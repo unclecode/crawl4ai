@@ -495,7 +495,11 @@ class AsyncWebCrawler:
                                 crawl_result.ssl_certificate = async_response.ssl_certificate
                                 crawl_result.network_requests = async_response.network_requests
                                 crawl_result.console_messages = async_response.console_messages
-                                crawl_result.success = bool(html)
+                                # Success when html is non-empty OR a binary
+                                # download was retrieved (PDFs, archives etc.
+                                # have empty html by design — file content is
+                                # in downloaded_files).
+                                crawl_result.success = bool(html) or bool(async_response.downloaded_files)
                                 crawl_result.session_id = getattr(config, "session_id", None)
                                 crawl_result.cache_status = "miss"
 
@@ -668,7 +672,9 @@ class AsyncWebCrawler:
                         timing=time.perf_counter() - start_time,
                         tag="COMPLETE"
                     )
-                    cached_result.success = bool(html)
+                    # Same binary-download awareness as the live-fetch path
+                    # — a cached PDF/archive should replay as success.
+                    cached_result.success = bool(html) or bool(getattr(cached_result, "downloaded_files", None))
                     cached_result.session_id = getattr(
                         config, "session_id", None)
                     # For raw: URLs, don't fall back to the raw HTML string as redirected_url
