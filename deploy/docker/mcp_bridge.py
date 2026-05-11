@@ -113,13 +113,41 @@ def attach_mcp(
                 return a
         return None
 
+    def _query_schema(fn: Callable) -> dict | None:
+        from fastapi import params as fp
+        import typing as _t
+        props, required = {}, []
+        _tmap = {str: "string", int: "integer", float: "number", bool: "boolean"}
+        for p in inspect.signature(fn).parameters.values():
+            d = p.default
+            if not isinstance(d, (fp.Query, fp.Path)):
+                continue
+            ann = p.annotation
+            if getattr(ann, "__origin__", None) is _t.Union:
+                ann = [a for a in ann.__args__ if a is not type(None)][0]
+            prop = {"type": _tmap.get(ann, "string")}
+            if getattr(d, "description", None):
+                prop["description"] = d.description
+            if d.default is not ...:
+                prop["default"] = d.default
+            else:
+                required.append(p.name)
+            props[p.name] = prop
+        if not props:
+            return None
+        schema = {"type": "object", "properties": props}
+        if required:
+            schema["required"] = required
+        return schema
+
     # MCP handlers
     @mcp.list_tools()
     async def _list_tools() -> List[t.Tool]:
         out = []
         for k, (proxy, orig_fn) in tools.items():
             desc   = getattr(orig_fn, "__mcp_description__", None) or inspect.getdoc(orig_fn) or ""
-            schema = getattr(orig_fn, "__mcp_schema__", None) or _schema(_body_model(orig_fn))
+            model = _body_model(orig_fn)
+            schema = getattr(orig_fn, "__mcp_schema__", None) or (_schema(model) if model else _query_schema(orig_fn)) or {"type": "object"}
             out.append(
                 t.Tool(name=k, description=desc, inputSchema=schema)
             )
