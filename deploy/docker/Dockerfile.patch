@@ -1,0 +1,20 @@
+ARG BASE_IMAGE=docker.1ms.run/unclecode/crawl4ai:latest
+FROM ${BASE_IMAGE}
+
+# Patch: fix Chinese characters being escaped (\uXXXX) in JSON output
+# Issue: json.dumps() defaults to ensure_ascii=True, which escapes non-ASCII chars
+
+# 1. mcp_bridge.py — MCP tool/resource responses
+#    _call_tool:   json.dumps(err)            → json.dumps(err, ensure_ascii=False)
+#    _call_tool:   json.dumps(res, default=str) → json.dumps(res, default=str, ensure_ascii=False)
+#    _read_resource: json.dumps(res, default=str) → json.dumps(res, default=str, ensure_ascii=False)
+RUN sed -i 's/json\.dumps(err)/json.dumps(err, ensure_ascii=False)/g' /app/mcp_bridge.py && \
+    sed -i 's/json\.dumps(res, default=str)/json.dumps(res, default=str, ensure_ascii=False)/g' /app/mcp_bridge.py
+
+# 2. api.py — stream_results() NDJSON output
+#    json.dumps(result_dict, default=datetime_handler) → ...ensure_ascii=False)
+#    json.dumps(error_response)                         → ...ensure_ascii=False)
+#    json.dumps({"status": "completed"})                → ...ensure_ascii=False)
+RUN sed -i 's/json\.dumps(result_dict, default=datetime_handler)/json.dumps(result_dict, default=datetime_handler, ensure_ascii=False)/g' /app/api.py && \
+    sed -i 's/json\.dumps(error_response)/json.dumps(error_response, ensure_ascii=False)/g' /app/api.py && \
+    sed -i 's/json\.dumps({"status": "completed"})/json.dumps({"status": "completed"}, ensure_ascii=False)/g' /app/api.py

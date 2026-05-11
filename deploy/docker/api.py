@@ -522,14 +522,14 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
                 if result_dict.get('pdf') is not None:
                     result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
                 logger.info(f"Streaming result for {result_dict.get('url', 'unknown')}")
-                data = json.dumps(result_dict, default=datetime_handler) + "\n"
+                data = json.dumps(result_dict, default=datetime_handler, ensure_ascii=False) + "\n"
                 yield data.encode('utf-8')
             except Exception as e:
                 logger.error(f"Serialization error: {e}")
                 error_response = {"error": str(e), "url": getattr(result, 'url', 'unknown')}
-                yield (json.dumps(error_response) + "\n").encode('utf-8')
+                yield (json.dumps(error_response, ensure_ascii=False) + "\n").encode('utf-8')
 
-        yield json.dumps({"status": "completed"}).encode('utf-8')
+        yield json.dumps({"status": "completed"}, ensure_ascii=False).encode('utf-8')
         
     except asyncio.CancelledError:
         logger.warning("Client disconnected during streaming")
