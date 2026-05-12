@@ -45,7 +45,10 @@ from utils import (
     validate_llm_provider,
     get_llm_temperature,
     get_llm_base_url,
-    get_redis_task_ttl
+    get_redis_task_ttl,
+    _deep_merge,
+    get_browser_config_dict,
+    get_run_config_dict,
 )
 from webhook import WebhookDeliveryService
 
@@ -306,20 +309,19 @@ async def handle_markdown_request(
         cache_mode = CacheMode.ENABLED if cache == "1" else CacheMode.WRITE_ONLY
 
         from crawler_pool import get_crawler, release_crawler
-        from utils import load_config as _load_config
-        _cfg = _load_config()
-        browser_cfg = BrowserConfig(
-            extra_args=_cfg["crawler"]["browser"].get("extra_args", []),
-            **_cfg["crawler"]["browser"].get("kwargs", {}),
+        browser_cfg = BrowserConfig.load(
+            _deep_merge(get_browser_config_dict(config), {})
         )
+        endpoint_overrides = {
+            "markdown_generator": md_generator,
+            "scraping_strategy": LXMLWebScrapingStrategy(),
+            "cache_mode": cache_mode,
+        }
+        run_dict = _deep_merge(get_run_config_dict(config), endpoint_overrides)
         crawler = await get_crawler(browser_cfg)
         result = await crawler.arun(
             url=decoded_url,
-            config=CrawlerRunConfig(
-                markdown_generator=md_generator,
-                scraping_strategy=LXMLWebScrapingStrategy(),
-                cache_mode=cache_mode
-            )
+            config=CrawlerRunConfig.load(run_dict)
         )
 
         if not result.success:
@@ -565,8 +567,12 @@ async def handle_crawl_request(
 
     try:
         urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
-        browser_config = BrowserConfig.load(browser_config)
-        crawler_config = CrawlerRunConfig.load(crawler_config)
+        browser_config = BrowserConfig.load(
+            _deep_merge(get_browser_config_dict(config), browser_config or {})
+        )
+        crawler_config = CrawlerRunConfig.load(
+            _deep_merge(get_run_config_dict(config), crawler_config or {})
+        )
 
         dispatcher = MemoryAdaptiveDispatcher(
             memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
@@ -590,7 +596,7 @@ async def handle_crawl_request(
                 hook_manager=hook_manager
             )
             logger.info(f"Hooks attachment status: {hooks_status['status']}")
-        
+
         base_config = config["crawler"]["base_config"]
 
         # Build the config(s) to pass to arun/arun_many
@@ -751,12 +757,19 @@ async def handle_stream_crawl_request(
     hooks_info = None
     crawler = None
     try:
-        browser_config = BrowserConfig.load(browser_config)
         # browser_config.verbose = True # Set to False or remove for production stress testing
+        browser_config = BrowserConfig.load(
+            _deep_merge(get_browser_config_dict(config), browser_config or {})
+        )
         browser_config.verbose = False
-        crawler_config = CrawlerRunConfig.load(crawler_config)
-        crawler_config.scraping_strategy = LXMLWebScrapingStrategy()
-        crawler_config.stream = True
+        endpoint_overrides = {
+            "scraping_strategy": LXMLWebScrapingStrategy(),
+            "stream": True,
+        }
+        merged_run = _deep_merge(get_run_config_dict(config), endpoint_overrides)
+        crawler_config = CrawlerRunConfig.load(
+            _deep_merge(merged_run, crawler_config or {})
+        )
 
         # Deep crawl streaming supports exactly one start URL
         if crawler_config.deep_crawl_strategy is not None and len(urls) != 1:

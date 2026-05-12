@@ -56,8 +56,14 @@ security:
 
 # Crawler Configuration
 crawler:
-  base_config:
+  run_config:
     simulate_user: true
+    word_count_threshold: 10
+    only_text: false
+    wait_until: "domcontentloaded"
+    page_timeout: 60000
+    process_iframes: false
+    verbose: false
   memory_threshold_percent: 95.0
   rate_limiter:
     enabled: true

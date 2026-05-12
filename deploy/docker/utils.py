@@ -60,7 +60,7 @@ DEFAULT_CONFIG = {
         },
     },
     "crawler": {
-        "base_config": {"simulate_user": True},
+        "run_config": {"simulate_user": True},
         "memory_threshold_percent": 95.0,
         "rate_limiter": {"enabled": True, "base_delay": [1.0, 2.0]},
         "timeouts": {"stream_init": 30.0, "batch_process": 300.0},
@@ -99,6 +99,21 @@ DEFAULT_CONFIG = {
         "headers": {"User-Agent": "Crawl4AI-Webhook/1.0"},
     },
 }
+
+
+def get_browser_config_dict(config: dict) -> dict:
+    """Extract browser config dict from the loaded config (kwargs + extra_args)."""
+    browser_section = config.get("crawler", {}).get("browser", {})
+    result = dict(browser_section.get("kwargs", {}))
+    if browser_section.get("extra_args"):
+        result["extra_args"] = browser_section["extra_args"]
+    return result
+
+
+def get_run_config_dict(config: dict) -> dict:
+    """Extract run config dict from the loaded config (supports both run_config and legacy base_config)."""
+    crawler = config.get("crawler", {})
+    return dict(crawler.get("run_config", crawler.get("base_config", {})))
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
