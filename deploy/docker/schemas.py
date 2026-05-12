@@ -6,8 +6,25 @@ from utils import FilterType
 
 class CrawlRequest(BaseModel):
     urls: List[str] = Field(min_length=1, max_length=100)
-    browser_config: Optional[Dict] = Field(default_factory=dict)
-    crawler_config: Optional[Dict] = Field(default_factory=dict)
+    browser_config: Optional[Dict] = Field(
+        default_factory=dict,
+        description="Optional BrowserConfig overrides (e.g. headless, user_agent, proxy, viewport)"
+    )
+    crawler_config: Optional[Dict] = Field(
+        default_factory=dict,
+        description=(
+            "Optional CrawlerRunConfig overrides. Key parameters: "
+            "wait_until ('load', 'domcontentloaded', 'networkidle', 'commit') — when to consider navigation done; "
+            "delay_before_return_html (float, seconds) — extra wait before capturing HTML, useful for SPAs; "
+            "cache_mode ('enabled', 'disabled', 'read_only', 'write_only', 'bypass') — cache behaviour; "
+            "js_code (str | list) — JavaScript to execute after page load; "
+            "wait_for (str) — CSS selector or JS expression to wait for before returning; "
+            "screenshot (bool) — capture a screenshot; pdf (bool) — generate a PDF; "
+            "extraction_strategy (dict) — structured extraction config; "
+            "markdown_generator (dict) — markdown generation config. "
+            "All CrawlerRunConfig fields are accepted; unknown keys are silently ignored."
+        )
+    )
     crawler_configs: Optional[List[Dict]] = Field(
         default=None,
         description=(
@@ -70,6 +87,12 @@ class MarkdownRequest(BaseModel):
     provider: Optional[str] = Field(None, description="LLM provider override (e.g., 'anthropic/claude-3-opus')")
     temperature: Optional[float] = Field(None, description="LLM temperature override (0.0-2.0)")
     base_url: Optional[str] = Field(None, description="LLM API base URL override")
+    crawler_config: Optional[Dict] = Field(
+        default_factory=dict,
+        description="Optional CrawlerRunConfig overrides (e.g. wait_until, delay_before_return_html, cache_mode). "
+                    "Takes precedence over the 'c' cache parameter when cache_mode is specified here. "
+                    "scraping_strategy is always set to LXMLWebScrapingStrategy by this endpoint and cannot be overridden."
+    )
 
 
 class RawCode(BaseModel):
@@ -77,16 +100,30 @@ class RawCode(BaseModel):
 
 class HTMLRequest(BaseModel):
     url: str
-    
+    crawler_config: Optional[Dict] = Field(
+        default_factory=dict,
+        description="Optional CrawlerRunConfig overrides (e.g. wait_until, delay_before_return_html, cache_mode)"
+    )
+
 class ScreenshotRequest(BaseModel):
     url: str
-    screenshot_wait_for: Optional[float] = 2
-    wait_for_images: Optional[bool] = False
+    screenshot_wait_for: Optional[float] = None
+    wait_for_images: Optional[bool] = None
     output_path: Optional[str] = None
+    crawler_config: Optional[Dict] = Field(
+        default_factory=dict,
+        description="Optional CrawlerRunConfig overrides (e.g. wait_until, delay_before_return_html, cache_mode). "
+                    "screenshot=True is always enforced."
+    )
 
 class PDFRequest(BaseModel):
     url: str
     output_path: Optional[str] = None
+    crawler_config: Optional[Dict] = Field(
+        default_factory=dict,
+        description="Optional CrawlerRunConfig overrides (e.g. wait_until, delay_before_return_html, cache_mode). "
+                    "pdf=True is always enforced."
+    )
 
 
 class JSEndpointRequest(BaseModel):
@@ -94,6 +131,11 @@ class JSEndpointRequest(BaseModel):
     scripts: List[str] = Field(
         ...,
         description="List of separated JavaScript snippets to execute"
+    )
+    crawler_config: Optional[Dict] = Field(
+        default_factory=dict,
+        description="Optional CrawlerRunConfig overrides (e.g. wait_until, delay_before_return_html, cache_mode). "
+                    "js_code is always set from the scripts parameter and cannot be overridden via crawler_config."
     )
 
 
