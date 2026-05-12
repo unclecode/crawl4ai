@@ -128,7 +128,8 @@
             opacity: 1;
         }
 
-        #adv-editor .CodeMirror {
+        #bc-editor .CodeMirror,
+        #cc-editor .CodeMirror {
             height: 100% !important;
         }
 
@@ -243,17 +244,10 @@
                 <!-- Advanced config for /crawl endpoints -->
                 <details id="adv-config" class="mb-4">
                     <summary class="text-sm text-secondary cursor-pointer">Advanced Config <span
-                        class="text-xs text-primary">(Python → auto‑JSON)</span></summary>
+                        class="text-xs text-primary">(Python → auto‑JSON, both configs sent together)</span></summary>
 
                     <!-- Toolbar -->
                     <div class="flex items-center justify-end space-x-3 mt-2">
-                        <label for="cfg-type" class="text-xs text-secondary">Type:</label>
-                        <select id="cfg-type"
-                                class="bg-dark border border-border rounded px-1 py-0.5 text-xs">
-                            <option value="CrawlerRunConfig">CrawlerRunConfig</option>
-                            <option value="BrowserConfig">BrowserConfig</option>
-                        </select>
-
                         <!-- help link -->
                         <a href="https://docs.crawl4ai.com/api/parameters/"
                            target="_blank"
@@ -266,12 +260,25 @@
                             </svg>
                             <span>Docs</span>
                         </a>
-
-                        <span id="cfg-status" class="text-xs text-secondary ml-2"></span>
                     </div>
 
-                    <!-- CodeMirror host -->
-                    <div id="adv-editor" class="mt-2 border border-border rounded overflow-auto" style="height: 160px; min-height: 160px; max-height: 500px; resize: vertical;"></div>
+                    <!-- Two editors side by side -->
+                    <div class="mt-2 grid grid-cols-1 lg:grid-cols-2 gap-2">
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs text-primary">BrowserConfig</span>
+                                <span id="bc-status" class="text-xs text-secondary"></span>
+                            </div>
+                            <div id="bc-editor" class="border border-border rounded overflow-auto" style="height: 160px; min-height: 120px; max-height: 500px; resize: vertical;"></div>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs text-primary">CrawlerRunConfig</span>
+                                <span id="cc-status" class="text-xs text-secondary"></span>
+                            </div>
+                            <div id="cc-editor" class="border border-border rounded overflow-auto" style="height: 160px; min-height: 120px; max-height: 500px; resize: vertical;"></div>
+                        </div>
+                    </div>
                 </details>
 
                 <div class="flex space-x-2">
@@ -452,11 +459,7 @@
         });
 
         // ================ ADVANCED CONFIG EDITOR ================
-        const cm = CodeMirror(document.getElementById('adv-editor'), {
-            value: `CrawlerRunConfig(
-    stream=True,
-    cache_mode=CacheMode.BYPASS,
-)`,
+        const cmOpts = {
             mode: 'python',
             lineNumbers: true,
             theme: 'darcula',
@@ -465,25 +468,25 @@
             matchBrackets: true,
             gutters: ["CodeMirror-linenumbers"],
             lineWrapping: true,
-        });
+        };
 
-        const TEMPLATES = {
-            CrawlerRunConfig: `CrawlerRunConfig(
-    stream=True,
-    cache_mode=CacheMode.BYPASS,
-)`,
-            BrowserConfig: `BrowserConfig(
+        const cmBC = CodeMirror(document.getElementById('bc-editor'), {
+            value: `BrowserConfig(
     headless=True,
     extra_args=[
         "--no-sandbox",
         "--disable-gpu",
     ],
 )`,
-        };
+            ...cmOpts,
+        });
 
-        document.getElementById('cfg-type').addEventListener('change', (e) => {
-            cm.setValue(TEMPLATES[e.target.value]);
-            document.getElementById('cfg-status').textContent = '';
+        const cmCC = CodeMirror(document.getElementById('cc-editor'), {
+            value: `CrawlerRunConfig(
+    stream=True,
+    cache_mode=CacheMode.BYPASS,
+)`,
+            ...cmOpts,
         });
         
         // Handle endpoint selection change to show appropriate options
@@ -513,9 +516,10 @@
             }
         });
 
-        async function pyConfigToJson() {
-            const code = cm.getValue().trim();
+        async function parseConfig(editor, statusId) {
+            const code = editor.getValue().trim();
             if (!code) return {};
+            const statusEl = document.getElementById(statusId);
 
             const res = await fetch('/config/dump', {
                 method: 'POST',
@@ -523,18 +527,24 @@
                 body: JSON.stringify({ code }),
             });
 
-            const statusEl = document.getElementById('cfg-status');
             if (!res.ok) {
                 const msg = await res.text();
-                statusEl.textContent = '✖ config error';
+                statusEl.textContent = '✖ error';
                 statusEl.className = 'text-xs text-red-400';
                 throw new Error(msg || 'Invalid config');
             }
 
             statusEl.textContent = '✓ parsed';
             statusEl.className = 'text-xs text-green-400';
-
             return await res.json();
+        }
+
+        async function parseBothConfigs() {
+            const [bcJson, ccJson] = await Promise.all([
+                parseConfig(cmBC, 'bc-status').catch(e => { throw new Error('BrowserConfig: ' + e.message); }),
+                parseConfig(cmCC, 'cc-status').catch(e => { throw new Error('CrawlerRunConfig: ' + e.message); }),
+            ]);
+            return { browser_config: bcJson, crawler_config: ccJson };
         }
 
         // ================ SERVER COMMUNICATION ================
@@ -615,23 +625,19 @@
         async function runCrawl() {
             const endpoint = document.getElementById('endpoint').value;
             const urls = document.getElementById('urls').value.trim().split(/\n/).filter(u => u);
-            // 1) grab python from CodeMirror, validate via /config/dump
+            // 1) parse both editors via /config/dump
             let advConfig = {};
             try {
-                const cfgJson = await pyConfigToJson(); // may throw
-                if (Object.keys(cfgJson).length) {
-                    const cfgType = document.getElementById('cfg-type').value;
-                    advConfig = cfgType === 'CrawlerRunConfig'
-                        ? { crawler_config: cfgJson }
-                        : { browser_config: cfgJson };
+                const parsed = await parseBothConfigs();
+                if (Object.keys(parsed.browser_config).length || Object.keys(parsed.crawler_config).length) {
+                    advConfig = parsed;
                 }
             } catch (err) {
-                const codeText = cm.getValue();
-                const streamFlag = /stream\s*=\s*True/i.test(codeText);
+                const ccText = cmCC.getValue();
+                const streamFlag = /stream\s*=\s*True/i.test(ccText);
                 const isCrawlEndpoint = document.getElementById('endpoint').value === 'crawl';
                 if (isCrawlEndpoint && streamFlag) {
-                    // Fallback: proceed with minimal config only for stream
-                    advConfig = { crawler_config: { stream: true } };
+                    advConfig = { browser_config: {}, crawler_config: { stream: true } };
                 } else {
                     updateStatus('error');
                     document.querySelector('#response-content code').textContent =
@@ -923,9 +929,10 @@
             // Save current scroll position (important for large code blocks)
             const scrollTop = element.parentElement.scrollTop;
 
-            // Reset the element
+            // Reset the element - escape HTML to prevent browser from
+            // parsing HTML tags in JSON response (e.g. <img src="...">)
             const text = element.textContent;
-            element.innerHTML = text;
+            element.textContent = text;
             element.removeAttribute('data-highlighted');
 
             // Reapply highlighting
