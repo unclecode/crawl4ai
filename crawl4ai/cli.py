@@ -1193,9 +1193,13 @@ Always return valid, properly formatted JSON."""
                 console.print(f"[green]Deep crawling enabled:[/green] {deep_crawl} strategy, max {max_pages} pages")
 
         config = get_global_config()
-        
-        browser_cfg.verbose = config.get("VERBOSE", False)
-        crawler_cfg.verbose = config.get("VERBOSE", False)
+
+        # Priority: CLI --verbose flag > global config > default (False)
+        global_verbose = config.get("VERBOSE", False)
+        effective_verbose = verbose if verbose else global_verbose
+
+        browser_cfg.verbose = effective_verbose
+        crawler_cfg.verbose = effective_verbose
 
         # Get JSON output config (priority: CLI flag > global config)
         if json_ensure_ascii is not None:

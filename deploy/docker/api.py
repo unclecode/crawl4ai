@@ -758,10 +758,9 @@ async def handle_stream_crawl_request(
     crawler = None
     try:
         # browser_config.verbose = True # Set to False or remove for production stress testing
-        browser_config = BrowserConfig.load(
-            _deep_merge(get_browser_config_dict(config), browser_config or {})
-        )
-        browser_config.verbose = False
+        merged_browser = _deep_merge(get_browser_config_dict(config), browser_config or {})
+        # logger.info(f"[stream] browser_config verbose={merged_browser.get('verbose', 'NOT SET')}")
+        browser_config = BrowserConfig.load(merged_browser)
         endpoint_overrides = {
             "scraping_strategy": LXMLWebScrapingStrategy(),
             "stream": True,

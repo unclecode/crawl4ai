@@ -6,6 +6,7 @@ import asyncio
 from typing import Optional, Dict
 from contextlib import asynccontextmanager
 import json
+import yaml
 from .models import CrawlResult, MarkdownGenerationResult, StringCompatibleMarkdown
 import aiofiles
 from .async_logger import AsyncLogger
@@ -33,9 +34,15 @@ class AsyncDatabaseManager:
         self.connection_semaphore = asyncio.Semaphore(pool_size)
         self._initialized = False
         self.version_manager = VersionManager()
+        _db_verbose = False
+        _config_file = Path.home() / ".crawl4ai" / "global.yml"
+        if _config_file.exists():
+            with open(_config_file) as _f:
+                _cfg = yaml.safe_load(_f) or {}
+                _db_verbose = _cfg.get("DB_VERBOSE", False)
         self.logger = AsyncLogger(
             log_file=os.path.join(base_directory, ".crawl4ai", "crawler_db.log"),
-            verbose=False,
+            verbose=_db_verbose,
             tag_width=10,
         )
 

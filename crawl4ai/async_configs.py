@@ -630,7 +630,7 @@ class BrowserConfig:
         ignore_https_errors: bool = True,
         java_script_enabled: bool = True,
         sleep_on_close: bool = False,
-        verbose: bool = True,
+        verbose: bool = False,
         cookies: list = None,
         headers: dict = None,
         user_agent: str = (
@@ -1486,7 +1486,7 @@ class CrawlerRunConfig():
         score_links: bool = False,
         preserve_https_for_internal_links: bool = False,
         # Debugging and Logging Parameters
-        verbose: bool = True,
+        verbose: bool = False,
         log_console: bool = False,
         # Network and Console Capturing Parameters
         capture_network_requests: bool = False,

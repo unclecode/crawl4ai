@@ -124,6 +124,11 @@ USER_SETTINGS = {
         "description": "Enable verbose output for all commands",
         "type": "boolean"
     },
+    "DB_VERBOSE": {
+        "default": False,
+        "description": "Enable verbose output for database operations",
+        "type": "boolean"
+    },
     "BROWSER_HEADLESS": {
         "default": True,
         "description": "Run browser in headless mode by default",

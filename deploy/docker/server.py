@@ -878,7 +878,7 @@ def chunk_doc_sections(doc: str) -> List[str]:
 async def get_context(
     request: Request,
     _td: Dict = Depends(token_dep),
-    context_type: str = Query("all", regex="^(code|doc|all)$"),
+    context_type: str = Query("all", pattern="^(code|doc|all)$"),
     query: Optional[str] = Query(
         None, description="search query to filter chunks"),
     score_ratio: float = Query(

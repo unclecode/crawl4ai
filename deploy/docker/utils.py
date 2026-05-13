@@ -107,13 +107,22 @@ def get_browser_config_dict(config: dict) -> dict:
     result = dict(browser_section.get("kwargs", {}))
     if browser_section.get("extra_args"):
         result["extra_args"] = browser_section["extra_args"]
+    # Include crawler-level verbose
+    crawler_verbose = config.get("crawler", {}).get("verbose")
+    if crawler_verbose is not None:
+        result["verbose"] = crawler_verbose
     return result
 
 
 def get_run_config_dict(config: dict) -> dict:
     """Extract run config dict from the loaded config (supports both run_config and legacy base_config)."""
     crawler = config.get("crawler", {})
-    return dict(crawler.get("run_config", crawler.get("base_config", {})))
+    result = dict(crawler.get("run_config", crawler.get("base_config", {})))
+    # Include crawler-level verbose (overrides run_config.verbose if present)
+    crawler_verbose = crawler.get("verbose")
+    if crawler_verbose is not None:
+        result["verbose"] = crawler_verbose
+    return result
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
