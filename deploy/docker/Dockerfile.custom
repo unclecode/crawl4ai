@@ -1,0 +1,34 @@
+# ============================================================
+# Build a custom Crawl4AI image based on the official one,
+# replacing ALL code from your GitHub fork.
+#
+# No local files needed — everything comes from GitHub.
+#
+# Usage (from any directory):
+#   docker build -t crawl4ai-custom:latest \
+#       -f deploy/docker/Dockerfile.custom .
+# ============================================================
+
+ARG BASE_IMAGE=docker.1ms.run/unclecode/crawl4ai:latest
+FROM ${BASE_IMAGE}
+
+USER root
+
+ARG GITHUB_REPO=https://github.com/wchy1128/crawl4ai.git
+ARG GITHUB_BRANCH=main
+
+# 1. Clone your fork
+RUN git clone --depth 1 --branch ${GITHUB_BRANCH} ${GITHUB_REPO} /tmp/crawl4ai
+
+# 2. Reinstall the crawl4ai library
+RUN pip install --no-cache-dir /tmp/crawl4ai && \
+    python -c "import crawl4ai; print('crawl4ai library OK')"
+
+# 3. Replace all server-side code (same as official: COPY deploy/docker/* /app/)
+RUN cp -r /tmp/crawl4ai/deploy/docker/* /app/ && \
+    rm -rf /tmp/crawl4ai
+
+# 4. Fix ownership — official image runs as appuser
+RUN chown -R appuser:appuser /app
+
+USER appuser
