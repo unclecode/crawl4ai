@@ -539,6 +539,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         captured_requests = []
         captured_console = []
 
+        # Track latest document-level response status for same-domain requests.
+        # Some sites (e.g., Zhihu) return 403 initially but JS challenge passes
+        # and triggers a client-side navigation that returns 200.
+        _js_nav_status = None
+        _js_nav_url = None
+
         # Handle user agent with magic mode.
         # For persistent contexts the UA is locked at browser launch time
         # (launch_persistent_context bakes it into the protocol layer), so
@@ -613,6 +619,22 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             # Call hook after page creation
             await self.execute_hook("on_page_context_created", page, context=context, config=config)
+
+            # Lightweight listener: track same-domain document-level responses
+            # after goto. Used to detect JS-triggered navigations that may
+            # return a different status code than the initial goto.
+            _target_domain = urlparse(url).hostname
+            async def _track_js_nav_response(response):
+                nonlocal _js_nav_status, _js_nav_url
+                try:
+                    if response.request.resource_type == "document":
+                        resp_host = urlparse(response.url).hostname
+                        if resp_host == _target_domain:
+                            _js_nav_status = response.status
+                            _js_nav_url = response.url
+                except Exception:
+                    pass
+            page.on("response", _track_js_nav_response)
 
             # Network Request Capturing
             if config.capture_network_requests:
@@ -1140,6 +1162,31 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # instead of using page.url which would be "about:blank".
             ###
             is_local_content = url.startswith("file://") or url.startswith("raw://") or url.startswith("raw:")
+
+            # ──────────────────────────────────────────────────────────────
+            # Post-JS status code correction.
+            # Some sites (e.g., Zhihu) return 403 with a JS challenge page
+            # initially. After the browser executes the challenge, it triggers
+            # a same-domain document navigation that returns the real status
+            # code. Use that instead of the stale initial goto() status.
+            # ──────────────────────────────────────────────────────────────
+            if status_code in (403, 503) and _js_nav_status is not None:
+                if _js_nav_status != status_code:
+                    status_code = _js_nav_status
+                    response_headers = dict(response_headers)
+
+            # Verbose diagnostics: log final status code resolution
+            if self.browser_config.verbose and not is_local_content:
+                self.logger.info(
+                    message="Response status: {status} (redirected={redirected}, js_nav={js_nav}) for {url}",
+                    tag="STATUS",
+                    params={
+                        "status": status_code,
+                        "redirected": redirected_status_code,
+                        "js_nav": _js_nav_status,
+                        "url": url[:80],
+                    },
+                )
             if not is_local_content:
                 redirected_url = page.url  # Use current page URL to capture JS redirects
             

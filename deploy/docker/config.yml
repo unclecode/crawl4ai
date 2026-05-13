@@ -92,6 +92,8 @@ crawler:
     process_iframes: false
     magic: true
     remove_overlay_elements: true
+    delay_before_return_html: 1.0
+    override_navigator: true
 
 # Logging Configuration
 logging:

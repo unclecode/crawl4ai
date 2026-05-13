@@ -629,6 +629,12 @@ class AsyncWebCrawler:
                             _blocked, _block_reason = is_blocked(
                                 crawl_result.status_code, crawl_result.html or "")
                             if _blocked:
+                                if config.verbose:
+                                    self.logger.info(
+                                        message="Anti-bot blocked: reason={reason}, status={status}, url={url}",
+                                        tag="ANTIBOT",
+                                        params={"reason": _block_reason, "status": crawl_result.status_code, "url": url[:80]},
+                                    )
                                 crawl_result.success = False
                                 crawl_result.error_message = f"Blocked by anti-bot protection: {_block_reason}"
                         crawl_result.crawl_stats = _crawl_stats
