@@ -254,6 +254,20 @@ class AsyncWebCrawler:
             try:
                 self.logger.verbose = config.verbose
 
+                if config.verbose:
+                    import json as _json
+                    bc_dict = self.browser_config.to_dict() if hasattr(self.browser_config, 'to_dict') else vars(self.browser_config)
+                    cc_dict = config.to_dict() if hasattr(config, 'to_dict') else vars(config)
+                    self.logger.info(
+                        message="Crawling {url}\n  BrowserConfig: {browser_config}\n  CrawlerRunConfig: {crawler_config}",
+                        tag="CRAWL",
+                        params={
+                            "url": url,
+                            "browser_config": _json.dumps({k: str(v) for k, v in bc_dict.items()}, default=str, ensure_ascii=False),
+                            "crawler_config": _json.dumps({k: str(v) for k, v in cc_dict.items()}, default=str, ensure_ascii=False),
+                        },
+                    )
+
                 # Default to ENABLED if no cache mode specified
                 if config.cache_mode is None:
                     config.cache_mode = CacheMode.ENABLED

@@ -194,6 +194,15 @@ app.mount(
     name="play",
 )
 
+# ── static playground2 (HTML preview) ───────────────────────
+PLAYGROUND2_DIR = pathlib.Path(__file__).parent / "static" / "playground2"
+if PLAYGROUND2_DIR.exists():
+    app.mount(
+        "/playground2",
+        StaticFiles(directory=PLAYGROUND2_DIR, html=True),
+        name="play2",
+    )
+
 # ── static monitor dashboard ────────────────────────────────
 MONITOR_DIR = pathlib.Path(__file__).parent / "static" / "monitor"
 if not MONITOR_DIR.exists():
@@ -383,7 +392,16 @@ def _safe_eval_config(expr: str) -> dict:
 
     obj = eval(compile(tree, "<config>", "eval"),
                {"__builtins__": {}}, safe_env)
-    return obj.dump()
+
+    # Extract only the keyword args the user actually wrote in the editor.
+    # This preserves user intent even when the value equals the class default
+    # (e.g. stream=False), which obj.dump() would silently drop.
+    from crawl4ai.async_configs import to_serializable_dict
+    user_keys = [kw.arg for kw in call.keywords if kw.arg]
+    flat = {}
+    for k in user_keys:
+        flat[k] = to_serializable_dict(getattr(obj, k))
+    return flat
 
 
 # ── job router ──────────────────────────────────────────────
@@ -757,8 +775,9 @@ async def crawl(
     if crawl_request.hooks and not HOOKS_ENABLED:
         raise HTTPException(403, "Hooks are disabled. Set CRAWL4AI_HOOKS_ENABLED=true to enable.")
     # Check whether it is a redirection for a streaming request
-    crawler_config = CrawlerRunConfig.load(crawl_request.crawler_config)
-    if crawler_config.stream:
+    # Merge with server defaults (e.g. stream: true from config.yml) before checking
+    merged_run = _deep_merge(get_default_run_config_dict(), crawl_request.crawler_config or {})
+    if merged_run.get("stream", False):
         return await stream_process(crawl_request=crawl_request)
     
     # Prepare hooks config if provided

@@ -138,6 +138,17 @@
             background-color: rgba(78, 255, 255, 0.2) !important;
             transition: background-color 0.5s ease;
         }
+
+        /* HTML Preview sub-tab styles */
+        .html-subtab-btn.active {
+            background-color: #202020;
+            color: #4EFFFF;
+            border-bottom: 2px solid #4EFFFF;
+        }
+
+        #html-preview-iframe {
+            border-radius: 4px;
+        }
     </style>
 </head>
 
@@ -315,6 +326,7 @@
         <section class="bg-surface rounded-lg border border-border overflow-hidden flex-1 flex flex-col">
             <div class="border-b border-border flex">
                 <button data-tab="response" class="tab-btn active px-4 py-2 border-r border-border">Response</button>
+                <button data-tab="html" class="tab-btn px-4 py-2 border-r border-border text-secondary opacity-50 cursor-not-allowed" disabled>HTML</button>
                 <button data-tab="python" class="tab-btn px-4 py-2 border-r border-border">Python</button>
                 <button data-tab="curl" class="tab-btn px-4 py-2">cURL</button>
             </div>
@@ -328,6 +340,94 @@
                         </button>
                     </div>
                     <pre id="response-content" class="p-4 text-sm h-full"><code class="json hljs">{}</code></pre>
+                </div>
+
+                <!-- HTML Preview Tab -->
+                <div class="tab-content hidden h-full">
+                    <span id="html-content" class="hidden"></span>
+                    <!-- URL Selector (multi-URL results) -->
+                    <div id="html-url-selector" class="hidden border-b border-border px-4 py-2 flex items-center gap-2">
+                        <label class="text-xs text-secondary">Result:</label>
+                        <select id="html-result-select" class="bg-dark border border-border rounded px-2 py-1 text-xs flex-1"></select>
+                    </div>
+
+                    <!-- Sub-tab bar -->
+                    <div class="border-b border-border flex">
+                        <button data-subtab="preview" class="html-subtab-btn active px-3 py-1.5 text-xs border-r border-border text-primary">Preview</button>
+                        <button data-subtab="source" class="html-subtab-btn px-3 py-1.5 text-xs border-r border-border">Source</button>
+                        <button data-subtab="diagnosis" class="html-subtab-btn px-3 py-1.5 text-xs">Diagnosis</button>
+                    </div>
+
+                    <!-- Preview (iframe) -->
+                    <div id="html-preview-panel" class="html-subtab-content h-full" style="min-height: 300px;">
+                        <div id="html-preview-empty" class="flex items-center justify-center h-full text-secondary text-sm">
+                            Run a crawl to preview HTML content
+                        </div>
+                        <iframe id="html-preview-iframe" class="w-full border-0 hidden"
+                            style="min-height: 500px; background: #fff;"
+                            sandbox="" referrerpolicy="no-referrer"></iframe>
+                    </div>
+
+                    <!-- Source (raw HTML) -->
+                    <div id="html-source-panel" class="html-subtab-content hidden h-full">
+                        <div class="absolute right-2 top-2">
+                            <button class="copy-btn bg-surface border border-border rounded px-2 py-1 text-xs hover:bg-dark"
+                                data-target="#html-source-code">Copy</button>
+                        </div>
+                        <pre id="html-source-code" class="p-4 text-sm h-full overflow-auto" style="max-height: 600px;"><code class="xml hljs"></code></pre>
+                    </div>
+
+                    <!-- Diagnosis -->
+                    <div id="html-diagnosis-panel" class="html-subtab-content hidden h-full overflow-auto p-4 space-y-3" style="max-height: 600px;">
+                        <div id="html-diagnosis-empty" class="flex items-center justify-center h-full text-secondary text-sm">
+                            Run a crawl to see diagnosis info
+                        </div>
+                        <div id="html-diagnosis-content" class="hidden space-y-3">
+                            <!-- Status & Size -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <div class="bg-dark border border-border rounded p-2">
+                                    <div class="text-xs text-secondary mb-1">HTTP Status</div>
+                                    <div id="diag-status" class="text-sm font-bold"></div>
+                                </div>
+                                <div class="bg-dark border border-border rounded p-2">
+                                    <div class="text-xs text-secondary mb-1">HTML Size</div>
+                                    <div id="diag-html-size" class="text-sm"></div>
+                                </div>
+                            </div>
+                            <!-- URLs -->
+                            <div class="bg-dark border border-border rounded p-2">
+                                <div class="text-xs text-secondary mb-1">URL Redirect</div>
+                                <div class="text-sm">
+                                    <span class="text-secondary">Requested:</span>
+                                    <span id="diag-url" class="text-light ml-1 break-all"></span>
+                                </div>
+                                <div class="text-sm mt-1" id="diag-redirect-row">
+                                    <span class="text-secondary">Final:</span>
+                                    <span id="diag-redirected-url" class="text-accent ml-1 break-all"></span>
+                                </div>
+                            </div>
+                            <!-- Page Title -->
+                            <div class="bg-dark border border-border rounded p-2">
+                                <div class="text-xs text-secondary mb-1">Page Title</div>
+                                <div id="diag-title" class="text-sm text-primary"></div>
+                            </div>
+                            <!-- Error -->
+                            <div id="diag-error-row" class="hidden bg-dark border border-red-500 rounded p-2">
+                                <div class="text-xs text-red-400 mb-1">Error</div>
+                                <div id="diag-error" class="text-sm text-red-300"></div>
+                            </div>
+                            <!-- Headers -->
+                            <div class="bg-dark border border-border rounded p-2">
+                                <div class="text-xs text-secondary mb-1">Response Headers</div>
+                                <pre id="diag-headers" class="text-xs text-light overflow-auto max-h-48 whitespace-pre-wrap"></pre>
+                            </div>
+                            <!-- Anti-crawl -->
+                            <div class="bg-dark border border-border rounded p-2">
+                                <div class="text-xs text-secondary mb-1">Anti-Crawl Indicators</div>
+                                <div id="diag-anticrawl" class="text-xs space-y-1"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Python Tab -->
@@ -412,6 +512,8 @@
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
+                if (btn.disabled) return;
+
                 document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
 
@@ -425,6 +527,28 @@
                     forceHighlightElement(activeCode);
                 }
             });
+        });
+
+        // HTML sub-tab switching
+        document.querySelectorAll('.html-subtab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.html-subtab-btn').forEach(b => {
+                    b.classList.remove('active', 'text-primary');
+                });
+                document.querySelectorAll('.html-subtab-content').forEach(c => c.classList.add('hidden'));
+
+                btn.classList.add('active', 'text-primary');
+                const panelId = `html-${btn.dataset.subtab}-panel`;
+                document.getElementById(panelId).classList.remove('hidden');
+            });
+        });
+
+        // URL selector for multi-result HTML preview
+        document.getElementById('html-result-select').addEventListener('change', (e) => {
+            const index = parseInt(e.target.value);
+            if (lastCrawlResults && lastCrawlResults[index]) {
+                renderHtmlPreview(lastCrawlResults[index]);
+            }
         });
 
         // View switching
@@ -450,6 +574,10 @@
         // Initialize clipboard and highlight.js
         new ClipboardJS('#export-btn');
         hljs.highlightAll();
+
+        // Global state for HTML Preview tab
+        let lastCrawlResults = null;
+        let lastEndpoint = null;
 
         // Keyboard shortcut
         window.addEventListener('keydown', e => {
@@ -513,6 +641,13 @@
             } else {
                 // For /crawl endpoints, show the advanced config
                 advConfig.classList.remove('hidden');
+            }
+
+            // Update HTML tab availability
+            if (!['crawl', 'crawl_stream'].includes(endpoint)) {
+                lastEndpoint = endpoint;
+                lastCrawlResults = null;
+                updateHtmlTabState();
             }
         });
 
@@ -711,6 +846,9 @@
                     document.querySelector('#response-content code').textContent = JSON.stringify(responseData, null, 2);
                     document.querySelector('#response-content code').className = 'json hljs';
                     forceHighlightElement(document.querySelector('#response-content code'));
+                    lastEndpoint = endpoint;
+                    lastCrawlResults = null;
+                    updateHtmlTabState();
                 } else if (endpoint === 'crawl_stream' || useStreamOverride) {
                     // Stream processing - now handled directly by /crawl endpoint
                     response = await fetch(api, {
@@ -750,6 +888,14 @@
                     document.querySelector('#response-content code').textContent = text;
                     document.querySelector('#response-content code').className = 'json hljs'; // Reset classes
                     forceHighlightElement(document.querySelector('#response-content code'));
+                    lastEndpoint = endpoint;
+                    try {
+                        lastCrawlResults = text.trim().split('\n')
+                            .filter(l => l.trim())
+                            .map(l => JSON.parse(l))
+                            .filter(obj => obj.url || obj.html);
+                    } catch(e) { lastCrawlResults = null; }
+                    populateHtmlTab();
                 } else {
                     // Regular request (handles /crawl and /md)
                     response = await fetch(api, {
@@ -776,6 +922,9 @@
                     document.querySelector('#response-content code').textContent = JSON.stringify(responseData, null, 2);
                     document.querySelector('#response-content code').className = 'json hljs'; // Ensure class is set
                     forceHighlightElement(document.querySelector('#response-content code'));
+                    lastEndpoint = endpoint;
+                    lastCrawlResults = responseData.results || null;
+                    populateHtmlTab();
                 }
 
                 forceHighlightElement(document.querySelector('#response-content code'));
@@ -799,6 +948,9 @@
                     2
                 );
                 forceHighlightElement(document.querySelector('#response-content code'));
+                lastEndpoint = document.getElementById('endpoint').value;
+                lastCrawlResults = null;
+                updateHtmlTabState();
             }
         }
 
@@ -922,6 +1074,180 @@
         // Event listeners
         document.getElementById('run-btn').addEventListener('click', runCrawl);
         document.getElementById('st-run').addEventListener('click', runStressTest);
+
+        // ================ HTML PREVIEW FUNCTIONS ================
+
+        function renderHtmlPreview(result) {
+            if (!result) return;
+
+            const htmlContent = result.html || '';
+            const statusCode = result.status_code;
+            const responseHeaders = result.response_headers || {};
+            const requestedUrl = result.url || '';
+            const redirectedUrl = result.redirected_url || '';
+            const errorMessage = result.error_message || '';
+
+            // --- Preview ---
+            const iframe = document.getElementById('html-preview-iframe');
+            const emptyPreview = document.getElementById('html-preview-empty');
+            if (htmlContent) {
+                iframe.classList.remove('hidden');
+                emptyPreview.classList.add('hidden');
+                iframe.srcdoc = htmlContent;
+            } else {
+                iframe.classList.add('hidden');
+                emptyPreview.classList.remove('hidden');
+                emptyPreview.textContent = 'No HTML content available';
+            }
+
+            // --- Source ---
+            const sourceCodeEl = document.querySelector('#html-source-code code');
+            sourceCodeEl.textContent = htmlContent || '(empty)';
+            sourceCodeEl.className = 'xml hljs';
+            forceHighlightElement(sourceCodeEl);
+
+            // --- Diagnosis ---
+            document.getElementById('html-diagnosis-empty').classList.add('hidden');
+            document.getElementById('html-diagnosis-content').classList.remove('hidden');
+
+            // Status code
+            const statusEl = document.getElementById('diag-status');
+            statusEl.textContent = statusCode != null ? statusCode : 'N/A';
+            statusEl.className = 'text-sm font-bold ' + (
+                statusCode >= 200 && statusCode < 300 ? 'text-green-400' :
+                statusCode >= 300 && statusCode < 400 ? 'text-yellow-400' :
+                statusCode >= 400 ? 'text-red-400' : 'text-secondary'
+            );
+
+            // HTML size
+            const htmlSize = new Blob([htmlContent]).size;
+            document.getElementById('diag-html-size').textContent =
+                htmlSize > 1024 ? (htmlSize / 1024).toFixed(1) + ' KB' : htmlSize + ' bytes';
+
+            // URLs
+            document.getElementById('diag-url').textContent = requestedUrl;
+            const redirectRow = document.getElementById('diag-redirect-row');
+            if (redirectedUrl && redirectedUrl !== requestedUrl) {
+                redirectRow.classList.remove('hidden');
+                document.getElementById('diag-redirected-url').textContent = redirectedUrl;
+            } else {
+                redirectRow.classList.add('hidden');
+            }
+
+            // Page title
+            const titleMatch = htmlContent.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+            document.getElementById('diag-title').textContent =
+                titleMatch ? titleMatch[1].trim() : '(no title found)';
+
+            // Error
+            const errorRow = document.getElementById('diag-error-row');
+            if (errorMessage) {
+                errorRow.classList.remove('hidden');
+                document.getElementById('diag-error').textContent = errorMessage;
+            } else {
+                errorRow.classList.add('hidden');
+            }
+
+            // Response headers
+            const headersPre = document.getElementById('diag-headers');
+            headersPre.textContent = Object.entries(responseHeaders)
+                .map(([k, v]) => `${k}: ${v}`).join('\n') || '(none)';
+
+            // Anti-crawl indicators
+            const anticrawlEl = document.getElementById('diag-anticrawl');
+            const indicators = [];
+            const htmlLower = htmlContent.toLowerCase();
+
+            if (responseHeaders['cf-ray'] || (responseHeaders['server'] || '').toLowerCase().includes('cloudflare')) {
+                indicators.push({ label: 'Cloudflare Detected', color: 'text-yellow-400', detail: `CF-Ray: ${responseHeaders['cf-ray'] || 'N/A'}` });
+            }
+
+            const botHeaders = Object.keys(responseHeaders).filter(k =>
+                k.toLowerCase().startsWith('x-') || k.toLowerCase().includes('captcha') || k.toLowerCase().includes('bot')
+            );
+            if (botHeaders.length) {
+                indicators.push({ label: 'Anti-Bot Headers', color: 'text-yellow-400', detail: botHeaders.join(', ') });
+            }
+
+            if (redirectedUrl && redirectedUrl !== requestedUrl) {
+                indicators.push({ label: 'URL Redirected', color: 'text-yellow-400', detail: `${requestedUrl} → ${redirectedUrl}` });
+            }
+
+            const captchaKws = ['captcha', 'recaptcha', 'hcaptcha', 'turnstile', 'challenge-platform', 'cf-challenge'];
+            const foundCaptcha = captchaKws.filter(kw => htmlLower.includes(kw));
+            if (foundCaptcha.length) {
+                indicators.push({ label: 'CAPTCHA Detected', color: 'text-red-400', detail: foundCaptcha.join(', ') });
+            }
+
+            const loginKws = ['login', 'sign in', 'sign-in', 'signin', 'auth/login', 'authenticate'];
+            const foundLogin = loginKws.filter(kw => htmlLower.includes(kw));
+            if (foundLogin.length && statusCode === 200) {
+                indicators.push({ label: 'Possible Login Wall', color: 'text-yellow-400', detail: `Keywords: ${foundLogin.join(', ')}` });
+            }
+
+            if (htmlSize < 500 && statusCode === 200) {
+                indicators.push({ label: 'Suspiciously Small Page', color: 'text-yellow-400', detail: `${htmlSize} bytes` });
+            }
+
+            if (statusCode >= 400) {
+                indicators.push({ label: `HTTP ${statusCode} Error`, color: 'text-red-400', detail: responseHeaders['server'] || 'Unknown server' });
+            }
+
+            if (indicators.length === 0) {
+                anticrawlEl.innerHTML = '<div class="text-green-400">No obvious anti-crawl indicators detected</div>';
+            } else {
+                anticrawlEl.innerHTML = indicators.map(ind =>
+                    `<div class="flex items-start gap-2"><span class="${ind.color} font-bold">!</span><div><span class="${ind.color} font-medium">${ind.label}</span><div class="text-secondary">${ind.detail}</div></div></div>`
+                ).join('');
+            }
+        }
+
+        function updateHtmlTabState() {
+            const htmlTabBtn = document.querySelector('[data-tab="html"]');
+            const isCrawl = (lastEndpoint === 'crawl' || lastEndpoint === 'crawl_stream');
+            const hasResults = lastCrawlResults && lastCrawlResults.length > 0;
+
+            if (isCrawl && hasResults) {
+                htmlTabBtn.disabled = false;
+                htmlTabBtn.classList.remove('text-secondary', 'opacity-50', 'cursor-not-allowed');
+                htmlTabBtn.classList.add('text-light');
+            } else {
+                htmlTabBtn.disabled = true;
+                htmlTabBtn.classList.add('text-secondary', 'opacity-50', 'cursor-not-allowed');
+                htmlTabBtn.classList.remove('text-light');
+
+                if (htmlTabBtn.classList.contains('active')) {
+                    htmlTabBtn.classList.remove('active');
+                    document.querySelector('[data-tab="response"]').classList.add('active');
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+                    document.querySelector('#response-content').parentElement.classList.remove('hidden');
+                }
+            }
+        }
+
+        function populateHtmlTab() {
+            updateHtmlTabState();
+            if (!lastCrawlResults || lastCrawlResults.length === 0) return;
+
+            const selectEl = document.getElementById('html-result-select');
+            const selectorRow = document.getElementById('html-url-selector');
+
+            selectEl.innerHTML = '';
+            if (lastCrawlResults.length > 1) {
+                selectorRow.classList.remove('hidden');
+                lastCrawlResults.forEach((result, i) => {
+                    const opt = document.createElement('option');
+                    opt.value = i;
+                    opt.textContent = result.url || `Result ${i + 1}`;
+                    selectEl.appendChild(opt);
+                });
+            } else {
+                selectorRow.classList.add('hidden');
+            }
+
+            renderHtmlPreview(lastCrawlResults[0]);
+            initCopyButtons();
+        }
 
         function forceHighlightElement(element) {
             if (!element) return;

@@ -57,14 +57,6 @@ security:
 # Crawler Configuration
 crawler:
   verbose: true
-  run_config:
-    simulate_user: true
-    word_count_threshold: 10
-    only_text: false
-    wait_until: "domcontentloaded"
-    page_timeout: 60000
-    process_iframes: false
-    magic: false
   memory_threshold_percent: 95.0
   rate_limiter:
     enabled: true
@@ -78,7 +70,9 @@ crawler:
   browser:
     kwargs:
       headless: true
-      text_mode: true
+      text_mode: false
+      enable_stealth: true
+      user_agent_mode: "random"
     extra_args:
       # - "--single-process"
       - "--no-sandbox"
@@ -88,6 +82,16 @@ crawler:
       - "--disable-web-security"
       - "--allow-insecure-localhost"
       - "--ignore-certificate-errors"
+  run_config:
+    stream: false
+    simulate_user: true
+    word_count_threshold: 10
+    only_text: false
+    wait_until: "load"
+    page_timeout: 60000
+    process_iframes: false
+    magic: true
+    remove_overlay_elements: true
 
 # Logging Configuration
 logging:
