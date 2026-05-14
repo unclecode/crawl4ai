@@ -116,6 +116,7 @@ def attach_mcp(
     def _query_schema(fn: Callable) -> dict | None:
         from fastapi import params as fp
         import typing as _t
+        import re as _re
         props, required = {}, []
         _tmap = {str: "string", int: "integer", float: "number", bool: "boolean"}
         for p in inspect.signature(fn).parameters.values():
@@ -123,9 +124,24 @@ def attach_mcp(
             if not isinstance(d, (fp.Query, fp.Path)):
                 continue
             ann = p.annotation
-            if getattr(ann, "__origin__", None) is _t.Union:
+            is_optional = getattr(ann, "__origin__", None) is _t.Union and type(None) in ann.__args__
+            if is_optional:
                 ann = [a for a in ann.__args__ if a is not type(None)][0]
             prop = {"type": _tmap.get(ann, "string")}
+            # Extract constraints from Pydantic v2 metadata entries
+            # Pydantic v2 stores ge/le/pattern etc. inside FieldInfo.metadata list
+            for meta in getattr(d, "metadata", []) or []:
+                # pattern → enum (if it's a simple alternation like "^(a|b|c)$")
+                pat = getattr(meta, "pattern", None)
+                if pat and isinstance(pat, str):
+                    m = _re.match(r"^\^\((.+)\)\$$", pat)
+                    if m:
+                        prop["enum"] = [v.strip() for v in m.group(1).split("|")]
+                # ge/le/gt/lt → JSON Schema range constraints
+                for attr, key in [("ge", "minimum"), ("le", "maximum"), ("gt", "exclusiveMinimum"), ("lt", "exclusiveMaximum")]:
+                    val = getattr(meta, attr, None)
+                    if val is not None:
+                        prop[key] = val
             if getattr(d, "description", None):
                 prop["description"] = d.description
             if d.default is not ...:
