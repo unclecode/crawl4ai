@@ -294,10 +294,10 @@ class TestCrawlerRunConfigDefaults:
         cfg = CrawlerRunConfig()
         assert cfg.screenshot is False
 
-    def test_verbose_default_true(self):
-        """Verbose should be on by default."""
+    def test_verbose_default_false(self):
+        """Verbose should be off by default."""
         cfg = CrawlerRunConfig()
-        assert cfg.verbose is True
+        assert cfg.verbose is False
 
 
 class TestCrawlerRunConfigRoundtrip:
