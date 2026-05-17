@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Optional, Dict, Any, List
 import os
+import sys
 from datetime import datetime
 from urllib.parse import unquote
 from rich.console import Console
@@ -118,6 +119,7 @@ class AsyncLogger(AsyncLoggerBase):
         icons: Optional[Dict[str, str]] = None,
         colors: Optional[Dict[LogLevel, LogColor]] = None,
         verbose: bool = True,
+        console: Optional[Console] = None,
     ):
         """
         Initialize the logger.
@@ -129,6 +131,7 @@ class AsyncLogger(AsyncLoggerBase):
             icons: Custom icons for different tags
             colors: Custom colors for different log levels
             verbose: Whether to output to console
+            console: Optional Rich console for log output. Defaults to stderr.
         """
         self.log_file = log_file
         self.log_level = log_level
@@ -136,7 +139,7 @@ class AsyncLogger(AsyncLoggerBase):
         self.icons = icons or self.DEFAULT_ICONS
         self.colors = colors or self.DEFAULT_COLORS
         self.verbose = verbose
-        self.console = Console()
+        self.console = console or Console(file=sys.stderr)
 
         # Create log file directory if needed
         if log_file:
