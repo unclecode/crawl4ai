@@ -115,8 +115,9 @@
     font-family: var(--font-primary);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
     width: 320px;
+    max-height: 500px;
     color: #e8e9ed;
-    overflow: hidden;
+    overflow-y: auto;
     pointer-events: auto; /* Ensure clicks work */
 }
 
