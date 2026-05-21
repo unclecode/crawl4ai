@@ -1118,6 +1118,8 @@ class CrawlerRunConfig():
                                          If None, scrolls until the entire page is loaded. Default: None.
         process_iframes (bool): If True, attempts to process and inline iframe content.
                                 Default: False.
+        follow_frames (bool): If True, returns child frame content for single-frame framesets.
+                              Default: True.
         remove_overlay_elements (bool): If True, remove overlays/popups before extracting HTML.
                                         Default: False.
         simulate_user (bool): If True, simulate user interactions (mouse moves, clicks) for anti-bot measures.
@@ -1279,6 +1281,7 @@ class CrawlerRunConfig():
         scroll_delay: float = 0.2,
         max_scroll_steps: Optional[int] = None,
         process_iframes: bool = False,
+        follow_frames: bool = True,
         remove_overlay_elements: bool = False,
         simulate_user: bool = False,
         override_navigator: bool = False,
@@ -1406,6 +1409,7 @@ class CrawlerRunConfig():
         self.scroll_delay = scroll_delay
         self.max_scroll_steps = max_scroll_steps
         self.process_iframes = process_iframes
+        self.follow_frames = follow_frames
         self.remove_overlay_elements = remove_overlay_elements
         self.simulate_user = simulate_user
         self.override_navigator = override_navigator
@@ -1686,6 +1690,7 @@ class CrawlerRunConfig():
             scroll_delay=kwargs.get("scroll_delay", 0.2),
             max_scroll_steps=kwargs.get("max_scroll_steps"),
             process_iframes=kwargs.get("process_iframes", False),
+            follow_frames=kwargs.get("follow_frames", True),
             remove_overlay_elements=kwargs.get("remove_overlay_elements", False),
             simulate_user=kwargs.get("simulate_user", False),
             override_navigator=kwargs.get("override_navigator", False),
@@ -1810,6 +1815,7 @@ class CrawlerRunConfig():
             "scroll_delay": self.scroll_delay,
             "max_scroll_steps": self.max_scroll_steps,
             "process_iframes": self.process_iframes,
+            "follow_frames": self.follow_frames,
             "remove_overlay_elements": self.remove_overlay_elements,
             "simulate_user": self.simulate_user,
             "override_navigator": self.override_navigator,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import re
 import time
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Any, List, Union
@@ -401,6 +402,52 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         # Return the page object
         return page
+
+    async def _try_follow_frameset(self, page):
+        """
+        Return the child frame content for single-frame frameset redirects.
+
+        Deprecated frameset pages are often used as full-page wrappers around a
+        single child frame. In that case the top-level HTML is just an empty
+        shell, while Playwright has already loaded the meaningful content in the
+        child frame.
+        """
+        try:
+            frames = page.frames
+            if len(frames) != 2:
+                return None, None
+
+            main_html = await page.content()
+            if "<frameset" not in main_html.lower():
+                return None, None
+
+            match = re.search(r"<frameset([^>]*)>", main_html, re.IGNORECASE)
+            if not match:
+                return None, None
+
+            attrs = match.group(1)
+            rows = re.search(r"rows=[\"']([^\"']+)[\"']", attrs, re.IGNORECASE)
+            cols = re.search(r"cols=[\"']([^\"']+)[\"']", attrs, re.IGNORECASE)
+
+            def is_full_viewport(value: str) -> bool:
+                parts = [part.strip().lower() for part in value.split(",")]
+                return len(parts) == 1 and parts[0] in {"100%", "*"}
+
+            if rows and not is_full_viewport(rows.group(1)):
+                return None, None
+            if cols and not is_full_viewport(cols.group(1)):
+                return None, None
+
+            child_frame = frames[1]
+            child_html = await child_frame.content()
+            child_url = child_frame.url
+
+            if not child_html or not child_url:
+                return None, None
+
+            return child_html, child_url
+        except Exception:
+            return None, None
 
     async def create_session(self, **kwargs) -> str:
         """
@@ -968,6 +1015,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if config.remove_overlay_elements:
                 await self.remove_overlay_elements(page)
 
+            frame_url = None
+            frame_html = None
+            if config.follow_frames and not config.css_selector:
+                frame_html, frame_url = await self._try_follow_frameset(page)
+
             if config.css_selector:
                 try:
                     # Handle comma-separated selectors by splitting them
@@ -989,6 +1041,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     html = f"<div class='crawl4ai-result'>\n" + "\n".join(html_parts) + "\n</div>"                    
                 except Error as e:
                     raise RuntimeError(f"Failed to extract HTML content: {str(e)}")
+            elif frame_html is not None:
+                html = frame_html
             else:
                 html = await page.content()
             
@@ -1043,7 +1097,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # This ensures we capture the current page URL at the time we return the response, 
             # which correctly reflects any JavaScript navigation that occurred.
             ###
-            redirected_url = page.url  # Use current page URL to capture JS redirects
+            redirected_url = frame_url or page.url  # Use current page URL to capture JS redirects
             
             # Return complete response
             return AsyncCrawlResponse(
