@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional, Callable
 import time
 import json
+import inspect
 
 # Import both, but use conditionally
 try:
@@ -158,27 +159,31 @@ class StealthAdapter(BrowserAdapter):
     def _check_stealth_availability(self) -> bool:
         """Check if playwright_stealth is available and get the correct function"""
         try:
-            from playwright_stealth import stealth_async
-            self._stealth_function = stealth_async
+            from playwright_stealth import Stealth
+            stealth = Stealth()
+            self._stealth_function = stealth.apply_stealth_async
             return True
         except ImportError:
             try:
-                from playwright_stealth import stealth_sync
-                self._stealth_function = stealth_sync
+                from playwright_stealth import stealth_async
+                self._stealth_function = stealth_async
                 return True
             except ImportError:
-                self._stealth_function = None
-                return False
+                try:
+                    from playwright_stealth import stealth_sync
+                    self._stealth_function = stealth_sync
+                    return True
+                except ImportError:
+                    self._stealth_function = None
+                    return False
 
     async def apply_stealth(self, page: Page):
         """Apply stealth to a page if available"""
         if self._stealth_available and self._stealth_function:
             try:
-                if hasattr(self._stealth_function, '__call__'):
-                    if 'async' in getattr(self._stealth_function, '__name__', ''):
-                        await self._stealth_function(page)
-                    else:
-                        self._stealth_function(page)
+                result = self._stealth_function(page)
+                if inspect.isawaitable(result):
+                    await result
             except Exception as e:
                 # Fail silently or log error depending on requirements
                 pass
