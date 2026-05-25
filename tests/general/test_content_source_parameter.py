@@ -69,6 +69,27 @@ class TestContentSourceParameter(unittest.TestCase):
         self.assertIsInstance(result, MarkdownGenerationResult)
         self.assertEqual(result.raw_markdown, "# Test Content\n\nThis is a test paragraph.")
 
+    def test_adjacent_spans_get_readable_spacing(self):
+        """Adjacent field spans should not be concatenated in markdown."""
+        html = (
+            '<a href="/event">'
+            '<span>London Build Expo</span>'
+            '<span>25–26 Nov 2026</span>'
+            '<span>2026-11-25</span>'
+            '<span>2026-11-26</span>'
+            '</a>'
+        )
+
+        result = DefaultMarkdownGenerator().generate_markdown(
+            input_html=html, base_url="https://www.excel.london"
+        )
+
+        self.assertIn(
+            "London Build Expo 25–26 Nov 2026 2026-11-25 2026-11-26",
+            result.raw_markdown,
+        )
+        self.assertNotIn("Expo25", result.raw_markdown)
+
     def test_html_source_selection_logic(self):
         """Test that the HTML source selection logic works correctly."""
         # We'll test the dispatch pattern directly to avoid async complexities

@@ -1069,6 +1069,16 @@ class CustomHTML2Text(HTML2Text):
                 setattr(self, key, value)
 
     def handle_tag(self, tag, attrs, start):
+        # Adjacent inline spans often represent distinct fields in card/list
+        # layouts (for example, an event title followed by one or more date
+        # spans). When the source HTML has no whitespace between those spans,
+        # the default text conversion concatenates the fields into a single
+        # token. Preserve a readable separator before subsequent spans.
+        if tag == "span" and start and self.outtextlist:
+            last_char = self.outtextlist[-1][-1:] if self.outtextlist[-1] else ""
+            if last_char and not last_char.isspace() and last_char not in "([{":
+                self.o(" ")
+
         # Handle preserved tags
         if tag in self.preserve_tags:
             if start:
