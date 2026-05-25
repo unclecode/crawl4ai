@@ -1,4 +1,4 @@
-from .__version__ import __version__ as crawl4ai_version
+﻿from .__version__ import __version__ as crawl4ai_version
 import os
 import re
 import sys
@@ -252,6 +252,7 @@ class AsyncWebCrawler:
             try:
                 self.logger.verbose = config.verbose
 
+                kwargs.pop('verbose', None)  # prevent conflict with **kwargs forwarding
                 # Default to ENABLED if no cache mode specified
                 if config.cache_mode is None:
                     config.cache_mode = CacheMode.ENABLED
