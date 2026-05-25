@@ -666,19 +666,23 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                     comment.getparent().remove(comment)
 
             # Handle tag-based removal first
+            # Clear children before removal to prevent lxml child promotion
             excluded_tags = set(kwargs.get("excluded_tags", []) or [])
             if excluded_tags:
                 for tag in excluded_tags:
                     for element in body.xpath(f".//{tag}"):
                         if element.getparent() is not None:
+                            element.clear()
                             element.getparent().remove(element)
 
             # Handle CSS selector-based exclusion
+            # Prevent lxml from promoting children during tag removal
             excluded_selector = kwargs.get("excluded_selector", "")
             if excluded_selector:
                 try:
                     for element in body.cssselect(excluded_selector):
                         if element.getparent() is not None:
+                            element.clear()  
                             element.getparent().remove(element)
                 except Exception as e:
                     self._log(
