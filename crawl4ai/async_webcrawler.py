@@ -764,7 +764,7 @@ class AsyncWebCrawler:
             ################################
             # Scraping Strategy Execution  #
             ################################
-            result: ScrapingResult = scraping_strategy.scrap(
+            result: ScrapingResult = await scraping_strategy.ascrap(
                 url, html, **params)
 
             if result is None:
