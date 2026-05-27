@@ -562,6 +562,12 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             ):
                 parent = el.getparent()
                 if parent is not None:
+                    if el.tail:
+                        prev = el.getprevious()
+                        if prev is not None:
+                            prev.tail = (prev.tail or "") + el.tail
+                        else:
+                            parent.text = (parent.text or "") + el.tail
                     parent.remove(el)
 
         return root
