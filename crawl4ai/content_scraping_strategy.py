@@ -562,6 +562,18 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             ):
                 parent = el.getparent()
                 if parent is not None:
+                    # Preserve the element's tail text before removing it.
+                    # In lxml, .tail holds the text that follows the element
+                    # in the parent's serialisation.  Calling parent.remove(el)
+                    # without rescuing the tail silently drops that text.
+                    # See https://github.com/unclecode/crawl4ai/issues/1938
+                    tail = el.tail
+                    if tail:
+                        prev = el.getprevious()
+                        if prev is not None:
+                            prev.tail = (prev.tail or "") + tail
+                        else:
+                            parent.text = (parent.text or "") + tail
                     parent.remove(el)
 
         return root
