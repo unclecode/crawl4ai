@@ -137,8 +137,8 @@ def attach_mcp(
         except HTTPException as exc:
             # map server‑side errors into MCP "text/error" payloads
             err = {"error": exc.status_code, "detail": exc.detail}
-            return [t.TextContent(type = "text", text=json.dumps(err))]
-        return [t.TextContent(type = "text", text=json.dumps(res, default=str))]
+            return [t.TextContent(type = "text", text=json.dumps(err, ensure_ascii=False))]
+        return [t.TextContent(type = "text", text=json.dumps(res, default=str, ensure_ascii=False))]
 
     @mcp.list_resources()
     async def _list_resources() -> List[t.Resource]:
@@ -152,7 +152,7 @@ def attach_mcp(
         if name not in resources:
             raise HTTPException(404, "resource not found")
         res = resources[name]()
-        return [t.TextContent(type = "text", text=json.dumps(res, default=str))]
+        return [t.TextContent(type = "text", text=json.dumps(res, default=str, ensure_ascii=False))]
 
     @mcp.list_resource_templates()
     async def _list_templates() -> List[t.ResourceTemplate]:
