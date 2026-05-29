@@ -796,7 +796,7 @@ async def get_context(
     """
     This end point is design for any questions about Crawl4ai library. It returns a plain text markdown with extensive information about Crawl4ai. 
     You can use this as a context for any AI assistant. Use this endpoint for AI assistants to retrieve library context for decision making or code generation tasks.
-    Alway is BEST practice you provide a query to filter the context. Otherwise the lenght of the response will be very long.
+    It is BEST practice to provide a query to filter the context. Otherwise the length of the response will be very long.
 
     Parameters:
     - context_type: Specify "code" for code context, "doc" for documentation context, or "all" for both.
