@@ -129,7 +129,7 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
             parts.append(
                 f"{text}⟨{num}⟩"
                 if not match.group(0).startswith("!")
-                else f"![{text}⟨{num}⟩]"
+                else f"![{text}⟨{num}⟩]({url})"
             )
             last_end = match.end()
 
