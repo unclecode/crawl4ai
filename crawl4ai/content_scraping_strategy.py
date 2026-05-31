@@ -422,10 +422,15 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             return None
 
         parent = img.getparent()
-        if parent.tag in ["button", "input"]:
-            return None
+        if parent is None:
+            # Orphaned element (e.g. detached from the tree during processing).
+            # There is no parent context to filter on, so include the image.
+            parent_classes: list = []
+        else:
+            if parent.tag in ["button", "input"]:
+                return None
+            parent_classes = parent.get("class", "").split()
 
-        parent_classes = parent.get("class", "").split()
         if any(
             "button" in cls or "icon" in cls or "logo" in cls for cls in parent_classes
         ):
@@ -562,6 +567,18 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             ):
                 parent = el.getparent()
                 if parent is not None:
+                    # Preserve the element's tail text before removing it.
+                    # In lxml, .tail holds the text that follows the element
+                    # in the parent's serialisation.  Calling parent.remove(el)
+                    # without rescuing the tail silently drops that text.
+                    # See https://github.com/unclecode/crawl4ai/issues/1938
+                    tail = el.tail
+                    if tail:
+                        prev = el.getprevious()
+                        if prev is not None:
+                            prev.tail = (prev.tail or "") + tail
+                        else:
+                            parent.text = (parent.text or "") + tail
                     parent.remove(el)
 
         return root
