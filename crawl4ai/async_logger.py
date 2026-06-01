@@ -144,7 +144,11 @@ class AsyncLogger(AsyncLoggerBase):
         self.verbose = verbose
         # Default to stderr so log lines do not corrupt stdout-based protocols
         # (e.g. MCP stdio transport, piped shell commands).
-        self.console = console if console is not None else Console(stderr=True)
+        # width=200: Rich's default falls back to 80 in non-TTY contexts
+        # (e.g. Docker `docker logs`, CI, captured stdout), which truncates
+        # useful diagnostic lines. TTYs still auto-detect actual terminal
+        # width; this only lifts the non-TTY fallback cap.
+        self.console = console if console is not None else Console(stderr=True, width=200)
 
         # Create log file directory if needed
         if log_file:

@@ -126,7 +126,7 @@ ALLOWED_DESERIALIZE_TYPES = {
     # Config classes
     "BrowserConfig", "CrawlerRunConfig", "HTTPCrawlerConfig",
     "LLMConfig", "ProxyConfig", "GeolocationConfig",
-    "SeedingConfig", "VirtualScrollConfig", "LinkPreviewConfig",
+    "SeedingConfig", "VirtualScrollConfig", "LinkPreviewConfig", "DomainMapperConfig",
     # Extraction strategies
     "JsonCssExtractionStrategy", "JsonXPathExtractionStrategy",
     "JsonLxmlExtractionStrategy", "LLMExtractionStrategy",
@@ -2211,3 +2211,99 @@ class SeedingConfig:
         config_dict = self.to_dict()
         config_dict.update(kwargs)
         return SeedingConfig.from_kwargs(config_dict)
+
+
+class DomainMapperConfig:
+    """
+    Configuration for comprehensive domain URL discovery via DomainMapper.
+
+    Discovers all URLs under a domain using multiple sources (sitemap, Common Crawl,
+    Wayback Machine, Certificate Transparency, path probing, robots.txt mining,
+    RSS/Atom feeds, homepage link extraction) without deep crawling.
+    """
+    def __init__(
+        self,
+        source: str = "sitemap+cc+crt+probe",
+        max_urls: int = -1,
+        concurrency: int = 50,
+        hits_per_sec: int = 10,
+        force: bool = False,
+        extract_head: bool = True,
+        filter_nonsense_urls: bool = True,
+        soft_404_detection: bool = True,
+        query: Optional[str] = None,
+        score_threshold: Optional[float] = None,
+        scoring_method: str = "bm25",
+        probe_paths: Optional[List[str]] = None,
+        common_subdomains: Optional[List[str]] = None,
+        include_subdomains: bool = True,
+        source_timeout: float = 30.0,
+        use_browser_for_homepage: bool = False,
+        verbose: Optional[bool] = None,
+        cache_ttl_hours: int = 24,
+        base_directory: Optional[str] = None,
+        dns_timeout: float = 3.0,
+        http_timeout: float = 10.0,
+    ):
+        """
+        Args:
+            source: Discovery sources joined by '+'. Valid: sitemap, cc, wayback,
+                    crt, probe, robots, feed, homepage. Default: "sitemap+cc+crt+probe"
+            max_urls: Maximum URLs to return. -1 for unlimited.
+            concurrency: Max concurrent requests across all hosts.
+            hits_per_sec: Rate limit in requests/second.
+            force: Bypass all caches.
+            extract_head: Fetch and parse <head> metadata for each URL.
+            filter_nonsense_urls: Filter utility URLs (robots.txt, favicon, etc.).
+            soft_404_detection: Fingerprint and filter soft-404 pages (SPAs).
+            query: BM25 relevance query. Requires extract_head=True.
+            score_threshold: Minimum relevance score (0.0-1.0) to include URL.
+            scoring_method: Scoring algorithm. Currently only "bm25".
+            probe_paths: Extra paths to probe on each host (added to defaults).
+            common_subdomains: Extra subdomain prefixes to guess (added to defaults).
+            include_subdomains: Discover and scan subdomains. When False, only scans
+                               the exact domain provided (skips crt.sh, DNS guessing,
+                               Wayback/CC host discovery). Default True.
+            source_timeout: Max seconds per discovery source. Sources that exceed
+                           this are killed and skipped. Prevents slow sources from
+                           blocking fast results. Default 30.0.
+            use_browser_for_homepage: Use Playwright for JS-rendered homepages.
+            verbose: Override logger verbose setting.
+            cache_ttl_hours: Hours before cached results expire.
+            base_directory: Base directory for cache files.
+            dns_timeout: Timeout in seconds for DNS resolution.
+            http_timeout: Timeout in seconds for HTTP requests.
+        """
+        self.source = source
+        self.max_urls = max_urls
+        self.concurrency = concurrency
+        self.hits_per_sec = hits_per_sec
+        self.force = force
+        self.extract_head = extract_head
+        self.filter_nonsense_urls = filter_nonsense_urls
+        self.soft_404_detection = soft_404_detection
+        self.query = query
+        self.score_threshold = score_threshold
+        self.scoring_method = scoring_method
+        self.probe_paths = probe_paths
+        self.common_subdomains = common_subdomains
+        self.include_subdomains = include_subdomains
+        self.source_timeout = source_timeout
+        self.use_browser_for_homepage = use_browser_for_homepage
+        self.verbose = verbose
+        self.cache_ttl_hours = cache_ttl_hours
+        self.base_directory = base_directory
+        self.dns_timeout = dns_timeout
+        self.http_timeout = http_timeout
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {k: v for k, v in self.__dict__.items()}
+
+    @staticmethod
+    def from_kwargs(kwargs: Dict[str, Any]) -> 'DomainMapperConfig':
+        return DomainMapperConfig(**kwargs)
+
+    def clone(self, **kwargs: Any) -> 'DomainMapperConfig':
+        config_dict = self.to_dict()
+        config_dict.update(kwargs)
+        return DomainMapperConfig.from_kwargs(config_dict)

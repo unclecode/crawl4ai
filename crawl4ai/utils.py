@@ -2486,7 +2486,23 @@ def quick_extract_links(html: str, base_url: str) -> Dict[str, List[Dict[str, st
     except Exception:
         return {"internal": [], "external": []}
 
+    # base_domain stays anchored to the real page origin so internal/external
+    # classification is correct even when a <base> tag points elsewhere.
     base_domain = get_base_domain(base_url)
+
+    # Honor <head><base href> for relative-URL resolution (#752). The full LXML
+    # scraping path does this; the prefetch quick path (used by scan/site) must
+    # too — otherwise relative links resolve against the page URL and the base
+    # tag is ignored. urljoin handles a relative <base href> against the page.
+    try:
+        base_el = doc.xpath("//head/base[@href]")
+        if base_el:
+            base_href = (base_el[0].get("href") or "").strip()
+            if base_href:
+                base_url = urljoin(base_url, base_href)
+    except Exception:
+        pass
+
     internal: List[Dict[str, str]] = []
     external: List[Dict[str, str]] = []
     seen: Set[str] = set()
