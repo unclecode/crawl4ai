@@ -5,6 +5,66 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.7] - 2026-06-01
+
+0.8.7 is a security-hardening release. It bundles every responsibly-disclosed vulnerability patched since 0.8.6, plus the new DomainMapper feature and a batch of scraping, deep-crawl, and LLM fixes.
+
+### Security
+
+This release fixes multiple critical vulnerabilities in the Docker API server. If you self-host the Docker API, upgrade immediately. Two GitHub Security Advisories accompany this release.
+
+- **CRITICAL: AST Sandbox Escape leading to Pre-Auth RCE (CVSS 9.8, CWE-94/913)**: a `gi_frame.f_back` frame-chain escape in the computed-field `eval()` path. Removed `eval()` from computed fields entirely and deleted `_safe_eval_expression`. Credit: Song Binglin ([q1uf3ng](https://github.com/q1uf3ng)).
+- **CRITICAL: Hook Sandbox Escape RCE (CVSS 9.8, CWE-94)**: injected module objects (`asyncio`, `json`, `re`) carried a full `__builtins__`, bypassing the `__import__` block. Stripped injected builtins and removed dangerous allowlist entries. Credit: by111 ([August829](https://github.com/August829)).
+- **CRITICAL: Hardcoded JWT Secret (CVSS 9.8, CWE-798)**: the default signing key `"mysecret"` allowed token forgery. Removed the default, reject weak/short secrets, and auto-generate an ephemeral key when JWT is enabled with no key set. Credit: by111 ([August829](https://github.com/August829)).
+- **HIGH: Arbitrary File Write via `output_path` (CVSS 9.1, CWE-22)**: `/screenshot` and `/pdf` wrote to any path. Restricted writes to `CRAWL4AI_OUTPUT_DIR` and reject `..` traversal. Credit: Jeongbean Jeon, wulonchia.
+- **HIGH: SSRF via Webhook URL (CVSS 8.6, CWE-918)**: webhook URLs on `/crawl/job` and `/llm/job` could reach internal and cloud-metadata IPs. Added a blocklist and `follow_redirects=False`. Credit: Jeongbean Jeon.
+- **HIGH: SSRF via Direct Crawl Endpoints (CVSS 8.6, CWE-918)**: `/crawl`, `/md`, and `/llm` fetched arbitrary URLs, and IPv6-mapped IPv4 addresses (`[::ffff:169.254.169.254]`) bypassed naive checks. Added destination validation on all entry points and normalize IPv6-mapped IPv4 before the blocklist check. Credit: secsys_codex, Velayutham Selvaraj, IcySun.
+- **HIGH: Arbitrary JavaScript Execution via `/execute_js` (CVSS 8.1, CWE-94)**: disabled by default via `CRAWL4AI_EXECUTE_JS_ENABLED`, removed `--disable-web-security` from default browser args, and added an SSRF blocklist on the destination. Credit: by111 ([August829](https://github.com/August829)).
+- **MEDIUM: Monitor Endpoint Auth Bypass (CVSS 6.5, CWE-306)**: `/monitor/*` routes, including destructive actions, were unauthenticated. Added `token_dep` to the router and an explicit token check on the WebSocket endpoint. Credit: Jeongbean Jeon.
+- **MEDIUM: Stored XSS in Monitor Dashboard (CVSS 6.1, CWE-79)**: URLs and errors were rendered via `innerHTML` without escaping. Added server-side `html.escape()` and a client-side `escapeHtml()` wrapper. Credit: Jeongbean Jeon.
+- **eval() removed from `/config/dump`**: replaced with JSON input validated by Pydantic.
+- **Config hardening**: validate the `markdown_generator` type in `CrawlerRunConfig` to reject malformed JSON (#1880).
+
+### Added
+
+- **DomainMapper**: comprehensive domain URL discovery, with an `include_subdomains` flag and a per-source timeout.
+- **arun_many config-list support in the Docker API**: per-URL configs (#1837).
+- **Docker server can listen on all addresses.**
+
+### Fixed
+
+- **Markdown and scraping fidelity**:
+  - Preserve mermaid diagram text from SVGs and prevent nested fences (#1043)
+  - Preserve table `rowspan`/`colspan` in cleaned HTML (#1920)
+  - Preserve `.tail` text when removing empty elements (#1938)
+  - Keep sentence order in `NlpSentenceChunking` (#1909)
+- **Deep crawl and dispatcher**:
+  - Fix the deep-crawl streaming ContextVar bug, using `set(False)` instead of `reset(token)` (#1917)
+  - Wire `semaphore_count` into the auto-created `MemoryAdaptiveDispatcher` and default it to 10 (#1927)
+- **LLM and providers**:
+  - Add Bedrock to the provider prefixes so AWS credential auth works
+  - Default `LLMExtractionStrategy.extraction_type` to schema
+  - Add `LLMTableExtraction` to the Docker deserialization allowlist
+- **Crawler and downloads**:
+  - Return `success=True` for binary downloads and skip the block check when `downloaded_files` is set
+  - Honor `<base href>` in prefetch `quick_extract_links` (#752)
+- **Logging and MCP**:
+  - Route `AsyncLogger` output to stderr by default (#1968) and use `Console(width=200)` for non-TTY contexts
+  - Use `ensure_ascii=False` in the MCP bridge to preserve CJK characters (#1967)
+- **Browser and misc**:
+  - `browser_adapter` now uses the `Stealth` import, fixing a stealth import mismatch (#1960)
+  - Correct the `arun()` return type to `CrawlResultContainer` (#1898)
+  - Log the real failure reason before COMPLETE, fixing a misleading "SCRAPE ok" line (#1949)
+  - Assistant toolbar scroll fix and issue-1973 fix
+
+### Docs
+
+- Added Privacy Policy, Terms of Service, and Support pages.
+
+### Security Credits
+
+Song Binglin (q1uf3ng), by111 (August829), Jeongbean Jeon, wulonchia, secsys_codex, Velayutham Selvaraj, and IcySun. See `SECURITY-CREDITS.md`.
+
 ## [0.8.0] - 2026-01-12
 
 ### Security

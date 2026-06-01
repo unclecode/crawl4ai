@@ -37,11 +37,11 @@ Limited slots._
 
 Crawl4AI turns the web into clean, LLM ready Markdown for RAG, agents, and data pipelines. Fast, controllable, battle tested by a 50k+ star community.
 
-[✨ Check out latest update v0.8.6](#-recent-updates)
+[✨ Check out latest update v0.8.7](#-recent-updates)
 
-✨ **New in v0.8.6**: Security hotfix — replaced `litellm` with `unclecode-litellm` due to a PyPI supply chain compromise. If you're on v0.8.5, please upgrade immediately.
+✨ **New in v0.8.7**: Security-hardening release. Fixes critical Docker API vulnerabilities (RCE, SSRF, auth bypass, file write, XSS, hardcoded JWT secret), adds DomainMapper, and ships scraping, deep-crawl, and LLM fixes. If you self-host the Docker API, upgrade immediately. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.7.md)
 
-✨ Recent v0.8.5: Anti-Bot Detection, Shadow DOM & 60+ Bug Fixes! Automatic 3-tier anti-bot detection with proxy escalation, Shadow DOM flattening, deep crawl cancellation, config defaults API, consent popup removal, and critical security patches. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.5.md)
+✨ Recent v0.8.6: Security hotfix that replaced `litellm` with `unclecode-litellm` due to a PyPI supply chain compromise.
 
 ✨ Previous v0.8.0: Crash Recovery & Prefetch Mode! Deep crawl crash recovery with `resume_state` and `on_state_change` callbacks for long-running crawls. New `prefetch=True` mode for 5-10x faster URL discovery. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.0.md)
 
@@ -565,7 +565,20 @@ async def test_news_crawl():
 ## ✨ Recent Updates
 
 <details open>
-<summary><strong>Version 0.8.6 — Security Hotfix: litellm Supply Chain Fix</strong></summary>
+<summary><strong>Version 0.8.7 Release Highlights - Security Hardening, DomainMapper & Community Fixes</strong></summary>
+
+A security-hardening release. Fixes critical Docker API vulnerabilities (AST sandbox escape RCE, hook sandbox RCE, hardcoded JWT secret, SSRF on webhook and crawl endpoints, arbitrary file write, monitor auth bypass, stored XSS, and unauthenticated JS execution), adds the DomainMapper feature, and ships a batch of scraping, deep-crawl, and LLM fixes. If you self-host the Docker API, upgrade immediately.
+
+```bash
+pip install -U crawl4ai
+```
+
+[Full v0.8.7 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.7.md)
+
+</details>
+
+<details>
+<summary><strong>Version 0.8.6 - Security Hotfix: litellm Supply Chain Fix</strong></summary>
 
 Replaced `litellm` dependency with `unclecode-litellm` due to a PyPI supply chain compromise affecting the original package. If you're on v0.8.5 or earlier, upgrade immediately.
 
