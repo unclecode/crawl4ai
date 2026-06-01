@@ -302,3 +302,6 @@ MEMORY.md
 
 # Handoff files
 HANDOFF-*.md
+
+# Security advisory payloads - kept private, published via GitHub Security Advisories only
+.security/
