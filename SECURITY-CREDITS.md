@@ -10,4 +10,4 @@ We thank the following security researchers for their responsible disclosure:
 | by111 (August829) | GitHub: [August829](https://github.com/August829) | Hardcoded JWT secret, eval in /config/dump, /execute_js, hook sandbox escape | 2026-04-14 |
 | secsys_codex | secsys_codex@163.com | SSRF via /md, /crawl, /llm endpoints (URL destination validation) | 2026-04-18 |
 | Velayutham Selvaraj | [LinkedIn](https://www.linkedin.com/in/velayuthamselvaraj) | SSRF via missing host validation in validate_url_scheme (independent report) | 2026-05-06 |
-| IcySun | icysun@qq.com | SSRF, file write via output_path, missing auth by default, hook sandbox bypass via asyncio (independent report) | 2026-05-15 |
+| IcySun & Yashon | icysun@qq.com, liyaoyin@qq.com | SSRF, file write via output_path, missing auth by default, hook sandbox bypass via asyncio (independent report) | 2026-05-15 |
