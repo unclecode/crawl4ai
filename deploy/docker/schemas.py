@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict
 from enum import Enum
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 from utils import FilterType
 
 
@@ -84,9 +84,27 @@ class ScreenshotRequest(BaseModel):
     wait_for_images: Optional[bool] = False
     output_path: Optional[str] = None
 
+    @field_validator("output_path")
+    @classmethod
+    def reject_traversal(cls, v):
+        if v is None:
+            return v
+        if ".." in v.replace("\\", "/").split("/"):
+            raise ValueError("output_path must not contain path traversal sequences")
+        return v
+
 class PDFRequest(BaseModel):
     url: str
     output_path: Optional[str] = None
+
+    @field_validator("output_path")
+    @classmethod
+    def reject_traversal(cls, v):
+        if v is None:
+            return v
+        if ".." in v.replace("\\", "/").split("/"):
+            raise ValueError("output_path must not contain path traversal sequences")
+        return v
 
 
 class JSEndpointRequest(BaseModel):

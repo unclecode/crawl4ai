@@ -4,7 +4,7 @@ Relies on the existing Redis task helpers in api.py
 """
 
 from typing import Dict, Optional, Callable
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, HttpUrl
 
 from api import (
@@ -60,6 +60,11 @@ async def llm_job_enqueue(
 ):
     webhook_config = None
     if payload.webhook_config:
+        from utils import validate_webhook_url
+        try:
+            validate_webhook_url(str(payload.webhook_config.webhook_url))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         webhook_config = payload.webhook_config.model_dump(mode='json')
 
     return await handle_llm_request(
@@ -96,6 +101,11 @@ async def crawl_job_enqueue(
 ):
     webhook_config = None
     if payload.webhook_config:
+        from utils import validate_webhook_url
+        try:
+            validate_webhook_url(str(payload.webhook_config.webhook_url))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         webhook_config = payload.webhook_config.model_dump(mode='json')
 
     return await handle_crawl_job(

@@ -458,6 +458,14 @@
             document.getElementById('last-update').textContent = 'Live: ' + new Date().toLocaleTimeString();
         }
 
+        // XSS prevention: escape user-supplied content before innerHTML injection
+        function escapeHtml(text) {
+            if (text == null) return '';
+            const div = document.createElement('div');
+            div.textContent = String(text);
+            return div.innerHTML;
+        }
+
         function updateRequestsDisplay(requests) {
             // Update active requests count
             const activeCount = document.getElementById('active-count');
@@ -471,9 +479,9 @@
                 } else {
                     activeList.innerHTML = requests.active.map(req => `
                         <div class="flex items-center justify-between p-2 bg-dark rounded border border-border">
-                            <span class="text-primary">${req.id.substring(0, 8)}</span>
-                            <span class="text-secondary">${req.endpoint}</span>
-                            <span class="text-light truncate max-w-[200px]" title="${req.url}">${req.url}</span>
+                            <span class="text-primary">${escapeHtml(req.id.substring(0, 8))}</span>
+                            <span class="text-secondary">${escapeHtml(req.endpoint)}</span>
+                            <span class="text-light truncate max-w-[200px]" title="${escapeHtml(req.url)}">${escapeHtml(req.url)}</span>
                             <span class="text-accent">${req.elapsed.toFixed(1)}s</span>
                             <span class="pulse-slow">⏳</span>
                         </div>
@@ -489,9 +497,9 @@
                 } else {
                     completedList.innerHTML = requests.completed.map(req => `
                         <div class="flex items-center gap-3 p-2 bg-dark rounded">
-                            <span class="text-secondary w-16 flex-shrink-0">${req.id.substring(0, 8)}</span>
-                            <span class="text-secondary w-16 flex-shrink-0">${req.endpoint}</span>
-                            <span class="text-light truncate flex-1" title="${req.url}">${req.url}</span>
+                            <span class="text-secondary w-16 flex-shrink-0">${escapeHtml(req.id.substring(0, 8))}</span>
+                            <span class="text-secondary w-16 flex-shrink-0">${escapeHtml(req.endpoint)}</span>
+                            <span class="text-light truncate flex-1" title="${escapeHtml(req.url)}">${escapeHtml(req.url)}</span>
                             <span class="w-12 flex-shrink-0 text-right">${req.elapsed.toFixed(2)}s</span>
                             <span class="text-secondary w-16 flex-shrink-0 text-right">${req.mem_delta > 0 ? '+' : ''}${req.mem_delta}MB</span>
                             <span class="w-12 flex-shrink-0 text-right">${req.success ? '✅' : '❌'} ${req.status_code}</span>
@@ -585,10 +593,10 @@
                         return `<div class="p-2 bg-dark rounded border border-red-500">
                             <div class="flex justify-between">
                                 <span class="text-secondary">${time}</span>
-                                <span class="text-red-500">${err.endpoint}</span>
+                                <span class="text-red-500">${escapeHtml(err.endpoint)}</span>
                             </div>
-                            <div class="text-xs text-light mt-1">${err.url}</div>
-                            <div class="text-xs text-red-400 mt-1 font-mono">${err.error}</div>
+                            <div class="text-xs text-light mt-1">${escapeHtml(err.url)}</div>
+                            <div class="text-xs text-red-400 mt-1 font-mono">${escapeHtml(err.error)}</div>
                         </div>`;
                     }).join('');
                 }
@@ -695,9 +703,9 @@
                 } else {
                     activeList.innerHTML = data.active.map(req => `
                         <div class="flex items-center justify-between p-2 bg-dark rounded border border-border">
-                            <span class="text-primary">${req.id.substring(0, 8)}</span>
-                            <span class="text-secondary">${req.endpoint}</span>
-                            <span class="text-light truncate max-w-[200px]" title="${req.url}">${req.url}</span>
+                            <span class="text-primary">${escapeHtml(req.id.substring(0, 8))}</span>
+                            <span class="text-secondary">${escapeHtml(req.endpoint)}</span>
+                            <span class="text-light truncate max-w-[200px]" title="${escapeHtml(req.url)}">${escapeHtml(req.url)}</span>
                             <span class="text-accent">${req.elapsed.toFixed(1)}s</span>
                             <span class="pulse-slow">⏳</span>
                         </div>
@@ -711,9 +719,9 @@
                 } else {
                     completedList.innerHTML = data.completed.map(req => `
                         <div class="flex items-center gap-3 p-2 bg-dark rounded">
-                            <span class="text-secondary w-16 flex-shrink-0">${req.id.substring(0, 8)}</span>
-                            <span class="text-secondary w-16 flex-shrink-0">${req.endpoint}</span>
-                            <span class="text-light truncate flex-1" title="${req.url}">${req.url}</span>
+                            <span class="text-secondary w-16 flex-shrink-0">${escapeHtml(req.id.substring(0, 8))}</span>
+                            <span class="text-secondary w-16 flex-shrink-0">${escapeHtml(req.endpoint)}</span>
+                            <span class="text-light truncate flex-1" title="${escapeHtml(req.url)}">${escapeHtml(req.url)}</span>
                             <span class="w-12 flex-shrink-0 text-right">${req.elapsed.toFixed(2)}s</span>
                             <span class="text-secondary w-16 flex-shrink-0 text-right">${req.mem_delta > 0 ? '+' : ''}${req.mem_delta}MB</span>
                             <span class="w-12 flex-shrink-0 text-right">${req.success ? '✅' : '❌'} ${req.status_code}</span>
@@ -808,10 +816,10 @@
                         return `<div class="p-2 bg-dark rounded border border-red-500">
                             <div class="flex justify-between">
                                 <span class="text-secondary">${time}</span>
-                                <span class="text-red-500">${err.endpoint}</span>
+                                <span class="text-red-500">${escapeHtml(err.endpoint)}</span>
                             </div>
-                            <div class="text-xs text-light mt-1">${err.url}</div>
-                            <div class="text-xs text-red-400 mt-1 font-mono">${err.error}</div>
+                            <div class="text-xs text-light mt-1">${escapeHtml(err.url)}</div>
+                            <div class="text-xs text-red-400 mt-1 font-mono">${escapeHtml(err.error)}</div>
                         </div>`;
                     }).join('');
                 }

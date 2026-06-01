@@ -45,7 +45,8 @@ from utils import (
     validate_llm_provider,
     get_llm_temperature,
     get_llm_base_url,
-    get_redis_task_ttl
+    get_redis_task_ttl,
+    validate_url_destination,
 )
 from webhook import WebhookDeliveryService
 
@@ -91,6 +92,7 @@ async def handle_llm_qa(
     try:
         if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")):
             url = 'https://' + url
+        validate_url_destination(url)
         # Extract base URL by finding last '?q=' occurrence
         last_q_index = url.rfind('?q=')
         if last_q_index != -1:
@@ -284,6 +286,7 @@ async def handle_markdown_request(
         decoded_url = unquote(url)
         if not decoded_url.startswith(('http://', 'https://')) and not decoded_url.startswith(("raw:", "raw://")):
             decoded_url = 'https://' + decoded_url
+        validate_url_destination(decoded_url)
 
         if filter_type == FilterType.RAW:
             md_generator = DefaultMarkdownGenerator()
@@ -442,6 +445,7 @@ async def create_new_task(
     decoded_url = unquote(input_path)
     if not decoded_url.startswith(('http://', 'https://')) and not decoded_url.startswith(("raw:", "raw://")):
         decoded_url = 'https://' + decoded_url
+    validate_url_destination(decoded_url)
 
     from datetime import datetime
     task_id = f"llm_{int(datetime.now().timestamp())}_{id(background_tasks)}"
@@ -565,6 +569,8 @@ async def handle_crawl_request(
 
     try:
         urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
+        for url in urls:
+            validate_url_destination(url)
         browser_config = BrowserConfig.load(browser_config)
         crawler_config = CrawlerRunConfig.load(crawler_config)
 
