@@ -149,12 +149,35 @@ def load_config() -> Dict:
 
     return config
 
+class CRLFSafeFilter(logging.Filter):
+    """Strip CR/LF/control chars from log records (log-injection / forging).
+
+    A crawl URL or error reflected into a log line could otherwise inject
+    newlines and forge additional log entries."""
+
+    _BAD = {ord(c): None for c in "\r\n"} | {i: None for i in range(0, 32) if i != 9}
+
+    def filter(self, record: "logging.LogRecord") -> bool:
+        try:
+            msg = record.getMessage()
+            cleaned = msg.translate(self._BAD)
+            if cleaned != msg:
+                record.msg = cleaned
+                record.args = ()
+        except Exception:
+            pass
+        return True
+
+
 def setup_logging(config: Dict) -> None:
-    """Configure application logging."""
+    """Configure application logging with CRLF-safe records."""
     logging.basicConfig(
         level=config["logging"]["level"],
         format=config["logging"]["format"]
     )
+    crlf = CRLFSafeFilter()
+    for handler in logging.getLogger().handlers:
+        handler.addFilter(crlf)
 
 def get_base_url(request: Request) -> str:
     """Get base URL including scheme and host."""
@@ -299,17 +322,39 @@ ALLOWED_OUTPUT_DIR = os.environ.get("CRAWL4AI_OUTPUT_DIR", "/tmp/crawl4ai-output
 
 def validate_output_path(user_path: str) -> str:
     """Resolve and restrict output_path to ALLOWED_OUTPUT_DIR.
-    Prevents arbitrary file write via path traversal."""
+
+    Hardened against the symlink/TOCTOU bypass: in addition to the string
+    containment check, the REAL path (symlinks resolved) of the target and its
+    parent must also stay inside the allowed dir, so a symlink planted inside
+    the dir cannot redirect the write elsewhere. The final write must also use
+    O_NOFOLLOW (see write_output_file)."""
     from fastapi import HTTPException
     safe_path = os.path.normpath(user_path).lstrip(os.sep)
     abs_path = os.path.abspath(os.path.join(ALLOWED_OUTPUT_DIR, safe_path))
     abs_allowed = os.path.abspath(ALLOWED_OUTPUT_DIR) + os.sep
-    if not abs_path.startswith(abs_allowed):
+    # Resolve symlinks on the parent dir (the file itself may not exist yet) and
+    # re-check containment; this defeats a symlinked path component. The trailing
+    # os.sep on both sides also rejects sibling-prefix names ("...-evil").
+    real_parent = os.path.realpath(os.path.dirname(abs_path))
+    real_path = os.path.join(real_parent, os.path.basename(abs_path))
+    string_ok = abs_path.startswith(abs_allowed)
+    real_ok = (real_path + os.sep).startswith(abs_allowed)
+    if not (string_ok and real_ok):
         raise HTTPException(
             status_code=400,
-            detail=f"output_path must resolve within {ALLOWED_OUTPUT_DIR}"
+            detail=f"output_path must resolve within {ALLOWED_OUTPUT_DIR}",
         )
-    return abs_path
+    return real_path
+
+
+def write_output_file(abs_path: str, data: bytes) -> None:
+    """Write bytes to a validated output path without following a symlink at the
+    final component (defends the symlink-TOCTOU write)."""
+    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(abs_path, flags, 0o600)
+    with os.fdopen(fd, "wb") as f:
+        f.write(data)
 
 
 import ipaddress
@@ -355,42 +400,54 @@ def validate_url_destination(url: str) -> None:
         raise HTTPException(status_code=400, detail=f"URL blocked (SSRF protection): {e}")
 
 
+_NAT64_NETWORK = ipaddress.ip_network("64:ff9b::/96")
+_6TO4_NETWORK = ipaddress.ip_network("2002::/16")
+_V4COMPAT_NETWORK = ipaddress.ip_network("::/96")
+
+
 def _expand_ip_candidates(ip):
-    """Return [ip] plus any IPv4 form wrapped inside the IPv6 address.
-    SSRF guards must check the unwrapped form because ::ffff:127.0.0.1 and
-    ::127.0.0.1 route to 127.0.0.1 but would not match IPv4 blocklists directly."""
+    """Return [ip] plus any IPv4 form embedded inside the IPv6 address.
+    SSRF guards must check the unwrapped form because ::ffff:169.254.169.254,
+    NAT64 64:ff9b::a9fe:a9fe, and 6to4 2002:a9fe:a9fe:: all route to an internal
+    IPv4 that would not match an IPv6-only check."""
     candidates = [ip]
     if isinstance(ip, ipaddress.IPv6Address):
-        if ip.ipv4_mapped is not None:
-            candidates.append(ip.ipv4_mapped)
-        else:
-            as_int = int(ip)
-            if 0 < as_int < 2**32:
-                candidates.append(ipaddress.IPv4Address(as_int))
+        mapped = ip.ipv4_mapped
+        if mapped is not None:
+            candidates.append(mapped)
+        elif ip in _NAT64_NETWORK or ip in _V4COMPAT_NETWORK:
+            candidates.append(ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF))
+        elif ip in _6TO4_NETWORK:
+            candidates.append(ipaddress.IPv4Address((int(ip) >> 80) & 0xFFFFFFFF))
     return candidates
 
 
 def validate_webhook_url(url: str) -> None:
-    """Reject webhook URLs targeting internal/private/reserved networks (SSRF protection)."""
+    """Reject webhook/crawl URLs targeting non-global (internal/private/reserved)
+    networks (SSRF protection).
+
+    One rule: reject any resolved IP where not ip.is_global, evaluated on every
+    embedded IPv4 transition form (v4-mapped, NAT64, 6to4, v4-compat). This
+    closes the gaps in the old explicit blocklist (the IPv6 unspecified ::,
+    NAT64, 6to4). The error is opaque - it never echoes the resolved internal
+    IP (which would be a DNS/oracle leak)."""
     parsed = urlparse(str(url))
     hostname = parsed.hostname
     if not hostname:
-        raise ValueError("Webhook URL must have a valid hostname")
+        raise ValueError("URL must have a valid hostname")
     hostname_lower = hostname.lower()
-    if hostname_lower in _BLOCKED_HOSTNAMES:
-        raise ValueError(f"Webhook URL hostname '{hostname}' is blocked")
-    if hostname_lower.startswith("host.docker.internal"):
-        raise ValueError(f"Webhook URL hostname '{hostname}' is blocked")
+    if hostname_lower in _BLOCKED_HOSTNAMES or hostname_lower.startswith("host.docker.internal"):
+        raise ValueError("URL host is blocked")
     try:
         resolved = socket.getaddrinfo(hostname, None)
     except socket.gaierror:
-        raise ValueError(f"Cannot resolve webhook hostname '{hostname}'")
+        raise ValueError("Cannot resolve URL host")
     for _, _, _, _, sockaddr in resolved:
         ip = ipaddress.ip_address(sockaddr[0])
         for candidate in _expand_ip_candidates(ip):
-            for network in _BLOCKED_NETWORKS:
-                if candidate in network:
-                    raise ValueError(f"Webhook URL resolves to blocked address: {ip}")
+            if not candidate.is_global:
+                # opaque: do not leak the resolved internal IP
+                raise ValueError("URL resolves to a blocked address")
 
 
 def verify_email_domain(email: str) -> bool:

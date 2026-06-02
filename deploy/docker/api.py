@@ -129,7 +129,7 @@ async def handle_llm_qa(
             prompt_with_variables=prompt,
             api_token=get_llm_api_key(config, resolved_provider),
             temperature=temperature or get_llm_temperature(config, resolved_provider),
-            base_url=base_url or get_llm_base_url(config, resolved_provider),
+            base_url=get_llm_base_url(config, resolved_provider),  # ignore request base_url (key-exfil vector)
             base_delay=config["llm"].get("backoff_base_delay", 2),
             max_attempts=config["llm"].get("backoff_max_attempts", 3),
             exponential_factor=config["llm"].get("backoff_exponential_factor", 2)
@@ -188,7 +188,7 @@ async def process_llm_extraction(
                 provider=provider or config["llm"]["provider"],
                 api_token=api_key,
                 temperature=temperature or get_llm_temperature(config, provider),
-                base_url=base_url or get_llm_base_url(config, provider)
+                base_url=get_llm_base_url(config, provider)  # ignore request base_url (key-exfil vector)
             ),
             instruction=instruction,
             schema=json.loads(schema) if schema else None,
@@ -299,7 +299,7 @@ async def handle_markdown_request(
                         provider=provider or config["llm"]["provider"],
                         api_token=get_llm_api_key(config, provider),  # Returns None to let litellm handle it
                         temperature=temperature or get_llm_temperature(config, provider),
-                        base_url=base_url or get_llm_base_url(config, provider)
+                        base_url=get_llm_base_url(config, provider)  # ignore request base_url (key-exfil vector)
                     ),
                     instruction=query or "Extract main content"
                 )

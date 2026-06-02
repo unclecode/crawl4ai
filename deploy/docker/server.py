@@ -36,7 +36,7 @@ from schemas import (
 
 from utils import (
     FilterType, load_config, setup_logging, verify_email_domain,
-    validate_output_path, validate_webhook_url, validate_url_destination,
+    validate_output_path, write_output_file, validate_webhook_url, validate_url_destination,
 )
 import os
 import sys
@@ -426,9 +426,7 @@ async def generate_screenshot(
         screenshot_data = results[0].screenshot
         if body.output_path:
             abs_path = validate_output_path(body.output_path)
-            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-            with open(abs_path, "wb") as f:
-                f.write(base64.b64decode(screenshot_data))
+            write_output_file(abs_path, base64.b64decode(screenshot_data))
             return {"success": True, "path": abs_path}
         return {"success": True, "screenshot": screenshot_data}
     except Exception as e:
@@ -464,9 +462,7 @@ async def generate_pdf(
         pdf_data = results[0].pdf
         if body.output_path:
             abs_path = validate_output_path(body.output_path)
-            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-            with open(abs_path, "wb") as f:
-                f.write(pdf_data)
+            write_output_file(abs_path, pdf_data)
             return {"success": True, "path": abs_path}
         return {"success": True, "pdf": base64.b64encode(pdf_data).decode()}
     except Exception as e:

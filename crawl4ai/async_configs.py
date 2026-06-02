@@ -2022,6 +2022,30 @@ class CrawlerRunConfig():
         config_dict.update(kwargs)
         return CrawlerRunConfig.from_kwargs(config_dict)
 
+
+# Environment variable names that `LLMConfig(api_token="env:NAME")` may NOT
+# resolve. This blocks the credential-exfil gadget where an untrusted config
+# body sets api_token="env:SECRET_KEY" and pairs it with a base_url to leak a
+# server secret. Normal provider keys (OPENAI_API_KEY, ANTHROPIC_API_KEY,
+# HF_TOKEN, ...) are unaffected.
+_FORBIDDEN_ENV_SUBSTRINGS = ("SECRET", "PASSWORD", "PRIVATE", "PASSWD")
+_FORBIDDEN_ENV_PREFIXES = ("CRAWL4AI", "AWS_SECRET")
+_FORBIDDEN_ENV_EXACT = {"SECRET_KEY", "REDIS_PASSWORD", "TOKEN"}
+
+
+def _is_forbidden_env_name(name: str) -> bool:
+    if not name:
+        return True
+    u = name.upper()
+    if u in _FORBIDDEN_ENV_EXACT:
+        return True
+    if any(s in u for s in _FORBIDDEN_ENV_SUBSTRINGS):
+        return True
+    if any(u.startswith(p) for p in _FORBIDDEN_ENV_PREFIXES):
+        return True
+    return False
+
+
 class LLMConfig:
     def __init__(
         self,
@@ -2044,7 +2068,17 @@ class LLMConfig:
         if api_token and not api_token.startswith("env:"):
             self.api_token = api_token
         elif api_token and api_token.startswith("env:"):
-            self.api_token = os.getenv(api_token[4:])
+            # `env:NAME` resolves an environment variable. Refuse to read names
+            # that are clearly server secrets, so an untrusted config body cannot
+            # exfiltrate them via `env:SECRET_KEY` and a paired base_url. Normal
+            # provider keys (…_API_KEY / …_TOKEN) are unaffected.
+            _env_name = api_token[4:]
+            if _is_forbidden_env_name(_env_name):
+                raise ValueError(
+                    f"LLMConfig.api_token may not reference the protected "
+                    f"environment variable {_env_name!r}"
+                )
+            self.api_token = os.getenv(_env_name)
         else:
             # Check if given provider starts with any of key in PROVIDER_MODELS_PREFIXES
             # If not, check if it is in PROVIDER_MODELS

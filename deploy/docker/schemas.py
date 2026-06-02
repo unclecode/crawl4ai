@@ -121,6 +121,16 @@ class WebhookConfig(BaseModel):
     webhook_data_in_payload: bool = False
     webhook_headers: Optional[Dict[str, str]] = None
 
+    @field_validator("webhook_headers")
+    @classmethod
+    def _validate_headers(cls, v):
+        # Reject unsafe outbound headers early (422). Mirrors
+        # webhook.sanitize_webhook_headers; kept inline to avoid an import cycle.
+        if not v:
+            return v
+        from webhook import sanitize_webhook_headers
+        return sanitize_webhook_headers(v)
+
 
 class WebhookPayload(BaseModel):
     """Payload sent to webhook endpoints."""

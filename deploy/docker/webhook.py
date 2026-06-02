@@ -6,10 +6,42 @@ This module provides webhook notification functionality with exponential backoff
 import asyncio
 import httpx
 import logging
+import re
 from typing import Dict, Optional
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
+
+# Webhook request-header policy: user-controlled outbound headers could inject
+# hop-by-hop / smuggling headers or CRLF. Allow only well-formed names, reject
+# control chars in values, and deny sensitive/hop-by-hop names.
+_WEBHOOK_HEADER_NAME = re.compile(r"^[A-Za-z0-9-]{1,64}$")
+_WEBHOOK_DENY_HEADERS = {
+    "host", "content-length", "transfer-encoding", "connection",
+    "content-type", "proxy-authorization", "authorization", "cookie",
+    "expect", "upgrade", "te", "trailer",
+}
+_MAX_WEBHOOK_HEADERS = 20
+_MAX_WEBHOOK_HEADER_VALUE = 2048
+
+
+def sanitize_webhook_headers(headers: Optional[Dict[str, str]]) -> Dict[str, str]:
+    """Validate user-supplied webhook headers; raise ValueError on any bad one."""
+    if not headers:
+        return {}
+    if len(headers) > _MAX_WEBHOOK_HEADERS:
+        raise ValueError("too many webhook headers")
+    clean: Dict[str, str] = {}
+    for name, value in headers.items():
+        if not isinstance(name, str) or not _WEBHOOK_HEADER_NAME.match(name):
+            raise ValueError(f"invalid webhook header name: {name!r}")
+        if name.lower() in _WEBHOOK_DENY_HEADERS:
+            raise ValueError(f"webhook header not allowed: {name}")
+        sval = str(value)
+        if len(sval) > _MAX_WEBHOOK_HEADER_VALUE or any(c in sval for c in "\r\n\x00"):
+            raise ValueError(f"invalid value for webhook header {name}")
+        clean[name] = sval
+    return clean
 
 
 class WebhookDeliveryService:
@@ -50,7 +82,12 @@ class WebhookDeliveryService:
         validate_webhook_url(webhook_url)
 
         default_headers = self.config.get("headers", {})
-        merged_headers = {**default_headers, **(headers or {})}
+        try:
+            safe_custom = sanitize_webhook_headers(headers)
+        except ValueError as e:
+            logger.warning(f"Dropping unsafe webhook headers: {e}")
+            safe_custom = {}
+        merged_headers = {**default_headers, **safe_custom}
         merged_headers["Content-Type"] = "application/json"
 
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=False) as client:
