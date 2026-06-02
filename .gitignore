@@ -305,3 +305,6 @@ HANDOFF-*.md
 
 # Security advisory payloads - kept private, published via GitHub Security Advisories only
 .security/
+
+# Local pipeline/run output
+out/
