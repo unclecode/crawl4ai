@@ -1387,6 +1387,11 @@ class CrawlerRunConfig():
                             into the main parameter set.
                             Default: None.
 
+        total_timeout (int or None): Maximum total time in milliseconds for the entire crawl operation.
+                                     This includes navigation, JS execution, and extraction.
+                                     If None, a default watchdog may be applied by the dispatcher.
+                                     Default: None.
+
         url: str = None  # This is not a compulsory parameter
     """
     _UNWANTED_PROPS = {
@@ -1516,10 +1521,13 @@ class CrawlerRunConfig():
         # Anti-Bot Retry Parameters
         max_retries: int = 0,
         fallback_fetch_function: Optional[Callable[[str], Awaitable[str]]] = None,
+        # Global Timeout
+        total_timeout: Optional[int] = None,
     ):
         # TODO: Planning to set properties dynamically based on the __init__ signature
         self.url = url
         self.base_url = base_url  # Base URL for markdown link resolution
+        self.total_timeout = total_timeout
 
         # Content Processing Parameters
         self.word_count_threshold = word_count_threshold
