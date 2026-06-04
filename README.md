@@ -37,9 +37,9 @@ Limited slots._
 
 Crawl4AI turns the web into clean, LLM ready Markdown for RAG, agents, and data pipelines. Fast, controllable, battle tested by a 50k+ star community.
 
-[✨ Check out latest update v0.8.7](#-recent-updates)
+[✨ Check out latest update v0.8.8](#-recent-updates)
 
-✨ **New in v0.8.7**: Security-hardening release. Fixes critical Docker API vulnerabilities (RCE, SSRF, auth bypass, file write, XSS, hardcoded JWT secret), adds DomainMapper, and ships scraping, deep-crawl, and LLM fixes. If you self-host the Docker API, upgrade immediately. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.7.md)
+✨ **New in v0.8.8**: Backward-compatible security patch for the self-hosted Docker API server (SSRF filter gaps, output_path file write, LLM credential exfiltration, log and webhook header injection). If you run the Docker server, upgrade. A larger secure-by-default release with breaking changes is coming in ~1-2 weeks. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.8.md)
 
 ✨ Recent v0.8.6: Security hotfix that replaced `litellm` with `unclecode-litellm` due to a PyPI supply chain compromise.
 
@@ -565,6 +565,19 @@ async def test_news_crawl():
 ## ✨ Recent Updates
 
 <details open>
+<summary><strong>Version 0.8.8 Release Highlights - Docker Server Security Patch</strong></summary>
+
+A focused, backward-compatible security patch for the self-hosted Docker API server: closes SSRF filter gaps (IPv6 transition forms), hardens screenshot/PDF `output_path` against a symlink write, stops LLM credential exfiltration via a request `base_url`, and adds CRLF-safe logging and webhook header validation. Upgrade in place, no config changes. A larger secure-by-default release with breaking changes is coming in ~1-2 weeks; a migration guide will accompany the pre-announcement.
+
+```bash
+pip install -U crawl4ai
+```
+
+[Full v0.8.8 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.8.md)
+
+</details>
+
+<details>
 <summary><strong>Version 0.8.7 Release Highlights - Security Hardening, DomainMapper & Community Fixes</strong></summary>
 
 A security-hardening release. Fixes critical Docker API vulnerabilities (AST sandbox escape RCE, hook sandbox RCE, hardcoded JWT secret, SSRF on webhook and crawl endpoints, arbitrary file write, monitor auth bypass, stored XSS, and unauthenticated JS execution), adds the DomainMapper feature, and ships a batch of scraping, deep-crawl, and LLM fixes. If you self-host the Docker API, upgrade immediately.

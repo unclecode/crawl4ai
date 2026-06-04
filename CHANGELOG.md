@@ -5,6 +5,32 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.8] - 2026-06-04
+
+0.8.8 is a focused, backward-compatible security patch for the self-hosted Docker API server. Upgrade in place; no configuration changes are required. If you run the Docker server, upgrade. If it is exposed to a network, also set `CRAWL4AI_API_TOKEN`.
+
+### Security
+
+Security advisories accompany this release.
+
+- **SSRF filter gaps closed (CWE-918)**: the Docker server's SSRF protection now rejects any resolved address that is not globally routable, evaluated on IPv6 transition forms too (NAT64 `64:ff9b::/96`, 6to4 `2002::/16`, IPv4-mapped, and the unspecified `::`), which previously bypassed the explicit blocklist and could reach internal services and cloud-metadata endpoints. SSRF errors no longer echo the resolved address. Credit: internal security audit.
+- **Arbitrary file write via `output_path` hardened (CWE-59/22)**: `/screenshot` and `/pdf` now resolve symlinks and re-check containment before writing, and write with `O_NOFOLLOW`, closing a symlink/TOCTOU bypass of the directory restriction. `output_path` behavior is unchanged for normal use. Credit: internal security audit.
+- **LLM credential exfiltration closed (CWE-522/200)**: the LLM endpoints (`/md`, `/llm`, `/llm/job`) ignore a request-supplied `base_url`, so the configured provider key can no longer be redirected to an attacker endpoint. `LLMConfig` additionally refuses to resolve protected environment variables via the `env:` token form. The `base_url` field is still accepted but no longer honored. Credit: Geo ([geo-chen](https://github.com/geo-chen)); the `env:` hardening from internal security audit.
+- **CRLF-safe logging (CWE-117)** and **webhook request-header validation (CWE-93)**: log records are stripped of CR/LF/control characters, and user-supplied webhook headers are validated (name pattern, no control characters, hop-by-hop/sensitive headers denied).
+
+All changes are backward compatible.
+
+### Coming next: secure-by-default Docker server (~1-2 weeks)
+
+The next release is a larger, secure-by-default update for the self-hosted Docker API server, with intentional breaking changes. We are giving advance notice so you can prepare. If you run the Docker server, start planning now and test in staging before upgrading:
+
+- Authentication will be on by default. The server binds loopback unless a credential (`CRAWL4AI_API_TOKEN`) is configured.
+- Request bodies are validated more strictly and safer defaults apply (TLS verification on, stricter outbound egress controls, declarative hook actions instead of inline code).
+- A few request options move server-side: `/screenshot` and `/pdf` return an artifact id instead of a file path, and the LLM endpoint is selected by provider name.
+- Hardened container defaults (least-privilege compose, Redis authentication, loopback bind).
+
+A full migration guide will accompany the pre-announcement on Discord and X.
+
 ## [0.8.7] - 2026-06-01
 
 0.8.7 is a security-hardening release. It bundles every responsibly-disclosed vulnerability patched since 0.8.6, plus the new DomainMapper feature and a batch of scraping, deep-crawl, and LLM fixes.
