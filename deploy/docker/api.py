@@ -47,12 +47,40 @@ from utils import (
     get_llm_base_url,
     get_redis_task_ttl,
     validate_url_destination,
+    validate_proxy_destination,
+    scrub_browser_extra_args,
 )
 from webhook import WebhookDeliveryService
 
 import psutil, time
 
 logger = logging.getLogger(__name__)
+
+
+def _enforce_proxy_safety(browser_config, crawler_config=None):
+    """Block SSRF via a caller-supplied proxy / proxy-redirecting browser flags.
+
+    The crawl-target URL is validated elsewhere; this covers the other paths
+    that reach Chromium's egress: BrowserConfig.proxy, BrowserConfig.proxy_config
+    .server, CrawlerRunConfig.proxy_config.server, and proxy/DNS flags smuggled
+    via extra_args. Raises HTTPException(400) on a non-global proxy host."""
+    from fastapi import HTTPException
+    try:
+        if browser_config is not None:
+            if getattr(browser_config, "proxy", None):
+                validate_proxy_destination(browser_config.proxy)
+            pc = getattr(browser_config, "proxy_config", None)
+            if pc is not None and getattr(pc, "server", None):
+                validate_proxy_destination(pc.server)
+            if getattr(browser_config, "extra_args", None):
+                browser_config.extra_args = scrub_browser_extra_args(browser_config.extra_args)
+        if crawler_config is not None:
+            cpc = getattr(crawler_config, "proxy_config", None)
+            if cpc is not None and getattr(cpc, "server", None):
+                validate_proxy_destination(cpc.server)
+    except ValueError:
+        # opaque: do not echo the resolved internal address
+        raise HTTPException(status_code=400, detail="Proxy destination blocked (SSRF protection)")
 
 # --- Helper to get memory ---
 def _get_memory_mb():
@@ -573,6 +601,7 @@ async def handle_crawl_request(
             validate_url_destination(url)
         browser_config = BrowserConfig.load(browser_config)
         crawler_config = CrawlerRunConfig.load(crawler_config)
+        _enforce_proxy_safety(browser_config, crawler_config)
 
         dispatcher = MemoryAdaptiveDispatcher(
             memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
@@ -717,6 +746,9 @@ async def handle_crawl_request(
         
         return response
 
+    except HTTPException:
+        raise  # client errors (e.g. blocked proxy 400) must not become 500
+
     except Exception as e:
         logger.error(f"Crawl error: {str(e)}", exc_info=True)
 
@@ -761,6 +793,7 @@ async def handle_stream_crawl_request(
         # browser_config.verbose = True # Set to False or remove for production stress testing
         browser_config.verbose = False
         crawler_config = CrawlerRunConfig.load(crawler_config)
+        _enforce_proxy_safety(browser_config, crawler_config)
         crawler_config.scraping_strategy = LXMLWebScrapingStrategy()
         crawler_config.stream = True
 
@@ -813,6 +846,11 @@ async def handle_stream_crawl_request(
             )
 
         return crawler, results_gen, hooks_info
+
+    except HTTPException:
+        if crawler:
+            await release_crawler(crawler)
+        raise  # client errors (e.g. blocked proxy 400) must not become 500
 
     except Exception as e:
         # Release crawler on setup error (for successful streams,

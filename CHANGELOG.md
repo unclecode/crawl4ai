@@ -5,6 +5,18 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.9] - 2026-06-04
+
+0.8.9 is a follow-up, backward-compatible security patch for the self-hosted Docker API server, closing an SSRF path that 0.8.8 did not cover. Upgrade in place; no configuration changes required.
+
+### Security
+
+A security advisory accompanies this release.
+
+- **SSRF via proxy settings (CWE-918)**: the SSRF destination check was applied only to the crawl target URL, not to the proxy address. An unauthenticated `/crawl`, `/crawl/stream`, or `/crawl/job` request could set `browser_config.proxy_config.server` (or the deprecated `browser_config.proxy`, or `crawler_config.proxy_config`, or a `--proxy-server` / `--host-resolver-rules` flag in `extra_args`) to an internal address and route the browser through it, reaching internal services and cloud-metadata endpoints. All proxy destinations are now validated with the same global-routability check before the browser is built, and proxy/DNS-redirecting flags are stripped from `extra_args`. A legitimate public proxy still works. Credit: Geo ([geo-chen](https://github.com/geo-chen)).
+
+Backward compatible. Note: raw `--proxy-server` / `--host-resolver-rules` / `--proxy-bypass-list` / `--proxy-pac-url` flags passed via `extra_args` are now ignored; configure proxies through `proxy_config` (which is validated).
+
 ## [0.8.8] - 2026-06-04
 
 0.8.8 is a focused, backward-compatible security patch for the self-hosted Docker API server. Upgrade in place; no configuration changes are required. If you run the Docker server, upgrade. If it is exposed to a network, also set `CRAWL4AI_API_TOKEN`.

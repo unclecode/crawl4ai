@@ -12,3 +12,4 @@ We thank the following security researchers for their responsible disclosure:
 | Velayutham Selvaraj | [LinkedIn](https://www.linkedin.com/in/velayuthamselvaraj) | SSRF via missing host validation in validate_url_scheme (independent report) | 2026-05-06 |
 | IcySun & Yashon | icysun@qq.com, liyaoyin@qq.com | SSRF, file write via output_path, missing auth by default, hook sandbox bypass via asyncio (independent report) | 2026-05-15 |
 | Geo ([geo-chen](https://github.com/geo-chen)) | cve@sageby.com | LLM API key exfiltration via unvalidated base_url (0.8.8) | 2026-06-02 |
+| Geo ([geo-chen](https://github.com/geo-chen)) | cve@sageby.com | SSRF via proxy_config.server bypassing the SSRF check (0.8.9) | 2026-06-04 |

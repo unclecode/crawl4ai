@@ -37,9 +37,9 @@ Limited slots._
 
 Crawl4AI turns the web into clean, LLM ready Markdown for RAG, agents, and data pipelines. Fast, controllable, battle tested by a 50k+ star community.
 
-[✨ Check out latest update v0.8.8](#-recent-updates)
+[✨ Check out latest update v0.8.9](#-recent-updates)
 
-✨ **New in v0.8.8**: Backward-compatible security patch for the self-hosted Docker API server (SSRF filter gaps, output_path file write, LLM credential exfiltration, log and webhook header injection). If you run the Docker server, upgrade. A larger secure-by-default release with breaking changes is coming in ~1-2 weeks. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.8.md)
+✨ **New in v0.8.9**: Follow-up security patch for the self-hosted Docker API server, closing an SSRF via proxy settings that 0.8.8 did not cover. Backward compatible. If you run the Docker server, upgrade. A larger secure-by-default release with breaking changes is coming in ~1-2 weeks. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.9.md)
 
 ✨ Recent v0.8.6: Security hotfix that replaced `litellm` with `unclecode-litellm` due to a PyPI supply chain compromise.
 
@@ -565,9 +565,22 @@ async def test_news_crawl():
 ## ✨ Recent Updates
 
 <details open>
+<summary><strong>Version 0.8.9 Release Highlights - Proxy SSRF Patch</strong></summary>
+
+A follow-up, backward-compatible security patch for the self-hosted Docker API server: closes an SSRF via proxy settings (`proxy_config.server`, the deprecated `proxy`, `crawler_config.proxy_config`, and proxy/DNS flags in `extra_args`) that 0.8.8 did not cover. Proxy destinations are now validated like crawl URLs. Upgrade in place, no config changes. A larger secure-by-default release with breaking changes is coming in ~1-2 weeks; a migration guide will accompany the pre-announcement.
+
+```bash
+pip install -U crawl4ai
+```
+
+[Full v0.8.9 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.9.md)
+
+</details>
+
+<details>
 <summary><strong>Version 0.8.8 Release Highlights - Docker Server Security Patch</strong></summary>
 
-A focused, backward-compatible security patch for the self-hosted Docker API server: closes SSRF filter gaps (IPv6 transition forms), hardens screenshot/PDF `output_path` against a symlink write, stops LLM credential exfiltration via a request `base_url`, and adds CRLF-safe logging and webhook header validation. Upgrade in place, no config changes. A larger secure-by-default release with breaking changes is coming in ~1-2 weeks; a migration guide will accompany the pre-announcement.
+A focused, backward-compatible security patch for the self-hosted Docker API server: closes SSRF filter gaps (IPv6 transition forms), hardens screenshot/PDF `output_path` against a symlink write, stops LLM credential exfiltration via a request `base_url`, and adds CRLF-safe logging and webhook header validation. Upgrade in place, no config changes.
 
 ```bash
 pip install -U crawl4ai

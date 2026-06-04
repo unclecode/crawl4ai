@@ -450,6 +450,47 @@ def validate_webhook_url(url: str) -> None:
                 raise ValueError("URL resolves to a blocked address")
 
 
+# Chromium launch flags that can redirect/route egress or remap DNS, enabling
+# the same SSRF as a proxy field. Stripped from caller-supplied extra_args.
+_DANGEROUS_BROWSER_ARGS = (
+    "--proxy-server", "--proxy-pac-url", "--proxy-bypass-list",
+    "--host-resolver-rules",
+)
+
+
+def validate_proxy_destination(server: str) -> None:
+    """Reject a proxy server whose host is non-global (SSRF via proxy_config).
+
+    The crawl-target SSRF check is applied to the URL being fetched, but a proxy
+    address is also attacker-controllable and is handed to Chromium's
+    --proxy-server. Validate it with the same not-is_global rule. Honors
+    CRAWL4AI_ALLOW_INTERNAL_URLS. Raises ValueError (opaque) on a blocked host."""
+    if ALLOW_INTERNAL_URLS or not server:
+        return
+    s = str(server)
+    # proxy strings may be "scheme://host:port" or bare "host:port"
+    parsed = urlparse(s if "://" in s else "//" + s)
+    host = parsed.hostname
+    if not host:
+        raise ValueError("Invalid proxy server")
+    # Reuse the destination check (resolve + not-is_global on transition forms).
+    validate_webhook_url(f"http://{host}")
+
+
+def scrub_browser_extra_args(extra_args):
+    """Drop egress/DNS-redirecting Chromium flags from caller-supplied args.
+
+    The supported way to set a proxy is proxy_config (validated). Raw
+    --proxy-*/--host-resolver-rules flags bypass that validation and re-enable
+    the SSRF, so they are removed. Returns the filtered list."""
+    if not extra_args:
+        return extra_args
+    return [
+        a for a in extra_args
+        if not any(str(a).startswith(bad) for bad in _DANGEROUS_BROWSER_ARGS)
+    ]
+
+
 def verify_email_domain(email: str) -> bool:
     try:
         domain = email.split('@')[1]
