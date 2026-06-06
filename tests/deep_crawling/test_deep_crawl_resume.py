@@ -507,6 +507,37 @@ class TestBestFirstResume:
         # So -0.9 should be crawled first
         assert crawl_order[0] == "https://example.com/high-priority"
 
+    @pytest.mark.asyncio
+    async def test_stream_results_follow_priority_order_with_out_of_order_batch(self):
+        saved_state = {
+            "strategy_type": "best_first",
+            "visited": ["https://example.com"],
+            "queue_items": [
+                {"score": -0.9, "depth": 1, "url": "https://example.com/high", "parent_url": "https://example.com"},
+                {"score": -0.1, "depth": 1, "url": "https://example.com/low", "parent_url": "https://example.com"},
+            ],
+            "depths": {"https://example.com": 0},
+            "pages_crawled": 1,
+        }
+
+        async def mock_arun_many(urls, config):
+            async def gen():
+                for url in reversed(urls):
+                    result = MagicMock(url=url, success=True, metadata={})
+                    result.links = {"internal": [], "external": []}
+                    yield result
+            return gen()
+
+        strategy = BestFirstCrawlingStrategy(max_depth=2, max_pages=10, resume_state=saved_state)
+        mock_crawler = MagicMock(arun_many=mock_arun_many)
+        results = [
+            result.url
+            async for result in strategy._arun_stream("https://example.com", mock_crawler, create_mock_config(stream=True))
+        ]
+
+        assert results[:2] == ["https://example.com/high", "https://example.com/low"]
+
+
 
 class TestCrossStrategyResume:
     """Tests that apply to all strategies."""
