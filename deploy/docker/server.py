@@ -356,7 +356,8 @@ async def get_markdown(
             400, "Invalid URL format. Must start with http://, https://, or for raw HTML (raw:, raw://)")
     markdown = await handle_markdown_request(
         body.url, body.f, body.q, body.c, config, body.provider,
-        body.temperature, body.base_url
+        body.temperature, body.base_url,
+        crawler_config=body.crawler_config
     )
     return JSONResponse({
         "url": body.url,
@@ -381,9 +382,9 @@ async def generate_html(
     Use when you need sanitized HTML structures for building schemas or further processing.
     """
     validate_url_scheme(body.url, allow_raw=True)
-    cfg = CrawlerRunConfig()
     crawler = None
     try:
+        cfg = CrawlerRunConfig.load(body.crawler_config or {})
         crawler = await get_crawler(get_default_browser_config())
         results = await crawler.arun(url=body.url, config=cfg)
         if not results[0].success:
@@ -418,7 +419,12 @@ async def generate_screenshot(
     validate_url_scheme(body.url)
     crawler = None
     try:
-        cfg = CrawlerRunConfig(screenshot=True, screenshot_wait_for=body.screenshot_wait_for, wait_for_images=body.wait_for_images)
+        cfg = CrawlerRunConfig.load(body.crawler_config or {})
+        cfg.screenshot = True
+        if body.screenshot_wait_for is not None:
+            cfg.screenshot_wait_for = body.screenshot_wait_for
+        if body.wait_for_images is not None:
+            cfg.wait_for_images = body.wait_for_images
         crawler = await get_crawler(get_default_browser_config())
         results = await crawler.arun(url=body.url, config=cfg)
         if not results[0].success:
@@ -454,7 +460,8 @@ async def generate_pdf(
     validate_url_scheme(body.url)
     crawler = None
     try:
-        cfg = CrawlerRunConfig(pdf=True)
+        cfg = CrawlerRunConfig.load(body.crawler_config or {})
+        cfg.pdf = True
         crawler = await get_crawler(get_default_browser_config())
         results = await crawler.arun(url=body.url, config=cfg)
         if not results[0].success:
@@ -535,7 +542,8 @@ async def execute_js(
         raise HTTPException(400, str(e))
     crawler = None
     try:
-        cfg = CrawlerRunConfig(js_code=body.scripts)
+        cfg = CrawlerRunConfig.load(body.crawler_config or {})
+        cfg.js_code = body.scripts
         crawler = await get_crawler(get_default_browser_config())
         results = await crawler.arun(url=body.url, config=cfg)
         if not results[0].success:

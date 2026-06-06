@@ -298,7 +298,8 @@ async def handle_markdown_request(
     config: Optional[dict] = None,
     provider: Optional[str] = None,
     temperature: Optional[float] = None,
-    base_url: Optional[str] = None
+    base_url: Optional[str] = None,
+    crawler_config: Optional[dict] = None,
 ) -> str:
     """Handle markdown generation requests."""
     crawler = None
@@ -344,14 +345,13 @@ async def handle_markdown_request(
             **_cfg["crawler"]["browser"].get("kwargs", {}),
         )
         crawler = await get_crawler(browser_cfg)
-        result = await crawler.arun(
-            url=decoded_url,
-            config=CrawlerRunConfig(
-                markdown_generator=md_generator,
-                scraping_strategy=LXMLWebScrapingStrategy(),
-                cache_mode=cache_mode
-            )
-        )
+        cc = crawler_config or {}
+        cfg = CrawlerRunConfig.load(cc)
+        cfg.markdown_generator = md_generator
+        cfg.scraping_strategy = LXMLWebScrapingStrategy()
+        if 'cache_mode' not in cc:
+            cfg.cache_mode = cache_mode
+        result = await crawler.arun(url=decoded_url, config=cfg)
 
         if not result.success:
             raise HTTPException(
