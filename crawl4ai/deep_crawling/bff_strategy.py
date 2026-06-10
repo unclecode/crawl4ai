@@ -291,13 +291,17 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                 # Count only successful crawls toward max_pages limit
                 if result.success:
                     self._pages_crawled += 1
-                    # Check if we've reached the limit during batch processing
-                    if self._pages_crawled >= self.max_pages:
-                        self.logger.info(f"Max pages limit ({self.max_pages}) reached during batch, stopping crawl")
-                        break  # Exit the generator
-                
+
+                # Yield the result before any limit check so the boundary page is
+                # kept (mirrors BFS/DFS, which append the result before breaking).
                 yield result
-                
+
+                # Stop once the limit is reached, but only after yielding the
+                # successful boundary page above.
+                if result.success and self._pages_crawled >= self.max_pages:
+                    self.logger.info(f"Max pages limit ({self.max_pages}) reached during batch, stopping crawl")
+                    break  # Exit the generator
+
                 # Only discover links from successful crawls
                 if result.success:
                     # Discover new links from this result

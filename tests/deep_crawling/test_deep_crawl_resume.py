@@ -747,6 +747,41 @@ class TestBestFirstRegressions:
         assert strategy.url_scorer is scorer
 
 
+class TestMaxPagesBoundaryYielded:
+    """best_first must YIELD exactly max_pages results (boundary page kept).
+
+    Regression for #859: best_first used to break BEFORE yielding the page that
+    hit the limit, so it returned max_pages-1 results while BFS already returned
+    max_pages. The downstream scan count (discovered_urls) is derived from the
+    yielded results, so the off-by-one surfaced as "11 requested -> 10 found".
+    BFS is included as the working reference. (DFS batch mode has a separate,
+    unrelated overshoot quirk and is intentionally not asserted here.)
+    """
+
+    @pytest.mark.parametrize(
+        "strategy_class",
+        [BFSDeepCrawlStrategy, BestFirstCrawlingStrategy],
+    )
+    @pytest.mark.asyncio
+    async def test_yields_exactly_max_pages(self, strategy_class):
+        max_pages = 11
+        strategy = strategy_class(max_depth=10, max_pages=max_pages)
+
+        mock_crawler = create_mock_crawler_unlimited_links()
+        # _arun_batch is the path the scan worker takes (crawler.arun with the
+        # default stream=False). best_first's _arun_batch re-clones with
+        # stream=True internally, so clone must honour the requested flag.
+        mock_config = create_mock_config()
+        mock_config.clone = lambda **kw: create_mock_config(stream=kw.get("stream", False))
+
+        results = await strategy._arun_batch("https://example.com", mock_crawler, mock_config)
+
+        assert len(results) == max_pages, (
+            f"{strategy_class.__name__} yielded {len(results)} results, "
+            f"expected exactly max_pages={max_pages}"
+        )
+
+
 class TestAPICompatibility:
     """Ensure API/serialization compatibility."""
 
