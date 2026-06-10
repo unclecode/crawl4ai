@@ -703,7 +703,13 @@ class HTML2Text(html.parser.HTMLParser):
                     self.soft_br()
                 if tag in ["td", "th"]:
                     if start:
-                        self.o("<{}>\n\n".format(tag))
+                        # Preserve rowspan and colspan attributes
+                        extra = ""
+                        for attr_name in ("rowspan", "colspan"):
+                            val = attrs.get(attr_name)
+                            if val is not None:
+                                extra += ' {}="{}"'.format(attr_name, val)
+                        self.o("<{}{}>\n\n".format(tag, extra))
                     else:
                         self.o("\n</{}>".format(tag))
                 else:
