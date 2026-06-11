@@ -1,4 +1,5 @@
 fastapi>=0.115.12
+aiohttp>=3.13.3
 uvicorn>=0.34.2
 gunicorn>=23.0.0
 slowapi==0.1.9
@@ -11,7 +12,12 @@ sse-starlette==2.2.1
 pydantic>=2.11
 rank-bm25==0.2.2
 anyio==4.9.0
-PyJWT==2.10.1
+PyJWT>=2.12.0,<3
+urllib3>=2.7.0
+cryptography>=46.0.5
+pyOpenSSL>=26.0.0
+setuptools>=78.1.1
+wheel>=0.46.2
 mcp>=1.18.0
 websockets>=15.0.1
 httpx[http2]>=0.27.2
