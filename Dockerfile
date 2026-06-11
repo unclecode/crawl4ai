@@ -136,6 +136,7 @@ else\n\
 fi' > /tmp/install.sh && chmod +x /tmp/install.sh
 
 COPY . /tmp/project/
+RUN rm -rf /tmp/project/sbom
 
 # Copy supervisor config first (might need root later, but okay for now)
 COPY deploy/docker/supervisord.conf .
@@ -167,7 +168,7 @@ RUN if [ "$INSTALL_TYPE" = "all" ] ; then \
         pip install "/tmp/project" ; \
     fi
 
-RUN pip install --no-cache-dir --upgrade pip && \
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     /tmp/install.sh && \
     python -c "import crawl4ai; print('✅ crawl4ai is ready to rock!')" && \
     python -c "from playwright.sync_api import sync_playwright; print('✅ Playwright is feeling dramatic!')"
@@ -175,6 +176,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 RUN crawl4ai-setup
 
 RUN playwright install --with-deps
+
+RUN apt-get update && apt-get dist-upgrade -y \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /home/appuser/.cache/ms-playwright \
     && cp -r /root/.cache/ms-playwright/chromium-* /home/appuser/.cache/ms-playwright/ \
