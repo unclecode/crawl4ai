@@ -302,3 +302,32 @@ def safe_proxy_repr(proxy: ProxyConfig):
     - Ensure `ProxyConfig.from_env()` actually loaded entries (`len(proxies) > 0`).
     - Attach `proxy_rotation_strategy` to `CrawlerRunConfig`.
     - Validate the proxy definitions you pass into the strategy.
+
+- "Crawl hangs on WSL2 when a system proxy is required"
+    - Prefer a dedicated Playwright-launched browser so the proxy is applied
+      through Playwright instead of relying on the managed browser subprocess
+      environment.
+    - Put the proxy on `BrowserConfig.proxy_config` for this case, and keep
+      `browser_mode="dedicated"`:
+
+      ```python
+      import asyncio
+      from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, ProxyConfig
+
+      async def main():
+          browser_config = BrowserConfig(
+              browser_mode="dedicated",
+              use_managed_browser=False,
+              proxy_config=ProxyConfig(server="http://172.29.240.1:7892"),
+          )
+          run_config = CrawlerRunConfig(page_timeout=15000)
+
+          async with AsyncWebCrawler(config=browser_config) as crawler:
+              result = await crawler.arun("https://example.com", config=run_config)
+              print("success:", result.success)
+
+      asyncio.run(main())
+      ```
+
+    - If your proxy host changes between WSL sessions, derive the Windows host IP
+      from `ip route` and rebuild the proxy URL before creating `BrowserConfig`.
