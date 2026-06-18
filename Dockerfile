@@ -90,10 +90,19 @@ RUN apt-get update && apt-get dist-upgrade -y \
     && rm -rf /var/lib/apt/lists/*
 
 RUN if [ "$ENABLE_GPU" = "true" ] && [ "$TARGETARCH" = "amd64" ] ; then \
+    echo "Installing NVIDIA CUDA Toolkit..." && \
     apt-get update && apt-get install -y --no-install-recommends \
-    nvidia-cuda-toolkit \
-    && apt-get clean \ 
-    && rm -rf /var/lib/apt/lists/* ; \
+        wget gnupg ca-certificates && \
+    \
+    wget https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/cuda-keyring_1.1-1_all.deb && \
+    dpkg -i cuda-keyring_1.1-1_all.deb && \
+    rm cuda-keyring_1.1-1_all.deb && \
+    \
+    apt-get update && apt-get install -y --no-install-recommends \
+        cuda-toolkit-12-5 && \
+    \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* ; \
 else \
     echo "Skipping NVIDIA CUDA Toolkit installation (unsupported platform or GPU disabled)"; \
 fi
