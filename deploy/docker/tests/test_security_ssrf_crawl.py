@@ -213,6 +213,51 @@ class TestSSRFSourceCoverage(unittest.TestCase):
         self.assertGreaterEqual(count, 5,  # 1 import + 4 call sites
             f"api.py should call validate_url_destination at all URL entry points (found {count})")
 
+    def test_every_crawl_handler_validates_destination(self):
+        """Per-handler check: each crawl handler body must validate seed URL
+        destinations (via the shared _normalize_and_validate_seeds helper). A
+        bare occurrence count missed the streaming handler (it had zero calls
+        while the count was still satisfied)."""
+        with open(os.path.join(DEPLOY_DIR, "api.py")) as f:
+            source = f.read()
+        handlers = [
+            "handle_crawl_request",
+            "handle_stream_crawl_request",
+        ]
+        for handler in handlers:
+            idx = source.index(f"async def {handler}")
+            nxt = source.find("\nasync def ", idx + 1)
+            body = source[idx: nxt if nxt != -1 else len(source)]
+            self.assertIn("_normalize_and_validate_seeds(", body,
+                f"{handler} must validate its seed URLs via _normalize_and_validate_seeds")
+
+    def test_default_browser_config_pins_egress(self):
+        """get_default_browser_config must apply enforce_egress so /html,
+        /screenshot, /pdf, /execute_js fetch through the pinning proxy
+        (DNS-rebinding / redirect-to-internal protection), not just validate
+        the seed and then let the browser re-resolve."""
+        with open(os.path.join(DEPLOY_DIR, "server.py")) as f:
+            source = f.read()
+        idx = source.index("def get_default_browser_config")
+        nxt = source.find("\ndef ", idx + 1)
+        body = source[idx: nxt if nxt != -1 else idx + 800]
+        self.assertIn("enforce_egress", body,
+            "get_default_browser_config must call enforce_egress on the returned config")
+
+    def test_llm_and_markdown_handlers_pin_egress(self):
+        """The /md and /llm handlers and the LLM background worker must pin
+        egress on their fetch config (same seed-only SSRF root cause)."""
+        with open(os.path.join(DEPLOY_DIR, "api.py")) as f:
+            source = f.read()
+        for handler in ("handle_llm_qa", "handle_markdown_request", "process_llm_extraction"):
+            idx = source.index(f"def {handler}")
+            nxt = source.find("\nasync def ", idx + 1)
+            nxt2 = source.find("\ndef ", idx + 1)
+            ends = [e for e in (nxt, nxt2) if e != -1]
+            body = source[idx: min(ends) if ends else len(source)]
+            self.assertIn("enforce_egress", body,
+                f"{handler} must call enforce_egress on its fetch config")
+
     def test_utils_has_allow_internal_flag(self):
         """utils.py must have CRAWL4AI_ALLOW_INTERNAL_URLS env var."""
         with open(os.path.join(DEPLOY_DIR, "utils.py")) as f:
@@ -228,6 +273,37 @@ class TestSSRFSourceCoverage(unittest.TestCase):
         func_body = source[idx:idx+500]
         self.assertIn("raw:", func_body,
             "validate_url_destination must skip raw: URLs")
+
+
+import pytest
+
+
+class TestStreamCrawlSSRFBehavioral:
+    """End-to-end: an internal seed URL must be 400-blocked on the streaming
+    path, not just asserted to exist in source. This is the behavioral guard
+    for the KOH stream-SSRF fix (and proves the deliberate 400 is not masked
+    to 500 by the handler's generic except)."""
+
+    def _auth(self):
+        from auth import create_access_token
+        return {"Authorization": f"Bearer {create_access_token({'sub': 'u@x.com'})}"}
+
+    INTERNAL = "http://169.254.169.254/latest/meta-data/"
+
+    def test_crawl_stream_blocks_internal(self, stock_client, server_module):
+        r = stock_client.post("/crawl/stream", json={"urls": [self.INTERNAL]}, headers=self._auth())
+        assert r.status_code == 400, f"expected 400 SSRF block, got {r.status_code}: {r.text[:200]}"
+        assert "SSRF" in r.text or "blocked" in r.text.lower()
+
+    def test_crawl_with_stream_true_blocks_internal(self, stock_client, server_module):
+        body = {"urls": [self.INTERNAL],
+                "crawler_config": {"type": "CrawlerRunConfig", "params": {"stream": True}}}
+        r = stock_client.post("/crawl", json=body, headers=self._auth())
+        assert r.status_code == 400, f"expected 400 SSRF block, got {r.status_code}: {r.text[:200]}"
+
+    def test_non_stream_crawl_still_blocks_internal(self, stock_client, server_module):
+        r = stock_client.post("/crawl", json={"urls": [self.INTERNAL]}, headers=self._auth())
+        assert r.status_code == 400, f"expected 400 SSRF block, got {r.status_code}: {r.text[:200]}"
 
 
 if __name__ == "__main__":

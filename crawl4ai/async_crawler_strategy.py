@@ -1474,7 +1474,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         try:
             suggested_filename = download.suggested_filename
-            download_path = os.path.join(self.browser_config.downloads_path, suggested_filename)
+            download_path = _safe_download_filepath(self.browser_config.downloads_path, suggested_filename)
+            # Playwright's save_as performs the write itself (no O_NOFOLLOW
+            # hook), so reject a symlink planted at the target before writing.
+            if os.path.islink(download_path):
+                raise ValueError(f"Refusing to write download through symlink: {download_path}")
 
             self.logger.info(
                 message="Downloading {filename} to {path}",
@@ -2413,6 +2417,35 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 # HTTP Crawler Strategy
 ####################################################################################################
 
+def _safe_download_filepath(downloads_path: str, filename: str) -> str:
+    """Resolve a download destination confined to ``downloads_path``.
+
+    The filename is derived from attacker-influenced input (a remote
+    Content-Disposition header, or the browser's suggested filename), so it is
+    reduced to a bare basename (dropping absolute paths and ``..`` traversal)
+    and the resolved path is re-checked to live inside the downloads root,
+    rejecting any pre-existing symlink that points outside. Raises ValueError
+    on any escape. The final write must still use ``_nofollow_opener`` (or an
+    equivalent ``O_NOFOLLOW`` / pre-write symlink check) to close the TOCTOU
+    window between this check and the open.
+    """
+    safe_name = os.path.basename(filename or "")
+    if not safe_name or safe_name in (".", ".."):
+        safe_name = f"download_{hashlib.md5((filename or '').encode()).hexdigest()[:10]}"
+    real_root = os.path.realpath(downloads_path)
+    real_path = os.path.realpath(os.path.join(real_root, safe_name))
+    if os.path.commonpath([real_root, real_path]) != real_root:
+        raise ValueError(f"Unsafe download filename rejected: {filename!r}")
+    return real_path
+
+
+def _nofollow_opener(path, flags):
+    """Opener for ``open``/``aiofiles.open`` that refuses to follow a symlink at
+    the final path component, closing the TOCTOU symlink-swap race after a path
+    has been confined by ``_safe_download_filepath``."""
+    return os.open(path, flags | os.O_NOFOLLOW)
+
+
 class HTTPCrawlerError(Exception):
     """Base error class for HTTP crawler specific exceptions"""
     pass
@@ -2707,9 +2740,9 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
                         os.makedirs(downloads_path, exist_ok=True)
 
                         filename = self._extract_filename(content_disposition, url, content_type)
-                        filepath = os.path.join(downloads_path, filename)
+                        filepath = _safe_download_filepath(downloads_path, filename)
 
-                        async with aiofiles.open(filepath, 'wb') as f:
+                        async with aiofiles.open(filepath, 'wb', opener=_nofollow_opener) as f:
                             await f.write(raw_bytes)
 
                         downloaded_files = [filepath]

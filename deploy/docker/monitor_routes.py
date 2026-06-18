@@ -1,8 +1,9 @@
 # monitor_routes.py - Monitor API endpoints
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Depends
 from pydantic import BaseModel
 from typing import Optional
 from monitor import get_monitor
+from auth import require_admin
 import logging
 import asyncio
 import json
@@ -153,7 +154,7 @@ class KillBrowserRequest(BaseModel):
     sig: str
 
 
-@router.post("/actions/cleanup")
+@router.post("/actions/cleanup", dependencies=[Depends(require_admin)])
 async def force_cleanup():
     """Force immediate janitor cleanup (kills idle cold pool browsers)."""
     try:
@@ -184,7 +185,7 @@ async def force_cleanup():
         raise HTTPException(500, str(e))
 
 
-@router.post("/actions/kill_browser")
+@router.post("/actions/kill_browser", dependencies=[Depends(require_admin)])
 async def kill_browser(req: KillBrowserRequest):
     """Kill a specific browser by signature (hot or cold only).
 
@@ -253,7 +254,7 @@ async def kill_browser(req: KillBrowserRequest):
         raise HTTPException(500, str(e))
 
 
-@router.post("/actions/restart_browser")
+@router.post("/actions/restart_browser", dependencies=[Depends(require_admin)])
 async def restart_browser(req: KillBrowserRequest):
     """Restart a browser (kill + recreate). Works for permanent too.
 
@@ -336,7 +337,7 @@ async def restart_browser(req: KillBrowserRequest):
         raise HTTPException(500, str(e))
 
 
-@router.post("/stats/reset")
+@router.post("/stats/reset", dependencies=[Depends(require_admin)])
 async def reset_stats():
     """Reset today's endpoint counters."""
     try:
@@ -360,15 +361,9 @@ async def websocket_endpoint(websocket: WebSocket):
     - Browser pool status
     - Timeline data
     """
-    # WebSocket endpoints don't inherit router dependencies in FastAPI.
-    # Validate token from query params if auth is configured.
-    import os
-    expected_token = os.environ.get("CRAWL4AI_API_TOKEN", "")
-    if expected_token:
-        token = websocket.query_params.get("token", "")
-        if token != expected_token:
-            await websocket.close(code=4003, reason="Authentication required")
-            return
+    # Auth is enforced by the AuthGateMiddleware (outermost ASGI layer), which
+    # validates the ?token= query param / Authorization header for this
+    # WebSocket and closes 4401 before we are reached. No bespoke check here.
     await websocket.accept()
     logger.info("WebSocket client connected")
 

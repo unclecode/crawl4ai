@@ -36,6 +36,22 @@ def mcp_tool(name: str | None = None):
     return deco
 
 # ── HTTP‑proxy helper for FastAPI endpoints ─────────────────────
+def _service_auth_headers() -> dict:
+    """Authenticate the internal loopback call to our own gated endpoints.
+
+    The MCP transport is now behind the AuthGateMiddleware, so by the time a
+    tool is invoked the MCP client is already authenticated. The loopback HTTP
+    call this proxy makes must therefore carry a credential too, or the gate
+    would 401 it. We mint a short-lived, data-scope service token: MCP exposes
+    only data-plane tools (no admin/monitor actions), so this grants no
+    privilege escalation. (Requires a shared SECRET_KEY across workers, which
+    the auth startup check already mandates for any real deployment.)
+    """
+    from auth import create_access_token
+    token = create_access_token({"sub": "mcp-service"}, scope="data")
+    return {"Authorization": f"Bearer {token}"}
+
+
 def _make_http_proxy(base_url: str, route, *, timeout: float | None = None):
     method = list(route.methods - {"HEAD", "OPTIONS"})[0]
     async def proxy(**kwargs):
@@ -48,12 +64,13 @@ def _make_http_proxy(base_url: str, route, *, timeout: float | None = None):
                 kwargs.pop(k)
         url = base_url.rstrip("/") + path
 
+        headers = _service_auth_headers()
         async with httpx.AsyncClient(timeout=timeout) as client:
             try:
                 r = (
-                    await client.get(url, params=kwargs)
+                    await client.get(url, params=kwargs, headers=headers)
                     if method == "GET"
-                    else await client.request(method, url, json=kwargs)
+                    else await client.request(method, url, json=kwargs, headers=headers)
                 )
                 r.raise_for_status()
                 return r.text if method == "GET" else r.json()

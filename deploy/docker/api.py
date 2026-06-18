@@ -25,7 +25,45 @@ from crawl4ai import (
     RateLimiter, 
     LLMConfig
 )
+from crawl4ai.async_configs import Provenance, UntrustedConfigError
+from hook_registry import build_declarative_hooks, HookValidationError
+from llm_broker import LLMProviderNotAllowed
 from crawl4ai.utils import perform_completion_with_backoff
+
+
+def _enqueue_job(background_tasks, factory, principal=None):
+    """Submit a background job to the bounded work queue (per-principal quota).
+
+    Falls back to FastAPI BackgroundTasks when the queue isn't running (tests /
+    no lifespan). Maps queue/quota limits to HTTP 503 / 429.
+    """
+    from work_queue import get_job_queue, QueueFull, QuotaExceeded
+    q = get_job_queue()
+    if q is None or not q.started:
+        background_tasks.add_task(factory)
+        return
+    try:
+        q.submit(factory, principal)
+    except QuotaExceeded:
+        raise HTTPException(status_code=429, detail="Too many concurrent jobs for this caller")
+    except QueueFull:
+        raise HTTPException(
+            status_code=503, detail="Server busy, retry later",
+            headers={"Retry-After": "5"},
+        )
+
+
+def _attach_declarative_hooks(crawler, hooks_config: dict) -> dict:
+    """Build and attach server-authored hooks from declarative specs.
+
+    Raises HookValidationError on an unknown action / invalid params, which the
+    handlers map to HTTP 400.
+    """
+    specs = hooks_config.get("hooks", []) or []
+    hooks = build_declarative_hooks(specs)
+    for hook_point, fn in hooks.items():
+        crawler.crawler_strategy.set_hook(hook_point, fn)
+    return {"status": "success", "attached": list(hooks.keys())}
 from crawl4ai.content_filter_strategy import (
     PruningContentFilter,
     BM25ContentFilter,
@@ -47,40 +85,12 @@ from utils import (
     get_llm_base_url,
     get_redis_task_ttl,
     validate_url_destination,
-    validate_proxy_destination,
-    scrub_browser_extra_args,
 )
 from webhook import WebhookDeliveryService
 
 import psutil, time
 
 logger = logging.getLogger(__name__)
-
-
-def _enforce_proxy_safety(browser_config, crawler_config=None):
-    """Block SSRF via a caller-supplied proxy / proxy-redirecting browser flags.
-
-    The crawl-target URL is validated elsewhere; this covers the other paths
-    that reach Chromium's egress: BrowserConfig.proxy, BrowserConfig.proxy_config
-    .server, CrawlerRunConfig.proxy_config.server, and proxy/DNS flags smuggled
-    via extra_args. Raises HTTPException(400) on a non-global proxy host."""
-    from fastapi import HTTPException
-    try:
-        if browser_config is not None:
-            if getattr(browser_config, "proxy", None):
-                validate_proxy_destination(browser_config.proxy)
-            pc = getattr(browser_config, "proxy_config", None)
-            if pc is not None and getattr(pc, "server", None):
-                validate_proxy_destination(pc.server)
-            if getattr(browser_config, "extra_args", None):
-                browser_config.extra_args = scrub_browser_extra_args(browser_config.extra_args)
-        if crawler_config is not None:
-            cpc = getattr(crawler_config, "proxy_config", None)
-            if cpc is not None and getattr(cpc, "server", None):
-                validate_proxy_destination(cpc.server)
-    except ValueError:
-        # opaque: do not echo the resolved internal address
-        raise HTTPException(status_code=400, detail="Proxy destination blocked (SSRF protection)")
 
 # --- Helper to get memory ---
 def _get_memory_mb():
@@ -133,6 +143,8 @@ async def handle_llm_qa(
             extra_args=cfg["crawler"]["browser"].get("extra_args", []),
             **cfg["crawler"]["browser"].get("kwargs", {}),
         )
+        from egress_broker import enforce_egress
+        enforce_egress(browser_cfg)
         crawler = await get_crawler(browser_cfg)
         result = await crawler.arun(url)
         if not result.success:
@@ -151,19 +163,24 @@ async def handle_llm_qa(
 
     Answer:"""
 
-        resolved_provider = provider or config["llm"]["provider"]
+        # Provider by name only; base_url/api_token are server-derived. A
+        # request-supplied base_url is ignored (it was the key-exfil vector).
+        from llm_broker import resolve_llm
+        llm = resolve_llm(config, provider)
         response = perform_completion_with_backoff(
-            provider=resolved_provider,
+            provider=llm["provider"],
             prompt_with_variables=prompt,
-            api_token=get_llm_api_key(config, resolved_provider),
-            temperature=temperature or get_llm_temperature(config, resolved_provider),
-            base_url=get_llm_base_url(config, resolved_provider),  # ignore request base_url (key-exfil vector)
+            api_token=llm["api_token"],
+            temperature=temperature or llm["temperature"],
+            base_url=llm["base_url"],
             base_delay=config["llm"].get("backoff_base_delay", 2),
             max_attempts=config["llm"].get("backoff_max_attempts", 3),
             exponential_factor=config["llm"].get("backoff_exponential_factor", 2)
         )
 
         return response.choices[0].message.content
+    except LLMProviderNotAllowed as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"QA processing error: {str(e)}", exc_info=True)
         raise HTTPException(
@@ -210,13 +227,15 @@ async def process_llm_extraction(
                 error=error_msg
             )
             return
-        api_key = get_llm_api_key(config, provider)  # Returns None to let litellm handle it
+        # Provider by name only; base_url/api_token server-derived (no exfil).
+        from llm_broker import resolve_llm
+        _llm = resolve_llm(config, provider)
         llm_strategy = LLMExtractionStrategy(
             llm_config=LLMConfig(
-                provider=provider or config["llm"]["provider"],
-                api_token=api_key,
-                temperature=temperature or get_llm_temperature(config, provider),
-                base_url=get_llm_base_url(config, provider)  # ignore request base_url (key-exfil vector)
+                provider=_llm["provider"],
+                api_token=_llm["api_token"],
+                temperature=temperature or _llm["temperature"],
+                base_url=_llm["base_url"],
             ),
             instruction=instruction,
             schema=json.loads(schema) if schema else None,
@@ -224,7 +243,19 @@ async def process_llm_extraction(
 
         cache_mode = CacheMode.ENABLED if cache == "1" else CacheMode.WRITE_ONLY
 
-        async with AsyncWebCrawler() as crawler:
+        # Re-validate the destination at fetch time (the enqueue-time check is a
+        # TOCTOU seed-only guard) and pin egress so the background fetch cannot
+        # be rebound/redirected to an internal target.
+        validate_url_destination(url)
+        from utils import load_config as _load_config
+        _wcfg = _load_config()
+        worker_browser_cfg = BrowserConfig(
+            extra_args=_wcfg["crawler"]["browser"].get("extra_args", []),
+            **_wcfg["crawler"]["browser"].get("kwargs", {}),
+        )
+        from egress_broker import enforce_egress
+        enforce_egress(worker_browser_cfg)
+        async with AsyncWebCrawler(config=worker_browser_cfg) as crawler:
             result = await crawler.arun(
                 url=url,
                 config=CrawlerRunConfig(
@@ -319,15 +350,18 @@ async def handle_markdown_request(
         if filter_type == FilterType.RAW:
             md_generator = DefaultMarkdownGenerator()
         else:
+            # Provider by name only; base_url/api_token are server-derived.
+            from llm_broker import resolve_llm
+            _llm = resolve_llm(config, provider)
             content_filter = {
                 FilterType.FIT: PruningContentFilter(),
                 FilterType.BM25: BM25ContentFilter(user_query=query or ""),
                 FilterType.LLM: LLMContentFilter(
                     llm_config=LLMConfig(
-                        provider=provider or config["llm"]["provider"],
-                        api_token=get_llm_api_key(config, provider),  # Returns None to let litellm handle it
-                        temperature=temperature or get_llm_temperature(config, provider),
-                        base_url=get_llm_base_url(config, provider)  # ignore request base_url (key-exfil vector)
+                        provider=_llm["provider"],
+                        api_token=_llm["api_token"],
+                        temperature=temperature or _llm["temperature"],
+                        base_url=_llm["base_url"],
                     ),
                     instruction=query or "Extract main content"
                 )
@@ -343,6 +377,8 @@ async def handle_markdown_request(
             extra_args=_cfg["crawler"]["browser"].get("extra_args", []),
             **_cfg["crawler"]["browser"].get("kwargs", {}),
         )
+        from egress_broker import enforce_egress
+        enforce_egress(browser_cfg)
         crawler = await get_crawler(browser_cfg)
         result = await crawler.arun(
             url=decoded_url,
@@ -363,6 +399,10 @@ async def handle_markdown_request(
                if filter_type == FilterType.RAW
                else result.markdown.fit_markdown)
 
+    except HTTPException:
+        raise
+    except LLMProviderNotAllowed as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Markdown error: {str(e)}", exc_info=True)
         raise HTTPException(
@@ -385,15 +425,18 @@ async def handle_llm_request(
     provider: Optional[str] = None,
     webhook_config: Optional[Dict] = None,
     temperature: Optional[float] = None,
-    api_base_url: Optional[str] = None
+    api_base_url: Optional[str] = None,
+    requester: Optional[str] = None,
+    is_admin: bool = False,
 ) -> JSONResponse:
     """Handle LLM extraction requests."""
     base_url = get_base_url(request)
-    
+
     try:
         if is_task_id(input_path):
             return await handle_task_status(
-                redis, input_path, base_url
+                redis, input_path, base_url,
+                requester=requester, is_admin=is_admin,
             )
 
         if not query:
@@ -419,9 +462,12 @@ async def handle_llm_request(
             provider,
             webhook_config,
             temperature,
-            api_base_url
+            api_base_url,
+            owner=requester,
         )
 
+    except HTTPException:
+        raise  # 429/503 (queue/quota), 400, etc. - don't mask as 500
     except Exception as e:
         logger.error(f"LLM endpoint error: {str(e)}", exc_info=True)
         return JSONResponse({
@@ -436,9 +482,16 @@ async def handle_task_status(
     task_id: str,
     base_url: str,
     *,
-    keep: bool = False
+    keep: bool = False,
+    requester: Optional[str] = None,
+    is_admin: bool = False,
 ) -> JSONResponse:
-    """Handle task status check requests."""
+    """Handle task status check requests.
+
+    Enforces ownership: a task records the `owner` (principal sub) that created
+    it; a different requester gets 404 (not 403, so task existence is not
+    revealed). Admin-scope principals may read any task.
+    """
     task = await redis.hgetall(f"task:{task_id}")
     if not task:
         raise HTTPException(
@@ -447,6 +500,15 @@ async def handle_task_status(
         )
 
     task = decode_redis_hash(task)
+
+    owner = task.get("owner")
+    if owner and not is_admin and owner != requester:
+        # Do not leak existence of someone else's task.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found"
+        )
+
     response = create_task_response(task, task_id, base_url)
 
     if task["status"] in [TaskStatus.COMPLETED, TaskStatus.FAILED]:
@@ -467,7 +529,8 @@ async def create_new_task(
     provider: Optional[str] = None,
     webhook_config: Optional[Dict] = None,
     temperature: Optional[float] = None,
-    api_base_url: Optional[str] = None
+    api_base_url: Optional[str] = None,
+    owner: Optional[str] = None,
 ) -> JSONResponse:
     """Create and initialize a new task."""
     decoded_url = unquote(input_path)
@@ -483,6 +546,8 @@ async def create_new_task(
         "created_at": datetime.now().isoformat(),
         "url": decoded_url
     }
+    if owner:
+        task_data["owner"] = owner
 
     # Store webhook config if provided
     if webhook_config:
@@ -490,20 +555,19 @@ async def create_new_task(
 
     await hset_with_ttl(redis, f"task:{task_id}", task_data, config)
 
-    background_tasks.add_task(
-        process_llm_extraction,
-        redis,
-        config,
-        task_id,
-        decoded_url,
-        query,
-        schema,
-        cache,
-        provider,
-        webhook_config,
-        temperature,
-        api_base_url
-    )
+    try:
+        _enqueue_job(
+            background_tasks,
+            lambda: process_llm_extraction(
+                redis, config, task_id, decoded_url, query, schema, cache,
+                provider, webhook_config, temperature, api_base_url,
+            ),
+            principal=owner,
+        )
+    except HTTPException:
+        # Don't leave an orphan PROCESSING task if we refused to enqueue.
+        await redis.delete(f"task:{task_id}")
+        raise
 
     return JSONResponse({
         "task_id": task_id,
@@ -569,6 +633,17 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
         if crawler:
             await release_crawler(crawler)
 
+
+def _normalize_and_validate_seeds(urls: List[str]) -> List[str]:
+    """Prefix bare hosts with https:// and SSRF-validate every seed URL's
+    destination. Shared by the streaming and non-streaming crawl handlers so a
+    new entry point cannot silently skip the destination check."""
+    urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
+    for url in urls:
+        validate_url_destination(url)
+    return urls
+
+
 async def handle_crawl_request(
     urls: List[str],
     browser_config: dict,
@@ -593,15 +668,15 @@ async def handle_crawl_request(
     start_time = time.time()
     mem_delta_mb = None
     peak_mem_mb = start_mem_mb
-    hook_manager = None
 
     try:
-        urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
-        for url in urls:
-            validate_url_destination(url)
-        browser_config = BrowserConfig.load(browser_config)
-        crawler_config = CrawlerRunConfig.load(crawler_config)
-        _enforce_proxy_safety(browser_config, crawler_config)
+        urls = _normalize_and_validate_seeds(urls)
+        browser_config = BrowserConfig.load(browser_config, provenance=Provenance.UNTRUSTED)
+        crawler_config = CrawlerRunConfig.load(crawler_config, provenance=Provenance.UNTRUSTED)
+        from egress_broker import enforce_egress
+        enforce_egress(browser_config)
+        from governor import clamp_deep_crawl
+        clamp_deep_crawl(crawler_config)
 
         dispatcher = MemoryAdaptiveDispatcher(
             memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
@@ -613,17 +688,10 @@ async def handle_crawl_request(
         from crawler_pool import get_crawler, release_crawler
         crawler = await get_crawler(browser_config)
         
-        # Attach hooks if provided
+        # Attach declarative hooks if provided
         hooks_status = {}
         if hooks_config:
-            from hook_manager import attach_user_hooks_to_crawler, UserHookManager
-            hook_manager = UserHookManager(timeout=hooks_config.get('timeout', 30))
-            hooks_status, hook_manager = await attach_user_hooks_to_crawler(
-                crawler,
-                hooks_config.get('code', {}),
-                timeout=hooks_config.get('timeout', 30),
-                hook_manager=hook_manager
-            )
+            hooks_status = _attach_declarative_hooks(crawler, hooks_config)
             logger.info(f"Hooks attachment status: {hooks_status['status']}")
         
         base_config = config["crawler"]["base_config"]
@@ -631,7 +699,7 @@ async def handle_crawl_request(
         # Build the config(s) to pass to arun/arun_many
         if crawler_configs and len(urls) > 1:
             # Per-URL config list: deserialize each and apply base_config
-            config_list = [CrawlerRunConfig.load(cc) for cc in crawler_configs]
+            config_list = [CrawlerRunConfig.load(cc, provenance=Provenance.UNTRUSTED) for cc in crawler_configs]
             for cfg in config_list:
                 for key, value in base_config.items():
                     if hasattr(cfg, key):
@@ -654,7 +722,13 @@ async def handle_crawl_request(
                                 urls[0] if len(urls) == 1 else urls,
                                 config=effective_config,
                                 dispatcher=dispatcher)
-        results = await partial_func()
+        # Optional per-crawl wall-clock deadline (config limits.wall_clock_s; 0 = none).
+        from governor import wall_clock_seconds
+        _deadline = wall_clock_seconds(config)
+        if _deadline and _deadline > 0:
+            results = await asyncio.wait_for(partial_func(), timeout=_deadline)
+        else:
+            results = await partial_func()
         
         # Ensure results is always a list
         if not isinstance(results, list):
@@ -721,33 +795,31 @@ async def handle_crawl_request(
             pass
 
         # Add hooks information if hooks were used
-        if hooks_config and hook_manager:
-            from hook_manager import UserHookManager
-            if isinstance(hook_manager, UserHookManager):
-                try:
-                    # Ensure all hook data is JSON serializable
-                    hook_data = {
-                        "status": hooks_status,
-                        "execution_log": hook_manager.execution_log,
-                        "errors": hook_manager.errors,
-                        "summary": hook_manager.get_summary()
-                    }
-                    # Test that it's serializable
-                    json.dumps(hook_data)
-                    response["hooks"] = hook_data
-                except (TypeError, ValueError) as e:
-                    logger.error(f"Hook data not JSON serializable: {e}")
-                    response["hooks"] = {
-                        "status": {"status": "error", "message": "Hook data serialization failed"},
-                        "execution_log": [],
-                        "errors": [{"error": str(e)}],
-                        "summary": {}
-                    }
-        
+        if hooks_config:
+            response["hooks"] = hooks_status
+
         return response
 
+    except (UntrustedConfigError, HookValidationError) as e:
+        # An untrusted request body tried to set a forbidden power-field,
+        # construct a disallowed type, or specify an invalid hook. Client error.
+        try:
+            from monitor import get_monitor
+            await get_monitor().track_request_end(
+                request_id, success=False, error=str(e), status_code=400
+            )
+        except:
+            pass
+        raise HTTPException(status_code=400, detail=f"Rejected request: {e}")
+
+    except asyncio.TimeoutError:
+        # Per-crawl wall-clock deadline exceeded.
+        raise HTTPException(status_code=504, detail="Crawl exceeded the time limit")
+
     except HTTPException:
-        raise  # client errors (e.g. blocked proxy 400) must not become 500
+        # Deliberate status (e.g. 400 SSRF "URL blocked") must pass through
+        # rather than be genericized to 500 by the handler below.
+        raise
 
     except Exception as e:
         logger.error(f"Crawl error: {str(e)}", exc_info=True)
@@ -789,11 +861,18 @@ async def handle_stream_crawl_request(
     hooks_info = None
     crawler = None
     try:
-        browser_config = BrowserConfig.load(browser_config)
+        # SSRF guard: validate every seed URL's destination before fetching,
+        # mirroring handle_crawl_request. The streaming path previously skipped
+        # this, leaving /crawl/stream (and /crawl with stream=true) unguarded.
+        urls = _normalize_and_validate_seeds(urls)
+        browser_config = BrowserConfig.load(browser_config, provenance=Provenance.UNTRUSTED)
         # browser_config.verbose = True # Set to False or remove for production stress testing
         browser_config.verbose = False
-        crawler_config = CrawlerRunConfig.load(crawler_config)
-        _enforce_proxy_safety(browser_config, crawler_config)
+        from egress_broker import enforce_egress
+        enforce_egress(browser_config)
+        crawler_config = CrawlerRunConfig.load(crawler_config, provenance=Provenance.UNTRUSTED)
+        from governor import clamp_deep_crawl
+        clamp_deep_crawl(crawler_config)
         crawler_config.scraping_strategy = LXMLWebScrapingStrategy()
         crawler_config.stream = True
 
@@ -810,19 +889,11 @@ async def handle_stream_crawl_request(
         from crawler_pool import get_crawler, release_crawler
         crawler = await get_crawler(browser_config)
 
-        # Attach hooks if provided
+        # Attach declarative hooks if provided
         if hooks_config:
-            from hook_manager import attach_user_hooks_to_crawler, UserHookManager
-            hook_manager = UserHookManager(timeout=hooks_config.get('timeout', 30))
-            hooks_status, hook_manager = await attach_user_hooks_to_crawler(
-                crawler,
-                hooks_config.get('code', {}),
-                timeout=hooks_config.get('timeout', 30),
-                hook_manager=hook_manager
-            )
+            hooks_status = _attach_declarative_hooks(crawler, hooks_config)
             logger.info(f"Hooks attachment status for streaming: {hooks_status['status']}")
-            # Include hook manager in hooks_info for proper tracking
-            hooks_info = {'status': hooks_status, 'manager': hook_manager}
+            hooks_info = {'status': hooks_status}
 
         # Deep crawl with single URL: use arun() which returns an async generator
         # mirroring the Python library's streaming behavior
@@ -847,10 +918,17 @@ async def handle_stream_crawl_request(
 
         return crawler, results_gen, hooks_info
 
-    except HTTPException:
+    except (UntrustedConfigError, HookValidationError) as e:
         if crawler:
             await release_crawler(crawler)
-        raise  # client errors (e.g. blocked proxy 400) must not become 500
+        raise HTTPException(status_code=400, detail=f"Rejected request: {e}")
+
+    except HTTPException:
+        # Deliberate status (e.g. 400 SSRF "URL blocked") must pass through
+        # rather than be genericized to 500 by the handler below.
+        if crawler:
+            await release_crawler(crawler)
+        raise
 
     except Exception as e:
         # Release crawler on setup error (for successful streams,
@@ -872,6 +950,7 @@ async def handle_crawl_job(
     crawler_config: Dict,
     config: Dict,
     webhook_config: Optional[Dict] = None,
+    owner: Optional[str] = None,
 ) -> Dict:
     """
     Fire-and-forget version of handle_crawl_request.
@@ -888,6 +967,8 @@ async def handle_crawl_job(
         "result": "",
         "error": "",
     }
+    if owner:
+        task_data["owner"] = owner
 
     # Store webhook config if provided
     if webhook_config:
@@ -921,7 +1002,6 @@ async def handle_crawl_job(
                 result=result
             )
 
-            await asyncio.sleep(5)  # Give Redis time to process the update
         except Exception as exc:
             await hset_with_ttl(redis, f"task:{task_id}", {
                 "status": TaskStatus.FAILED,
@@ -938,5 +1018,9 @@ async def handle_crawl_job(
                 error=str(exc)
             )
 
-    background_tasks.add_task(_runner)
+    try:
+        _enqueue_job(background_tasks, _runner, principal=owner)
+    except HTTPException:
+        await redis.delete(f"task:{task_id}")
+        raise
     return {"task_id": task_id}

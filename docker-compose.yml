@@ -16,8 +16,22 @@ x-base-config: &base-config
   #   - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
   #   - GEMINI_API_KEY=${GEMINI_API_KEY:-}
   #   - LLM_PROVIDER=${LLM_PROVIDER:-}  # Optional: Override default provider (e.g., "anthropic/claude-3-opus")
-  volumes:
-    - /dev/shm:/dev/shm  # Chromium performance
+  # Chromium needs shared memory but the host /dev/shm bind was a shared,
+  # writable mount; use a private sized tmpfs instead.
+  shm_size: "1gb"
+  # Least privilege: drop all capabilities, forbid privilege escalation, cap PIDs.
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  pids_limit: 512
+  # Read-only root filesystem; only these paths are writable (tmpfs).
+  read_only: true
+  tmpfs:
+    - /tmp
+    - /var/lib/redis
+    - /var/lib/crawl4ai/outputs:mode=0700
+    - /home/appuser/.cache
   deploy:
     resources:
       limits:

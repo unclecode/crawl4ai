@@ -9,8 +9,13 @@ Crawl4AI FastAPI entry‑point
 # ── stdlib & 3rd‑party imports ───────────────────────────────
 from crawler_pool import get_crawler, release_crawler, close_all, janitor
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
+from crawl4ai.async_configs import Provenance, UntrustedConfigError
 from crawl4ai.__version__ import __version__
-from auth import create_access_token, get_token_dependency, TokenRequest
+from auth import (
+    create_access_token, get_token_dependency, TokenRequest,
+    constant_time_eq, resolve_secret_key,
+)
+from auth_gate import AuthGateMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 from fastapi import Request, Depends
@@ -36,7 +41,7 @@ from schemas import (
 
 from utils import (
     FilterType, load_config, setup_logging, verify_email_domain,
-    validate_output_path, write_output_file, validate_webhook_url, validate_url_destination,
+    validate_webhook_url, validate_url_destination,
 )
 import os
 import sys
@@ -88,6 +93,13 @@ HOOKS_ENABLED = os.environ.get("CRAWL4AI_HOOKS_ENABLED", "false").lower() == "tr
 # /execute_js disabled by default (arbitrary JS + SSRF risk). Set to "true" to enable.
 EXECUTE_JS_ENABLED = os.environ.get("CRAWL4AI_EXECUTE_JS_ENABLED", "false").lower() == "true"
 
+# Chromium renderer sandbox. --no-sandbox is kept by default because the
+# container runs as non-root without a usable sandbox. On a host that provides
+# an unprivileged user namespace (unprivileged_userns_clone=1) or a seccomp
+# profile, set CRAWL4AI_CHROMIUM_SANDBOX=true to drop --no-sandbox and run the
+# renderer sandboxed. Verify Chromium still starts after flipping it.
+CHROMIUM_SANDBOX = os.environ.get("CRAWL4AI_CHROMIUM_SANDBOX", "false").lower() == "true"
+
 # Warn loudly if API token is not set (all endpoints unauthenticated)
 _api_token = config.get("security", {}).get("api_token", "") or os.environ.get("CRAWL4AI_API_TOKEN", "")
 if not _api_token:
@@ -98,12 +110,30 @@ if not _api_token:
     )
 
 # ── default browser config helper ─────────────────────────────
+def _browser_extra_args() -> list:
+    """Effective Chromium launch flags. Drops --no-sandbox when the operator
+    opts into the renderer sandbox (CRAWL4AI_CHROMIUM_SANDBOX=true)."""
+    args = list(config["crawler"]["browser"].get("extra_args", []))
+    if CHROMIUM_SANDBOX:
+        args = [a for a in args if a != "--no-sandbox"]
+    return args
+
+
 def get_default_browser_config() -> BrowserConfig:
-    """Get default BrowserConfig from config.yml."""
-    return BrowserConfig(
-        extra_args=config["crawler"]["browser"].get("extra_args", []),
+    """Get default BrowserConfig from config.yml.
+
+    Egress hardening (TLS-verify on, pinning proxy so Chromium never resolves
+    the target itself) is applied here so every endpoint that fetches through
+    the default config (/html, /screenshot, /pdf, /execute_js) gets the same
+    DNS-rebinding / redirect-to-internal protection as /crawl, rather than
+    relying on each handler to remember it."""
+    bc = BrowserConfig(
+        extra_args=_browser_extra_args(),
         **config["crawler"]["browser"].get("kwargs", {}),
     )
+    from egress_broker import enforce_egress
+    enforce_egress(bc)
+    return bc
 
 # import logging
 # page_log = logging.getLogger("page_cap")
@@ -134,6 +164,28 @@ async def lifespan(_: FastAPI):
     from monitor import MonitorStats
     import monitor as monitor_module
 
+    # Enforce auth posture before serving any traffic.
+    _resolve_auth()
+
+    # Initialize the sandboxed artifact store + reaper.
+    from artifacts import init_store
+    init_store()
+    app.state.artifact_janitor = asyncio.create_task(_artifact_janitor())
+
+    # Start the localhost pinning forward-proxy and route the browser through it.
+    from egress_proxy import PinningProxy
+    from egress_broker import set_egress_proxy
+    app.state.egress_proxy = PinningProxy()
+    set_egress_proxy(await app.state.egress_proxy.start())
+
+    # Bounded background-job queue (per-principal quotas optional).
+    from work_queue import WorkQueue, set_job_queue
+    from governor import job_queue_caps
+    _caps = job_queue_caps(config)
+    app.state.job_queue = WorkQueue(**_caps)
+    await app.state.job_queue.start()
+    set_job_queue(app.state.job_queue)
+
     # Initialize monitor
     monitor_module.monitor_stats = MonitorStats(redis)
     await monitor_module.monitor_stats.load_from_redis()
@@ -141,7 +193,7 @@ async def lifespan(_: FastAPI):
 
     # Initialize browser pool
     await init_permanent(BrowserConfig(
-        extra_args=config["crawler"]["browser"].get("extra_args", []),
+        extra_args=_browser_extra_args(),
         **config["crawler"]["browser"].get("kwargs", {}),
     ))
 
@@ -154,6 +206,15 @@ async def lifespan(_: FastAPI):
     # Cleanup
     app.state.janitor.cancel()
     app.state.timeline_updater.cancel()
+    app.state.artifact_janitor.cancel()
+    try:
+        await app.state.egress_proxy.stop()
+    except Exception:
+        pass
+    try:
+        await app.state.job_queue.stop()
+    except Exception:
+        pass
 
     # Monitor cleanup (persist stats and stop workers)
     from monitor import get_monitor
@@ -163,6 +224,16 @@ async def lifespan(_: FastAPI):
         logger.error(f"Monitor cleanup failed: {e}")
 
     await close_all()
+
+async def _artifact_janitor():
+    """Periodically reap expired / over-quota artifacts."""
+    from artifacts import janitor as _reap
+    while True:
+        await asyncio.sleep(300)
+        try:
+            _reap()
+        except Exception as e:
+            logger.warning(f"Artifact janitor error: {e}")
 
 async def _timeline_updater():
     """Update timeline data every 5 seconds."""
@@ -240,13 +311,31 @@ limiter = Limiter(
 
 def _setup_security(app_: FastAPI):
     sec = config["security"]
-    if not sec["enabled"]:
-        return
     if sec.get("https_redirect"):
         app_.add_middleware(HTTPSRedirectMiddleware)
-    if sec.get("trusted_hosts", []) != ["*"]:
+    # Apply the Host guard whenever real hostnames are configured, independent
+    # of `security.enabled` (the old code silently skipped it when disabled).
+    trusted = sec.get("trusted_hosts", ["*"])
+    if trusted and trusted != ["*"]:
+        app_.add_middleware(TrustedHostMiddleware, allowed_hosts=trusted)
+    elif config["app"]["host"] not in ("127.0.0.1", "localhost", "::1"):
+        logging.getLogger("crawl4ai.security").warning(
+            "trusted_hosts is ['*'] on a non-loopback bind (%s): the Host guard "
+            "is disabled. Set security.trusted_hosts to your real hostname(s).",
+            config["app"]["host"],
+        )
+
+    # Deny-by-default CORS: only explicitly allowlisted origins; never '*' with
+    # credentials.
+    origins = [o for o in (sec.get("cors_allow_origins") or []) if o and o != "*"]
+    if origins:
+        from fastapi.middleware.cors import CORSMiddleware
         app_.add_middleware(
-            TrustedHostMiddleware, allowed_hosts=sec["trusted_hosts"]
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
         )
 
 
@@ -257,13 +346,103 @@ if config["observability"]["prometheus"]["enabled"]:
 
 token_dep = get_token_dependency(config)
 
+# ── security response headers (unconditional, strict-by-default) ──────
+SECURITY_BASELINE_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Resource-Policy": "same-origin",
+}
+# Strict CSP for the API / error surface (the injection-reflection paths).
+STRICT_CSP = (
+    "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; "
+    "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; "
+    "base-uri 'none'; form-action 'none'"
+)
+# The dashboard/playground still ship inline scripts/styles; until they are
+# externalized (CSP-compat refactor) they must not receive the strict CSP or
+# they break. They still get the baseline headers (nosniff, frame DENY).
+_UI_PREFIXES = ("/dashboard", "/playground", "/static")
+
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     resp = await call_next(request)
-    if config["security"]["enabled"]:
-        resp.headers.update(config["security"]["headers"])
+    for k, v in SECURITY_BASELINE_HEADERS.items():
+        resp.headers.setdefault(k, v)
+    path = request.url.path
+    if not any(path.startswith(p) for p in _UI_PREFIXES):
+        resp.headers.setdefault("Content-Security-Policy", STRICT_CSP)
+    if config["security"].get("https_redirect"):
+        resp.headers.setdefault(
+            "Strict-Transport-Security", "max-age=63072000; includeSubDomains"
+        )
     return resp
+
+
+# ── authentication gate (outermost ASGI layer, fails closed) ──────────
+# The single place auth is decided: covers every route, static mount, the MCP
+# transports and the metrics endpoint, for HTTP and WebSocket alike. Only the
+# health check and the token-issuing endpoint are public.
+HEALTH_PATH = config["observability"]["health_check"]["endpoint"]
+
+
+def _current_api_token() -> str:
+    """The effective static operator token (config or environment)."""
+    return (
+        config.get("security", {}).get("api_token", "")
+        or os.environ.get("CRAWL4AI_API_TOKEN", "")
+    )
+
+
+app.add_middleware(
+    AuthGateMiddleware,
+    token_provider=_current_api_token,
+    public_paths={HEALTH_PATH, "/token"},
+)
+
+# ── request body-size limit (DoS) ─────────────────────────────────────
+from governor import BodySizeLimitMiddleware, max_body_bytes_from_config
+app.add_middleware(BodySizeLimitMiddleware, max_bytes=max_body_bytes_from_config(config))
+
+
+def _resolve_auth():
+    """Runtime auth-posture guard. Runs at startup (lifespan), not import, so
+    the behavioral test harness can import the app without a hard exit.
+
+    - credential configured  -> enforce (fail fast on jwt_enabled w/o SECRET_KEY)
+    - none + non-loopback bind -> refuse to start (would be open to the network)
+    - none + loopback bind    -> generate a one-off token and print it
+    """
+    host = config["app"]["host"]
+    loopback = host in ("127.0.0.1", "localhost", "::1")
+    api_token = _current_api_token()
+    jwt_enabled = config.get("security", {}).get("jwt_enabled", False)
+
+    if api_token or jwt_enabled:
+        if jwt_enabled:
+            resolve_secret_key(required=True)  # fail fast: no ephemeral secret
+        logger.info("Auth gate active (credential configured).")
+        return
+
+    if not loopback:
+        logger.critical(
+            "Refusing to start: binding %s with no CRAWL4AI_API_TOKEN and "
+            "jwt_enabled=false would expose an unauthenticated API. Set "
+            "CRAWL4AI_API_TOKEN=$(openssl rand -hex 32), enable jwt, or bind loopback.",
+            host,
+        )
+        sys.exit(1)
+
+    import secrets as _secrets
+    gen = _secrets.token_hex(32)
+    os.environ["CRAWL4AI_API_TOKEN"] = gen
+    logger.warning(
+        "No CRAWL4AI_API_TOKEN set; generated an ephemeral token for this "
+        "loopback session:\n    CRAWL4AI_API_TOKEN=%s",
+        gen,
+    )
 
 # ───────────────── URL validation helper ─────────────────
 ALLOWED_URL_SCHEMES = ("http://", "https://")
@@ -287,14 +466,19 @@ ALLOWED_TYPES = {
 
 
 def _config_from_json(data: dict) -> dict:
-    """Create CrawlerRunConfig or BrowserConfig from JSON {type, params}.
-    No eval() -- uses Pydantic constructors directly."""
+    """Validate a {type, params} config under the untrusted trust boundary and
+    echo the normalized result.
+
+    This endpoint is no longer a gadget-construction oracle: only the gated,
+    side-effect-free CrawlerRunConfig/BrowserConfig types may be validated, the
+    untrusted gate raises on forbidden power-fields and disallowed nested types
+    (LLM*, proxy, deep-crawl - which is what would read env/secrets), drops
+    unknown fields, and clamps quantities."""
     config_type = data.get("type")
-    params = data.get("params", {})
     if config_type == "CrawlerRunConfig":
-        obj = CrawlerRunConfig(**params)
+        obj = CrawlerRunConfig.load(data, provenance=Provenance.UNTRUSTED)
     elif config_type == "BrowserConfig":
-        obj = BrowserConfig(**params)
+        obj = BrowserConfig.load(data, provenance=Provenance.UNTRUSTED)
     else:
         raise ValueError("type must be 'CrawlerRunConfig' or 'BrowserConfig'")
     return obj.dump()
@@ -309,11 +493,57 @@ app.include_router(monitor_router, dependencies=[Depends(token_dep)])
 
 logger = logging.getLogger(__name__)
 
+
+# ── central exception handling (no internal detail leaks) ─────────────
+# 16 sites used to return raw str(e) to clients, leaking paths, dependency
+# versions, resolved internal IPs and sometimes secrets. Centralize: 5xx
+# responses are generic + carry a correlation id; the full detail is logged
+# server-side. 4xx developer messages are preserved.
+import uuid as _uuid
+from starlette.exceptions import HTTPException as _StarletteHTTPException
+
+
+@app.exception_handler(_StarletteHTTPException)
+async def _http_exception_handler(request: Request, exc: _StarletteHTTPException):
+    # 500 is the raw-str(e) leak vector -> genericize with a correlation id.
+    # Deliberate operational statuses (502/503/504, with their own short
+    # messages + headers like Retry-After) pass through, as do 4xx.
+    if exc.status_code == 500:
+        cid = _uuid.uuid4().hex[:12]
+        logger.error("server error 500 [cid=%s]: %s", cid, exc.detail)
+        return JSONResponse(
+            {"error": "Internal server error", "correlation_id": cid},
+            status_code=500,
+        )
+    return JSONResponse(
+        {"detail": exc.detail},
+        status_code=exc.status_code,
+        headers=getattr(exc, "headers", None),
+    )
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: Request, exc: Exception):
+    cid = _uuid.uuid4().hex[:12]
+    logger.exception("unhandled exception [cid=%s]", cid)
+    return JSONResponse(
+        {"error": "Internal server error", "correlation_id": cid},
+        status_code=500,
+    )
+
+
 # ──────────────────────── Endpoints ──────────────────────────
 @app.post("/token")
 async def get_token(req: TokenRequest):
     expected_token = config.get("security", {}).get("api_token", "")
-    if expected_token and req.api_token != expected_token:
+    if not expected_token:
+        # Fail closed: without a configured api_token the old behavior minted a
+        # JWT to anyone whose email merely had an MX record. Refuse instead.
+        raise HTTPException(
+            403,
+            "Token issuance is disabled: no api_token is configured on the server.",
+        )
+    if not req.api_token or not constant_time_eq(req.api_token, expected_token):
         raise HTTPException(401, "Invalid or missing api_token")
     if not verify_email_domain(req.email):
         raise HTTPException(400, "Invalid email domain")
@@ -354,9 +584,11 @@ async def get_markdown(
     if not body.url.startswith(("http://", "https://")) and not body.url.startswith(("raw:", "raw://")):
         raise HTTPException(
             400, "Invalid URL format. Must start with http://, https://, or for raw HTML (raw:, raw://)")
+    # base_url is intentionally not accepted from the request (key-exfil vector);
+    # the LLM endpoint is server-derived from the provider name only.
     markdown = await handle_markdown_request(
         body.url, body.f, body.q, body.c, config, body.provider,
-        body.temperature, body.base_url
+        body.temperature
     )
     return JSONResponse({
         "url": body.url,
@@ -399,6 +631,35 @@ async def generate_html(
         if crawler:
             await release_crawler(crawler)
 
+# ── artifact store helpers ───────────────────────────────────
+def _store_artifact(kind: str, data: bytes) -> dict:
+    """Write to the sandboxed store; map quota/size errors to HTTP codes."""
+    from artifacts import write_artifact, ArtifactTooLarge, QuotaExceeded
+    try:
+        meta = write_artifact(kind, data)
+    except ArtifactTooLarge:
+        raise HTTPException(413, "Artifact too large")
+    except QuotaExceeded:
+        raise HTTPException(507, "Artifact storage quota exceeded")
+    return {
+        "artifact_id": meta["artifact_id"],
+        "url": f"/artifacts/{meta['artifact_id']}",
+        "mime": meta["mime"],
+        "size": meta["size"],
+    }
+
+
+@app.get("/artifacts/{artifact_id}")
+async def get_artifact(artifact_id: str, _td: Dict = Depends(token_dep)):
+    """Fetch a previously generated artifact by its opaque id (authed)."""
+    from artifacts import resolve_artifact, ArtifactNotFound
+    try:
+        path, mime = resolve_artifact(artifact_id)
+    except ArtifactNotFound:
+        raise HTTPException(404, "Artifact not found")
+    return FileResponse(path, media_type=mime, headers={"X-Content-Type-Options": "nosniff"})
+
+
 # Screenshot endpoint
 
 
@@ -411,9 +672,9 @@ async def generate_screenshot(
     _td: Dict = Depends(token_dep),
 ):
     """
-    Capture a full-page PNG screenshot of the specified URL, waiting an optional delay before capture,
-    Use when you need an image snapshot of the rendered page. Its recommened to provide an output path to save the screenshot.
-    Then in result instead of the screenshot you will get a path to the saved file.
+    Capture a full-page PNG screenshot of the specified URL, waiting an optional delay before capture.
+    Use when you need an image snapshot of the rendered page. The image is also written to the
+    sandboxed artifact store; the response includes an `artifact_id` and a `url` to fetch it.
     """
     validate_url_scheme(body.url)
     crawler = None
@@ -424,11 +685,10 @@ async def generate_screenshot(
         if not results[0].success:
             raise HTTPException(500, detail=results[0].error_message or "Crawl failed")
         screenshot_data = results[0].screenshot
-        if body.output_path:
-            abs_path = validate_output_path(body.output_path)
-            write_output_file(abs_path, base64.b64decode(screenshot_data))
-            return {"success": True, "path": abs_path}
-        return {"success": True, "screenshot": screenshot_data}
+        art = _store_artifact("png", base64.b64decode(screenshot_data))
+        return {"success": True, "screenshot": screenshot_data, **art}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, detail=str(e))
     finally:
@@ -447,9 +707,9 @@ async def generate_pdf(
     _td: Dict = Depends(token_dep),
 ):
     """
-    Generate a PDF document of the specified URL,
-    Use when you need a printable or archivable snapshot of the page. It is recommended to provide an output path to save the PDF.
-    Then in result instead of the PDF you will get a path to the saved file.
+    Generate a PDF document of the specified URL.
+    Use when you need a printable or archivable snapshot of the page. The PDF is also written to the
+    sandboxed artifact store; the response includes an `artifact_id` and a `url` to fetch it.
     """
     validate_url_scheme(body.url)
     crawler = None
@@ -460,11 +720,10 @@ async def generate_pdf(
         if not results[0].success:
             raise HTTPException(500, detail=results[0].error_message or "Crawl failed")
         pdf_data = results[0].pdf
-        if body.output_path:
-            abs_path = validate_output_path(body.output_path)
-            write_output_file(abs_path, pdf_data)
-            return {"success": True, "path": abs_path}
-        return {"success": True, "pdf": base64.b64encode(pdf_data).decode()}
+        art = _store_artifact("pdf", pdf_data)
+        return {"success": True, "pdf": base64.b64encode(pdf_data).decode(), **art}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, detail=str(e))
     finally:
@@ -556,14 +815,15 @@ async def llm_endpoint(
     q: str = Query(...),
     provider: Optional[str] = Query(None, description="LLM provider override, e.g. 'openai/gpt-4o-mini'"),
     temperature: Optional[float] = Query(None, description="LLM temperature override"),
-    base_url: Optional[str] = Query(None, description="LLM API base URL override"),
     _td: Dict = Depends(token_dep),
 ):
+    # base_url is intentionally not accepted (key-exfil vector); the endpoint is
+    # derived server-side from the provider name only.
     if not q:
         raise HTTPException(400, "Query parameter 'q' is required")
     if not url.startswith(("http://", "https://")) and not url.startswith(("raw:", "raw://")):
         url = "https://" + url
-    answer = await handle_llm_qa(url, q, config, provider=provider, temperature=temperature, base_url=base_url)
+    answer = await handle_llm_qa(url, q, config, provider=provider, temperature=temperature)
     return JSONResponse({"answer": answer})
 
 
@@ -576,68 +836,23 @@ async def get_schema():
 
 @app.get("/hooks/info")
 async def get_hooks_info():
-    """Get information about available hook points and their signatures"""
-    from hook_manager import UserHookManager
-    
-    hook_info = {}
-    for hook_point, params in UserHookManager.HOOK_SIGNATURES.items():
-        hook_info[hook_point] = {
-            "parameters": params,
-            "description": get_hook_description(hook_point),
-            "example": get_hook_example(hook_point)
-        }
-    
+    """Enumerate the available declarative hook actions and their parameter schemas.
+
+    Arbitrary hook code is no longer accepted (it was an exec()-based RCE
+    surface). Each action maps to a server-authored, single-purpose Playwright
+    operation; clients select an action and supply schema-validated params.
+    """
+    from hook_registry import describe_registry
+
     return JSONResponse({
-        "available_hooks": hook_info,
-        "timeout_limits": {
-            "min": 1,
-            "max": 120,
-            "default": 30
-        }
+        "available_actions": describe_registry(),
+        "usage": {
+            "field": "hooks",
+            "shape": [{"action": "<action>", "params": {"...": "..."}}],
+            "max_hooks": 10,
+        },
+        "timeout_limits": {"min": 1, "max": 120, "default": 30},
     })
-
-
-def get_hook_description(hook_point: str) -> str:
-    """Get description for each hook point"""
-    descriptions = {
-        "on_browser_created": "Called after browser instance is created",
-        "on_page_context_created": "Called after page and context are created - ideal for authentication",
-        "before_goto": "Called before navigating to the target URL",
-        "after_goto": "Called after navigation is complete",
-        "on_user_agent_updated": "Called when user agent is updated",
-        "on_execution_started": "Called when custom JavaScript execution begins",
-        "before_retrieve_html": "Called before retrieving the final HTML - ideal for scrolling",
-        "before_return_html": "Called just before returning the HTML content"
-    }
-    return descriptions.get(hook_point, "")
-
-
-def get_hook_example(hook_point: str) -> str:
-    """Get example code for each hook point"""
-    examples = {
-        "on_page_context_created": """async def hook(page, context, **kwargs):
-    # Add authentication cookie
-    await context.add_cookies([{
-        'name': 'session',
-        'value': 'my-session-id',
-        'domain': '.example.com'
-    }])
-    return page""",
-        
-        "before_retrieve_html": """async def hook(page, context, **kwargs):
-    # Scroll to load lazy content
-    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-    await page.wait_for_timeout(2000)
-    return page""",
-        
-        "before_goto": """async def hook(page, context, url, **kwargs):
-    # Set custom headers
-    await page.set_extra_http_headers({
-        'X-Custom-Header': 'value'
-    })
-    return page"""
-    }
-    return examples.get(hook_point, "# Implement your hook logic here\nreturn page")
 
 
 @app.get(config["observability"]["health_check"]["endpoint"])
@@ -668,7 +883,12 @@ async def crawl(
     if crawl_request.hooks and not HOOKS_ENABLED:
         raise HTTPException(403, "Hooks are disabled. Set CRAWL4AI_HOOKS_ENABLED=true to enable.")
     # Check whether it is a redirection for a streaming request
-    crawler_config = CrawlerRunConfig.load(crawl_request.crawler_config)
+    try:
+        crawler_config = CrawlerRunConfig.load(
+            crawl_request.crawler_config, provenance=Provenance.UNTRUSTED
+        )
+    except UntrustedConfigError as e:
+        raise HTTPException(400, f"Rejected config: {e}")
     if crawler_config.stream:
         return await stream_process(crawl_request=crawl_request)
     
@@ -676,7 +896,7 @@ async def crawl(
     hooks_config = None
     if crawl_request.hooks:
         hooks_config = {
-            'code': crawl_request.hooks.code,
+            'hooks': crawl_request.hooks.hooks,
             'timeout': crawl_request.hooks.timeout
         }
     
@@ -714,7 +934,7 @@ async def stream_process(crawl_request: CrawlRequestWithHooks):
     hooks_config = None
     if crawl_request.hooks:
         hooks_config = {
-            'code': crawl_request.hooks.code,
+            'hooks': crawl_request.hooks.hooks,
             'timeout': crawl_request.hooks.timeout
         }
     
@@ -873,7 +1093,10 @@ async def get_context(
 print(f"MCP server running on {config['app']['host']}:{config['app']['port']}")
 attach_mcp(
     app,
-    base_url=f"http://{config['app']['host']}:{config['app']['port']}"
+    # Internal MCP tool calls go over loopback to our own gated endpoints,
+    # carrying a service token. Pin to 127.0.0.1 (config host may be 0.0.0.0,
+    # which is a bind address, not a valid connect target).
+    base_url=f"http://127.0.0.1:{config['app']['port']}"
 )
 
 # ────────────────────────── cli ──────────────────────────────

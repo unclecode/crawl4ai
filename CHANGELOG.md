@@ -5,6 +5,51 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-06-18
+
+0.9.0 is a major, secure-by-default release of the Crawl4AI Docker API server. The out-of-the-box deployment is now hardened with defense in depth: authentication is on by default, the server binds loopback unless you give it a token, and the network request body is treated as an untrusted trust boundary. This release contains breaking changes for the self-hosted HTTP server only. The core pip library (SDK / in-process use) is unchanged.
+
+**What changed:** the Docker server moved from an open, trust-the-caller posture to a closed, secure-by-default one. Defaults that used to be permissive (open bind, no auth, request-supplied browser internals, TLS verification off, Redis with no password) are now safe by default and gated behind explicit configuration.
+
+**What you must do:** set `CRAWL4AI_API_TOKEN` and re-issue any tokens, then review whether you relied on any of the request fields or features that are now configured server-side. Most plain "crawl these URLs" users only need the two steps in the "Everyone" section of the migration guide. The full guide is at `deploy/docker/MIGRATION.md`.
+
+### Security
+
+This release completes the secure-by-default hardening of the Docker API server begun in 0.8.7 and 0.8.8. It moves the worst remaining issues from mitigation to architecture: unauthenticated access and request-supplied code/config are eliminated by design rather than patched in place. Every change is hardening; users self-hosting the Docker server should upgrade and follow the migration guide.
+
+- **Authentication on by default, loopback bind**: the server no longer serves an unauthenticated API on `0.0.0.0`. With no token it binds `127.0.0.1` and prints a one-off local token; exposing it requires `CRAWL4AI_API_TOKEN` and `Authorization: Bearer <token>` on every request except `GET /health`.
+- **Request trust boundary**: a crawl request body now carries declarative, scalar options only. Fields that previously let a caller drive browser internals or arbitrary code are rejected at the network boundary.
+- **Declarative hooks replace hook code**: arbitrary Python hook strings are replaced by a fixed set of declarative actions, removing request-supplied code from the server entirely.
+- **Strengthened JWT, admin-scoped monitor actions, deny-by-default CORS, strict security headers, TLS verification on, password-protected loopback-only Redis, bounded job queue, generic error responses with correlation ids, and validated webhook headers** round out the defense-in-depth posture. See the migration guide for the full list.
+- **Download path confinement (CWE-22)**: both download sinks now confine writes with basename plus realpath plus `O_NOFOLLOW`, closing a path-traversal-to-file-write class. Credit: Y4tacker.
+- **SSRF destination validation on the streaming crawl path (CWE-918)**: `/crawl/stream` and `/crawl` with `stream=true` now validate the destination and return HTTP 400 for disallowed targets, matching the non-streaming handlers. Credit: KOH Jun Sheng.
+- **Request-supplied `browser_config.extra_args` rejected (CWE-94)**: launch arguments can no longer be supplied over the network, closing a Chromium launch-arg injection class. Credit: Y4tacker, UDU_RisePho ([hoanggxyuuki](https://github.com/hoanggxyuuki)).
+
+All reporters are credited in `SECURITY-CREDITS.md`. GitHub Security Advisories accompany this release.
+
+### Breaking Changes
+
+These apply to the self-hosted Docker API server only. The pip library is unaffected. See `deploy/docker/MIGRATION.md` for the step-by-step migration and `deploy/docker/SECURITY-VERIFY.md` for the deployment checklist.
+
+- **Auth is on by default**: set `CRAWL4AI_API_TOKEN` and send `Authorization: Bearer <token>`. With no token the server binds loopback only.
+- **Loopback bind by default**: the server no longer binds `0.0.0.0` without a token; put a TLS-terminating reverse proxy in front when you expose it.
+- **Tokens must be re-issued**: the JWT implementation changed and tokens from older versions are no longer valid. Re-mint via `POST /token`.
+- **Request trust boundary**: `js_code`, `js_code_before_wait`, `c4a_script`, `proxy` / `proxy_config`, `extra_args`, `user_data_dir`, `cdp_url`, `cookies`, `headers`, `init_scripts`, `base_url`, `deep_crawl_strategy`, `simulate_user`, `magic`, `process_in_browser`, and nested LLM config objects are rejected with HTTP 400 when sent over the network. Configure them server-side or use the in-process SDK. Unknown fields are dropped; timeouts, viewport, and scroll counts are clamped.
+- **Hooks are declarative**: `hooks.code` is replaced by a fixed action set (`block_resources`, `add_cookies`, `set_headers`, `scroll_to_bottom`, `wait_for_timeout`). See `GET /hooks/info`.
+- **`output_path` removed, replaced by an artifact id**: `/screenshot` and `/pdf` store the result and return `artifact_id` + URL; fetch via authenticated `GET /artifacts/{artifact_id}` (TTL and quota apply).
+- **LLM `base_url` removed**: `/md`, `/llm`, and `/llm/job` select a provider by name only; endpoint and key are configured server-side and constrained by `config.llm.allowed_providers`.
+- **Monitor actions require an admin token**: `POST /monitor/actions/*` and `/monitor/stats/reset` need an admin-scope principal.
+- **CORS deny-by-default**: cross-origin browser requests are denied unless listed in `security.cors_allow_origins`.
+- **TLS verification on**: self-signed / internal TLS targets fail by default. Escape hatches for trusted internal testing: `CRAWL4AI_ALLOW_INSECURE_TLS=true`, `CRAWL4AI_ALLOW_INTERNAL_URLS=true`.
+- **Webhook headers validated**: malformed or hop-by-hop / sensitive headers are rejected with HTTP 422.
+- **Redis requires a password**: in-container Redis is loopback-only, password-protected, and its port is no longer published. For external Redis set `REDIS_PASSWORD`.
+- **Bounded background job queue**: request body size, per-crawl wall clock, queue size, and per-principal concurrency are now capped (configurable; `0` = unbounded).
+- **Generic 5xx responses**: server errors return `{"error": "Internal server error", "correlation_id": "…"}`; match the id in the logs for detail.
+
+### Security Credits
+
+Y4tacker, KOH Jun Sheng, and UDU_RisePho ([hoanggxyuuki](https://github.com/hoanggxyuuki)). See `SECURITY-CREDITS.md`.
+
 ## [0.8.9] - 2026-06-04
 
 0.8.9 is a follow-up, backward-compatible security patch for the self-hosted Docker API server, closing an SSRF path that 0.8.8 did not cover. Upgrade in place; no configuration changes required.

@@ -81,60 +81,55 @@ DEPLOY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 # VULN 1: Arbitrary File Write - Path Traversal
 # ============================================================================
 
-class TestPathTraversalBlocked(unittest.TestCase):
-    """Test validate_output_path blocks all traversal attempts."""
+class TestOutputPathRemoved(unittest.TestCase):
+    """output_path is gone; the server owns paths via the artifact store.
 
-    def test_absolute_path_gets_jailed(self):
-        """Absolute paths get stripped and jailed inside allowed dir."""
-        result = validate_output_path("/app/server.py")
-        self.assertTrue(result.startswith(ALLOWED_OUTPUT_DIR))
-        self.assertNotEqual(result, "/app/server.py")
+    The old string-only validate_output_path was bypassable (symlink/TOCTOU,
+    sibling-prefix '...-evil') -> arbitrary write -> RCE. The fix is to never
+    accept a caller path at all. Behavioral artifact-store coverage (O_NOFOLLOW,
+    O_EXCL, hex id, TTL, quota) lives in test_security_artifact_store.py.
+    """
 
-    def test_absolute_etc_passwd_gets_jailed(self):
-        result = validate_output_path("/etc/passwd")
-        self.assertTrue(result.startswith(ALLOWED_OUTPUT_DIR))
-        self.assertNotEqual(result, "/etc/passwd")
+    def test_screenshot_request_has_no_output_path(self):
+        sys.path.insert(0, DEPLOY_DIR)
+        from schemas import ScreenshotRequest
+        self.assertNotIn("output_path", ScreenshotRequest.model_fields)
 
-    def test_relative_traversal_simple(self):
-        with self.assertRaises(ValueError):
-            validate_output_path("../../etc/passwd")
+    def test_pdf_request_has_no_output_path(self):
+        sys.path.insert(0, DEPLOY_DIR)
+        from schemas import PDFRequest
+        self.assertNotIn("output_path", PDFRequest.model_fields)
 
-    def test_relative_traversal_deep(self):
-        with self.assertRaises(ValueError):
-            validate_output_path("foo/../../bar/../../../app/evil.py")
-
-    def test_absolute_path_home_gets_jailed(self):
-        result = validate_output_path("/home/appuser/.bashrc")
-        self.assertTrue(result.startswith(ALLOWED_OUTPUT_DIR))
-
-    def test_absolute_path_tmp_outside_gets_jailed(self):
-        result = validate_output_path("/tmp/other-dir/evil.py")
-        self.assertTrue(result.startswith(ALLOWED_OUTPUT_DIR))
-
-    def test_simple_filename(self):
-        result = validate_output_path("test.png")
-        self.assertTrue(result.startswith(ALLOWED_OUTPUT_DIR))
-        self.assertTrue(result.endswith("test.png"))
-
-    def test_subdirectory(self):
-        result = validate_output_path("subdir/deep/test.png")
-        self.assertTrue(result.startswith(ALLOWED_OUTPUT_DIR))
-
-    def test_filename_with_dots(self):
-        result = validate_output_path("my.screenshot.2024.png")
-        self.assertTrue(result.endswith("my.screenshot.2024.png"))
+    def test_validate_output_path_deleted(self):
+        sys.path.insert(0, DEPLOY_DIR)
+        import utils
+        self.assertFalse(
+            hasattr(utils, "validate_output_path"),
+            "validate_output_path must be deleted (caller paths no longer accepted)",
+        )
 
 
 class TestPydanticPathValidator(unittest.TestCase):
-    """Verify schemas.py has traversal rejection on output_path."""
+    """output_path (and its traversal validator) are gone entirely.
 
-    def test_schemas_has_validator(self):
-        with open(os.path.join(DEPLOY_DIR, "schemas.py")) as f:
-            source = f.read()
-        self.assertIn("reject_traversal", source,
-            "schemas.py must have reject_traversal validator on output_path")
-        self.assertIn('".."', source,
-            "Validator must check for '..' traversal")
+    Traversal rejection used to be the mitigation; the real fix is that no
+    caller path is accepted at all, so there is nothing to traverse. The
+    sandboxed artifact store owns all paths now.
+    """
+
+    def test_no_output_path_field_on_request_models(self):
+        sys.path.insert(0, DEPLOY_DIR)
+        from schemas import ScreenshotRequest, PDFRequest
+        self.assertNotIn("output_path", ScreenshotRequest.model_fields)
+        self.assertNotIn("output_path", PDFRequest.model_fields)
+
+    def test_traversal_validator_removed(self):
+        # No reject_traversal validator should remain registered on the models.
+        sys.path.insert(0, DEPLOY_DIR)
+        from schemas import ScreenshotRequest, PDFRequest
+        for model in (ScreenshotRequest, PDFRequest):
+            names = set(getattr(model, "__pydantic_decorators__").field_validators)
+            self.assertNotIn("reject_traversal", names)
 
 
 # ============================================================================
@@ -154,13 +149,30 @@ class TestMonitorAuthStructural(unittest.TestCase):
                 return
         self.fail("Could not find monitor_router include_router line")
 
-    def test_websocket_has_token_check(self):
+    def test_websocket_auth_enforced_by_gate(self):
+        """The monitor WS is gated by the AuthGateMiddleware (behavioral).
+
+        Auth moved out of the route's bespoke, timing-unsafe env-token check
+        and into the outermost ASGI gate, which closes an unauthenticated
+        WebSocket before it is accepted.
+        """
+        import sys
+        sys.path.insert(0, DEPLOY_DIR)
+        import server
+        from starlette.testclient import TestClient
+
+        client = TestClient(server.app)
+        # Unauthenticated connect must be rejected by the gate.
+        with self.assertRaises(Exception):
+            with client.websocket_connect("/monitor/ws") as ws:
+                ws.receive_text()
+
+        # The old in-route check must be gone (it read a different secret than
+        # the REST path and compared with a timing-unsafe `!=`).
         with open(os.path.join(DEPLOY_DIR, "monitor_routes.py")) as f:
             source = f.read()
-        self.assertIn("CRAWL4AI_API_TOKEN", source,
-            "WebSocket endpoint must check CRAWL4AI_API_TOKEN")
-        self.assertIn("websocket.close", source,
-            "WebSocket must close connection on auth failure")
+        self.assertNotIn('os.environ.get("CRAWL4AI_API_TOKEN"', source,
+            "bespoke WS token check must be removed; the gate owns WS auth")
 
 
 # ============================================================================
@@ -271,15 +283,20 @@ class TestSSRFBlocked(unittest.TestCase):
 
 class TestWebhookSourceChecks(unittest.TestCase):
 
-    def test_follow_redirects_disabled(self):
+    def test_redirects_not_auto_followed(self):
+        # Redirects are followed manually and re-validated per hop, never
+        # auto-followed (which would skip the SSRF re-check).
         with open(os.path.join(DEPLOY_DIR, "webhook.py")) as f:
             source = f.read()
-        self.assertIn("follow_redirects=False", source)
+        self.assertIn("allow_redirects=False", source)
+        self.assertIn("check_redirect", source)  # each hop re-validated
 
     def test_webhook_validates_at_send_time(self):
+        # Validation happens at send time via the egress broker (resolve_and_pin
+        # rejects non-global targets); the connection is also pinned to that IP.
         with open(os.path.join(DEPLOY_DIR, "webhook.py")) as f:
             source = f.read()
-        self.assertIn("validate_webhook_url", source)
+        self.assertIn("resolve_and_pin", source)
 
     def test_job_validates_webhook(self):
         with open(os.path.join(DEPLOY_DIR, "job.py")) as f:
