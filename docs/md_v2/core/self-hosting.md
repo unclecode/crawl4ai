@@ -1,5 +1,14 @@
 # Self-Hosting Crawl4AI 🚀
 
+> **🔐 0.9.0 is secure-by-default (breaking changes).** The self-hosted Docker
+> server now requires authentication by default, binds to loopback unless you
+> set a token, validates request bodies against a strict trust boundary, uses
+> declarative hooks instead of inline Python, and returns artifact ids for
+> screenshot/pdf. If you are upgrading from 0.8.x, read the
+> [migration guide](https://github.com/unclecode/crawl4ai/blob/main/deploy/docker/MIGRATION.md)
+> first. Some examples below are being updated for 0.9.0; the migration guide is
+> the authoritative reference for the new defaults.
+
 **Take Control of Your Web Crawling Infrastructure**
 
 Self-hosting Crawl4AI gives you complete control over your web crawling and data extraction pipeline. Unlike cloud-based solutions, you own your data, infrastructure, and destiny.
@@ -441,6 +450,15 @@ Executes JavaScript snippets on the specified URL and returns the full crawl res
 ---
 
 ## User-Provided Hooks API
+
+> **⚠️ Changed in 0.9.0.** The inline-Python hook API described below was removed.
+> Sending arbitrary Python code to the server is no longer accepted (it was an
+> unauthenticated code-execution surface). 0.9.0 replaces it with **declarative
+> hooks**: a fixed set of safe, server-validated actions (for example
+> `add_cookies`, `set_headers`, `block_resources`) supplied as JSON, with no code
+> execution. See the [migration guide](https://github.com/unclecode/crawl4ai/blob/main/deploy/docker/MIGRATION.md)
+> for the declarative hook format. The inline-code examples in this section apply
+> to 0.8.x only and are kept for reference until this page is fully rewritten.
 
 The Docker API supports user-provided hook functions, allowing you to customize the crawling behavior by injecting your own Python code at specific points in the crawling pipeline. This powerful feature enables authentication, performance optimization, and custom content extraction without modifying the server code.
 
@@ -2459,6 +2477,11 @@ rate_limiting:
   storage_uri: "memory://"  # Use "redis://localhost:6379" if you need persistent/shared limits
 
 # Security Configuration
+# NOTE (0.9.0): the defaults below reflect 0.8.x. In 0.9.0 the Docker server is
+# secure-by-default - authentication is required, the server binds loopback
+# unless a token is set, and request bodies are validated against a trust
+# boundary. See the migration guide for the 0.9.0 defaults and config keys:
+# https://github.com/unclecode/crawl4ai/blob/main/deploy/docker/MIGRATION.md
 security:
   enabled: false # Master toggle for security features
   jwt_enabled: false # Enable JWT authentication (requires security.enabled=true)
