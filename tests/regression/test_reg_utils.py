@@ -10,6 +10,8 @@ import pytest
 from crawl4ai.utils import (
     extract_xml_data,
     extract_xml_data_legacy,
+    get_base_domain,
+    is_external_url,
     normalize_url,
     normalize_url_for_deep_crawl,
     efficient_normalize_url_for_deep_crawl,
@@ -498,3 +500,52 @@ class TestImageScoring:
         """IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD should exist."""
         from crawl4ai.config import IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD
         assert isinstance(IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD, (int, float))
+
+
+# ===================================================================
+# is_external_url
+# ===================================================================
+
+class TestIsExternalUrl:
+    """is_external_url must use a domain-label boundary, not a raw string suffix.
+
+    Before the fix, ``not url_domain.endswith(base)`` treated any host that
+    merely *ended with* the base string as internal, so sibling/look-alike
+    domains (``notexample.com``, ``evilexample.com``) were mislabeled as
+    internal to ``example.com`` — corrupting internal/external link bucketing
+    and deep-crawl scoping.
+    """
+
+    BASE = get_base_domain("https://example.com/page")  # -> "example.com"
+
+    def test_same_domain_is_internal(self):
+        assert is_external_url("https://example.com/other", self.BASE) is False
+
+    def test_www_variant_is_internal(self):
+        assert is_external_url("https://www.example.com/x", self.BASE) is False
+
+    def test_real_subdomain_is_internal(self):
+        assert is_external_url("https://sub.example.com/x", self.BASE) is False
+        assert is_external_url("https://deep.sub.example.com/x", self.BASE) is False
+
+    def test_unrelated_domain_is_external(self):
+        assert is_external_url("https://other.com/x", self.BASE) is True
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://notexample.com/landing",
+            "https://myexample.com/x",
+            "https://evilexample.com/phish",
+        ],
+    )
+    def test_sibling_lookalike_domain_is_external(self, url):
+        # The regression: a label boundary is required, so a host that only
+        # shares the trailing string is external, not internal.
+        assert is_external_url(url, self.BASE) is True
+
+    def test_special_scheme_is_external(self):
+        assert is_external_url("mailto:a@b.com", self.BASE) is True
+
+    def test_relative_url_is_internal(self):
+        assert is_external_url("/relative/path", self.BASE) is False
