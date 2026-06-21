@@ -25,13 +25,27 @@ x-base-config: &base-config
   security_opt:
     - no-new-privileges:true
   pids_limit: 512
-  # Read-only root filesystem; only these paths are writable (tmpfs).
+  # Read-only root filesystem. crawl4ai runs as the non-root appuser (uid/gid
+  # 999), so every runtime-writable path needs a tmpfs it can actually write.
+  # The boot crash came from two gaps, not from the bare mounts: ~/.crawl4ai was
+  # never mounted (its import-time makedirs hit the read-only FS, so the worker
+  # crash-looped and nothing bound :11235), and the outputs tmpfs pinned
+  # mode=0700 while owned by root, so appuser couldn't write it. The bare tmpfs
+  # below default to mode 1777 and are already writable; owning them by appuser
+  # is just extra hardening.
   read_only: true
   tmpfs:
     - /tmp
-    - /var/lib/redis
-    - /var/lib/crawl4ai/outputs:mode=0700
-    - /home/appuser/.cache
+    - /var/lib/redis:uid=999,gid=999,mode=0700
+    - /var/lib/crawl4ai/outputs:uid=999,gid=999,mode=0700
+    # crawl4ai writes its home (DB, logs, seeder index) here at import time.
+    - /home/appuser/.crawl4ai:uid=999,gid=999,mode=0700
+    # Only the writable cache subdir gets a tmpfs; a tmpfs over the whole
+    # ~/.cache would shadow the Chromium baked into ~/.cache/ms-playwright.
+    - /home/appuser/.cache/url_seeder:uid=999,gid=999,mode=0700
+    # gunicorn 26+ opens a control socket under $HOME/.gunicorn by default;
+    # give it a writable dir (or pass --no-control-socket to disable it).
+    - /home/appuser/.gunicorn:uid=999,gid=999,mode=0700
   deploy:
     resources:
       limits:
