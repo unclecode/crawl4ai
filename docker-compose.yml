@@ -29,9 +29,12 @@ x-base-config: &base-config
   read_only: true
   tmpfs:
     - /tmp
-    - /var/lib/redis
-    - /var/lib/crawl4ai/outputs:mode=0700
-    - /home/appuser/.cache
+    - /var/lib/redis:uid=999,gid=999,mode=0700
+    - /var/lib/crawl4ai/outputs:uid=999,gid=999,mode=0700
+    - /home/appuser/.crawl4ai:uid=999,gid=999,mode=0700
+    # Keep the baked Playwright browser under ~/.cache/ms-playwright visible.
+    - /home/appuser/.cache/url_seeder:uid=999,gid=999,mode=0700
+    - /home/appuser/.gunicorn:uid=999,gid=999,mode=0700
   deploy:
     resources:
       limits:
