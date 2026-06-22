@@ -27,8 +27,8 @@ Crawl4AI v0.8.5 is the biggest release since v0.8.0, bringing automatic anti-bot
 
 Key highlights:
 - **🛡️ Anti-Bot Detection & Proxy Escalation**: 3-tier detection with automatic retry, proxy chain, and fallback
-- **🌑 Shadow DOM Flattening**: Extract content hidden inside shadow DOM components
-- **🛑 Deep Crawl Cancellation**: Stop long crawls gracefully with `cancel()` or `should_cancel` callback
+- ** Shadow DOM Flattening**: Extract content hidden inside shadow DOM components
+- ** Deep Crawl Cancellation**: Stop long crawls gracefully with `cancel()` or `should_cancel` callback
 - **🔒 Critical Security Fixes**: RCE via deserialization patched, Redis CVE-2025-49844 fixed
 
 [Read full release notes →](../blog/release-v0.8.5.md)
@@ -41,8 +41,8 @@ Key highlights:
 Crawl4AI v0.8.0 introduces crash recovery for deep crawls, a new prefetch mode for fast URL discovery, and critical security fixes for Docker deployments.
 
 Key highlights:
-- **🔄 Deep Crawl Crash Recovery**: `on_state_change` callback for real-time state persistence, `resume_state` to continue from checkpoints
-- **⚡ Prefetch Mode**: `prefetch=True` for 5-10x faster URL discovery, perfect for two-phase crawling patterns
+- ** Deep Crawl Crash Recovery**: `on_state_change` callback for real-time state persistence, `resume_state` to continue from checkpoints
+- ** Prefetch Mode**: `prefetch=True` for 5-10x faster URL discovery, perfect for two-phase crawling patterns
 - **🔒 Security Fixes**: Hooks disabled by default, `file://` URLs blocked on Docker API, `__import__` removed from sandbox
 
 [Read full release notes →](../blog/release-v0.8.0.md)
@@ -53,9 +53,9 @@ Key highlights:
 Crawl4AI v0.7.8 is a focused stability release addressing 11 bugs reported by the community. Fixes for Docker deployments, LLM extraction, URL handling, and dependency compatibility.
 
 Key highlights:
-- **🐳 Docker API Fixes**: ContentRelevanceFilter deserialization, ProxyConfig serialization, cache folder permissions
+- ** Docker API Fixes**: ContentRelevanceFilter deserialization, ProxyConfig serialization, cache folder permissions
 - **🤖 LLM Improvements**: Configurable rate limiter backoff, HTML input format support
-- **📦 Dependencies**: Replaced deprecated PyPDF2 with pypdf, Pydantic v2 ConfigDict compatibility
+- ** Dependencies**: Replaced deprecated PyPDF2 with pypdf, Pydantic v2 ConfigDict compatibility
 
 [Read full release notes →](../blog/release-v0.7.8.md)
 

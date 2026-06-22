@@ -1,4 +1,4 @@
-# Crawl4AI Docker Guide 🐳
+# Crawl4AI Docker Guide 
 
 ## Table of Contents
 - [Prerequisites](#prerequisites)
@@ -47,7 +47,7 @@ Before we dive in, make sure you have:
 - Python 3.10+ (if using the Python SDK).
 - Node.js 16+ (if using the Node.js examples).
 
-> 💡 **Pro tip**: Run `docker info` to check your Docker installation and available resources.
+>  **Pro tip**: Run `docker info` to check your Docker installation and available resources.
 
 ## Installation
 
@@ -90,7 +90,7 @@ ANTHROPIC_API_KEY=your-anthropic-key
 # GEMINI_API_TOKEN=your-gemini-token
 EOL
 ```
-> 🔑 **Note**: Keep your API keys secure! Never commit `.llm.env` to version control.
+>  **Note**: Keep your API keys secure! Never commit `.llm.env` to version control.
 
 #### 3. Run the Container
 
@@ -833,7 +833,7 @@ curl -X POST http://localhost:11235/llm/job \
 - Single URL only (not an array)
 - Supports schema-based extraction with `schema` parameter
 
-> 💡 **Pro tip**: See [WEBHOOK_EXAMPLES.md](./WEBHOOK_EXAMPLES.md) for detailed examples including TypeScript client code, Flask webhook handlers, and failure handling.
+>  **Pro tip**: See [WEBHOOK_EXAMPLES.md](./WEBHOOK_EXAMPLES.md) for detailed examples including TypeScript client code, Flask webhook handlers, and failure handling.
 
 ---
 
@@ -975,7 +975,7 @@ You can override the default `config.yml`.
         ```
         *(Note: Ensure `my-custom-config.yml` is in the same directory as `docker-compose.yml`)*
 
-> 💡 When mounting, your custom file *completely replaces* the default one. Ensure it's a valid and complete configuration.
+>  When mounting, your custom file *completely replaces* the default one. Ensure it's a valid and complete configuration.
 
 ### Configuration Recommendations
 
@@ -985,17 +985,17 @@ You can override the default `config.yml`.
    - Set up proper rate limiting to protect your server
    - Consider your environment before enabling HTTPS redirect
 
-2. **Resource Management** 💻
+2. **Resource Management** 
    - Adjust memory_threshold_percent based on available RAM
    - Set timeouts according to your content size and network conditions
    - Use Redis for rate limiting in multi-container setups
 
-3. **Monitoring** 📊
+3. **Monitoring** 
    - Enable Prometheus if you need metrics
    - Set DEBUG logging in development, INFO in production
    - Regular health check monitoring is crucial
 
-4. **Performance Tuning** ⚡
+4. **Performance Tuning** 
    - Start with conservative rate limiter delays
    - Increase batch_process timeout for large content
    - Adjust stream_init timeout based on initial response times
@@ -1004,9 +1004,9 @@ You can override the default `config.yml`.
 
 We're here to help you succeed with Crawl4AI! Here's how to get support:
 
-- 📖 Check our [full documentation](https://docs.crawl4ai.com)
-- 🐛 Found a bug? [Open an issue](https://github.com/unclecode/crawl4ai/issues)
-- 💬 Join our [Discord community](https://discord.gg/crawl4ai)
+-  Check our [full documentation](https://docs.crawl4ai.com)
+-  Found a bug? [Open an issue](https://github.com/unclecode/crawl4ai/issues)
+-  Join our [Discord community](https://discord.gg/crawl4ai)
 - ⭐ Star us on GitHub to show support!
 
 ## Summary
@@ -1030,4 +1030,4 @@ Remember, the examples in the `examples` folder are your friends - they show rea
 
 Keep exploring, and don't hesitate to reach out if you need help! We're building something amazing together. 🚀
 
-Happy crawling! 🕷️
+Happy crawling! 

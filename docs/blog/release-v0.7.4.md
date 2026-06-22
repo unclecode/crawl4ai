@@ -6,15 +6,15 @@
 
 Today I'm releasing Crawl4AI v0.7.4—the Intelligent Table Extraction & Performance Update. This release introduces revolutionary LLM-powered table extraction with intelligent chunking, significant performance improvements for concurrent crawling, enhanced browser management, and critical stability fixes that make Crawl4AI more robust for production workloads.
 
-## 🎯 What's New at a Glance
+##  What's New at a Glance
 
 - **🚀 LLMTableExtraction**: Revolutionary table extraction with intelligent chunking for massive tables
-- **⚡ Enhanced Concurrency**: True concurrency improvements for fast-completing tasks in batch operations
-- **🔧 Browser Manager Fixes**: Resolved race conditions in concurrent page creation
-- **⌨️ Cross-Platform Browser Profiler**: Improved keyboard handling and quit mechanisms
+- ** Enhanced Concurrency**: True concurrency improvements for fast-completing tasks in batch operations
+- ** Browser Manager Fixes**: Resolved race conditions in concurrent page creation
+- **⌨ Cross-Platform Browser Profiler**: Improved keyboard handling and quit mechanisms
 - **🔗 Advanced URL Processing**: Better handling of raw URLs and base tag link resolution
 - **🛡️ Enhanced Proxy Support**: Flexible proxy configuration with dict and string formats
-- **🐳 Docker Improvements**: Better API handling and raw HTML support
+- ** Docker Improvements**: Better API handling and raw HTML support
 
 ## 🚀 LLMTableExtraction: Revolutionary Table Processing
 
@@ -123,7 +123,7 @@ for table in result.tables:
 - **Government Data**: Extract census data, statistical tables from official sources
 - **Competitive Intelligence**: Process competitor pricing and feature tables
 
-## ⚡ Enhanced Concurrency: True Performance Gains
+##  Enhanced Concurrency: True Performance Gains
 
 **The Problem:** The `arun_many()` method wasn't achieving true concurrency for fast-completing tasks, leading to sequential processing bottlenecks in batch operations.
 
@@ -157,7 +157,7 @@ async with AsyncWebCrawler() as crawler:
 - **Monitoring Systems**: Faster health checks and status page monitoring
 - **Data Aggregation**: Improved performance for real-time data collection
 
-## 🔧 Critical Stability Fixes
+##  Critical Stability Fixes
 
 ### Browser Manager Race Condition Resolution
 
@@ -232,7 +232,7 @@ async with AsyncWebCrawler(config=browser_config) as crawler:
     result = await crawler.arun("https://httpbin.org/ip")
 ```
 
-## 🐳 Docker & Infrastructure Improvements
+##  Docker & Infrastructure Improvements
 
 This release includes several Docker and infrastructure improvements:
 
@@ -241,7 +241,7 @@ This release includes several Docker and infrastructure improvements:
 - **Documentation Updates**: Comprehensive Docker deployment examples
 - **Test Coverage**: Expanded test suite with better coverage
 
-## 📚 Documentation & Examples
+##  Documentation & Examples
 
 Enhanced documentation includes:
 
@@ -250,11 +250,11 @@ Enhanced documentation includes:
 - **Docker Deployment**: Complete deployment guide with examples
 - **Performance Optimization**: Guidelines for concurrent crawling
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 Thanks to our contributors and community for feedback, bug reports, and feature requests that made this release possible.
 
-## 📚 Resources
+##  Resources
 
 - [Full Documentation](https://docs.crawl4ai.com)
 - [GitHub Repository](https://github.com/unclecode/crawl4ai)
@@ -265,6 +265,6 @@ Thanks to our contributors and community for feedback, bug reports, and feature 
 
 *Crawl4AI v0.7.4 delivers intelligent table extraction and significant performance improvements. The new LLMTableExtraction strategy handles complex tables that were previously impossible to process, while concurrency improvements make batch operations 3-4x faster. Try the intelligent table extraction—it's a game changer for data extraction workflows!*
 
-**Happy Crawling! 🕷️**
+**Happy Crawling! **
 
 *- The Crawl4AI Team*

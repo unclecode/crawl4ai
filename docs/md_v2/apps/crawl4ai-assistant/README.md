@@ -11,7 +11,7 @@ Visual extraction tools for Crawl4AI - Click to extract data and content from an
 - **Code Generation**: Generates complete Python code for Crawl4AI
 - **Beautiful Dark UI**: Consistent with Crawl4AI's design language
 
-## 📦 Installation
+##  Installation
 
 ### Method 1: Load Unpacked Extension (Recommended for Development)
 
@@ -32,7 +32,7 @@ If you want proper icons:
    - `icon-128.png`
 3. Then follow Method 1 above
 
-## 🎯 How to Use
+##  How to Use
 
 ### Using Click2Crawl
 
@@ -76,7 +76,7 @@ To use it:
 3. The script will generate a `generated_schema.json` file
 4. Use this schema in your Crawl4AI projects!
 
-## 🎨 Visual Feedback
+##  Visual Feedback
 
 - **Blue dashed outline**: Container selection mode
 - **Green dashed outline**: Field selection mode
@@ -84,18 +84,18 @@ To use it:
 - **Solid green outline**: Selected fields
 - **Floating toolbar**: Shows current mode and selection status
 
-## ⌨️ Keyboard Shortcuts
+## ⌨ Keyboard Shortcuts
 
 - **ESC**: Cancel current capture session
 
-## 🔧 Technical Details
+##  Technical Details
 
 - Built with Manifest V3 for security and performance
 - Pure client-side - no data sent to external servers
 - Generates code that uses Crawl4AI's LLM integration
 - Smart selector generation prioritizes stable attributes
 
-## 🐛 Troubleshooting
+##  Troubleshooting
 
 ### Extension doesn't load
 - Make sure you're in Developer Mode
@@ -112,13 +112,13 @@ To use it:
 - Check that you have an LLM API key configured
 - Make sure the website structure hasn't changed
 
-## 🤝 Contributing
+##  Contributing
 
 This extension is part of the Crawl4AI project. Contributions are welcome!
 
 - Report issues: [GitHub Issues](https://github.com/unclecode/crawl4ai/issues)
 - Join discussion: [Discord](https://discord.gg/crawl4ai)
 
-## 📄 License
+##  License
 
 Same as Crawl4AI - see main project for details.

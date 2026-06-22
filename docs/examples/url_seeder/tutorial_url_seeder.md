@@ -1,4 +1,4 @@
-# 🔬 Building an AI Research Assistant with Crawl4AI: Smart URL Discovery
+#  Building an AI Research Assistant with Crawl4AI: Smart URL Discovery
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1QIwVYrQaZGPJQGHQBvMSbkdnc5usqoGw#scrollTo=xbV1w9YM4LkW)
 
@@ -6,9 +6,9 @@
 
 In this tutorial, we'll build an **AI-powered research assistant** that intelligently discovers, filters, and analyzes web content. Instead of blindly crawling hundreds of pages, we'll use Crawl4AI's URL Seeder to:
 
-- 🔍 **Discover all available URLs** without crawling them first
-- 🎯 **Score and rank** them by relevance using AI
-- 🕷️ **Crawl only the most relevant** content
+-  **Discover all available URLs** without crawling them first
+-  **Score and rank** them by relevance using AI
+-  **Crawl only the most relevant** content
 - 🤖 **Generate research insights** with proper citations
 
 By the end, you'll have a complete research pipeline that can analyze any topic across multiple websites efficiently.
@@ -150,11 +150,11 @@ class ResearchResult:
 config = ResearchConfig()
 console.print(Panel(
     f"[bold cyan]Research Configuration[/bold cyan]\n\n"
-    f"🌐 Domain: {config.domain}\n"
-    f"🔍 Max Discovery: {config.max_urls_discovery} URLs\n"
-    f"🕷️ Max Crawl: {config.max_urls_to_crawl} pages\n"
+    f" Domain: {config.domain}\n"
+    f" Max Discovery: {config.max_urls_discovery} URLs\n"
+    f" Max Crawl: {config.max_urls_to_crawl} pages\n"
     f"🤖 AI Model: {config.llm_model}",
-    title="⚙️ Settings"
+    title=" Settings"
 ))
 
 # cell 6 type:markdown
@@ -216,7 +216,7 @@ async def enhance_query_with_llm(query: str, config: ResearchConfig) -> Research
         console.print(Panel(
             f"[green]✅ Enhanced Query:[/green] {result.enhanced_query}\n"
             f"[dim]Key terms: {', '.join(data['key_terms'])}[/dim]",
-            title="🔍 Query Enhancement"
+            title=" Query Enhancement"
         ))
         
         return result
@@ -261,7 +261,7 @@ async def discover_urls(
     This means we know which pages are worth crawling
     BEFORE we spend time crawling them!
     """
-    console.print(f"\n[cyan]🔍 Discovering URLs from {domain}...[/cyan]")
+    console.print(f"\n[cyan] Discovering URLs from {domain}...[/cyan]")
     
     # Use context manager for automatic cleanup
     async with AsyncUrlSeeder(logger=AsyncLogger(verbose=config.verbose)) as seeder:
@@ -300,7 +300,7 @@ async def discover_urls(
             
             # Display a sample of what we found
             if top_urls:
-                table = Table(title="🎯 Top Discovered URLs")
+                table = Table(title=" Top Discovered URLs")
                 table.add_column("Score", style="cyan")
                 table.add_column("Title", style="green")
                 table.add_column("URL", style="dim")
@@ -352,7 +352,7 @@ async def crawl_selected_urls(
         console.print("[red]❌ No URLs to crawl[/red]")
         return []
     
-    console.print(f"\n[cyan]🕷️ Crawling {len(url_list)} URLs...[/cyan]")
+    console.print(f"\n[cyan] Crawling {len(url_list)} URLs...[/cyan]")
     
     # Configure intelligent content extraction
     # This removes ads, navigation, and other noise
@@ -497,7 +497,7 @@ Keep the total response under 800 words."""
 
 # Example synthesis
 synthesis, citations = await generate_research_synthesis(enhanced, crawled, config)
-console.print(Panel(synthesis[:500] + "...", title="📝 Research Synthesis Preview"))
+console.print(Panel(synthesis[:500] + "...", title=" Research Synthesis Preview"))
 
 # cell 14 type:markdown
 ## Step 6: Complete Research Pipeline
@@ -535,7 +535,7 @@ async def research_pipeline(
     ))
     
     # Step 1: Enhance query
-    console.print(f"\n[bold cyan]📝 Step 1: Query Processing[/bold cyan]")
+    console.print(f"\n[bold cyan] Step 1: Query Processing[/bold cyan]")
     if config.use_llm_enhancement:
         research_query = await enhance_query_with_llm(query, config)
     else:
@@ -548,7 +548,7 @@ async def research_pipeline(
         )
     
     # Step 2: Discover URLs
-    console.print(f"\n[bold cyan]🔍 Step 2: URL Discovery[/bold cyan]")
+    console.print(f"\n[bold cyan] Step 2: URL Discovery[/bold cyan]")
     discovered_urls = await discover_urls(
         domain=config.domain,
         query=research_query,
@@ -567,7 +567,7 @@ async def research_pipeline(
         )
     
     # Step 3: Crawl selected URLs
-    console.print(f"\n[bold cyan]🕷️ Step 3: Content Crawling[/bold cyan]")
+    console.print(f"\n[bold cyan] Step 3: Content Crawling[/bold cyan]")
     crawled_content = await crawl_selected_urls(
         urls=discovered_urls,
         query=research_query,
@@ -603,10 +603,10 @@ async def research_pipeline(
     duration = datetime.now() - start_time
     console.print(Panel(
         f"[bold green]✅ Research completed in {duration}[/bold green]\n\n"
-        f"📊 Discovered: {len(discovered_urls)} URLs\n"
-        f"🕷️ Crawled: {len(crawled_content)} pages\n"
-        f"📚 Citations: {len(citations)} sources",
-        title="🎉 Pipeline Complete",
+        f" Discovered: {len(discovered_urls)} URLs\n"
+        f" Crawled: {len(crawled_content)} pages\n"
+        f" Citations: {len(citations)} sources",
+        title=" Pipeline Complete",
         border_style="green"
     ))
     
@@ -633,7 +633,7 @@ def format_research_output(result: ResearchResult) -> None:
     """
     # Header
     console.print("\n" + "=" * 60)
-    console.print("[bold cyan]🔬 RESEARCH REPORT[/bold cyan]")
+    console.print("[bold cyan] RESEARCH REPORT[/bold cyan]")
     console.print("=" * 60)
     
     # Query information
@@ -646,29 +646,29 @@ def format_research_output(result: ResearchResult) -> None:
     stats_table.add_column(style="cyan")
     stats_table.add_column()
     
-    stats_table.add_row("📊 URLs Discovered", str(result.metadata['total_discovered']))
-    stats_table.add_row("🕷️ Pages Crawled", str(result.metadata['total_crawled']))
-    stats_table.add_row("📚 Sources Cited", str(result.metadata['total_cited']))
-    stats_table.add_row("⏱️ Processing Time", result.metadata['duration'])
+    stats_table.add_row(" URLs Discovered", str(result.metadata['total_discovered']))
+    stats_table.add_row(" Pages Crawled", str(result.metadata['total_crawled']))
+    stats_table.add_row(" Sources Cited", str(result.metadata['total_cited']))
+    stats_table.add_row("⏱ Processing Time", result.metadata['duration'])
     
     console.print("\n[bold]Statistics:[/bold]")
     console.print(stats_table)
     
     # Synthesis
-    console.print("\n[bold]📝 SYNTHESIS[/bold]")
+    console.print("\n[bold] SYNTHESIS[/bold]")
     console.print("-" * 60)
     console.print(result.synthesis)
     
     # Citations
     if result.citations:
-        console.print("\n[bold]📚 SOURCES[/bold]")
+        console.print("\n[bold] SOURCES[/bold]")
         console.print("-" * 60)
         for citation in result.citations:
             console.print(f"\n[{citation['source_id']}] [cyan]{citation['title']}[/cyan]")
             console.print(f"    [dim]{citation['url']}[/dim]")
     
     # Top discovered URLs
-    console.print("\n[bold]🔍 TOP DISCOVERED URLS[/bold]")
+    console.print("\n[bold] TOP DISCOVERED URLS[/bold]")
     console.print("-" * 60)
     
     urls_table = Table()
@@ -767,7 +767,7 @@ async def save_research_results(
     with open(md_path, 'w') as f:
         f.write('\n'.join(md_content))
     
-    console.print(f"\n[green]💾 Results saved:[/green]")
+    console.print(f"\n[green] Results saved:[/green]")
     console.print(f"  JSON: {json_path}")
     console.print(f"  Markdown: {md_path}")
     
@@ -777,7 +777,7 @@ async def save_research_results(
 json_path, md_path = await save_research_results(result, config)
 
 # cell 20 type:markdown
-## 🎯 Putting It All Together: Interactive Research Assistant
+##  Putting It All Together: Interactive Research Assistant
 
 Now let's create an interactive version where you can research any topic! This brings together everything we've learned into a user-friendly tool.
 
@@ -791,7 +791,7 @@ async def interactive_research_assistant():
     """
     # Welcome message
     console.print(Panel.fit(
-        "[bold cyan]🔬 AI Research Assistant[/bold cyan]\n\n"
+        "[bold cyan] AI Research Assistant[/bold cyan]\n\n"
         "Powered by Crawl4AI's intelligent URL discovery\n"
         "[dim]• Discover without crawling\n"
         "• Score by relevance\n"
@@ -811,13 +811,13 @@ async def interactive_research_assistant():
     ]
     
     # Display examples
-    console.print("\n[bold]📋 Example queries:[/bold]")
+    console.print("\n[bold] Example queries:[/bold]")
     for i, example in enumerate(examples, 1):
         console.print(f"  {i}. {example}")
     
     # Get user input
     console.print("\n[bold]Enter a number (1-5) or type your own query:[/bold]")
-    user_input = input("🔍 > ").strip()
+    user_input = input(" > ").strip()
     
     # Determine query
     if user_input.isdigit() and 1 <= int(user_input) <= len(examples):
@@ -833,7 +833,7 @@ async def interactive_research_assistant():
     console.print("  2. Standard (10 URLs, balanced)")
     console.print("  3. Comprehensive (20 URLs, thorough)")
     
-    config_choice = input("⚙️ > ").strip()
+    config_choice = input(" > ").strip()
     
     # Create configuration
     if config_choice == "1":
@@ -850,7 +850,7 @@ async def interactive_research_assistant():
     format_research_output(result)
     
     # Save results
-    save_choice = input("\n💾 Save results? (y/n): ").strip().lower()
+    save_choice = input("\n Save results? (y/n): ").strip().lower()
     if save_choice == 'y':
         await save_research_results(result, config)
 
@@ -919,7 +919,7 @@ speed_config = ResearchConfig(
 )
 
 console.print(Panel(
-    "[green]⚡ Speed Optimizations:[/green]\n\n"
+    "[green] Speed Optimizations:[/green]\n\n"
     "• Reduced discovery scope\n"
     "• Disabled live URL checking\n"
     "• Increased parallelism\n"
@@ -934,7 +934,7 @@ The URL Seeder automatically caches results for efficiency:
 
 # cell 27 type:code
 # Cache demonstration
-console.print("[bold]🗄️ Understanding Caching:[/bold]\n")
+console.print("[bold] Understanding Caching:[/bold]\n")
 
 console.print("1. [cyan]First run:[/cyan] Fetches fresh data")
 console.print("   - Discovers URLs from sitemap/Common Crawl")
@@ -997,7 +997,7 @@ Other patterns to consider:
 - **Trend Detection**: Time-based discovery and analysis
 
 # cell 29 type:markdown
-## 🎓 Summary & Next Steps
+##  Summary & Next Steps
 
 ### What You've Learned
 
@@ -1026,10 +1026,10 @@ You've built a complete AI research assistant that:
 
 ### Resources
 
-- 🐙 **GitHub**: [github.com/unclecode/crawl4ai](https://github.com/unclecode/crawl4ai)
-- 📚 **Documentation**: [crawl4ai.com/docs](https://crawl4ai.com/docs)
-- 💬 **Discord**: [Join our community](https://discord.gg/crawl4ai)
+-  **GitHub**: [github.com/unclecode/crawl4ai](https://github.com/unclecode/crawl4ai)
+-  **Documentation**: [crawl4ai.com/docs](https://crawl4ai.com/docs)
+-  **Discord**: [Join our community](https://discord.gg/crawl4ai)
 
-Thank you for learning with Crawl4AI! 🙏
+Thank you for learning with Crawl4AI! 
 
-Happy researching! 🚀🔬
+Happy researching! 🚀

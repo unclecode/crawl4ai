@@ -2,7 +2,7 @@
 
 A real-world demonstration of Crawl4AI's multi-step crawling with LLM-generated automation scripts.
 
-## 🎯 What This Example Shows
+##  What This Example Shows
 
 This example demonstrates advanced Crawl4AI features:
 - **LLM-Generated Scripts**: Automatically create C4A-Script from HTML snippets
@@ -31,7 +31,7 @@ Products are extracted with:
 - Sponsored/Small Business badges
 - Direct product URLs
 
-## 📁 Files
+##  Files
 
 - `amazon_r2d2_search.py` - Main example script
 - `header.html` - Amazon search bar HTML (provided)
@@ -42,7 +42,7 @@ Products are extracted with:
   - `extracted_products.json` - Final scraped data
   - `search_results_screenshot.png` - Visual proof of results
 
-## 🏃 Running the Example
+##  Running the Example
 
 1. **Prerequisites**
    ```bash
@@ -65,7 +65,7 @@ Products are extracted with:
    - Extracts all products
    - Saves results to JSON
 
-## 📊 Sample Output
+##  Sample Output
 
 ```json
 [
@@ -83,7 +83,7 @@ Products are extracted with:
 ]
 ```
 
-## 🔍 Key Features Demonstrated
+##  Key Features Demonstrated
 
 ### Session Persistence
 ```python
@@ -116,7 +116,7 @@ schema = {
 }
 ```
 
-## 🛠️ Customization
+##  Customization
 
 ### Search Different Products
 Change the search term in the script generation:
@@ -144,21 +144,21 @@ Adapt the approach for other e-commerce sites by:
 2. Adjusting the search goals
 3. Updating the extraction schema
 
-## 🎓 Learning Points
+##  Learning Points
 
 1. **No Manual Scripting**: LLM generates all automation code
 2. **Session Management**: Maintain state across page navigations
 3. **Robust Extraction**: Handle dynamic content and multiple products
 4. **Error Handling**: Graceful fallbacks if generation fails
 
-## 🐛 Troubleshooting
+##  Troubleshooting
 
 - **"No products found"**: Check if Amazon's HTML structure changed
 - **"Script generation failed"**: Ensure LLM API key is configured
 - **"Page timeout"**: Increase wait times in the config
 - **"Session lost"**: Ensure same session_id is used consistently
 
-## 📚 Next Steps
+##  Next Steps
 
 - Try searching for different products
 - Add pagination to get more results

@@ -140,19 +140,19 @@ Welcome to the Crawl4AI Apps Hub - your gateway to interactive tools and demos t
 </style>
 
 <div class="intro-section">
-<h2>🛠️ Interactive Tools for Modern Web Scraping</h2>
+<h2> Interactive Tools for Modern Web Scraping</h2>
 <p>
 Our apps are designed to make Crawl4AI more accessible and powerful. Whether you're learning browser automation, designing extraction strategies, or building complex scrapers, these tools provide visual, interactive ways to work with Crawl4AI's features.
 </p>
 </div>
 
-## 🎯 Available Apps
+##  Available Apps
 
 <div class="apps-container">
 
 <div class="app-card">
     <span class="app-status status-available">Available</span>
-    <h3>🎨 C4A-Script Interactive Editor</h3>
+    <h3> C4A-Script Interactive Editor</h3>
     <p class="app-description">
         A visual, block-based programming environment for creating browser automation scripts. Perfect for beginners and experts alike!
     </p>
@@ -170,7 +170,7 @@ Our apps are designed to make Crawl4AI more accessible and powerful. Whether you
 
 <div class="app-card">
     <span class="app-status status-available">Available</span>
-    <h3>🧠 LLM Context Builder</h3>
+    <h3> LLM Context Builder</h3>
     <p class="app-description">
         Generate optimized context files for your favorite LLM when working with Crawl4AI. Get focused, relevant documentation based on your needs.
     </p>
@@ -188,7 +188,7 @@ Our apps are designed to make Crawl4AI more accessible and powerful. Whether you
 
 <div class="app-card">
     <span class="app-status status-coming-soon">Coming Soon</span>
-    <h3>🕸️ Web Scraping Playground</h3>
+    <h3> Web Scraping Playground</h3>
     <p class="app-description">
         Test your scraping strategies on real websites with instant feedback. See how different configurations affect your results.
     </p>
@@ -205,7 +205,7 @@ Our apps are designed to make Crawl4AI more accessible and powerful. Whether you
 
 <div class="app-card">
     <span class="app-status status-available">Available</span>
-    <h3>🔍 Crawl4AI Assistant (Chrome Extension)</h3>
+    <h3> Crawl4AI Assistant (Chrome Extension)</h3>
     <p class="app-description">
         Visual schema builder Chrome extension - click on webpage elements to generate extraction schemas and Python code!
     </p>
@@ -223,7 +223,7 @@ Our apps are designed to make Crawl4AI more accessible and powerful. Whether you
 
 <div class="app-card">
     <span class="app-status status-coming-soon">Coming Soon</span>
-    <h3>🧪 Extraction Lab</h3>
+    <h3> Extraction Lab</h3>
     <p class="app-description">
         Experiment with different extraction strategies and see how they perform on your content. Compare LLM vs CSS vs XPath approaches.
     </p>
@@ -257,7 +257,7 @@ Our apps are designed to make Crawl4AI more accessible and powerful. Whether you
 
 <div class="app-card">
     <span class="app-status status-coming-soon">Coming Soon</span>
-    <h3>📊 Crawl Monitor</h3>
+    <h3> Crawl Monitor</h3>
     <p class="app-description">
         Real-time monitoring dashboard for your crawling operations. Track performance, debug issues, and optimize your scrapers.
     </p>
@@ -276,25 +276,25 @@ Our apps are designed to make Crawl4AI more accessible and powerful. Whether you
 
 ## 🚀 Why Use These Apps?
 
-### 🎯 **Accelerate Learning**
+###  **Accelerate Learning**
 Visual tools help you understand Crawl4AI's concepts faster than reading documentation alone.
 
-### 💡 **Reduce Development Time**
+###  **Reduce Development Time**
 Generate working code instantly instead of writing everything from scratch.
 
-### 🔍 **Improve Quality**
+###  **Improve Quality**
 Test and refine your approach before deploying to production.
 
-### 🤝 **Community Driven**
+###  **Community Driven**
 These tools are built based on user feedback. Have an idea? [Let us know](https://github.com/unclecode/crawl4ai/issues)!
 
-## 📢 Stay Updated
+##  Stay Updated
 
 Want to know when new apps are released? 
 
 - ⭐ [Star us on GitHub](https://github.com/unclecode/crawl4ai) to get notifications
-- 🐦 Follow [@unclecode](https://twitter.com/unclecode) for announcements
-- 💬 Join our [Discord community](https://discord.gg/crawl4ai) for early access
+-  Follow [@unclecode](https://twitter.com/unclecode) for announcements
+-  Join our [Discord community](https://discord.gg/crawl4ai) for early access
 
 ---
 

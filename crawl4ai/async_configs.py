@@ -11,7 +11,7 @@ from .config import (
     IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
     PROVIDER_MODELS,
     PROVIDER_MODELS_PREFIXES,
-    SCREENSHOT_HEIGHT_TRESHOLD,
+    SCREENSHOT_HEIGHT_THRESHOLD,
     PAGE_TIMEOUT,
     IMAGE_SCORE_THRESHOLD,
     SOCIAL_MEDIA_DOMAINS,
@@ -897,9 +897,9 @@ class BrowserConfig:
         self.memory_saving_mode = memory_saving_mode
         self.max_pages_before_recycle = max_pages_before_recycle
 
-        fa_user_agenr_generator = ValidUAGenerator()
+        ua_generator = ValidUAGenerator()
         if self.user_agent_mode == "random":
-            self.user_agent = fa_user_agenr_generator.generate(
+            self.user_agent = ua_generator.generate(
                 **(self.user_agent_generator_config or {})
             )
         else:
@@ -1496,7 +1496,7 @@ class CrawlerRunConfig():
         screenshot_wait_for (float or None): Additional wait time before taking a screenshot.
                                              Default: None.
         screenshot_height_threshold (int): Threshold for page height to decide screenshot strategy.
-                                           Default: SCREENSHOT_HEIGHT_TRESHOLD (from config, e.g. 20000).
+                                            Default: SCREENSHOT_HEIGHT_THRESHOLD (from config, e.g. 20000).
         force_viewport_screenshot (bool): If True, always take viewport-only screenshots regardless of page height.
                                           When False, uses automatic decision (viewport for short pages, full-page for long pages).
                                           Default: False.
@@ -1530,8 +1530,6 @@ class CrawlerRunConfig():
                                            Default: False.
         exclude_domains (list of str): List of specific domains to exclude from results.
                                        Default: [].
-        exclude_internal_links (bool): If True, exclude internal links from the results.
-                                       Default: False.
         score_links (bool): If True, calculate intrinsic quality scores for all links using URL structure,
                            text quality, and contextual relevance metrics. Separate from link_preview_config.
                            Default: False.
@@ -1654,7 +1652,7 @@ class CrawlerRunConfig():
         # Media Handling Parameters
         screenshot: bool = False,
         screenshot_wait_for: float = None,
-        screenshot_height_threshold: int = SCREENSHOT_HEIGHT_TRESHOLD,
+        screenshot_height_threshold: int = SCREENSHOT_HEIGHT_THRESHOLD,
         force_viewport_screenshot: bool = False,
         pdf: bool = False,
         capture_mhtml: bool = False,

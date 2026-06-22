@@ -1,6 +1,6 @@
 # Self-Hosting Crawl4AI 🚀
 
-> **🔐 0.9.0 is secure-by-default (breaking changes).** The self-hosted Docker
+> ** 0.9.0 is secure-by-default (breaking changes).** The self-hosted Docker
 > server now requires authentication by default, binds to loopback unless you
 > set a token, validates request bodies against a strict trust boundary, uses
 > declarative hooks instead of inline Python, and returns artifact ids for
@@ -16,12 +16,12 @@ Self-hosting Crawl4AI gives you complete control over your web crawling and data
 ## Why Self-Host?
 
 - **🔒 Data Privacy**: Your crawled data never leaves your infrastructure
-- **💰 Cost Control**: No per-request pricing - scale within your own resources
-- **🎯 Customization**: Full control over browser configurations, extraction strategies, and performance tuning
-- **📊 Transparency**: Real-time monitoring dashboard shows exactly what's happening
-- **⚡ Performance**: Direct access without API rate limits or geographic restrictions
+- ** Cost Control**: No per-request pricing - scale within your own resources
+- ** Customization**: Full control over browser configurations, extraction strategies, and performance tuning
+- ** Transparency**: Real-time monitoring dashboard shows exactly what's happening
+- ** Performance**: Direct access without API rate limits or geographic restrictions
 - **🛡️ Security**: Keep sensitive data extraction workflows behind your firewall
-- **🔧 Flexibility**: Customize, extend, and integrate with your existing infrastructure
+- ** Flexibility**: Customize, extend, and integrate with your existing infrastructure
 
 When you self-host, you can scale from a single container to a full browser infrastructure, all while maintaining complete control and visibility.
 
@@ -64,7 +64,7 @@ Before we dive in, make sure you have:
 - Python 3.10+ (if using the Python SDK).
 - Node.js 16+ (if using the Node.js examples).
 
-> 💡 **Pro tip**: Run `docker info` to check your Docker installation and available resources.
+>  **Pro tip**: Run `docker info` to check your Docker installation and available resources.
 
 ## Installation
 
@@ -78,7 +78,7 @@ Pull and run images directly from Docker Hub without building locally.
 
 Our latest release is `0.8.0`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
 
-> 💡 **Note**: The `latest` tag points to the stable `0.8.0` version.
+>  **Note**: The `latest` tag points to the stable `0.8.0` version.
 
 ```bash
 # Pull the latest version
@@ -119,7 +119,7 @@ ANTHROPIC_API_KEY=your-anthropic-key
 # ANTHROPIC_TEMPERATURE=0.3
 EOL
 ```
-> 🔑 **Note**: Keep your API keys secure! Never commit `.llm.env` to version control.
+>  **Note**: Keep your API keys secure! Never commit `.llm.env` to version control.
 
 #### 3. Run the Container
 
@@ -857,7 +857,7 @@ else:
     print(f"Error: {response.status_code}")
 ```
 
-> 💡 **Remember**: Always test your hooks on safe, known websites first before using them on production sites. Never crawl sites that you don't have permission to access or that might be malicious.
+>  **Remember**: Always test your hooks on safe, known websites first before using them on production sites. Never crawl sites that you don't have permission to access or that might be malicious.
 
 ### Hooks Utility: Function-Based Approach (Python)
 
@@ -1990,9 +1990,9 @@ http://localhost:11235/monitor
 - **Network I/O**: Total bytes sent/received since startup
 - **Server Uptime**: How long your server has been running
 - **Browser Pool Status**:
-  - 🔥 Permanent browser (always-on default config, ~270MB)
-  - ♨️ Hot pool (frequently used configs, ~180MB each)
-  - ❄️ Cold pool (idle browsers awaiting cleanup, ~180MB each)
+  -  Permanent browser (always-on default config, ~270MB)
+  -  Hot pool (frequently used configs, ~180MB each)
+  -  Cold pool (idle browsers awaiting cleanup, ~180MB each)
 - **Memory Pressure**: LOW/MEDIUM/HIGH indicator for janitor behavior
 
 #### 2. Live Request Tracking
@@ -2560,7 +2560,7 @@ You can override the default `config.yml`.
         ```
         *(Note: Ensure `my-custom-config.yml` is in the same directory as `docker-compose.yml`)*
 
-> 💡 When mounting, your custom file *completely replaces* the default one. Ensure it's a valid and complete configuration.
+>  When mounting, your custom file *completely replaces* the default one. Ensure it's a valid and complete configuration.
 
 ### Configuration Recommendations
 
@@ -2570,17 +2570,17 @@ You can override the default `config.yml`.
    - Set up proper rate limiting to protect your server
    - Consider your environment before enabling HTTPS redirect
 
-2. **Resource Management** 💻
+2. **Resource Management** 
    - Adjust memory_threshold_percent based on available RAM
    - Set timeouts according to your content size and network conditions
    - Use Redis for rate limiting in multi-container setups
 
-3. **Monitoring** 📊
+3. **Monitoring** 
    - Enable Prometheus if you need metrics
    - Set DEBUG logging in development, INFO in production
    - Regular health check monitoring is crucial
 
-4. **Performance Tuning** ⚡
+4. **Performance Tuning** 
    - Start with conservative rate limiter delays
    - Increase batch_process timeout for large content
    - Adjust stream_init timeout based on initial response times
@@ -2589,9 +2589,9 @@ You can override the default `config.yml`.
 
 We're here to help you succeed with Crawl4AI! Here's how to get support:
 
-- 📖 Check our [full documentation](https://docs.crawl4ai.com)
-- 🐛 Found a bug? [Open an issue](https://github.com/unclecode/crawl4ai/issues)
-- 💬 Join our [Discord community](https://discord.gg/crawl4ai)
+-  Check our [full documentation](https://docs.crawl4ai.com)
+-  Found a bug? [Open an issue](https://github.com/unclecode/crawl4ai/issues)
+-  Join our [Discord community](https://discord.gg/crawl4ai)
 - ⭐ Star us on GitHub to show support!
 
 ## Summary
@@ -2613,11 +2613,11 @@ Congratulations! You now have everything you need to self-host your own Crawl4AI
 
 By self-hosting Crawl4AI, you:
 - 🔒 **Own Your Data**: Everything stays in your infrastructure
-- 📊 **See Everything**: Real-time dashboard shows exactly what's happening
-- 💰 **Control Costs**: Scale within your resources, no per-request fees
-- ⚡ **Maximize Performance**: Direct access with smart browser pooling (10x memory efficiency)
+-  **See Everything**: Real-time dashboard shows exactly what's happening
+-  **Control Costs**: Scale within your resources, no per-request fees
+-  **Maximize Performance**: Direct access with smart browser pooling (10x memory efficiency)
 - 🛡️ **Stay Secure**: Keep sensitive workflows behind your firewall
-- 🔧 **Customize Freely**: Full control over configs, strategies, and optimizations
+-  **Customize Freely**: Full control over configs, strategies, and optimizations
 
 **Next Steps:**
 
@@ -2628,14 +2628,14 @@ By self-hosting Crawl4AI, you:
 5. **Go Production**: Set up alerting, log aggregation, and automated cleanup
 
 **Key Resources:**
-- 🎮 **Playground**: `http://localhost:11235/playground` - Interactive testing
-- 📊 **Monitor Dashboard**: `http://localhost:11235/monitor` - Real-time visibility
-- 📖 **Architecture Docs**: `deploy/docker/ARCHITECTURE.md` - Deep technical dive
-- 💬 **Discord Community**: Get help and share experiences
+-  **Playground**: `http://localhost:11235/playground` - Interactive testing
+-  **Monitor Dashboard**: `http://localhost:11235/monitor` - Real-time visibility
+-  **Architecture Docs**: `deploy/docker/ARCHITECTURE.md` - Deep technical dive
+-  **Discord Community**: Get help and share experiences
 - ⭐ **GitHub**: Report issues, contribute, show support
 
 Remember: The monitoring dashboard is your window into your infrastructure. Use it to understand performance, troubleshoot issues, and optimize your deployment. The examples in the `examples` folder show real-world usage patterns you can adapt.
 
 **You're now in control of your web crawling destiny!** 🚀
 
-Happy crawling! 🕷️
+Happy crawling! 

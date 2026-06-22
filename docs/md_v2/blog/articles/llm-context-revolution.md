@@ -20,7 +20,7 @@ Think of it as HTTP for AI context. Just as HTTP doesn't dictate your website's 
 
 <div style="background-color: #1a1a1c; border: 1px solid #3f3f44; padding: 20px; margin: 20px 0;">
 
-#### 🧠 **Memory: The Foundation**
+####  **Memory: The Foundation**
 ```markdown
 # AsyncWebCrawler.arun() - Memory Context
 
@@ -45,7 +45,7 @@ This is your API reference—the facts, the parameters, the return types. It's t
 
 <div style="background-color: #1a1a1c; border: 1px solid #3f3f44; padding: 20px; margin: 20px 0;">
 
-#### 🎯 **Reasoning: The Soul**
+####  **Reasoning: The Soul**
 ```markdown
 # AsyncWebCrawler Design Philosophy - Reasoning Context
 
@@ -80,7 +80,7 @@ This is where the library creator's philosophy lives. It's not just *what* the l
 
 <div style="background-color: #1a1a1c; border: 1px solid #3f3f44; padding: 20px; margin: 20px 0;">
 
-#### 💻 **Examples: The Practice**
+####  **Examples: The Practice**
 ```python
 # Crawling with JavaScript execution
 result = await crawler.arun(
@@ -117,7 +117,7 @@ By providing structured context across these three dimensions, we're not just do
 ## The Cultural DNA of Your Library
 
 <div style="display: flex; align-items: center; background-color: #3f3f44; padding: 20px; margin: 20px 0; border-left: 4px solid #09b5a5;">
-<div style="font-size: 48px; margin-right: 20px;">🧬</div>
+<div style="font-size: 48px; margin-right: 20px;"></div>
 <div>
 <strong>Your library's reasoning is its cultural DNA.</strong><br>
 It reflects your taste, your architectural decisions, your opinions about how things should be done. A library without reasoning is like a recipe without techniques—sure, you have the ingredients, but good luck making something edible.

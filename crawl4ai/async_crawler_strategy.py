@@ -16,7 +16,7 @@ import random
 import uuid
 from .js_snippet import load_js_script
 from .models import AsyncCrawlResponse
-from .config import SCREENSHOT_HEIGHT_TRESHOLD
+from .config import SCREENSHOT_HEIGHT_THRESHOLD
 from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig
 from .async_logger import AsyncLogger
 from .ssl_certificate import SSLCertificate
@@ -919,7 +919,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     # )
 
                     target_width = self.browser_config.viewport_width
-                    target_height = int(target_width * page_width / page_height * 0.95)
+                    target_height = int(target_width * page_height / page_width)
                     await page.set_viewport_size(
                         {"width": target_width, "height": target_height}
                     )
@@ -1878,7 +1878,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Set a large viewport
             large_viewport_height = min(
                 page_height,
-                kwargs.get("screenshot_height_threshold", SCREENSHOT_HEIGHT_TRESHOLD),
+                kwargs.get("screenshot_height_threshold", SCREENSHOT_HEIGHT_THRESHOLD),
             )
             await page.set_viewport_size(
                 {"width": page_width, "height": large_viewport_height}
@@ -2249,14 +2249,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     results.append({"success": False, "error": str(e)})
 
             return {"success": True, "results": results}
-
-        except Exception as e:
-            self.logger.error(
-                message="Script execution failed: {error}",
-                tag="JS_EXEC",
-                params={"error": str(e)},
-            )
-            return {"success": False, "error": str(e)}
 
         except Exception as e:
             self.logger.error(

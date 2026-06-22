@@ -1,16 +1,16 @@
-# 💖 Sponsors & Supporters
+#  Sponsors & Supporters
 
 Thank you to everyone supporting Crawl4AI! Your sponsorship helps keep this project open-source and actively maintained.
 
-## 👑 Founding Sponsors
+##  Founding Sponsors
 *The first 50 sponsors who believed in our vision - permanently recognized*
 
 <!-- Founding sponsors will be listed here with special recognition -->
-🎉 **Become a Founding Sponsor!** Only [X/50] spots remaining! [Join now →](https://github.com/sponsors/unclecode)
+ **Become a Founding Sponsor!** Only [X/50] spots remaining! [Join now →](https://github.com/sponsors/unclecode)
 
 ---
 
-## 🏢 Data Infrastructure Partners ($2000/month)
+##  Data Infrastructure Partners ($2000/month)
 *These organizations are building their data sovereignty with Crawl4AI at the core*
 
 <!-- Data Infrastructure Partners will be listed here -->
@@ -18,7 +18,7 @@ Thank you to everyone supporting Crawl4AI! Your sponsorship helps keep this proj
 
 ---
 
-## 💼 Growing Teams ($500/month)
+##  Growing Teams ($500/month)
 *Teams scaling their data extraction with Crawl4AI*
 
 <!-- Growing Teams will be listed here -->
@@ -34,7 +34,7 @@ Thank you to everyone supporting Crawl4AI! Your sponsorship helps keep this proj
 
 ---
 
-## 🌱 Believers ($5/month)
+##  Believers ($5/month)
 *The community supporting data democratization*
 
 <!-- Believers will be listed here -->
@@ -42,15 +42,15 @@ Thank you to everyone supporting Crawl4AI! Your sponsorship helps keep this proj
 
 ---
 
-## 🤝 Want to Sponsor?
+##  Want to Sponsor?
 
 Crawl4AI is the #1 trending open-source web crawler. We're building the future of data extraction - where organizations own their data pipelines instead of relying on rate-limited APIs.
 
 ### Available Sponsorship Tiers:
-- **🌱 Believer** ($5/mo) - Support the movement
+- ** Believer** ($5/mo) - Support the movement
 - **🚀 Builder** ($50/mo) - Priority support & early access
-- **💼 Growing Team** ($500/mo) - Bi-weekly syncs & optimization
-- **🏢 Data Infrastructure Partner** ($2000/mo) - Full partnership & dedicated support
+- ** Growing Team** ($500/mo) - Bi-weekly syncs & optimization
+- ** Data Infrastructure Partner** ($2000/mo) - Full partnership & dedicated support
 
 [View all tiers and benefits →](https://github.com/sponsors/unclecode)
 
@@ -58,7 +58,7 @@ Crawl4AI is the #1 trending open-source web crawler. We're building the future o
 
 Building data extraction at scale? Need dedicated support or infrastructure? Let's talk about a custom partnership.
 
-📧 Contact: [hello@crawl4ai.com](mailto:hello@crawl4ai.com) | 📅 [Schedule a call](https://calendar.app.google/rEpvi2UBgUQjWHfJ9)
+ Contact: [hello@crawl4ai.com](mailto:hello@crawl4ai.com) |  [Schedule a call](https://calendar.app.google/rEpvi2UBgUQjWHfJ9)
 
 ---
 

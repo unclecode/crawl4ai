@@ -1,4 +1,4 @@
-# 🎨 Crawl4AI Brand Book
+#  Crawl4AI Brand Book
 
 <style>
 /* Brand Book Styles */
@@ -568,14 +568,14 @@
     <p>A comprehensive design system for building consistent, terminal-inspired experiences</p>
 </div>
 
-## 📖 About This Guide
+##  About This Guide
 
 This brand book documents the complete visual language of Crawl4AI. Whether you're building documentation pages, interactive apps, or Chrome extensions, these guidelines ensure consistency while maintaining the unique terminal-aesthetic that defines our brand.
 
 ---
 
 <div class="section-header">
-    <span class="section-icon">🎨</span>
+    <span class="section-icon"></span>
     <h2 class="section-title">Color System</h2>
 </div>
 
@@ -744,7 +744,7 @@ Our color palette is built around a terminal-dark aesthetic with vibrant cyan an
 ---
 
 <div class="section-header">
-    <span class="section-icon">✍️</span>
+    <span class="section-icon"></span>
     <h2 class="section-title">Typography</h2>
 </div>
 
@@ -837,7 +837,7 @@ Our typography system is built around **Dank Mono**, a monospace font that reinf
 ---
 
 <div class="section-header">
-    <span class="section-icon">🧩</span>
+    <span class="section-icon"></span>
     <h2 class="section-title">Components</h2>
 </div>
 
@@ -940,13 +940,13 @@ Our typography system is built around **Dank Mono**, a monospace font that reinf
 
 <div class="component-grid">
     <div class="brand-card">
-        <h3 class="brand-card-title">🎨 C4A-Script Editor</h3>
+        <h3 class="brand-card-title"> C4A-Script Editor</h3>
         <p class="brand-card-description">A visual, block-based programming environment for creating browser automation scripts. Perfect for beginners and experts alike!</p>
         <button class="brand-btn brand-btn-primary" style="margin-top: 1rem;">Launch Editor →</button>
     </div>
 
     <div class="brand-card">
-        <h3 class="brand-card-title">🧠 LLM Context Builder</h3>
+        <h3 class="brand-card-title"> LLM Context Builder</h3>
         <p class="brand-card-description">Generate optimized context files for your favorite LLM when working with Crawl4AI. Get focused, relevant documentation based on your needs.</p>
         <button class="brand-btn brand-btn-primary" style="margin-top: 1rem;">Launch Builder →</button>
     </div>
@@ -1003,7 +1003,7 @@ Our typography system is built around **Dank Mono**, a monospace font that reinf
 ---
 
 <div class="section-header">
-    <span class="section-icon">📐</span>
+    <span class="section-icon"></span>
     <h2 class="section-title">Spacing & Layout</h2>
 </div>
 
@@ -1198,7 +1198,7 @@ Maximum width with auto margins for centered layouts
 ---
 
 <div class="section-header">
-    <span class="section-icon">🎯</span>
+    <span class="section-icon"></span>
     <h2 class="section-title">Accessibility</h2>
 </div>
 
@@ -1239,7 +1239,7 @@ Respect `prefers-reduced-motion` for users who need it:
 ---
 
 <div class="section-header">
-    <span class="section-icon">💾</span>
+    <span class="section-icon"></span>
     <h2 class="section-title">CSS Variables</h2>
 </div>
 
@@ -1288,7 +1288,7 @@ Use these CSS variables for consistency across all styles:
 ---
 
 <div class="section-header">
-    <span class="section-icon">📚</span>
+    <span class="section-icon"></span>
     <h2 class="section-title">Resources</h2>
 </div>
 
@@ -1318,7 +1318,7 @@ If you're unsure about which style to use or need help implementing these guidel
 ---
 
 <div style="background: #1a1a1a; border: 1px solid #50ffff; border-radius: 8px; padding: 2rem; margin: 3rem 0; text-align: center;">
-    <h3 style="margin: 0 0 1rem 0; color: #50ffff;">🎨 Keep It Terminal</h3>
+    <h3 style="margin: 0 0 1rem 0; color: #50ffff;"> Keep It Terminal</h3>
     <p style="margin: 0; color: #d5cec0; font-size: 1rem;">
         When in doubt, ask yourself: "Does this feel like a terminal?" If yes, you're on brand.
     </p>

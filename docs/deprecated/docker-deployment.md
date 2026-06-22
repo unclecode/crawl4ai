@@ -1,11 +1,11 @@
-# 🐳 Using Docker (Legacy)
+#  Using Docker (Legacy)
 
 Crawl4AI is available as Docker images for easy deployment. You can either pull directly from Docker Hub (recommended) or build from the repository.
 
 ---
 
 <details>
-<summary>🐳 <strong>Option 1: Docker Hub (Recommended)</strong></summary>
+<summary> <strong>Option 1: Docker Hub (Recommended)</strong></summary>
 
 Choose the appropriate image based on your platform and needs:
 
@@ -64,7 +64,7 @@ Note: Due to hardware constraints, only the basic version is recommended for Ras
 </details>
 
 <details>
-<summary>🐳 <strong>Option 2: Build from Repository</strong></summary>
+<summary> <strong>Option 2: Build from Repository</strong></summary>
 
 Build the image locally based on your platform:
 
@@ -117,7 +117,7 @@ curl http://localhost:11235/health
 </details>
 
 <details>
-<summary>🐳 <strong>Option 3: Using Docker Compose</strong></summary>
+<summary> <strong>Option 3: Using Docker Compose</strong></summary>
 
 Docker Compose provides a more structured way to run Crawl4AI, especially when dealing with environment variables and multiple configurations.
 
@@ -178,7 +178,7 @@ Deploy your own instance of Crawl4AI with one click:
 
 [![DigitalOcean Referral Badge](https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%203.svg)](https://www.digitalocean.com/?repo=https://github.com/unclecode/crawl4ai/tree/0.3.74&refcode=a0780f1bdb3d&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge)
 
-> 💡 **Recommended specs**: 4GB RAM minimum. Select "professional-xs" or higher when deploying for stable operation.
+>  **Recommended specs**: 4GB RAM minimum. Select "professional-xs" or higher when deploying for stable operation.
 
 The deploy will:
 - Set up a Docker container with Crawl4AI
