@@ -162,7 +162,7 @@ This example shows:
 
 ## Advanced Technique 1: Custom Execution Hooks
 
-> Warning: You might feel confused by the end of the next few examples 😅, so make sure you are comfortable with the order of the parts before you start this.
+> Warning: You might feel confused by the end of the next few examples , so make sure you are comfortable with the order of the parts before you start this.
 
 Use custom hooks to handle complex scenarios, such as waiting for content to load dynamically:
 

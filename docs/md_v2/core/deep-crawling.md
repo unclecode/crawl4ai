@@ -112,7 +112,7 @@ strategy = DFSDeepCrawlStrategy(
 - **`filter_chain`**: FilterChain instance for URL filtering
 - **`url_scorer`**: Scorer instance for evaluating URLs
 
-### 2.3 BestFirstCrawlingStrategy (⭐️ - Recommended Deep crawl strategy)
+### 2.3 BestFirstCrawlingStrategy (⭐ - Recommended Deep crawl strategy)
 
 For more intelligent crawling, use **BestFirstCrawlingStrategy** with scorers to prioritize the most relevant pages:
 

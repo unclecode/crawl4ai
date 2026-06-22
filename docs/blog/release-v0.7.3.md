@@ -6,18 +6,18 @@
 
 Today I'm releasing Crawl4AI v0.7.3—the Multi-Config Intelligence Update. This release brings smarter URL-specific configurations, flexible Docker deployments, important bug fixes, and documentation improvements that make Crawl4AI more robust and production-ready.
 
-## 🎯 What's New at a Glance
+##  What's New at a Glance
 
-- **🕵️ Undetected Browser Support**: Stealth mode for bypassing bot detection systems
-- **🎨 Multi-URL Configurations**: Different crawling strategies for different URL patterns in a single batch
-- **🐳 Flexible Docker LLM Providers**: Configure LLM providers via environment variables
-- **🧠 Memory Monitoring**: Enhanced memory usage tracking and optimization tools
-- **📊 Enhanced Table Extraction**: Improved table access and DataFrame conversion
-- **💰 GitHub Sponsors**: 4-tier sponsorship system with custom arrangements
-- **🔧 Bug Fixes**: Resolved several critical issues for better stability
-- **📚 Documentation Updates**: Clearer examples and improved API documentation
+- ** Undetected Browser Support**: Stealth mode for bypassing bot detection systems
+- ** Multi-URL Configurations**: Different crawling strategies for different URL patterns in a single batch
+- ** Flexible Docker LLM Providers**: Configure LLM providers via environment variables
+- ** Memory Monitoring**: Enhanced memory usage tracking and optimization tools
+- ** Enhanced Table Extraction**: Improved table access and DataFrame conversion
+- ** GitHub Sponsors**: 4-tier sponsorship system with custom arrangements
+- ** Bug Fixes**: Resolved several critical issues for better stability
+- ** Documentation Updates**: Clearer examples and improved API documentation
 
-## 🎨 Multi-URL Configurations: One Size Doesn't Fit All
+##  Multi-URL Configurations: One Size Doesn't Fit All
 
 **The Problem:** You're crawling a mix of documentation sites, blogs, and API endpoints. Each needs different handling—caching for docs, fresh content for news, structured extraction for APIs. Previously, you'd run separate crawls or write complex conditional logic.
 
@@ -82,7 +82,7 @@ async with AsyncWebCrawler() as crawler:
 - **Reduced Complexity**: No more if/else forests in your extraction code
 - **Better Performance**: Each URL gets exactly the processing it needs
 
-## 🕵️ Undetected Browser Support: Stealth Mode Activated
+##  Undetected Browser Support: Stealth Mode Activated
 
 **The Problem:** Modern websites employ sophisticated bot detection systems. Cloudflare, Akamai, and custom solutions block automated crawlers, limiting access to valuable content.
 
@@ -161,7 +161,7 @@ result = await crawler.arun("https://bot-protected-site.com", config=config)
 - **Content Aggregation**: Collect news and social media despite anti-bot measures
 - **Compliance Testing**: Verify your own site's bot protection effectiveness
 
-## 🧠 Memory Monitoring & Optimization
+##  Memory Monitoring & Optimization
 
 **The Problem:** Long-running crawl sessions consuming excessive memory, especially when processing large batches or heavy JavaScript sites.
 
@@ -203,7 +203,7 @@ async with AsyncWebCrawler() as crawler:
 - **Performance Tuning**: Identify memory bottlenecks and optimization opportunities
 - **Scalability Planning**: Understand memory patterns for horizontal scaling
 
-## 📊 Enhanced Table Extraction
+##  Enhanced Table Extraction
 
 **The Problem:** Table data was accessed through the generic `result.media` interface, making DataFrame conversion cumbersome and unclear.
 
@@ -240,15 +240,15 @@ if result.tables:
 - **ETL Pipelines**: Cleaner integration with data processing workflows
 - **Reporting**: Simplified table extraction for automated reporting systems
 
-## 💰 Community Support: GitHub Sponsors
+##  Community Support: GitHub Sponsors
 
 I've launched GitHub Sponsors to ensure Crawl4AI's continued development and support our growing community.
 
 **Sponsorship Tiers:**
-- **🌱 Supporter ($5/month)**: Community support + early feature previews
+- ** Supporter ($5/month)**: Community support + early feature previews
 - **🚀 Professional ($25/month)**: Priority support + beta access
-- **🏢 Business ($100/month)**: Direct consultation + custom integrations
-- **🏛️ Enterprise ($500/month)**: Dedicated support + feature development
+- ** Business ($100/month)**: Direct consultation + custom integrations
+- ** Enterprise ($500/month)**: Dedicated support + feature development
 
 **Why Sponsor?**
 - Ensure continuous development and maintenance
@@ -258,7 +258,7 @@ I've launched GitHub Sponsors to ensure Crawl4AI's continued development and sup
 
 [**Become a Sponsor →**](https://github.com/sponsors/unclecode)
 
-## 🐳 Docker: Flexible LLM Provider Configuration
+##  Docker: Flexible LLM Provider Configuration
 
 **The Problem:** Hardcoded LLM providers in Docker deployments. Want to switch from OpenAI to Groq? Rebuild and redeploy. Testing different models? Multiple Docker images.
 
@@ -311,7 +311,7 @@ response = requests.post("http://localhost:11235/crawl", json={
 - **Development Flexibility**: Test locally with one provider, deploy with another
 - **Secure Configuration**: Keep API keys in `.llm.env` file, not in commands
 
-## 🔧 Bug Fixes & Improvements
+##  Bug Fixes & Improvements
 
 This release includes several important bug fixes that improve stability and reliability:
 
@@ -321,7 +321,7 @@ This release includes several important bug fixes that improve stability and rel
 - **Table Extraction**: Improved table detection and extraction accuracy
 - **Error Handling**: Better error messages and recovery from network failures
 
-## 📚 Documentation Enhancements
+##  Documentation Enhancements
 
 Based on community feedback, we've updated:
 - Clearer examples for multi-URL configuration
@@ -330,11 +330,11 @@ Based on community feedback, we've updated:
 - Added real-world URLs in examples for better understanding
 - New comprehensive demo showcasing all v0.7.3 features
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 Thanks to our contributors and the entire community for feedback and bug reports.
 
-## 📚 Resources
+##  Resources
 
 - [Full Documentation](https://docs.crawl4ai.com)
 - [GitHub Repository](https://github.com/unclecode/crawl4ai)
@@ -345,6 +345,6 @@ Thanks to our contributors and the entire community for feedback and bug reports
 
 *Crawl4AI continues to evolve with your needs. This release makes it smarter, more flexible, and more stable. Try the new multi-config feature and flexible Docker deployment—they're game changers!*
 
-**Happy Crawling! 🕷️**
+**Happy Crawling! **
 
 *- The Crawl4AI Team*

@@ -51,7 +51,7 @@ graph TD
 
 Crawl4AI is evolving to provide more intelligent, efficient, and versatile web crawling capabilities. This roadmap outlines the key developments and features planned for the project, organized into strategic sections that build upon our current foundation.
 
-## 1. Advanced Crawling Systems 🔧
+## 1. Advanced Crawling Systems 
 
 This section introduces three powerful crawling systems that extend Crawl4AI's capabilities from basic web crawling to intelligent, purpose-driven data extraction.
 
@@ -163,7 +163,7 @@ async with AsyncWebCrawler() as crawler:
     print("Success Rate:", result.success_rate)
 ```
 
-# Section 2: Specialized Features 🛠️
+# Section 2: Specialized Features 
 
 This section introduces specialized tools and features that enhance Crawl4AI's capabilities for specific use cases and data extraction needs.
 
@@ -308,15 +308,15 @@ async with AsyncWebCrawler() as crawler:
 
 Each of these specialized features builds upon Crawl4AI's core functionality while providing targeted solutions for specific use cases. They can be used independently or combined for more complex data extraction and processing needs.
 
-# Section 3: Development Tools 🔧
+# Section 3: Development Tools 
 
 This section covers tools designed to enhance the development experience, monitoring, and deployment of Crawl4AI applications.
 
-### 3.1 Crawl4AI Playground 🎮
+### 3.1 Crawl4AI Playground 
 
 The Crawl4AI Playground is an interactive web-based development environment that simplifies web scraping experimentation, development, and deployment. With its intuitive interface and AI-powered assistance, users can quickly prototype, test, and deploy web scraping solutions.
 
-#### Key Features 🌟
+#### Key Features 
 
 ##### Visual Strategy Builder
 - Interactive point-and-click interface for building extraction strategies
@@ -441,7 +441,7 @@ print(f"Monitor URL: {deployment.monitor_url}")
 
 These development tools work together to provide a comprehensive environment for developing, testing, monitoring, and deploying Crawl4AI applications. The Playground helps users experiment and generate optimal configurations, the Performance Monitor ensures smooth operation, and the Cloud Integration tools simplify deployment and scaling.
 
-# Section 4: Community & Growth 🌱
+# Section 4: Community & Growth 
 
 This section outlines initiatives designed to build and support the Crawl4AI community, provide educational resources, and ensure sustainable project growth.
 

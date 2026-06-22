@@ -166,17 +166,17 @@ Song Binglin (q1uf3ng), by111 (August829), Jeongbean Jeon, wulonchia, secsys_cod
 
 ### Added
 - **🚀 init_scripts for BrowserConfig**: Pre-page-load JavaScript injection for stealth evasions
-- **🔄 CDP Connection Improvements**: WebSocket URL support, proper cleanup, browser reuse
-- **💾 Crash Recovery for Deep Crawl**: `resume_state` and `on_state_change` for BFS/DFS/Best-First strategies
-- **📄 PDF/MHTML for raw:/file:// URLs**: Generate PDFs and MHTML from cached HTML content
-- **📸 Screenshots for raw:/file:// URLs**: Render cached HTML and capture screenshots
+- ** CDP Connection Improvements**: WebSocket URL support, proper cleanup, browser reuse
+- ** Crash Recovery for Deep Crawl**: `resume_state` and `on_state_change` for BFS/DFS/Best-First strategies
+- ** PDF/MHTML for raw:/file:// URLs**: Generate PDFs and MHTML from cached HTML content
+- ** Screenshots for raw:/file:// URLs**: Render cached HTML and capture screenshots
 - **🔗 base_url Parameter**: Proper URL resolution for raw: HTML processing
-- **⚡ Prefetch Mode**: Two-phase deep crawling with fast link extraction
-- **🔀 Enhanced Proxy Support**: Improved proxy rotation and sticky sessions
-- **🌐 HTTP Strategy Proxy Support**: Non-browser crawler now supports proxies
-- **🖥️ Browser Pipeline for raw:/file://**: New `process_in_browser` parameter
-- **📋 Smart TTL Cache for Sitemap Seeder**: `cache_ttl_hours` and `validate_sitemap_lastmod` parameters
-- **📚 Security Documentation**: Added SECURITY.md with vulnerability reporting guidelines
+- ** Prefetch Mode**: Two-phase deep crawling with fast link extraction
+- ** Enhanced Proxy Support**: Improved proxy rotation and sticky sessions
+- ** HTTP Strategy Proxy Support**: Non-browser crawler now supports proxies
+- ** Browser Pipeline for raw:/file://**: New `process_in_browser` parameter
+- ** Smart TTL Cache for Sitemap Seeder**: `cache_ttl_hours` and `validate_sitemap_lastmod` parameters
+- ** Security Documentation**: Added SECURITY.md with vulnerability reporting guidelines
 
 ### Fixed
 - **raw: URL Parsing**: Fixed truncation at `#` character (CSS color codes like `#eee`)
@@ -201,7 +201,7 @@ Song Binglin (q1uf3ng), by111 (August829), Jeongbean Jeon, wulonchia, secsys_cod
 ## [0.7.3] - 2025-08-09
 
 ### Added
-- **🕵️ Undetected Browser Support**: New browser adapter pattern with stealth capabilities
+- ** Undetected Browser Support**: New browser adapter pattern with stealth capabilities
   - `browser_adapter.py` with undetected Chrome integration
   - Bypass sophisticated bot detection systems (Cloudflare, Akamai, custom solutions)
   - Support for headless stealth mode with anti-detection techniques
@@ -209,7 +209,7 @@ Song Binglin (q1uf3ng), by111 (August829), Jeongbean Jeon, wulonchia, secsys_cod
   - Comprehensive examples for anti-bot strategies and stealth crawling
   - Full documentation guide for undetected browser usage
 
-- **🎨 Multi-URL Configuration System**: URL-specific crawler configurations for batch processing
+- ** Multi-URL Configuration System**: URL-specific crawler configurations for batch processing
   - Different crawling strategies for different URL patterns in a single batch
   - Support for string patterns with wildcards (`"*.pdf"`, `"*/blog/*"`)
   - Lambda function matchers for complex URL logic
@@ -217,7 +217,7 @@ Song Binglin (q1uf3ng), by111 (August829), Jeongbean Jeon, wulonchia, secsys_cod
   - Fallback configuration support when no patterns match
   - First-match-wins configuration selection with optional fallback
 
-- **🧠 Memory Monitoring & Optimization**: Comprehensive memory usage tracking
+- ** Memory Monitoring & Optimization**: Comprehensive memory usage tracking
   - New `memory_utils.py` module for memory monitoring and optimization
   - Real-time memory usage tracking during crawl sessions
   - Memory leak detection and reporting
@@ -225,21 +225,21 @@ Song Binglin (q1uf3ng), by111 (August829), Jeongbean Jeon, wulonchia, secsys_cod
   - Peak memory usage analysis and efficiency metrics
   - Automatic cleanup suggestions for memory-intensive operations
 
-- **📊 Enhanced Table Extraction**: Improved table access and DataFrame conversion
+- ** Enhanced Table Extraction**: Improved table access and DataFrame conversion
   - Direct `result.tables` interface replacing generic `result.media` approach
   - Instant pandas DataFrame conversion with `pd.DataFrame(table['data'])`
   - Enhanced table detection algorithms for better accuracy
   - Table metadata including source XPath and headers
   - Improved table structure preservation during extraction
 
-- **💰 GitHub Sponsors Integration**: 4-tier sponsorship system
+- ** GitHub Sponsors Integration**: 4-tier sponsorship system
   - Supporter ($5/month): Community support + early feature previews
   - Professional ($25/month): Priority support + beta access
   - Business ($100/month): Direct consultation + custom integrations
   - Enterprise ($500/month): Dedicated support + feature development
   - Custom arrangement options for larger organizations
 
-- **🐳 Docker LLM Provider Flexibility**: Environment-based LLM configuration
+- ** Docker LLM Provider Flexibility**: Environment-based LLM configuration
   - `LLM_PROVIDER` environment variable support for dynamic provider switching
   - `.llm.env` file support for secure configuration management
   - Per-request provider override capabilities in API endpoints
@@ -1172,14 +1172,14 @@ asyncio.run(browser_management_demo())
 - Introduced `CacheMode` enum (`ENABLED`, `DISABLED`, `READ_ONLY`, `WRITE_ONLY`, `BYPASS`) and `always_bypass_cache` parameter in AsyncWebCrawler for fine-grained cache control. This replaces `bypass_cache`, `no_cache_read`, `no_cache_write`, and `always_by_pass_cache`.
 
 
-### 🗑️ Removals
+###  Removals
 
 - Removed deprecated: `crawl4ai/content_cleaning_strategy.py`.
 - Removed internal class ContentCleaningStrategy
 - Removed legacy cache control flags:  `bypass_cache`,  `disable_cache`,  `no_cache_read`,  `no_cache_write`, and `always_by_pass_cache`.  These have been superseded by  `cache_mode`.
 
 
-### ⚙️ Other Changes
+###  Other Changes
 
 - Moved version file to `crawl4ai/__version__.py`.
 - Added `crawl4ai/cache_context.py`.
@@ -1196,7 +1196,7 @@ asyncio.run(browser_management_demo())
 - The synchronous version of `WebCrawler` is being phased out.  While still available via `crawl4ai[sync]`, it will eventually be removed. Transition to `AsyncWebCrawler` is strongly recommended. Boolean cache control flags in `arun` are also deprecated, migrate to using the `cache_mode` parameter.  See examples in the "New Features" section above for correct usage.
 
 
-### 🐛 Bug Fixes
+###  Bug Fixes
 
 - Resolved issue with browser context closing unexpectedly in Docker. This significantly improves stability, particularly within containerized environments. 
 - Fixed memory leaks associated with incorrect asynchronous cleanup by removing the `__del__` method and ensuring the browser context is closed explicitly using context managers.
@@ -1680,8 +1680,8 @@ Significant improvements in text processing and performance:
 
 - 🚀 **Dependency reduction**: Removed dependency on spaCy model for text chunk labeling in cosine extraction strategy.
 - 🤖 **Transformer upgrade**: Implemented text sequence classification using a transformer model for labeling text chunks.
-- ⚡ **Performance enhancement**: Improved model loading speed due to removal of spaCy dependency.
-- 🔧 **Future-proofing**: Laid groundwork for potential complete removal of spaCy dependency in future versions.
+-  **Performance enhancement**: Improved model loading speed due to removal of spaCy dependency.
+-  **Future-proofing**: Laid groundwork for potential complete removal of spaCy dependency in future versions.
 
 These changes address issue #68 and provide a foundation for faster, more efficient text processing in Crawl4AI.
 
@@ -1689,40 +1689,40 @@ These changes address issue #68 and provide a foundation for faster, more effici
 
 Major improvements in functionality, performance, and cross-platform compatibility! 🚀
 
-- 🐳 **Docker enhancements**: Significantly improved Dockerfile for easy installation on Linux, Mac, and Windows.
-- 🌐 **Official Docker Hub image**: Launched our first official image on Docker Hub for streamlined deployment.
-- 🔧 **Selenium upgrade**: Removed dependency on ChromeDriver, now using Selenium's built-in capabilities for better compatibility.
-- 🖼️ **Image description**: Implemented ability to generate textual descriptions for extracted images from web pages.
-- ⚡ **Performance boost**: Various improvements to enhance overall speed and performance.
+-  **Docker enhancements**: Significantly improved Dockerfile for easy installation on Linux, Mac, and Windows.
+-  **Official Docker Hub image**: Launched our first official image on Docker Hub for streamlined deployment.
+-  **Selenium upgrade**: Removed dependency on ChromeDriver, now using Selenium's built-in capabilities for better compatibility.
+-  **Image description**: Implemented ability to generate textual descriptions for extracted images from web pages.
+-  **Performance boost**: Various improvements to enhance overall speed and performance.
 
 A big shoutout to our amazing community contributors:
 - [@aravindkarnam](https://github.com/aravindkarnam) for developing the textual description extraction feature.
 - [@FractalMind](https://github.com/FractalMind) for creating the first official Docker Hub image and fixing Dockerfile errors.
 - [@ketonkss4](https://github.com/ketonkss4) for identifying Selenium's new capabilities, helping us reduce dependencies.
 
-Your contributions are driving Crawl4AI forward! 🙌
+Your contributions are driving Crawl4AI forward! 
 
 ## [v0.2.75] - 2024-07-19
 
 Minor improvements for a more maintainable codebase:
 
-- 🔄 Fixed typos in `chunking_strategy.py` and `crawler_strategy.py` to improve code readability
-- 🔄 Removed `.test_pads/` directory from `.gitignore` to keep our repository clean and organized
+-  Fixed typos in `chunking_strategy.py` and `crawler_strategy.py` to improve code readability
+-  Removed `.test_pads/` directory from `.gitignore` to keep our repository clean and organized
 
 These changes may seem small, but they contribute to a more stable and sustainable codebase. By fixing typos and updating our `.gitignore` settings, we're ensuring that our code is easier to maintain and scale in the long run.
 
 ## [v0.2.74] - 2024-07-08
-A slew of exciting updates to improve the crawler's stability and robustness! 🎉
+A slew of exciting updates to improve the crawler's stability and robustness! 
 
-- 💻 **UTF encoding fix**: Resolved the Windows \"charmap\" error by adding UTF encoding.
+-  **UTF encoding fix**: Resolved the Windows \"charmap\" error by adding UTF encoding.
 - 🛡️ **Error handling**: Implemented MaxRetryError exception handling in LocalSeleniumCrawlerStrategy.
-- 🧹 **Input sanitization**: Improved input sanitization and handled encoding issues in LLMExtractionStrategy.
-- 🚮 **Database cleanup**: Removed existing database file and initialized a new one.
+-  **Input sanitization**: Improved input sanitization and handled encoding issues in LLMExtractionStrategy.
+-  **Database cleanup**: Removed existing database file and initialized a new one.
 
 
 ## [v0.2.73] - 2024-07-03
 
-💡 In this release, we've bumped the version to v0.2.73 and refreshed our documentation to ensure you have the best experience with our project.
+ In this release, we've bumped the version to v0.2.73 and refreshed our documentation to ensure you have the best experience with our project.
 
 * Supporting website need "with-head" mode to crawl the website with head.
 * Fixing the installation issues for setup.py and dockerfile.
@@ -1730,23 +1730,23 @@ A slew of exciting updates to improve the crawler's stability and robustness! �
 
 ## [v0.2.72] - 2024-06-30
 
-This release brings exciting updates and improvements to our project! 🎉
+This release brings exciting updates and improvements to our project! 
 
-* 📚 **Documentation Updates**: Our documentation has been revamped to reflect the latest changes and additions.
+*  **Documentation Updates**: Our documentation has been revamped to reflect the latest changes and additions.
 * 🚀 **New Modes in setup.py**: We've added support for three new modes in setup.py: default, torch, and transformers. This enhances the project's flexibility and usability.
-* 🐳 **Docker File Updates**: The Docker file has been updated to ensure seamless compatibility with the new modes and improvements.
-* 🕷️ **Temporary Solution for Headless Crawling**: We've implemented a temporary solution to overcome issues with crawling websites in headless mode.
+*  **Docker File Updates**: The Docker file has been updated to ensure seamless compatibility with the new modes and improvements.
+*  **Temporary Solution for Headless Crawling**: We've implemented a temporary solution to overcome issues with crawling websites in headless mode.
 
 These changes aim to improve the overall user experience, provide more flexibility, and enhance the project's performance. We're thrilled to share these updates with you and look forward to continuing to evolve and improve our project!
 
 ## [0.2.71] - 2024-06-26
 
-**Improved Error Handling and Performance** 🚧
+**Improved Error Handling and Performance** 
 
-* 🚫 Refactored `crawler_strategy.py` to handle exceptions and provide better error messages, making it more robust and reliable.
-* 💻 Optimized the `get_content_of_website_optimized` function in `utils.py` for improved performance, reducing potential bottlenecks.
-* 💻 Updated `utils.py` with the latest changes, ensuring consistency and accuracy.
-* 🚫 Migrated to `ChromeDriverManager` to resolve Chrome driver download issues, providing a smoother user experience.
+*  Refactored `crawler_strategy.py` to handle exceptions and provide better error messages, making it more robust and reliable.
+*  Optimized the `get_content_of_website_optimized` function in `utils.py` for improved performance, reducing potential bottlenecks.
+*  Updated `utils.py` with the latest changes, ensuring consistency and accuracy.
+*  Migrated to `ChromeDriverManager` to resolve Chrome driver download issues, providing a smoother user experience.
 
 These changes focus on refining the existing codebase, resulting in a more stable, efficient, and user-friendly experience. With these improvements, you can expect fewer errors and better performance in the crawler strategy and utility functions.
 

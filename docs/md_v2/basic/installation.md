@@ -1,4 +1,4 @@
-# Installation 💻
+# Installation 
 
 Crawl4AI offers flexible installation options to suit various use cases. You can install it as a Python package, use it with Docker, or run it as a local server.
 
@@ -50,7 +50,7 @@ pip install -e ".[all]"
 playwright install # Install Playwright dependencies
 ```
 
-💡 After installation with "torch", "transformer", or "all" options, it's recommended to run the following CLI command to load the required models:
+ After installation with "torch", "transformer", or "all" options, it's recommended to run the following CLI command to load the required models:
 
 ```bash
 crawl4ai-download-models
@@ -134,4 +134,4 @@ This script should successfully crawl the example website and print the first 50
 
 If you encounter any issues during installation or usage, please check the [documentation](https://docs.crawl4ai.com/) or raise an issue on the [GitHub repository](https://github.com/unclecode/crawl4ai/issues).
 
-Happy crawling! 🕷️🤖
+Happy crawling! 🤖

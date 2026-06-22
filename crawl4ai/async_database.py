@@ -332,13 +332,44 @@ class AsyncDatabaseManager:
                     else:
                         row_dict[field] = ""
 
+                # Handle markdown separately (stored as raw text, not JSON-serialized)
+                raw_md = row_dict.get("markdown", "")
+                if raw_md:
+                    try:
+                        parsed = json.loads(raw_md)
+                        if isinstance(parsed, dict):
+                            row_dict["markdown"] = parsed
+                        else:
+                            row_dict["markdown"] = MarkdownGenerationResult(
+                                raw_markdown=str(parsed) if parsed is not None else "",
+                                markdown_with_citations="",
+                                references_markdown="",
+                                fit_markdown="",
+                                fit_html="",
+                            )
+                    except (json.JSONDecodeError, ValueError):
+                        row_dict["markdown"] = MarkdownGenerationResult(
+                            raw_markdown=raw_md,
+                            markdown_with_citations="",
+                            references_markdown="",
+                            fit_markdown="",
+                            fit_html="",
+                        )
+                else:
+                    row_dict["markdown"] = MarkdownGenerationResult(
+                        raw_markdown="",
+                        markdown_with_citations="",
+                        references_markdown="",
+                        fit_markdown="",
+                        fit_html="",
+                    )
+
                 # Parse JSON fields
                 json_fields = [
                     "media",
                     "links",
                     "metadata",
                     "response_headers",
-                    "markdown",
                 ]
                 for field in json_fields:
                     try:
@@ -346,21 +377,7 @@ class AsyncDatabaseManager:
                             json.loads(row_dict[field]) if row_dict[field] else {}
                         )
                     except json.JSONDecodeError:
-                        # Very UGLY, never mention it to me please
-                        if field == "markdown" and isinstance(row_dict[field], str):
-                            row_dict[field] = MarkdownGenerationResult(
-                                raw_markdown=row_dict[field] or "",
-                                markdown_with_citations="",
-                                references_markdown="",
-                                fit_markdown="",
-                                fit_html="",
-                            )
-                        else:
-                            row_dict[field] = {}
-
-                if isinstance(row_dict["markdown"], Dict):
-                    if row_dict["markdown"].get("raw_markdown"):
-                        row_dict["markdown"] = row_dict["markdown"]["raw_markdown"]
+                        row_dict[field] = {}
 
                 # Parse downloaded_files
                 try:
@@ -505,7 +522,11 @@ class AsyncDatabaseManager:
                 )
             else:
                 content_map["markdown"] = (
-                    MarkdownGenerationResult().model_dump_json(),
+                    MarkdownGenerationResult(
+                        raw_markdown="",
+                        markdown_with_citations="",
+                        references_markdown="",
+                    ).model_dump_json(),
                     "markdown",
                 )
         except Exception as e:
@@ -514,7 +535,11 @@ class AsyncDatabaseManager:
             )
             # Fallback to empty markdown result
             content_map["markdown"] = (
-                MarkdownGenerationResult().model_dump_json(),
+                MarkdownGenerationResult(
+                    raw_markdown="",
+                    markdown_with_citations="",
+                    references_markdown="",
+                ).model_dump_json(),
                 "markdown",
             )
 

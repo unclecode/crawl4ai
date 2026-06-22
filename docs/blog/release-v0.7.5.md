@@ -6,7 +6,7 @@
 
 Today I'm releasing Crawl4AI v0.7.5—focused on extensibility and security. This update introduces the Docker Hooks System for pipeline customization, enhanced LLM integration, and important security improvements.
 
-## 🎯 What's New at a Glance
+##  What's New at a Glance
 
 - **Docker Hooks System**: Custom Python functions at key pipeline points with function-based API
 - **Function-Based Hooks**: New `hooks_to_string()` utility with Docker client auto-conversion
@@ -15,7 +15,7 @@ Today I'm releasing Crawl4AI v0.7.5—focused on extensibility and security. Thi
 - **Bug Fixes**: Resolved multiple community-reported issues
 - **Improved Docker Error Handling**: Better debugging and reliability
 
-## 🔧 Docker Hooks System: Pipeline Customization
+##  Docker Hooks System: Pipeline Customization
 
 Every scraping project needs custom logic—authentication, performance optimization, content processing. Traditional solutions require forking or complex workarounds. Docker Hooks let you inject custom Python functions at 8 key points in the crawling pipeline.
 
@@ -249,7 +249,7 @@ async def test_https_preservation():
                 print(f"  → {link}")
 ```
 
-## 🛠️ Bug Fixes and Improvements
+##  Bug Fixes and Improvements
 
 ### Major Fixes
 - **URL Processing**: Fixed '+' sign preservation in query parameters (#1332)
@@ -286,7 +286,7 @@ browser_config = BrowserConfig(
 )
 ```
 
-## 🔄 Breaking Changes
+##  Breaking Changes
 
 1. **Python 3.10+ Required**: Upgrade from Python 3.9
 2. **Proxy Parameter Deprecated**: Use new `proxy_config` structure
@@ -310,9 +310,9 @@ python docs/releases_review/demo_v0.7.5.py
 ```
 
 **Resources:**
-- 📖 Documentation: [docs.crawl4ai.com](https://docs.crawl4ai.com)
-- 🐙 GitHub: [github.com/unclecode/crawl4ai](https://github.com/unclecode/crawl4ai)
-- 💬 Discord: [discord.gg/crawl4ai](https://discord.gg/jP8KfhDhyN)
-- 🐦 Twitter: [@unclecode](https://x.com/unclecode)
+-  Documentation: [docs.crawl4ai.com](https://docs.crawl4ai.com)
+-  GitHub: [github.com/unclecode/crawl4ai](https://github.com/unclecode/crawl4ai)
+-  Discord: [discord.gg/crawl4ai](https://discord.gg/jP8KfhDhyN)
+-  Twitter: [@unclecode](https://x.com/unclecode)
 
-Happy crawling! 🕷️
+Happy crawling! 

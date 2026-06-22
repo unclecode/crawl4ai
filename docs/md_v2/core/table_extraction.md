@@ -84,7 +84,7 @@ The strategy pattern allows you to choose different table extraction algorithms 
 >   - ✅ **Cerebras** (optimized for speed)
 >   - ⚠️ Avoid: OpenAI, Anthropic for large tables (slower)
 > 
-> **🚧 WORK IN PROGRESS**: 
+> ** WORK IN PROGRESS**: 
 > We are actively developing an **advanced non-LLM algorithm** that will handle complex table structures (rowspan, colspan, nested tables) for **FREE**. This will replace the need for costly LLM extraction in most cases. Coming soon!
 
 ### DefaultTableExtraction

@@ -31,7 +31,7 @@ A comprehensive web-based tutorial for learning and experimenting with C4A-Scrip
    http://localhost:8000
    ```
 
-**🌐 Try Online**: [Live Demo](https://docs.crawl4ai.com/c4a-script/demo)
+** Try Online**: [Live Demo](https://docs.crawl4ai.com/c4a-script/demo)
 
 ### 2. Try Your First Script
 
@@ -43,16 +43,16 @@ IF (EXISTS `.cookie-banner`) THEN CLICK `.accept`
 CLICK `#start-tutorial`
 ```
 
-## 🎯 What You'll Learn
+##  What You'll Learn
 
 ### Core Features
-- **📝 Text Editor**: Write C4A-Script with syntax highlighting
-- **🧩 Visual Editor**: Build scripts using drag-and-drop Blockly interface  
-- **🎬 Recording Mode**: Capture browser actions and auto-generate scripts
-- **⚡ Live Execution**: Run scripts in real-time with instant feedback
-- **📊 Timeline View**: Visualize and edit automation steps
+- ** Text Editor**: Write C4A-Script with syntax highlighting
+- ** Visual Editor**: Build scripts using drag-and-drop Blockly interface  
+- ** Recording Mode**: Capture browser actions and auto-generate scripts
+- ** Live Execution**: Run scripts in real-time with instant feedback
+- ** Timeline View**: Visualize and edit automation steps
 
-## 📚 Tutorial Content
+##  Tutorial Content
 
 ### Basic Commands
 - **Navigation**: `GO url`
@@ -71,7 +71,7 @@ CLICK `#start-tutorial`
 - **Variables**: `SET name = "value"`
 - **Complex selectors**: CSS selectors in backticks
 
-## 🎮 Interactive Playground Features
+##  Interactive Playground Features
 
 The tutorial includes a fully interactive web app with:
 
@@ -100,7 +100,7 @@ The tutorial includes a fully interactive web app with:
 - Search functionality
 - Export options
 
-## 🛠️ Tutorial Features
+##  Tutorial Features
 
 ### Live Code Editor
 - Syntax highlighting
@@ -125,7 +125,7 @@ Load pre-written examples demonstrating:
 - Multi-step form completion
 - Complex interaction sequences
 
-## 📖 Tutorial Sections
+##  Tutorial Sections
 
 ### 1. Getting Started
 Learn basic commands and syntax:
@@ -166,7 +166,7 @@ SET password = "pass123"
 login
 ```
 
-## 🎯 Practice Challenges
+##  Practice Challenges
 
 ### Challenge 1: Cookie & Popups
 Handle the cookie banner and newsletter popup that appear on page load.
@@ -183,7 +183,7 @@ Complete the entire multi-step survey form.
 ### Challenge 5: Full Workflow
 Create a script that logs in, browses products, and exports data.
 
-## 💡 Tips & Tricks
+##  Tips & Tricks
 
 ### 1. Use Specific Selectors
 ```c4a
@@ -219,7 +219,7 @@ ENDPROC
 handle_popups
 ```
 
-## 🔧 Troubleshooting
+##  Troubleshooting
 
 ### Common Issues
 
@@ -257,7 +257,7 @@ async with AsyncWebCrawler() as crawler:
     result = await crawler.arun(config=config)
 ```
 
-## 📝 Example Scripts
+##  Example Scripts
 
 Check the `scripts/` folder for complete examples:
 - `01-basic-interaction.c4a` - Getting started
@@ -266,7 +266,7 @@ Check the `scripts/` folder for complete examples:
 - `04-multi-step-form.c4a` - Complex forms
 - `05-complex-workflow.c4a` - Full automation
 
-## 🏗️ Developer Guide
+##  Developer Guide
 
 ### Project Architecture
 
@@ -336,7 +336,7 @@ THREADED = True
 - `POST /execute` - Script execution endpoint
 - `GET /examples/<script>` - Load example scripts
 
-## 🔧 Troubleshooting
+##  Troubleshooting
 
 ### Common Issues
 
@@ -361,14 +361,14 @@ python server.py --port 8001
 ### Debug Mode
 Enable detailed logging by setting `DEBUG = True` in `assets/app.js`
 
-## 📚 Additional Resources
+##  Additional Resources
 
 - **[C4A-Script Documentation](../../md_v2/core/c4a-script.md)** - Complete language guide
 - **[API Reference](../../md_v2/api/c4a-script-reference.md)** - Detailed command documentation
 - **[Live Demo](https://docs.crawl4ai.com/c4a-script/demo)** - Try without installation
 - **[Example Scripts](../)** - More automation examples
 
-## 🤝 Contributing
+##  Contributing
 
 ### Bug Reports
 1. Check existing issues on GitHub
@@ -391,6 +391,6 @@ Enable detailed logging by setting `DEBUG = True` in `assets/app.js`
 
 ---
 
-**Happy Automating!** 🎉
+**Happy Automating!** 
 
 Need help? Check our [documentation](https://docs.crawl4ai.com) or open an issue on [GitHub](https://github.com/unclecode/crawl4ai).

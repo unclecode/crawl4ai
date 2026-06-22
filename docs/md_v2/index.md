@@ -59,7 +59,7 @@
 #### 🚀 Crawl4AI Cloud API — Closed Beta (Launching Soon)
 Reliable, large-scale web extraction, now built to be _**drastically more cost-effective**_ than any of the existing solutions.
 
-👉 **Apply [here](https://forms.gle/E9MyPaNXACnAMaqG7) for early access**  
+ **Apply [here](https://forms.gle/E9MyPaNXACnAMaqG7) for early access**  
 _We’ll be onboarding in phases and working closely with early users.
 Limited slots._
 
@@ -75,14 +75,14 @@ Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant 
   <h3 style="color: white; margin: 0 0 10px 0;">🤖 Crawl4AI Skill for Claude & AI Assistants</h3>
   <p style="color: white; margin: 10px 0;">Supercharge your AI coding assistant with complete Crawl4AI knowledge! Download our comprehensive skill package that includes:</p>
   <ul style="color: white; margin: 10px 0;">
-    <li>📚 Complete SDK reference (23K+ words)</li>
+    <li> Complete SDK reference (23K+ words)</li>
     <li>🚀 Ready-to-use extraction scripts</li>
-    <li>⚡ Schema generation for efficient scraping</li>
-    <li>🔧 Version 0.7.4 compatible</li>
+    <li> Schema generation for efficient scraping</li>
+    <li> Version 0.7.4 compatible</li>
   </ul>
   <div style="text-align: center; margin-top: 15px;">
     <a href="assets/crawl4ai-skill.zip" download style="background: white; color: #667eea; padding: 12px 30px; border-radius: 5px; text-decoration: none; font-weight: bold; display: inline-block; transition: transform 0.2s;">
-      📦 Download Skill Package
+       Download Skill Package
     </a>
   </div>
   <p style="color: white; margin: 15px 0 0 0; font-size: 0.9em; text-align: center;">
@@ -90,7 +90,7 @@ Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant 
   </p>
 </div>
 
-## 🎯 New: Adaptive Web Crawling
+##  New: Adaptive Web Crawling
 
 Crawl4AI now features intelligent adaptive crawling that knows when to stop! Using advanced information foraging algorithms, it determines when sufficient information has been gathered to answer your query.
 

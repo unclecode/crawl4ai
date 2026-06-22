@@ -6,19 +6,19 @@
 
 Today I'm releasing Crawl4AI v0.7.7—the Self-Hosting & Monitoring Update. This release transforms Crawl4AI Docker from a simple containerized crawler into a complete self-hosting platform with enterprise-grade real-time monitoring, full operational transparency, and production-ready observability.
 
-## 🎯 What's New at a Glance
+##  What's New at a Glance
 
-- **📊 Real-time Monitoring Dashboard**: Interactive web UI with live system metrics and browser pool status
-- **🔌 Comprehensive Monitor API**: Complete REST API for programmatic access to all monitoring data
-- **⚡ WebSocket Streaming**: Real-time updates every 2 seconds for custom dashboards
-- **🎮 Control Actions**: Manual browser management (kill, restart, cleanup)
-- **🔥 Smart Browser Pool**: 3-tier architecture (permanent/hot/cold) with automatic promotion
-- **🧹 Janitor Cleanup System**: Automatic resource management with event logging
-- **📈 Production Metrics**: 6 critical metrics for operational excellence
-- **🏭 Integration Ready**: Prometheus, alerting, and log aggregation examples
-- **🐛 Critical Bug Fixes**: Async LLM extraction, DFS crawling, viewport config, and more
+- ** Real-time Monitoring Dashboard**: Interactive web UI with live system metrics and browser pool status
+- ** Comprehensive Monitor API**: Complete REST API for programmatic access to all monitoring data
+- ** WebSocket Streaming**: Real-time updates every 2 seconds for custom dashboards
+- ** Control Actions**: Manual browser management (kill, restart, cleanup)
+- ** Smart Browser Pool**: 3-tier architecture (permanent/hot/cold) with automatic promotion
+- ** Janitor Cleanup System**: Automatic resource management with event logging
+- ** Production Metrics**: 6 critical metrics for operational excellence
+- ** Integration Ready**: Prometheus, alerting, and log aggregation examples
+- ** Critical Bug Fixes**: Async LLM extraction, DFS crawling, viewport config, and more
 
-## 📊 Real-time Monitoring Dashboard: Complete Visibility
+##  Real-time Monitoring Dashboard: Complete Visibility
 
 **The Problem:** Running Crawl4AI in Docker was like flying blind. Users had no visibility into what was happening inside the container—memory usage, active requests, browser pools, or errors. Troubleshooting required checking logs, and there was no way to monitor performance or manually intervene when issues occurred.
 
@@ -29,10 +29,10 @@ Today I'm releasing Crawl4AI v0.7.7—the Self-Hosting & Monitoring Update. This
 Before v0.7.7, Docker was just a containerized crawler. After v0.7.7, it's a complete self-hosting platform that gives you:
 
 - **🔒 Data Privacy**: Your data never leaves your infrastructure
-- **💰 Cost Control**: No per-request pricing or rate limits
-- **🎯 Full Customization**: Complete control over configurations and strategies
-- **📊 Complete Transparency**: Real-time visibility into every aspect
-- **⚡ Performance**: Direct access without network overhead
+- ** Cost Control**: No per-request pricing or rate limits
+- ** Full Customization**: Complete control over configurations and strategies
+- ** Complete Transparency**: Real-time visibility into every aspect
+- ** Performance**: Direct access without network overhead
 - **🛡️ Enterprise Security**: Keep workflows behind your firewall
 
 ### Interactive Monitoring Dashboard
@@ -47,7 +47,7 @@ Access the dashboard at `http://localhost:11235/dashboard` to see:
 
 The dashboard updates every 2 seconds via WebSocket, giving you live visibility into your crawling operations.
 
-## 🔌 Monitor API: Programmatic Access
+##  Monitor API: Programmatic Access
 
 **The Problem:** Monitoring dashboards are great for humans, but automation and integration require programmatic access.
 
@@ -151,7 +151,7 @@ The Monitor API includes these endpoints:
 - `POST /monitor/actions/restart_browser` - Restart browser
 - `POST /monitor/stats/reset` - Reset accumulated statistics
 
-## ⚡ WebSocket Streaming: Real-time Updates
+##  WebSocket Streaming: Real-time Updates
 
 **The Problem:** Polling the API every few seconds wastes resources and adds latency. Real-time dashboards need instant updates.
 
@@ -193,7 +193,7 @@ asyncio.run(monitor_realtime())
 - **Integration**: Feed live data into monitoring tools like Grafana
 - **Automation**: React to events in real-time without polling
 
-## 🔥 Smart Browser Pool: 3-Tier Architecture
+##  Smart Browser Pool: 3-Tier Architecture
 
 **The Problem:** Creating a new browser for every request is slow and memory-intensive. Traditional browser pools are static and inefficient.
 
@@ -246,9 +246,9 @@ asyncio.run(demonstrate_browser_pool())
 
 **Pool Tiers:**
 
-- **🔥 Permanent Browser**: Always-on, default configuration, instant response
-- **♨️ Hot Pool**: Browsers promoted after 3+ uses, kept warm for quick access
-- **❄️ Cold Pool**: On-demand browsers for variant configs, cleaned up when idle
+- ** Permanent Browser**: Always-on, default configuration, instant response
+- ** Hot Pool**: Browsers promoted after 3+ uses, kept warm for quick access
+- ** Cold Pool**: On-demand browsers for variant configs, cleaned up when idle
 
 **Expected Real-World Impact:**
 - **Memory Efficiency**: 10x reduction in memory usage vs creating browsers per request
@@ -256,7 +256,7 @@ asyncio.run(demonstrate_browser_pool())
 - **Automatic Optimization**: Pool adapts to your usage patterns
 - **Resource Management**: Janitor automatically cleans up idle browsers
 
-## 🧹 Janitor System: Automatic Cleanup
+##  Janitor System: Automatic Cleanup
 
 **The Problem:** Long-running crawlers accumulate idle browsers and consume memory over time.
 
@@ -278,7 +278,7 @@ async def monitor_janitor_activity():
 # 2025-11-14 10:20:00: Hot pool browser promoted (10 requests)
 ```
 
-## 🎮 Control Actions: Manual Management
+##  Control Actions: Manual Management
 
 **The Problem:** Sometimes you need to manually intervene—kill a stuck browser, force cleanup, or restart resources.
 
@@ -320,7 +320,7 @@ async def reset_stats():
         print("📊 Statistics reset for fresh monitoring")
 ```
 
-## 📈 Production Integration Patterns
+##  Production Integration Patterns
 
 ### Prometheus Integration
 
@@ -417,7 +417,7 @@ CRITICAL_METRICS = {
 }
 ```
 
-## 🐛 Critical Bug Fixes
+##  Critical Bug Fixes
 
 This release includes significant bug fixes that improve stability and performance:
 
@@ -501,7 +501,7 @@ async with AsyncWebCrawler() as crawler:
 - **LLMConfig Documentation**: Fixed casing and variable name consistency (issue #1551)
 - **Python Version**: Dropped Python 3.9 support, now requires Python >=3.10
 
-## 📊 Expected Real-World Impact
+##  Expected Real-World Impact
 
 ### For DevOps & Infrastructure Teams
 - **Full Visibility**: Know exactly what's happening inside your crawling infrastructure
@@ -521,7 +521,7 @@ async with AsyncWebCrawler() as crawler:
 - **Troubleshooting**: Quickly identify and fix issues
 - **Learning**: See exactly how the browser pool works
 
-## 🔄 Breaking Changes
+##  Breaking Changes
 
 **None!** This release is fully backward compatible.
 
@@ -562,7 +562,7 @@ pip install --upgrade crawl4ai
 pip install crawl4ai==0.7.7
 ```
 
-## 🎬 Try the Demo
+##  Try the Demo
 
 Run the comprehensive demo that showcases all monitoring features:
 
@@ -580,7 +580,7 @@ python docs/releases_review/demo_v0.7.7.py
 7. Production metrics and alerting patterns
 8. Self-hosting value proposition
 
-## 📚 Documentation
+##  Documentation
 
 ### New Documentation
 - **[Self-Hosting Guide](https://docs.crawl4ai.com/core/self-hosting/)** - Complete self-hosting documentation with monitoring
@@ -592,7 +592,7 @@ python docs/releases_review/demo_v0.7.7.py
 - Production integration patterns
 - WebSocket streaming examples
 
-## 💡 Pro Tips
+##  Pro Tips
 
 1. **Start with the dashboard** - Visit `/dashboard` to get familiar with the monitoring system
 2. **Track the 6 key metrics** - Memory, success rate, latency, reuse rate, browser count, errors
@@ -603,24 +603,24 @@ python docs/releases_review/demo_v0.7.7.py
 7. **Check janitor logs** - Understand automatic cleanup patterns
 8. **Use control actions judiciously** - Manual interventions are for exceptional cases
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 Thank you to our community for the feedback, bug reports, and feature requests that shaped this release. Special thanks to everyone who contributed to the issues that were fixed in this version.
 
 The monitoring system was built based on real user needs for production deployments, and your input made it comprehensive and practical.
 
-## 📞 Support & Resources
+##  Support & Resources
 
-- **📖 Documentation**: [docs.crawl4ai.com](https://docs.crawl4ai.com)
-- **🐙 GitHub**: [github.com/unclecode/crawl4ai](https://github.com/unclecode/crawl4ai)
-- **💬 Discord**: [discord.gg/crawl4ai](https://discord.gg/jP8KfhDhyN)
-- **🐦 Twitter**: [@unclecode](https://x.com/unclecode)
-- **📊 Dashboard**: `http://localhost:11235/dashboard` (when running)
+- ** Documentation**: [docs.crawl4ai.com](https://docs.crawl4ai.com)
+- ** GitHub**: [github.com/unclecode/crawl4ai](https://github.com/unclecode/crawl4ai)
+- ** Discord**: [discord.gg/crawl4ai](https://discord.gg/jP8KfhDhyN)
+- ** Twitter**: [@unclecode](https://x.com/unclecode)
+- ** Dashboard**: `http://localhost:11235/dashboard` (when running)
 
 ---
 
 **Crawl4AI v0.7.7 delivers complete self-hosting with enterprise-grade monitoring. You now have full visibility and control over your web crawling infrastructure. The monitoring dashboard, comprehensive API, and WebSocket streaming give you everything needed for production deployments. Try the self-hosting platform—it's a game changer for operational excellence!**
 
-**Happy crawling with full visibility!** 🕷️📊
+**Happy crawling with full visibility!** 
 
 *- unclecode*

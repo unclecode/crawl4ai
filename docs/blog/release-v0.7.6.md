@@ -4,7 +4,7 @@
 
 I'm excited to announce Crawl4AI v0.7.6, featuring a complete webhook infrastructure for the Docker job queue API! This release eliminates polling and brings real-time notifications to both crawling and LLM extraction workflows.
 
-## 🎯 What's New
+##  What's New
 
 ### Webhook Support for Docker Job Queue API
 
@@ -158,20 +158,20 @@ def handle_webhook():
 app.run(port=8080)
 ```
 
-## 📊 Performance Improvements
+##  Performance Improvements
 
 - **Reduced Server Load**: Eliminates constant polling requests
 - **Lower Latency**: Instant notification vs. polling interval delay
 - **Better Resource Usage**: Frees up client connections while jobs run in background
 - **Scalable Architecture**: Handles high-volume crawling workflows efficiently
 
-## 🐛 Bug Fixes
+##  Bug Fixes
 
 - Fixed webhook configuration serialization for Pydantic HttpUrl fields
 - Improved error handling in webhook delivery service
 - Enhanced Redis task storage for webhook config persistence
 
-## 🌍 Expected Real-World Impact
+##  Expected Real-World Impact
 
 ### For Web Scraping Workflows
 - **Reduced Costs**: Less API calls = lower bandwidth and server costs
@@ -188,7 +188,7 @@ app.run(port=8080)
 - **Decoupling**: Decouple job submission from result processing
 - **Reliability**: Automatic retries ensure webhooks are delivered
 
-## 🔄 Breaking Changes
+##  Breaking Changes
 
 **None!** This release is fully backward compatible.
 
@@ -196,7 +196,7 @@ app.run(port=8080)
 - Existing code continues to work without modification
 - Polling is still supported for jobs without webhook config
 
-## 📚 Documentation
+##  Documentation
 
 ### New Documentation
 - **[WEBHOOK_EXAMPLES.md](../deploy/docker/WEBHOOK_EXAMPLES.md)** - Comprehensive webhook usage guide
@@ -206,7 +206,7 @@ app.run(port=8080)
 - **[Docker README](../deploy/docker/README.md)** - Added webhook sections
 - API documentation with webhook examples
 
-## 🛠️ Migration Guide
+##  Migration Guide
 
 No migration needed! Webhooks are opt-in:
 
@@ -231,7 +231,7 @@ payload = {
 }
 ```
 
-## 🔧 Configuration
+##  Configuration
 
 ### Global Webhook Configuration (config.yml)
 
@@ -274,7 +274,7 @@ docker run -d \
 pip install --upgrade crawl4ai
 ```
 
-## 💡 Pro Tips
+##  Pro Tips
 
 1. **Use notification-only mode** for large results - fetch data separately to avoid large webhook payloads
 2. **Set custom headers** for webhook authentication and request tracking
@@ -282,7 +282,7 @@ pip install --upgrade crawl4ai
 4. **Implement idempotent webhook handlers** - same webhook may be delivered multiple times on retry
 5. **Use structured schemas** with LLM extraction for predictable webhook data
 
-## 🎬 Demo
+##  Demo
 
 Try the release demo:
 
@@ -297,11 +297,11 @@ This comprehensive demo showcases:
 - Webhook retry mechanism
 - Real-time webhook receiver
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 Thank you to the community for the feedback that shaped this feature! Special thanks to everyone who requested webhook support for asynchronous job processing.
 
-## 📞 Support
+##  Support
 
 - **Documentation**: https://docs.crawl4ai.com
 - **GitHub Issues**: https://github.com/unclecode/crawl4ai/issues
@@ -309,6 +309,6 @@ Thank you to the community for the feedback that shaped this feature! Special th
 
 ---
 
-**Happy crawling with webhooks!** 🕷️🪝
+**Happy crawling with webhooks!** 
 
 *- unclecode*

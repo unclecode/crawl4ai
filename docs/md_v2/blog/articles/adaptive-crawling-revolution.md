@@ -26,7 +26,7 @@ But it's not about crawling less. It's about crawling *right*.
 
 <div style="background-color: #1a1a1c; border: 1px solid #3f3f44; padding: 20px; margin: 20px 0;">
 
-### 🧮 **Pure Statistics, No Magic**
+###  **Pure Statistics, No Magic**
 
 My first principle was crucial: start with classic statistical approaches. No embeddings. No LLMs. Just pure information theory:
 
@@ -50,7 +50,7 @@ This isn't regression to older methods—it's recognition that we've forgotten p
 Adaptive crawling implements what I call "information scenting"—like A* pathfinding but for knowledge acquisition. Each link is evaluated not randomly, but by its probability of contributing meaningful information toward answering current and future queries.
 
 <div style="display: flex; align-items: center; background-color: #3f3f44; padding: 20px; margin: 20px 0; border-left: 4px solid #09b5a5;">
-<div style="font-size: 48px; margin-right: 20px;">🎯</div>
+<div style="font-size: 48px; margin-right: 20px;"></div>
 <div>
 <strong>The Scenting Algorithm:</strong><br>
 From available links, we select those with highest information gain. It's not about following every path—it's about following the <em>right</em> paths. Like a bloodhound following the strongest scent to its target.
@@ -138,7 +138,7 @@ This is just the beginning. My roadmap for Adaptive Crawling:
 
 <div style="background-color: #1a1a1c; border: 1px solid #3f3f44; padding: 20px; margin: 20px 0;">
 
-### 💰 **The Economics of Intelligence**
+###  **The Economics of Intelligence**
 
 For a typical SaaS documentation crawl:
 
@@ -208,7 +208,7 @@ Those still using brute force? They'll wonder why their infrastructure costs kee
 
 <div style="background-color: #1a1a1c; border: 1px solid #3f3f44; padding: 20px; margin: 20px 0;">
 
-### 🧠 **Semantic Understanding Without the Cost**
+###  **Semantic Understanding Without the Cost**
 
 The embedding strategy brings semantic intelligence while maintaining efficiency:
 

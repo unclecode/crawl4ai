@@ -342,6 +342,16 @@ def _setup_security(app_: FastAPI):
 _setup_security(app)
 
 if config["observability"]["prometheus"]["enabled"]:
+    # Workaround: _IncludedRouter objects lack .path, causing AttributeError
+    # in prometheus_fastapi_instrumentator's routing introspection.
+    import prometheus_fastapi_instrumentator.routing as _pr
+    _orig = _pr._get_route_name
+    def _safe_route_name(scope, routes):
+        try:
+            return _orig(scope, routes)
+        except AttributeError:
+            return "unknown"
+    _pr._get_route_name = _safe_route_name
     Instrumentator().instrument(app).expose(app)
 
 token_dep = get_token_dependency(config)

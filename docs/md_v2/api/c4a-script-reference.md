@@ -4,7 +4,7 @@ Complete reference for all C4A-Script commands, syntax, and advanced features.
 
 ## Command Categories
 
-### 🧭 Navigation Commands
+###  Navigation Commands
 
 Navigate between pages and manage browser history.
 
@@ -91,7 +91,7 @@ FORWARD
 - Does nothing if no next page exists
 - Waits for navigation to complete
 
-### ⏱️ Wait Commands
+### ⏱ Wait Commands
 
 Control timing and synchronization with page elements.
 
@@ -171,7 +171,7 @@ WAIT "Search results" 15
 - Searches entire page content
 - Useful for dynamic status messages
 
-### 🖱️ Mouse Commands
+###  Mouse Commands
 
 Simulate mouse interactions and movements.
 
@@ -352,7 +352,7 @@ DRAG 0 200 400 200
 - Useful for sliders, resizing, reordering
 - Smooth drag animation
 
-### ⌨️ Keyboard Commands
+### ⌨ Keyboard Commands
 
 Simulate keyboard input and key presses.
 
@@ -534,7 +534,7 @@ SET `textarea#message` "Hello, this is a test message."
 - Faster than TYPE for long text
 - Triggers change and input events
 
-### 🔀 Control Flow Commands
+###  Control Flow Commands
 
 Add conditional logic and loops to your scripts.
 
@@ -690,7 +690,7 @@ REPEAT (PRESS ArrowDown, `window.scrollY < document.body.scrollHeight`)
 - JavaScript condition must return boolean
 - Be careful to avoid infinite loops
 
-### 💾 Variables and Data
+###  Variables and Data
 
 Store and manipulate data within scripts.
 
@@ -746,7 +746,7 @@ EVAL `document.title = "Automated Test"`
 - Return values are not captured
 - Be careful with security implications
 
-### 📝 Comments and Documentation
+###  Comments and Documentation
 
 #### `# <comment>`
 Add comments to scripts for documentation.
@@ -772,7 +772,7 @@ TYPE "user@example.com"
 - Can appear anywhere in script
 - Supports multi-line documentation blocks
 
-### 🔧 Procedures (Advanced)
+###  Procedures (Advanced)
 
 Define reusable command sequences.
 

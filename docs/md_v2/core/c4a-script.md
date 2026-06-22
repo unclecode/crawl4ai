@@ -54,7 +54,7 @@ Want to learn by doing? We've got you covered:
 
 **🚀 [Live Demo](https://docs.crawl4ai.com/apps/c4a-script/)** - Try C4A-Script in your browser right now!
 
-**📁 [Tutorial Examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/c4a_script/)** - Complete examples with source code
+** [Tutorial Examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/c4a_script/)** - Complete examples with source code
 
 ### Running the Tutorial Locally
 
@@ -135,7 +135,7 @@ TYPE $password
 
 ## Command Categories
 
-### 🧭 Navigation Commands
+###  Navigation Commands
 Move around the web like a user would:
 
 | Command | Purpose | Example |
@@ -145,14 +145,14 @@ Move around the web like a user would:
 | `BACK` | Go back in history | `BACK` |
 | `FORWARD` | Go forward in history | `FORWARD` |
 
-### ⏱️ Wait Commands
+### ⏱ Wait Commands
 Ensure elements are ready before interacting:
 
 | Command | Purpose | Example |
 |---------|---------|---------|
 | `WAIT` | Wait for time/element/text | `WAIT 3` or `WAIT \`#element\` 10` |
 
-### 🖱️ Mouse Commands
+###  Mouse Commands
 Click, drag, and move like a human:
 
 | Command | Purpose | Example |
@@ -163,7 +163,7 @@ Click, drag, and move like a human:
 | `SCROLL` | Scroll in direction | `SCROLL DOWN 500` |
 | `DRAG` | Drag from point to point | `DRAG 100 100 500 300` |
 
-### ⌨️ Keyboard Commands  
+### ⌨ Keyboard Commands  
 Type text and press keys naturally:
 
 | Command | Purpose | Example |
@@ -173,7 +173,7 @@ Type text and press keys naturally:
 | `CLEAR` | Clear input field | `CLEAR \`#search\`` |
 | `SET` | Set input value directly | `SET \`#email\` "user@example.com"` |
 
-### 🔀 Control Flow
+###  Control Flow
 Add logic and repetition to your scripts:
 
 | Command | Purpose | Example |
@@ -181,7 +181,7 @@ Add logic and repetition to your scripts:
 | `IF` | Conditional execution | `IF (EXISTS \`#popup\`) THEN CLICK \`#close\`` |
 | `REPEAT` | Loop commands | `REPEAT (SCROLL DOWN 300, 5)` |
 
-### 💾 Variables & Advanced
+###  Variables & Advanced
 Store data and execute custom code:
 
 | Command | Purpose | Example |
@@ -375,10 +375,10 @@ SET `#email` $test_email
 
 ## Getting Help
 
-- **📖 [Complete Examples](/examples/c4a_script/)** - Real-world automation scripts
-- **🎮 [Interactive Tutorial](/examples/c4a_script/tutorial/)** - Hands-on learning environment  
-- **📋 [API Reference](/api/c4a-script-reference/)** - Detailed command documentation
-- **🌐 [Live Demo](https://docs.crawl4ai.com/c4a-script/demo)** - Try it in your browser
+- ** [Complete Examples](/examples/c4a_script/)** - Real-world automation scripts
+- ** [Interactive Tutorial](/examples/c4a_script/tutorial/)** - Hands-on learning environment  
+- ** [API Reference](/api/c4a-script-reference/)** - Detailed command documentation
+- ** [Live Demo](https://docs.crawl4ai.com/c4a-script/demo)** - Try it in your browser
 
 ## What's Next?
 
