@@ -95,3 +95,26 @@ class TestHeadFingerprint:
         assert fp != ""
         # Should be deterministic
         assert fp == compute_head_fingerprint(head)
+
+    def test_value_case_change_changes_fingerprint(self):
+        """A case-only change in a title/meta *value* must change the
+        fingerprint, otherwise the cache validator treats a genuinely updated
+        page as unchanged and serves stale content. Regression."""
+        assert compute_head_fingerprint(
+            "<head><title>iPhone</title></head>"
+        ) != compute_head_fingerprint("<head><title>IPHONE</title></head>")
+        assert compute_head_fingerprint(
+            '<head><meta name="description" content="Buy Now"></head>'
+        ) != compute_head_fingerprint(
+            '<head><meta name="description" content="BUY NOW"></head>'
+        )
+
+    def test_tag_and_attribute_case_does_not_change_fingerprint(self):
+        """Tag/attribute case is still matched case-insensitively; only the
+        markup case (not the values) differing yields the same fingerprint."""
+        assert compute_head_fingerprint(
+            "<HEAD><TITLE>Hello</TITLE></HEAD>"
+        ) == compute_head_fingerprint("<head><title>Hello</title></head>")
+        assert compute_head_fingerprint(
+            '<head><META NAME="description" CONTENT="Hi"></head>'
+        ) == compute_head_fingerprint('<head><meta name="description" content="Hi"></head>')
