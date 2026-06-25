@@ -49,6 +49,7 @@ MarkdownGenerationResult = Union['MarkdownGenerationResultType']
 # Content filter types
 RelevantContentFilter = Union['RelevantContentFilterType']
 PruningContentFilter = Union['PruningContentFilterType']
+PruningContentFilterLXML = Union['PruningContentFilterLXMLType']
 BM25ContentFilter = Union['BM25ContentFilterType']
 LLMContentFilter = Union['LLMContentFilterType']
 
@@ -151,6 +152,9 @@ if TYPE_CHECKING:
         PruningContentFilter as PruningContentFilterType,
         BM25ContentFilter as BM25ContentFilterType,
         LLMContentFilter as LLMContentFilterType,
+    )
+    from .content_filter_strategy_lxml import (
+        PruningContentFilterLXML as PruningContentFilterLXMLType,
     )
     
     # Dispatcher imports

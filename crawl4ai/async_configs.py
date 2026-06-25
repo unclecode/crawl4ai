@@ -133,7 +133,7 @@ ALLOWED_DESERIALIZE_TYPES = {
     "CosineStrategy", "RegexExtractionStrategy",
     # Markdown / content
     "DefaultMarkdownGenerator",
-    "PruningContentFilter", "BM25ContentFilter", "LLMContentFilter",
+    "PruningContentFilter", "PruningContentFilterLXML", "BM25ContentFilter", "LLMContentFilter",
     # Scraping
     "LXMLWebScrapingStrategy", "PDFContentScrapingStrategy",
     # Chunking
@@ -190,7 +190,7 @@ UNTRUSTED_ALLOWED_TYPES = {
     # non-LLM extraction / markdown / scraping / chunking strategies
     "JsonCssExtractionStrategy", "JsonXPathExtractionStrategy",
     "JsonLxmlExtractionStrategy", "RegexExtractionStrategy", "CosineStrategy",
-    "DefaultMarkdownGenerator", "PruningContentFilter", "BM25ContentFilter",
+    "DefaultMarkdownGenerator", "PruningContentFilter", "PruningContentFilterLXML", "BM25ContentFilter",
     "LXMLWebScrapingStrategy", "PDFContentScrapingStrategy",
     "RegexChunking",
     "DefaultTableExtraction", "NoTableExtraction",
