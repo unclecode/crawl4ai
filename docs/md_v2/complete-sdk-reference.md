@@ -151,15 +151,15 @@ if __name__ == "__main__":
 ## 4. Generating Markdown Output
 - **`result.markdown`**:  
 - **`result.markdown.fit_markdown`**:  
-  The same content after applying any configured **content filter** (e.g., `PruningContentFilter`).
+  The same content after applying any configured **content filter** (e.g., `PruningContentFilterLXML`).
 ### Example: Using a Filter with `DefaultMarkdownGenerator`
 ```python
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 md_generator = DefaultMarkdownGenerator(
-    content_filter=PruningContentFilter(threshold=0.4, threshold_type="fixed")
+    content_filter=PruningContentFilterLXML(threshold=0.4, threshold_type="fixed")
 )
 
 config = CrawlerRunConfig(
@@ -172,7 +172,7 @@ async with AsyncWebCrawler() as crawler:
     print("Raw Markdown length:", len(result.markdown.raw_markdown))
     print("Fit Markdown length:", len(result.markdown.fit_markdown))
 ```
-**Note**: If you do **not** specify a content filter or markdown generator, you’ll typically see only the raw Markdown. `PruningContentFilter` may adds around `50ms` in processing time. We’ll dive deeper into these strategies in a dedicated **Markdown Generation** tutorial.
+**Note**: If you do **not** specify a content filter or markdown generator, you’ll typically see only the raw Markdown. `PruningContentFilterLXML` may adds around `50ms` in processing time. We’ll dive deeper into these strategies in a dedicated **Markdown Generation** tutorial.
 ## 5. Simple Data Extraction (CSS-based)
 ```python
 from crawl4ai import JsonCssExtractionStrategy
@@ -1006,7 +1006,7 @@ Instead of using one config for all URLs, provide a list of configs with `url_ma
 from crawl4ai import CrawlerRunConfig, MatchMode
 from crawl4ai.processors.pdf import PDFContentScrapingStrategy
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 # PDF files - specialized extraction
@@ -1019,7 +1019,7 @@ pdf_config = CrawlerRunConfig(
 blog_config = CrawlerRunConfig(
     url_matcher=["*/blog/*", "*/article/*", "*python.org*"],
     markdown_generator=DefaultMarkdownGenerator(
-        content_filter=PruningContentFilter(threshold=0.48)
+        content_filter=PruningContentFilterLXML(threshold=0.48)
     )
 )
 
@@ -1171,7 +1171,7 @@ print(result.markdown.raw_markdown[:200])
 print(result.markdown.fit_markdown)
 print(result.markdown.fit_html)
 ```
-**Important**: "Fit" content (in `fit_markdown`/`fit_html`) exists in result.markdown, only if you used a **filter** (like **PruningContentFilter** or **BM25ContentFilter**) within a `MarkdownGenerationStrategy`.
+**Important**: "Fit" content (in `fit_markdown`/`fit_html`) exists in result.markdown, only if you used a **filter** (like **PruningContentFilterLXML** or **BM25ContentFilter**) within a `MarkdownGenerationStrategy`.
 ## 4. Media & Links
 ### 4.1 **`media`** *(Dict[str, List[Dict]])*  
 **What**: Contains info about discovered images, videos, or audio. Typically keys: `"images"`, `"videos"`, `"audios"`.  
@@ -1363,7 +1363,7 @@ async def handle_result(result: CrawlResult):
    - `markdown_v2` - Removed in v0.5. Accessing it raises `AttributeError`. Use `markdown`.
    - `fit_markdown` and `fit_html` - Removed as top-level `CrawlResult` properties in v0.5. Use `result.markdown.fit_markdown` and `result.markdown.fit_html`.
 2. **Fit Content**  
-   - **`fit_markdown`** and **`fit_html`** appear in MarkdownGenerationResult, only if you used a content filter (like **PruningContentFilter** or **BM25ContentFilter**) inside your **MarkdownGenerationStrategy** or set them directly.  
+   - **`fit_markdown`** and **`fit_html`** appear in MarkdownGenerationResult, only if you used a content filter (like **PruningContentFilterLXML** or **BM25ContentFilter**) inside your **MarkdownGenerationStrategy** or set them directly.  
    - If no filter is used, they remain `None`.
 3. **References & Citations**  
    - If you enable link citations in your `DefaultMarkdownGenerator` (`options={"citations": True}`), you’ll see `markdown_with_citations` plus a **`references_markdown`** block. This helps large language models or academic-like referencing.
@@ -2038,7 +2038,7 @@ The `arun()` method returns a `CrawlResult` object with several useful propertie
 ```python
 config = CrawlerRunConfig(
     markdown_generator=DefaultMarkdownGenerator(
-        content_filter=PruningContentFilter(threshold=0.6),
+        content_filter=PruningContentFilterLXML(threshold=0.6),
         options={"ignore_links": True}
     )
 )
@@ -2293,12 +2293,12 @@ config = CrawlerRunConfig(markdown_generator=md_generator)
 - **`bm25_threshold`**: Raise it to keep fewer blocks; lower it to keep more.  
 - **`use_stemming`** *(default `True`)*: Whether to apply stemming to the query and content.
 - **`language (str)`**: Language for stemming (default: 'english').
-### 5.2 PruningContentFilter
-If you **don’t** have a specific query, or if you just want a robust “junk remover,” use `PruningContentFilter`. It analyzes text density, link density, HTML structure, and known patterns (like “nav,” “footer”) to systematically prune extraneous or repetitive sections.
+### 5.2 PruningContentFilterLXML
+If you **don’t** have a specific query, or if you just want a robust “junk remover,” use `PruningContentFilterLXML`. It analyzes text density, link density, HTML structure, and known patterns (like “nav,” “footer”) to systematically prune extraneous or repetitive sections.
 ```python
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 
-prune_filter = PruningContentFilter(
+prune_filter = PruningContentFilterLXML(
     threshold=0.5,
     threshold_type="fixed",  # or "dynamic"
     min_word_threshold=50
@@ -2383,12 +2383,12 @@ When a content filter is active, the library produces two forms of markdown insi
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 
 async def main():
     config = CrawlerRunConfig(
         markdown_generator=DefaultMarkdownGenerator(
-            content_filter=PruningContentFilter(threshold=0.6),
+            content_filter=PruningContentFilterLXML(threshold=0.6),
             options={"ignore_links": True}
         )
     )
@@ -2424,14 +2424,14 @@ print("FIT:\n", md_obj.fit_markdown)
 - Or feed `fit_markdown` into a vector database to reduce token usage.  
 - `references_markdown` can help you keep track of link provenance.
 ## 8. Combining Filters (BM25 + Pruning) in Two Passes
-You might want to **prune out** noisy boilerplate first (with `PruningContentFilter`), and then **rank what’s left** against a user query (with `BM25ContentFilter`). You don’t have to crawl the page twice. Instead:
-1. **First pass**: Apply `PruningContentFilter` directly to the raw HTML from `result.html` (the crawler’s downloaded HTML).  
+You might want to **prune out** noisy boilerplate first (with `PruningContentFilterLXML`), and then **rank what’s left** against a user query (with `BM25ContentFilter`). You don’t have to crawl the page twice. Instead:
+1. **First pass**: Apply `PruningContentFilterLXML` directly to the raw HTML from `result.html` (the crawler’s downloaded HTML).  
 2. **Second pass**: Take the pruned HTML (or text) from step 1, and feed it into `BM25ContentFilter`, focusing on a user query.
 ### Two-Pass Example
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.content_filter_strategy import PruningContentFilter, BM25ContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML, BM25ContentFilter
 from bs4 import BeautifulSoup
 
 async def main():
@@ -2450,8 +2450,8 @@ async def main():
 
         raw_html = result.html
 
-        # 2. First pass: PruningContentFilter on raw HTML
-        pruning_filter = PruningContentFilter(threshold=0.5, min_word_threshold=50)
+        # 2. First pass: PruningContentFilterLXML on raw HTML
+        pruning_filter = PruningContentFilterLXML(threshold=0.5, min_word_threshold=50)
 
         # filter_content returns a list of "text chunks" or cleaned HTML sections
         pruned_chunks = pruning_filter.filter_content(raw_html)
@@ -2518,17 +2518,24 @@ In **`CrawlerRunConfig`**, you can specify a **`content_filter`** to shape how c
 - **`result.markdown.fit_markdown`** (filtered or “fit” version)
 - **`result.markdown.fit_html`** (the corresponding HTML snippet that produced `fit_markdown`)
 ### 1.2 Common Filters
-## 2. PruningContentFilter
+## 2. PruningContentFilterLXML
+
+!!! warning "Deprecation"
+    Use `PruningContentFilterLXML` (lxml engine, **~10× faster**, identical output). The legacy
+    `PruningContentFilter` (BeautifulSoup) still works but emits a `DeprecationWarning`. In an
+    upcoming release `PruningContentFilter` will become an alias for the lxml engine, with
+    `PruningContentFilterLXML` kept as a legacy alias.
+
 ### 2.1 Usage Example
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 async def main():
     # Step 1: Create a pruning filter
-    prune_filter = PruningContentFilter(
+    prune_filter = PruningContentFilterLXML(
         # Lower → more content retained, higher → more content pruned
         threshold=0.45,           
         # "fixed" or "dynamic"
@@ -2623,7 +2630,7 @@ If the content filter is **BM25**, you might see additional logic or references 
 ## 5. Code Patterns Recap
 ### 5.1 Pruning
 ```python
-prune_filter = PruningContentFilter(
+prune_filter = PruningContentFilterLXML(
     threshold=0.5,
     threshold_type="fixed",
     min_word_threshold=10
@@ -2647,7 +2654,7 @@ config = CrawlerRunConfig(
     excluded_tags=["nav", "footer", "header"],
     exclude_external_links=True,
     markdown_generator=DefaultMarkdownGenerator(
-        content_filter=PruningContentFilter(threshold=0.5)
+        content_filter=PruningContentFilterLXML(threshold=0.5)
     )
 )
 ```
@@ -4698,7 +4705,7 @@ To keep context continuous across chunks, we can overlap them. E.g., `overlap_ra
 ## 7. Input Format
 By default, **LLMExtractionStrategy** uses `input_format="markdown"`, meaning the **crawler’s final markdown** is fed to the LLM. You can change to:
 - **`html`**: The cleaned HTML or raw HTML (depending on your crawler config) goes into the LLM.  
-- **`fit_markdown`**: If you used, for instance, `PruningContentFilter`, the “fit” version of the markdown is used. This can drastically reduce tokens if you trust the filter.  
+- **`fit_markdown`**: If you used, for instance, `PruningContentFilterLXML`, the “fit” version of the markdown is used. This can drastically reduce tokens if you trust the filter.  
 - **`markdown`**: Standard markdown output from the crawler’s `markdown_generator`.
 This setting is crucial: if the LLM instructions rely on HTML tags, pick `"html"`. If you prefer a text-based approach, pick `"markdown"`.
 ```python

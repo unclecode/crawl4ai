@@ -153,6 +153,7 @@ class TestPruningContentFilterLXMLBehavior:
 # --------------------------------------------------------------------------- #
 # Fidelity: new output must match the original bs4 implementation
 # --------------------------------------------------------------------------- #
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")  # deliberately exercises the deprecated bs4 filter
 class TestPruningEquivalence:
     @pytest.mark.parametrize("name", list(EQUIVALENCE_CASES.keys()))
     @pytest.mark.parametrize("config", CONFIGS)
@@ -182,6 +183,7 @@ class TestPruningEquivalence:
 # --------------------------------------------------------------------------- #
 # Performance: new must be substantially faster on a non-trivial page
 # --------------------------------------------------------------------------- #
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")  # compares against the deprecated bs4 filter
 def test_performance_faster_than_original():
     # ~600 repeated cards -> a few hundred KB of HTML
     html = "<body>" + "".join(

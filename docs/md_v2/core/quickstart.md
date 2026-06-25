@@ -92,17 +92,17 @@ By default, Crawl4AI automatically generates Markdown from each crawled page. Ho
 - **`result.markdown`**:  
   The direct HTML-to-Markdown conversion.  
 - **`result.markdown.fit_markdown`**:  
-  The same content after applying any configured **content filter** (e.g., `PruningContentFilter`).
+  The same content after applying any configured **content filter** (e.g., `PruningContentFilterLXML`).
 
 ### Example: Using a Filter with `DefaultMarkdownGenerator`
 
 ```python
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 md_generator = DefaultMarkdownGenerator(
-    content_filter=PruningContentFilter(threshold=0.4, threshold_type="fixed")
+    content_filter=PruningContentFilterLXML(threshold=0.4, threshold_type="fixed")
 )
 
 config = CrawlerRunConfig(
@@ -116,7 +116,7 @@ async with AsyncWebCrawler() as crawler:
     print("Fit Markdown length:", len(result.markdown.fit_markdown))
 ```
 
-**Note**: If you do **not** specify a content filter or markdown generator, you’ll typically see only the raw Markdown. `PruningContentFilter` may adds around `50ms` in processing time. We’ll dive deeper into these strategies in a dedicated **Markdown Generation** tutorial.
+**Note**: If you do **not** specify a content filter or markdown generator, you’ll typically see only the raw Markdown. `PruningContentFilterLXML` may adds around `50ms` in processing time. We’ll dive deeper into these strategies in a dedicated **Markdown Generation** tutorial.
 
 ---
 

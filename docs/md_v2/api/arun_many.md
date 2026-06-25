@@ -105,7 +105,7 @@ Instead of using one config for all URLs, provide a list of configs with `url_ma
 from crawl4ai import CrawlerRunConfig, MatchMode
 from crawl4ai.processors.pdf import PDFContentScrapingStrategy
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 # PDF files - specialized extraction
@@ -118,7 +118,7 @@ pdf_config = CrawlerRunConfig(
 blog_config = CrawlerRunConfig(
     url_matcher=["*/blog/*", "*/article/*", "*python.org*"],
     markdown_generator=DefaultMarkdownGenerator(
-        content_filter=PruningContentFilter(threshold=0.48)
+        content_filter=PruningContentFilterLXML(threshold=0.48)
     )
 )
 

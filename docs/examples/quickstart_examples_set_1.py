@@ -10,7 +10,7 @@ from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode, CrawlResult
 from crawl4ai import RoundRobinProxyStrategy
 from crawl4ai import JsonCssExtractionStrategy, LLMExtractionStrategy
 from crawl4ai import LLMConfig
-from crawl4ai import PruningContentFilter, BM25ContentFilter
+from crawl4ai import PruningContentFilterLXML, BM25ContentFilter
 from crawl4ai import DefaultMarkdownGenerator
 from crawl4ai import BFSDeepCrawlStrategy, DomainFilter, FilterChain
 from crawl4ai import BrowserConfig
@@ -69,7 +69,7 @@ async def demo_fit_markdown():
             url = "https://en.wikipedia.org/wiki/Python_(programming_language)",
             config=CrawlerRunConfig(
                 markdown_generator=DefaultMarkdownGenerator(
-                    content_filter=PruningContentFilter()
+                    content_filter=PruningContentFilterLXML()
                 )
             ),
         )
