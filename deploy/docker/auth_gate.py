@@ -15,6 +15,7 @@ Accepted credentials:
   * a valid HS256 JWT minted by this server -> the token's own scope claim.
 
 Public paths (the health check and the token-issuing endpoint) pass through.
+Public prefixes (the UI static shells) also pass through - they serve no data.
 On failure: HTTP 401 JSON, or WebSocket close 4401.
 On success: the validated principal is attached at scope["state"]["principal"]
 (readable downstream as request.state.principal) for scope/ownership checks.
@@ -38,10 +39,12 @@ class AuthGateMiddleware:
         *,
         token_provider: Callable[[], str],
         public_paths: Iterable[str] = (),
+        public_prefixes: Iterable[str] = (),
     ):
         self.app = app
         self._token_provider = token_provider
         self.public_paths = set(public_paths)
+        self.public_prefixes = tuple(public_prefixes)
 
     # ─────────────────────────── ASGI entry ───────────────────────────
     async def __call__(self, scope, receive, send):
@@ -49,7 +52,11 @@ class AuthGateMiddleware:
             await self.app(scope, receive, send)
             return
 
-        if scope.get("path", "") in self.public_paths:
+        path = scope.get("path", "")
+        if path in self.public_paths:
+            await self.app(scope, receive, send)
+            return
+        if self.public_prefixes and path.startswith(self.public_prefixes):
             await self.app(scope, receive, send)
             return
 

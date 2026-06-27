@@ -400,6 +400,7 @@ app.add_middleware(
     AuthGateMiddleware,
     token_provider=_current_api_token,
     public_paths={HEALTH_PATH, "/token"},
+    public_prefixes=_UI_PREFIXES,
 )
 
 # ── request body-size limit (DoS) ─────────────────────────────────────
