@@ -93,6 +93,16 @@ class TestCompose:
     def test_pids_limit(self, compose):
         assert "pids_limit" in compose
 
+    def test_read_only_runtime_tmpfs_are_appuser_owned(self, compose):
+        assert "/var/lib/redis:uid=999,gid=999,mode=0700" in compose
+        assert "/var/lib/crawl4ai/outputs:uid=999,gid=999,mode=0700" in compose
+        assert "/home/appuser/.crawl4ai:uid=999,gid=999,mode=0700" in compose
+        assert "/home/appuser/.gunicorn:uid=999,gid=999,mode=0700" in compose
+
+    def test_playwright_cache_is_not_shadowed(self, compose):
+        assert "/home/appuser/.cache\n" not in compose
+        assert "/home/appuser/.cache/url_seeder:uid=999,gid=999,mode=0700" in compose
+
 
 class TestEntrypoint:
     def test_entrypoint_exists_and_resolves_bind(self):
