@@ -1969,7 +1969,7 @@ class BrowserManager:
             session_ids = list(self.sessions.keys())
             for session_id in session_ids:
                 await self.kill_session(session_id)
-            for ctx in self.contexts_by_config.values():
+            for ctx in list(self.contexts_by_config.values()):
                 try:
                     await ctx.close()
                 except Exception:
@@ -1995,7 +1995,7 @@ class BrowserManager:
                     await self.kill_session(session_id)
 
                 # Close all contexts we created
-                for ctx in self.contexts_by_config.values():
+                for ctx in list(self.contexts_by_config.values()):
                     try:
                         await ctx.close()
                     except Exception:
@@ -2032,7 +2032,7 @@ class BrowserManager:
             session_ids = list(self.sessions.keys())
             for session_id in session_ids:
                 await self.kill_session(session_id)
-            for ctx in self.contexts_by_config.values():
+            for ctx in list(self.contexts_by_config.values()):
                 try:
                     await ctx.close()
                 except Exception:
@@ -2064,7 +2064,7 @@ class BrowserManager:
             await self.kill_session(session_id)
 
         # Now close all contexts we created. This reclaims memory from ephemeral contexts.
-        for ctx in self.contexts_by_config.values():
+        for ctx in list(self.contexts_by_config.values()):
             try:
                 await ctx.close()
             except Exception as e:
