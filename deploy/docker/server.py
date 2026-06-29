@@ -72,6 +72,10 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from prometheus_fastapi_instrumentator import Instrumentator
 from redis import asyncio as aioredis
+from redis_config import (
+    build_rate_limit_storage_uri as _build_rate_limit_storage_uri,
+    build_redis_url as _build_redis_url,
+)
 
 # ── internal imports (after sys.path append) ─────────────────
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
@@ -289,23 +293,12 @@ async def root():
     return RedirectResponse("/playground")
 
 # ─────────────────── infra / middleware  ─────────────────────
-def _build_redis_url(config: dict) -> str:
-    """Build Redis URL from config fields and environment variables."""
-    rc = config.get("redis", {})
-    host = os.environ.get("REDIS_HOST", rc.get("host", "localhost"))
-    port = os.environ.get("REDIS_PORT", rc.get("port", 6379))
-    password = os.environ.get("REDIS_PASSWORD", rc.get("password", ""))
-    db = rc.get("db", 0)
-    scheme = "rediss" if rc.get("ssl", False) else "redis"
-    auth = f":{password}@" if password else ""
-    return f"{scheme}://{auth}{host}:{port}/{db}"
-
 redis = aioredis.from_url(_build_redis_url(config))
 
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=[config["rate_limiting"]["default_limit"]],
-    storage_uri=config["rate_limiting"]["storage_uri"],
+    storage_uri=_build_rate_limit_storage_uri(config),
 )
 
 
