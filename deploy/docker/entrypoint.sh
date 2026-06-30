@@ -23,12 +23,31 @@ if [[ -z "${CRAWL4AI_API_TOKEN:-}" && -f /run/secrets/api_token ]]; then
 fi
 
 # --- Bind resolution: loopback unless a credential is present. ---------------
-PORT="${CRAWL4AI_PORT:-11235}"
+DEFAULT_PORT="11235"
+resolve_port() {
+    local port="${CRAWL4AI_PORT:-$DEFAULT_PORT}"
+    if [[ ! "$port" =~ ^[0-9]+$ ]]; then
+        if [[ "$port" == tcp://* ]]; then
+            echo "entrypoint: ignoring non-numeric CRAWL4AI_PORT='${port}' " \
+                 "(looks like a Kubernetes service link); using ${DEFAULT_PORT}." >&2
+            port="$DEFAULT_PORT"
+        else
+            echo "entrypoint: CRAWL4AI_PORT must be numeric, got '${port}'." >&2
+            exit 1
+        fi
+    fi
+    printf '%s\n' "$port"
+}
+
 if [[ -n "${CRAWL4AI_API_TOKEN:-}" || "${CRAWL4AI_JWT_ENABLED:-false}" == "true" ]]; then
     # A credential is configured -> the operator may expose all interfaces.
-    GUNICORN_BIND="${GUNICORN_BIND:-[::]:${PORT}}"
+    if [[ -z "${GUNICORN_BIND:-}" ]]; then
+        PORT="$(resolve_port)"
+        GUNICORN_BIND="[::]:${PORT}"
+    fi
 else
     # No credential -> refuse to expose; serve loopback only.
+    PORT="$(resolve_port)"
     GUNICORN_BIND="127.0.0.1:${PORT}"
     echo "entrypoint: no CRAWL4AI_API_TOKEN set; binding loopback only (${GUNICORN_BIND})." >&2
 fi

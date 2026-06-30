@@ -10,6 +10,8 @@ and is tracked as build-gated; it is out of scope for this offline suite.
 
 import os
 import re
+import stat
+import subprocess
 
 import pytest
 
@@ -109,6 +111,102 @@ class TestEntrypoint:
         src = _read(os.path.join(DOCKER_DIR, "entrypoint.sh"))
         assert "GUNICORN_BIND" in src and "REDIS_PASSWORD" in src
         assert "127.0.0.1" in src  # loopback default when no credential
+
+    def _run_entrypoint(self, tmp_path, extra_env):
+        fake_supervisord = tmp_path / "supervisord"
+        fake_supervisord.write_text(
+            "#!/usr/bin/env sh\n"
+            "echo \"GUNICORN_BIND=${GUNICORN_BIND}\"\n"
+            "echo \"REDIS_PASSWORD_SET=${REDIS_PASSWORD:+yes}\"\n",
+            encoding="utf-8",
+        )
+        fake_supervisord.chmod(
+            fake_supervisord.stat().st_mode | stat.S_IXUSR
+        )
+
+        env = os.environ.copy()
+        for key in (
+            "CRAWL4AI_API_TOKEN",
+            "CRAWL4AI_JWT_ENABLED",
+            "CRAWL4AI_PORT",
+            "GUNICORN_BIND",
+            "REDIS_PASSWORD",
+        ):
+            env.pop(key, None)
+        env.update(extra_env)
+        env["PATH"] = f"{tmp_path}{os.pathsep}{env['PATH']}"
+
+        return subprocess.run(
+            ["bash", os.path.join(DOCKER_DIR, "entrypoint.sh")],
+            cwd=DOCKER_DIR,
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+
+    def test_entrypoint_preserves_ipv6_wildcard_when_token_allows_exposure(self, tmp_path):
+        result = self._run_entrypoint(
+            tmp_path,
+            {
+                "CRAWL4AI_API_TOKEN": "test-token",
+                "CRAWL4AI_JWT_ENABLED": "false",
+                "CRAWL4AI_PORT": "11235",
+            },
+        )
+        assert result.returncode == 0, result.stderr
+        assert "GUNICORN_BIND=[::]:11235" in result.stdout
+
+    def test_entrypoint_ignores_kubernetes_service_link_port_env(self, tmp_path):
+        result = self._run_entrypoint(
+            tmp_path,
+            {
+                "CRAWL4AI_API_TOKEN": "test-token",
+                "CRAWL4AI_JWT_ENABLED": "false",
+                "CRAWL4AI_PORT": "tcp://10.0.101.25:80",
+            },
+        )
+        assert result.returncode == 0, result.stderr
+        assert "GUNICORN_BIND=[::]:11235" in result.stdout
+        assert "ignoring non-numeric CRAWL4AI_PORT" in result.stderr
+
+    def test_entrypoint_ignores_service_link_port_env_without_token(self, tmp_path):
+        result = self._run_entrypoint(
+            tmp_path,
+            {
+                "CRAWL4AI_JWT_ENABLED": "false",
+                "CRAWL4AI_PORT": "tcp://10.0.101.25:80",
+            },
+        )
+        assert result.returncode == 0, result.stderr
+        assert "GUNICORN_BIND=127.0.0.1:11235" in result.stdout
+        assert "ignoring non-numeric CRAWL4AI_PORT" in result.stderr
+
+    def test_entrypoint_preserves_explicit_gunicorn_bind(self, tmp_path):
+        result = self._run_entrypoint(
+            tmp_path,
+            {
+                "CRAWL4AI_API_TOKEN": "test-token",
+                "CRAWL4AI_JWT_ENABLED": "false",
+                "CRAWL4AI_PORT": "not-a-port",
+                "GUNICORN_BIND": "0.0.0.0:9999",
+            },
+        )
+        assert result.returncode == 0, result.stderr
+        assert "GUNICORN_BIND=0.0.0.0:9999" in result.stdout
+
+    def test_entrypoint_rejects_other_non_numeric_port_env(self, tmp_path):
+        result = self._run_entrypoint(
+            tmp_path,
+            {
+                "CRAWL4AI_API_TOKEN": "test-token",
+                "CRAWL4AI_JWT_ENABLED": "false",
+                "CRAWL4AI_PORT": "http://10.0.101.25:80",
+            },
+        )
+        assert result.returncode == 1
+        assert "CRAWL4AI_PORT must be numeric" in result.stderr
 
 
 class TestSandboxOptOut:
