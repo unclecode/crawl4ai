@@ -75,8 +75,8 @@ def get_home_folder():
 def load_bert_base_uncased():
     from transformers import BertTokenizer, BertModel
 
-    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", resume_download=None)
-    model = BertModel.from_pretrained("bert-base-uncased", resume_download=None)
+    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+    model = BertModel.from_pretrained("bert-base-uncased")
     model.eval()
     model, device = set_model_device(model)
     return tokenizer, model
@@ -94,8 +94,8 @@ def load_HF_embedding_model(model_name="BAAI/bge-small-en-v1.5") -> tuple:
     """
     from transformers import AutoTokenizer, AutoModel
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name, resume_download=None)
-    model = AutoModel.from_pretrained(model_name, resume_download=None)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModel.from_pretrained(model_name)
     model.eval()
     model, device = set_model_device(model)
     return tokenizer, model
@@ -134,10 +134,8 @@ def load_text_multilabel_classifier():
     #     # return load_spacy_model(), torch.device("cpu")
 
     MODEL = "cardiffnlp/tweet-topic-21-multi"
-    tokenizer = AutoTokenizer.from_pretrained(MODEL, resume_download=None)
-    model = AutoModelForSequenceClassification.from_pretrained(
-        MODEL, resume_download=None
-    )
+    tokenizer = AutoTokenizer.from_pretrained(MODEL)
+    model = AutoModelForSequenceClassification.from_pretrained(MODEL)
     model.eval()
     model, device = set_model_device(model)
     class_mapping = model.config.id2label
