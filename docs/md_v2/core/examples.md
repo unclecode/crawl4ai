@@ -23,6 +23,7 @@ This page provides a comprehensive list of example scripts that demonstrate vari
 |---------|-------------|------|
 | Built-in Browser | Demonstrates how to use the built-in browser capabilities. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/builtin_browser_example.py) |
 | Browser Optimization | Focuses on browser performance optimization techniques. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/browser_optimization_example.py) |
+| Camoufox Runtime | Shows how to use Crawl4AI with Camoufox in dedicated and persistent modes. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/camoufox_example.py) |
 | arun vs arun_many | Compares the `arun` and `arun_many` methods for single vs. multiple URL crawling. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/arun_vs_arun_many.py) |
 | Multiple URLs | Shows how to crawl multiple URLs asynchronously. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/async_webcrawler_multiple_urls_example.py) |
 | Page Interaction | Guide on interacting with dynamic elements through clicks. | [View Guide](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/tutorial_dynamic_clicks.md) |
@@ -77,6 +78,7 @@ This page provides a comprehensive list of example scripts that demonstrate vari
 |---------|-------------|------|
 | Hooks | Illustrates how to use hooks at different stages of the crawling process for advanced customization. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/hooks_example.py) |
 | Identity-Based Browsing | Illustrates identity-based browsing configurations for authentic browsing experiences. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/identity_based_browsing.py) |
+| Camoufox Proxy Example | Shows how to launch Camoufox with a residential proxy and a persistent profile. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/camoufox_proxy_example.py) |
 | Proxy Rotation | Shows how to use proxy rotation for web scraping and avoiding IP blocks. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/proxy_rotation_demo.py) |
 | SSL Certificate | Illustrates SSL certificate handling and verification. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/ssl_example.py) |
 | Language Support | Shows how to handle different languages during crawling. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/language_support_example.py) |

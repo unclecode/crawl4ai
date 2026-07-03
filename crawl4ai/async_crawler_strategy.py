@@ -73,7 +73,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     """
 
     def __init__(
-        self, browser_config: BrowserConfig = None, logger: AsyncLogger = None, browser_adapter: BrowserAdapter = None, **kwargs
+        self,
+        browser_config: BrowserConfig = None,
+        logger: AsyncLogger = None,
+        browser_adapter: BrowserAdapter = None,
+        browser_manager_factory: Callable[..., BrowserManager] = None,
+        **kwargs,
     ):
         """
         Initialize the AsyncPlaywrightCrawlerStrategy with a browser configuration.
@@ -93,6 +98,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         
         # Initialize browser adapter
         self.adapter = browser_adapter or PlaywrightAdapter()
+        if self.browser_config.is_camoufox and isinstance(self.adapter, UndetectedAdapter):
+            raise ValueError(
+                "browser_runtime='camoufox' cannot be combined with UndetectedAdapter. "
+                "Camoufox must own stealth and fingerprint behavior."
+            )
 
         # Initialize session management
         self._downloaded_files = []
@@ -111,7 +121,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         }
 
         # Initialize browser manager with config
-        self.browser_manager = BrowserManager(
+        browser_manager_cls = browser_manager_factory or BrowserManager
+        self.browser_manager = browser_manager_cls(
             browser_config=self.browser_config, 
             logger=self.logger,
             use_undetected=isinstance(self.adapter, UndetectedAdapter)
@@ -545,7 +556,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         # changing it here would only desync browser_config from reality.
         # Users should set user_agent or user_agent_mode on BrowserConfig.
         ua_changed = False
-        if not self.browser_config.use_persistent_context:
+        if (
+            not self.browser_config.use_persistent_context
+            and not self.browser_config.uses_browser_scoped_identity
+        ):
             user_agent_to_override = config.user_agent
             if user_agent_to_override:
                 self.browser_config.user_agent = user_agent_to_override
@@ -558,10 +572,15 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         # Keep sec-ch-ua in sync whenever the UA changed
         if ua_changed:
-            self.browser_config.browser_hint = UAGen.generate_client_hints(
-                self.browser_config.user_agent
+            self.browser_config.browser_hint = (
+                UAGen.generate_client_hints(self.browser_config.user_agent)
+                if self.browser_config.browser_type == "chromium"
+                else ""
             )
-            self.browser_config.headers["sec-ch-ua"] = self.browser_config.browser_hint
+            if self.browser_config.browser_hint:
+                self.browser_config.headers["sec-ch-ua"] = self.browser_config.browser_hint
+            else:
+                self.browser_config.headers.pop("sec-ch-ua", None)
 
         # Get page for session
         page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
@@ -595,7 +614,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # at context level by setup_context(). This fallback covers
             # managed-browser / persistent / CDP paths where setup_context()
             # is called without a crawlerRunConfig.
-            if config.override_navigator or config.simulate_user or config.magic:
+            if self.browser_manager._should_inject_navigator_overrides(config):
                 if not getattr(context, '_crawl4ai_nav_overrider_injected', False):
                     await context.add_init_script(load_js_script("navigator_overrider"))
                     context._crawl4ai_nav_overrider_injected = True
