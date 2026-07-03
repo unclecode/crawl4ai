@@ -1,17 +1,21 @@
 # best_first_crawling_strategy.py
+from __future__ import annotations
+
 import asyncio
 import logging
 from datetime import datetime
-from typing import AsyncGenerator, Optional, Set, Dict, List, Tuple, Any, Callable, Awaitable, Union
+from typing import AsyncGenerator, Optional, Set, Dict, List, Tuple, Any, Callable, Awaitable, Union, TYPE_CHECKING
 from urllib.parse import urlparse
 
 from ..models import TraversalStats
 from .filters import FilterChain
 from .scorers import URLScorer
 from . import DeepCrawlStrategy
-
 from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult, RunManyReturn
 from ..utils import normalize_url_for_deep_crawl
+
+if TYPE_CHECKING:
+    from ..async_dispatcher import BaseDispatcher
 
 from math import inf as infinity
 
@@ -47,6 +51,8 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         on_state_change: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
         # Optional cancellation callback - checked before each URL is processed
         should_cancel: Optional[Callable[[], Union[bool, Awaitable[bool]]]] = None,
+        # Optional dispatcher for rate limiting control (issue #1095)
+        dispatcher: Optional[BaseDispatcher] = None,
     ):
         self.max_depth = max_depth
         self.filter_chain = filter_chain
@@ -69,6 +75,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         self._on_state_change = on_state_change
         self._should_cancel = should_cancel
         self._last_state: Optional[Dict[str, Any]] = None
+        self.dispatcher = dispatcher
         # Shadow list for queue items (only used when on_state_change is set)
         self._queue_shadow: Optional[List[Tuple[float, int, str, Optional[str]]]] = None
 
@@ -275,7 +282,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             # Process the current batch of URLs.
             urls = [item[2] for item in batch]
             batch_config = config.clone(deep_crawl_strategy=None, stream=True)
-            stream_gen = await crawler.arun_many(urls=urls, config=batch_config)
+            stream_gen = await crawler.arun_many(urls=urls, config=batch_config, dispatcher=self.dispatcher)
             async for result in stream_gen:
                 result_url = result.url
                 # Find the corresponding tuple from the batch.

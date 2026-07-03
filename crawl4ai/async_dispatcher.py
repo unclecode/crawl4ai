@@ -38,31 +38,69 @@ class RateLimiter:
         self.max_retries = max_retries
         self.rate_limit_codes = rate_limit_codes or [429, 503]
         self.domains: Dict[str, DomainState] = {}
+        self._domain_locks: Dict[str, asyncio.Lock] = {}
 
     def get_domain(self, url: str) -> str:
         return urlparse(url).netloc
 
+    def _get_domain_lock(self, domain: str) -> asyncio.Lock:
+        """Get or create a per-domain lock for serializing requests."""
+        if domain not in self._domain_locks:
+            self._domain_locks[domain] = asyncio.Lock()
+        return self._domain_locks[domain]
+
     async def wait_if_needed(self, url: str) -> None:
         domain = self.get_domain(url)
-        state = self.domains.get(domain)
+        lock = self._get_domain_lock(domain)
 
-        if not state:
-            self.domains[domain] = DomainState()
-            state = self.domains[domain]
+        # Serialize concurrent requests to the same domain so each
+        # task waits its proper turn instead of all reading the same
+        # last_request_time and firing together (issue #1095).
+        async with lock:
+            state = self.domains.get(domain)
 
-        now = time.time()
-        if state.last_request_time:
-            wait_time = max(0, state.current_delay - (now - state.last_request_time))
-            if wait_time > 0:
-                await asyncio.sleep(wait_time)
+            if not state:
+                self.domains[domain] = DomainState()
+                state = self.domains[domain]
 
-        # Random delay within base range if no current delay
-        if state.current_delay == 0:
-            state.current_delay = random.uniform(*self.base_delay)
+            now = time.time()
+            if state.last_request_time:
+                wait_time = max(0, state.current_delay - (now - state.last_request_time))
+                if wait_time > 0:
+                    await asyncio.sleep(wait_time)
 
-        state.last_request_time = time.time()
+            # Random delay within base range if no current delay
+            if state.current_delay == 0:
+                state.current_delay = random.uniform(*self.base_delay)
 
-    def update_delay(self, url: str, status_code: int) -> bool:
+            state.last_request_time = time.time()
+
+    def _parse_retry_after(self, value: str) -> Optional[float]:
+        """Parse a Retry-After header value into seconds.
+
+        Supports both delay-seconds (e.g. "5") and HTTP-date formats.
+        Returns None if the value cannot be parsed.
+        """
+        # Try as integer seconds first
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            pass
+
+        # Try as HTTP-date (e.g. "Wed, 21 Oct 2015 07:28:00 GMT")
+        from email.utils import parsedate_to_datetime
+        try:
+            retry_date = parsedate_to_datetime(value)
+            from datetime import datetime, timezone
+            delay = (retry_date - datetime.now(timezone.utc)).total_seconds()
+            return max(0, delay)
+        except (ValueError, TypeError):
+            pass
+
+        return None
+
+    def update_delay(self, url: str, status_code: int,
+                     response_headers: Optional[Dict[str, str]] = None) -> bool:
         domain = self.get_domain(url)
         state = self.domains[domain]
 
@@ -71,10 +109,22 @@ class RateLimiter:
             if state.fail_count > self.max_retries:
                 return False
 
-            # Exponential backoff with random jitter
-            state.current_delay = min(
-                state.current_delay * 2 * random.uniform(0.75, 1.25), self.max_delay
-            )
+            # Use Retry-After header if available (issue #1095),
+            # otherwise fall back to exponential backoff with jitter.
+            retry_after = None
+            if response_headers:
+                raw = (response_headers.get("Retry-After")
+                       or response_headers.get("retry-after"))
+                if raw:
+                    retry_after = self._parse_retry_after(raw)
+
+            if retry_after is not None:
+                state.current_delay = min(retry_after, self.max_delay)
+            else:
+                # Exponential backoff with random jitter
+                state.current_delay = min(
+                    state.current_delay * 2 * random.uniform(0.75, 1.25), self.max_delay
+                )
         else:
             # Gradually reduce delay on success
             state.current_delay = max(
@@ -325,11 +375,11 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             
             # Handle rate limiting
             if self.rate_limiter and result.status_code:
-                if not self.rate_limiter.update_delay(url, result.status_code):
+                if not self.rate_limiter.update_delay(url, result.status_code, result.response_headers):
                     error_message = f"Rate limit retry count exceeded for domain {urlparse(url).netloc}"
                     if self.monitor:
                         self.monitor.update_task(task_id, status=CrawlStatus.FAILED)
-                        
+
             # Update status based on result
             if not result.success:
                 error_message = result.error_message
@@ -691,7 +741,7 @@ class SemaphoreDispatcher(BaseDispatcher):
                 memory_usage = peak_memory = end_memory - start_memory
 
                 if self.rate_limiter and result.status_code:
-                    if not self.rate_limiter.update_delay(url, result.status_code):
+                    if not self.rate_limiter.update_delay(url, result.status_code, result.response_headers):
                         error_message = f"Rate limit retry count exceeded for domain {urlparse(url).netloc}"
                         if self.monitor:
                             self.monitor.update_task(task_id, status=CrawlStatus.FAILED)
