@@ -34,4 +34,4 @@ else
 fi
 export GUNICORN_BIND
 
-exec supervisord -c supervisord.conf
+exec supervisord -c supervisord.conf --pidfile /tmp/supervisord.pid
