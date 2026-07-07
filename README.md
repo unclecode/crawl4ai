@@ -562,8 +562,6 @@ async def test_news_crawl():
 
 ---
 
-> **💡 Tip:** Some websites may use **CAPTCHA** based verification mechanisms to prevent automated access. If your workflow encounters such challenges, you may optionally integrate a third-party CAPTCHA-handling service such as <strong>[CapSolver](https://www.capsolver.com/blog/Partners/crawl4ai-capsolver/?utm_source=crawl4ai&utm_medium=github_pr&utm_campaign=crawl4ai_integration)</strong>. They support reCAPTCHA v2/v3, Cloudflare Turnstile, Challenge, AWS WAF, and more. Please ensure that your usage complies with the target website’s terms of service and applicable laws.
-
 ## ✨ Recent Updates
 
 <details open>
@@ -1211,16 +1209,33 @@ For more details, see our [full mission statement](./MISSION.md).
 
 ## 🌟 Current Sponsors
 
-### 🏢 Enterprise Sponsors & Partners
+### 🤝 Strategic Partners
 
-Our enterprise sponsors and technology partners help scale Crawl4AI to power production-grade data pipelines.
+These companies provide core infrastructure and technology that power Crawl4AI’s capabilities — from web access and proxy networks to AI tooling and data pipelines.
+
+| Company | About |
+|------|------|
+| <a href="https://www.joinmassive.com/" target="_blank"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/sponsors/massive_light.svg"><source media="(prefers-color-scheme: light)" srcset="docs/assets/sponsors/massive.svg"><img alt="Massive" src="docs/assets/sponsors/massive.svg" height="40"/></picture></a> | Massive is a web access API backed by millions of volunteer devices in 195+ countries. AI agents, models, and data pipelines use it to reach any site on the internet, reliably, in real time, and at scale. |
+
+### 🏢 Enterprise Sponsors
+
+Our enterprise sponsors support Crawl4AI and help scale it to power production-grade data pipelines.
 
 | Company | About | Sponsorship Tier |
 |------|------|----------------------------|
-| <a href="https://www.joinmassive.com/" target="_blank"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/sponsors/massive_light.svg"><source media="(prefers-color-scheme: light)" srcset="docs/assets/sponsors/massive.svg"><img alt="Massive" src="docs/assets/sponsors/massive.svg" height="40"/></picture></a> | Massive is a web access API backed by millions of volunteer devices in 195+ countries. AI agents, models, and data pipelines use it to reach any site on the internet — reliably, in real time, and at scale. | 🥇 Gold |
 | <a href="https://kipo.ai" target="_blank"><img src="https://docs.crawl4ai.com/uploads/sponsors/20251013045751_2d54f57f117c651e.png" alt="DataSync" height="40"/></a> | Helps engineers and buyers find, compare, and source electronic & industrial parts in seconds, with specs, pricing, lead times & alternatives.| 🥇 Gold |
 | <a href="https://www.kidocode.com/" target="_blank"><img src="https://docs.crawl4ai.com/uploads/sponsors/20251013045045_bb8dace3f0440d65.svg" alt="Kidocode" height="40"/></a> | Kidocode is a hybrid technology and entrepreneurship school for kids aged 5–18, offering both online and on-campus education. | 🥇 Gold |
 | <a href="https://www.alephnull.sg/" target="_blank"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/sponsors/aleph_null_light.svg"><source media="(prefers-color-scheme: light)" srcset="docs/assets/sponsors/aleph_null.svg"><img alt="Aleph null" src="docs/assets/sponsors/aleph_null.svg" height="40"/></picture></a> | Singapore-based  Aleph Null is Asia’s leading edtech hub, dedicated to student-centric, AI-driven education—empowering learners with the tools to thrive in a fast-changing world. | 🥇 Gold |
+
+---
+
+### 💼 Become a Strategic Partner or Sponsor
+
+Interested in partnering with Crawl4AI?
+
+Whether you’re a proxy provider, AI infrastructure company, cloud platform, or an organization looking to support the Crawl4AI ecosystem, we’d love to hear from you.
+
+📩 Contact: hello@crawl4ai.com
 
 
 
