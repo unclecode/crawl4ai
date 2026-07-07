@@ -17,7 +17,7 @@ dependencies = [
     "aiohttp>=3.11.11",
     "aiosqlite~=0.20",
     "anyio>=4.0.0",
-    "lxml~=5.3",
+    "lxml>=5.3,<7",
     "unclecode-litellm==1.81.13",
     "numpy>=1.26.0,<3",
     "pillow>=10.4",
