@@ -90,9 +90,10 @@ RUN apt-get update && apt-get dist-upgrade -y \
     && rm -rf /var/lib/apt/lists/*
 
 RUN if [ "$ENABLE_GPU" = "true" ] && [ "$TARGETARCH" = "amd64" ] ; then \
-    apt-get update && apt-get install -y --no-install-recommends \
+    echo "deb http://deb.debian.org/debian bookworm non-free" >> /etc/apt/sources.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
     nvidia-cuda-toolkit \
-    && apt-get clean \ 
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/* ; \
 else \
     echo "Skipping NVIDIA CUDA Toolkit installation (unsupported platform or GPU disabled)"; \
