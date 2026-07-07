@@ -6,7 +6,8 @@ This is the acceptance gate for the Docker-server security hardening
 asserts the secure-by-default end state:
 
   - every mutating + read endpoint, static mount, and MCP transport requires
-    auth out of the box (R1); only the health check is public,
+    auth out of the box (R1); only the health check and UI shell pages
+    (dashboard/playground) are public,
   - the token endpoint will not freely mint credentials when no api_token /
     secret is configured (R1),
   - strong security headers + a strict CSP are present on every response even
@@ -66,10 +67,11 @@ PROTECTED_ENDPOINTS = [
     ("get", "/monitor/timeline", None),
     # MCP transport (must be gated; today it is open AND launders credentials)
     ("get", "/mcp/schema", None),
-    # static mounts (dashboard / playground served unauthenticated today)
-    ("get", "/dashboard/", None),
-    ("get", "/playground/", None),
 ]
+
+# UI shell pages that are intentionally public — they serve only static
+# HTML/CSS/JS and contain no data.  All data routes behind them remain gated.
+PUBLIC_UI_PATHS = ["/dashboard/", "/playground/"]
 
 
 def _call(client, method, path, body):
@@ -88,6 +90,15 @@ class TestDefaultDeployIsSafe:
         """The health endpoint is the one intentionally public route."""
         r = stock_client.get(HEALTH)
         assert r.status_code == 200
+
+    @pytest.mark.parametrize("path", PUBLIC_UI_PATHS, ids=PUBLIC_UI_PATHS)
+    def test_ui_shell_is_public(self, stock_client, path):
+        """UI shells serve static HTML only — no data — so they load without auth."""
+        r = stock_client.get(path)
+        assert r.status_code == 200, (
+            f"GET {path} returned {r.status_code}; expected 200. "
+            f"UI shell pages must be publicly accessible."
+        )
 
     @pytest.mark.parametrize(
         "method,path,body",
