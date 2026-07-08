@@ -172,6 +172,14 @@
         </h1>
 
         <div class="ml-auto flex items-center space-x-4">
+            <!-- Token bar -->
+            <div id="token-bar" class="flex items-center space-x-2">
+                <input id="token-input" type="password" placeholder="API token"
+                       class="bg-dark border border-border rounded px-2 py-1 text-xs w-48">
+                <button id="token-save" class="px-2 py-1 bg-primary text-dark rounded text-xs hover:bg-primarydim">Set</button>
+                <button onclick="clearToken()" class="px-2 py-1 border border-border rounded text-xs hover:bg-surface">Clear</button>
+                <span id="token-status" class="text-xs"></span>
+            </div>
             <a href="/dashboard" class="text-xs text-secondary hover:text-primary underline">Monitor</a>
             <div class="flex space-x-2">
                 <button id="play-tab"
@@ -402,6 +410,44 @@
     </div>
 
     <script>
+        // ================ AUTH ================
+        const _savedToken = sessionStorage.getItem('crawl4ai_token');
+        const _tokenBar = document.getElementById('token-bar');
+        const _tokenInput = document.getElementById('token-input');
+        const _tokenSave = document.getElementById('token-save');
+        const _tokenStatus = document.getElementById('token-status');
+
+        function getToken() { return sessionStorage.getItem('crawl4ai_token') || ''; }
+
+        function authFetch(url, opts = {}) {
+            const token = getToken();
+            if (token) {
+                opts.headers = { ...opts.headers, 'Authorization': 'Bearer ' + token };
+            }
+            return fetch(url, opts);
+        }
+
+        function applyToken() {
+            const val = _tokenInput.value.trim();
+            if (!val) return;
+            sessionStorage.setItem('crawl4ai_token', val);
+            _tokenStatus.textContent = 'Token saved';
+            _tokenStatus.className = 'text-xs text-green-400';
+            setTimeout(() => { _tokenStatus.textContent = ''; }, 2000);
+        }
+
+        function clearToken() {
+            sessionStorage.removeItem('crawl4ai_token');
+            _tokenInput.value = '';
+            _tokenStatus.textContent = 'Token cleared';
+            _tokenStatus.className = 'text-xs text-yellow-400';
+            setTimeout(() => { _tokenStatus.textContent = ''; }, 2000);
+        }
+
+        if (_savedToken) _tokenInput.value = _savedToken;
+        _tokenSave.addEventListener('click', applyToken);
+        _tokenInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyToken(); });
+
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -517,7 +563,7 @@
             const code = cm.getValue().trim();
             if (!code) return {};
 
-            const res = await fetch('/config/dump', {
+            const res = await authFetch('/config/dump', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ code }),
@@ -691,7 +737,7 @@
                     // Get the question from the LLM-specific input
                     const question = document.getElementById('llm-question').value.trim() || "What is this page about?";
                     
-                    response = await fetch(`${api}/${encodedUrl}?q=${encodeURIComponent(question)}`, {
+                    response = await authFetch(`${api}/${encodedUrl}?q=${encodeURIComponent(question)}`, {
                         method: 'GET',
                         headers: { 'Accept': 'application/json' }
                     });
@@ -707,7 +753,7 @@
                     forceHighlightElement(document.querySelector('#response-content code'));
                 } else if (endpoint === 'crawl_stream' || useStreamOverride) {
                     // Stream processing - now handled directly by /crawl endpoint
-                    response = await fetch(api, {
+                    response = await authFetch(api, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
@@ -746,7 +792,7 @@
                     forceHighlightElement(document.querySelector('#response-content code'));
                 } else {
                     // Regular request (handles /crawl and /md)
-                    response = await fetch(api, {
+                    response = await authFetch(api, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
@@ -835,7 +881,7 @@
 
                 try {
                     if (useStream) {
-                        const response = await fetch(api, {
+                        const response = await authFetch(api, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)
@@ -859,7 +905,7 @@
 
                         memory = maxMem;
                     } else {
-                        const response = await fetch(api, {
+                        const response = await authFetch(api, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)

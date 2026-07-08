@@ -1,4 +1,4 @@
-fastapi>=0.115.12
+fastapi>=0.115.12,<0.137
 uvicorn>=0.34.2
 gunicorn>=23.0.0
 slowapi==0.1.9

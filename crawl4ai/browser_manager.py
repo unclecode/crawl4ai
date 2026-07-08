@@ -1112,7 +1112,11 @@ class BrowserManager:
         
         browser_args = {"headless": self.config.headless, "args": args}
 
-        if self.config.chrome_channel:
+        # On Windows, passing channel='chromium' (the default) causes Playwright
+        # to look for a system Chrome installation instead of using the bundled
+        # ms-playwright binary.  This makes Chrome exit immediately with code 0,
+        # resulting in TargetClosedError.  Skip the default channel.
+        if self.config.chrome_channel and self.config.chrome_channel != "chromium":
             browser_args["channel"] = self.config.chrome_channel
 
         if self.config.accept_downloads:
@@ -1969,7 +1973,7 @@ class BrowserManager:
             session_ids = list(self.sessions.keys())
             for session_id in session_ids:
                 await self.kill_session(session_id)
-            for ctx in self.contexts_by_config.values():
+            for ctx in list(self.contexts_by_config.values()):
                 try:
                     await ctx.close()
                 except Exception:
@@ -1995,7 +1999,7 @@ class BrowserManager:
                     await self.kill_session(session_id)
 
                 # Close all contexts we created
-                for ctx in self.contexts_by_config.values():
+                for ctx in list(self.contexts_by_config.values()):
                     try:
                         await ctx.close()
                     except Exception:
@@ -2032,7 +2036,7 @@ class BrowserManager:
             session_ids = list(self.sessions.keys())
             for session_id in session_ids:
                 await self.kill_session(session_id)
-            for ctx in self.contexts_by_config.values():
+            for ctx in list(self.contexts_by_config.values()):
                 try:
                     await ctx.close()
                 except Exception:
@@ -2064,7 +2068,7 @@ class BrowserManager:
             await self.kill_session(session_id)
 
         # Now close all contexts we created. This reclaims memory from ephemeral contexts.
-        for ctx in self.contexts_by_config.values():
+        for ctx in list(self.contexts_by_config.values()):
             try:
                 await ctx.close()
             except Exception as e:
