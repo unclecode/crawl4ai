@@ -90,7 +90,7 @@ RUN apt-get update && apt-get dist-upgrade -y \
     && rm -rf /var/lib/apt/lists/*
 
 RUN if [ "$ENABLE_GPU" = "true" ] && [ "$TARGETARCH" = "amd64" ] ; then \
-    echo "deb http://deb.debian.org/debian bookworm non-free" >> /etc/apt/sources.list \
+    echo "deb http://deb.debian.org/debian bookworm contrib non-free" >> /etc/apt/sources.list \
     && apt-get update && apt-get install -y --no-install-recommends \
     nvidia-cuda-toolkit \
     && apt-get clean \
