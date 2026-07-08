@@ -37,13 +37,13 @@ Limited slots._
 
 Crawl4AI turns the web into clean, LLM ready Markdown for RAG, agents, and data pipelines. Fast, controllable, battle tested by a 50k+ star community.
 
-[✨ Check out latest update v0.9](#-recent-updates)
+[✨ Check out latest update v0.9.1](#-recent-updates)
 
-✨ **New in v0.9**: Major secure-by-default release of the Docker API server. Auth is on by default, the server binds loopback unless given a token, and the request body is now an untrusted trust boundary. Breaking changes for the self-hosted server only; the pip library is unchanged. If you self-host the Docker API, read the [migration guide](https://github.com/unclecode/crawl4ai/blob/main/deploy/docker/MIGRATION.md) before upgrading. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.0.md)
+✨ **New in v0.9.1**: Patch release with 12 bug fixes across Docker, browser, and core. Adds `preserve_classes`/`preserve_tags` whitelist for PruningContentFilter, fixes Windows browser crash, Docker auth gate UI, HTTP timeout unit mismatch, and more. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.1.md)
+
+✨ Recent v0.9.0: Major secure-by-default release of the Docker API server. Auth is on by default, the server binds loopback unless given a token, and the request body is now an untrusted trust boundary. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.0.md)
 
 ✨ Recent v0.8.7: Security-hardening release. Fixes critical Docker API vulnerabilities (RCE, SSRF, auth bypass, file write, XSS, hardcoded JWT secret), adds DomainMapper, and ships scraping, deep-crawl, and LLM fixes. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.7.md)
-
-✨ Recent v0.8.6: Security hotfix that replaced `litellm` with `unclecode-litellm` due to a PyPI supply chain compromise.
 
 ✨ Previous v0.8.0: Crash Recovery & Prefetch Mode! Deep crawl crash recovery with `resume_state` and `on_state_change` callbacks for long-running crawls. New `prefetch=True` mode for 5-10x faster URL discovery. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.0.md)
 
@@ -567,11 +567,24 @@ async def test_news_crawl():
 ## ✨ Recent Updates
 
 <details open>
+<summary><strong>Version 0.9.1 Release Highlights - Bug Fixes & PruningContentFilter Whitelist</strong></summary>
+
+A patch release with 12 bug fixes and one new feature. The new `preserve_classes` / `preserve_tags` parameters for `PruningContentFilter` let you whitelist CSS classes or HTML tags that should never be pruned — useful for protecting short metadata elements like author names and timestamps.
+
+Bug fixes span Docker (auth gate UI, supervisord/redis dirs, FastAPI compatibility, redis auth), browser (Windows channel crash, context snapshot leak), core (HTTP timeout unit mismatch, best-first ordering), and extraction (html2text table attributes).
+
+```bash
+pip install -U crawl4ai
+```
+
+[Full v0.9.1 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.1.md)
+
+</details>
+
+<details>
 <summary><strong>Version 0.9.0 Release Highlights - Secure-by-Default Docker Server</strong></summary>
 
-A major, secure-by-default release of the Docker API server. The out-of-the-box deployment is hardened with defense in depth: authentication is on by default, the server binds loopback unless you give it a token, and the network request body is treated as an untrusted trust boundary. Request-supplied browser internals and hook code are gone; hooks are declarative, `output_path` is replaced by an artifact store, TLS verification is on, CORS is deny-by-default, and Redis is password-protected and loopback-only.
-
-This is a breaking release for the self-hosted Docker server only. The core pip library (SDK / in-process use) is unchanged. If you self-host the Docker API, read the migration guide before upgrading.
+A major, secure-by-default release of the Docker API server. The out-of-the-box deployment is hardened with defense in depth: authentication is on by default, the server binds loopback unless you give it a token, and the network request body is treated as an untrusted trust boundary.
 
 ```bash
 pip install -U crawl4ai
