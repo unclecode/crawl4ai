@@ -62,7 +62,7 @@ class TestDockerfile:
         # image runs as appuser, so both Chromium artifacts must be copied out
         # of root's install cache.
         cache_copy = re.search(
-            r"RUN mkdir -p /home/appuser/\.cache/ms-playwright(?P<commands>.*?)RUN crawl4ai-doctor",
+            r"cp -r(?P<artifacts>(?:(?!&&).)*)/home/appuser/\.cache/ms-playwright/",
             dockerfile,
             re.DOTALL,
         )
