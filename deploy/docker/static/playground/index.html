@@ -563,10 +563,13 @@
             const code = cm.getValue().trim();
             if (!code) return {};
 
+            // Server requires `type` alongside `code` (CrawlerRunConfig | BrowserConfig).
+            // The UI already tracks this in #cfg-type; omitting it always 400s Advanced Config.
+            const cfgType = document.getElementById('cfg-type').value;
             const res = await authFetch('/config/dump', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code }),
+                body: JSON.stringify({ type: cfgType, code }),
             });
 
             const statusEl = document.getElementById('cfg-status');
@@ -652,9 +655,12 @@
         // Detect if stream is requested inside payload
         function shouldUseStream(payload) {
             const toBool = (v) => v === true || (typeof v === 'string' && v.toLowerCase() === 'true');
-            const fromCrawler = payload && payload.crawler_config && payload.crawler_config.params && payload.crawler_config.params.stream;
+            // Successful /config/dump returns { type, params: { stream, ... } }
+            const fromCrawlerParams = payload && payload.crawler_config && payload.crawler_config.params && payload.crawler_config.params.stream;
+            // Fallback / minimal shapes may set stream at the crawler_config top level
+            const fromCrawlerTop = payload && payload.crawler_config && payload.crawler_config.stream;
             const direct = payload && payload.stream;
-            return toBool(fromCrawler) || toBool(direct);
+            return toBool(fromCrawlerParams) || toBool(fromCrawlerTop) || toBool(direct);
         }
 
         // Main run function
@@ -676,8 +682,8 @@
                 const streamFlag = /stream\s*=\s*True/i.test(codeText);
                 const isCrawlEndpoint = document.getElementById('endpoint').value === 'crawl';
                 if (isCrawlEndpoint && streamFlag) {
-                    // Fallback: proceed with minimal config only for stream
-                    advConfig = { crawler_config: { stream: true } };
+                    // Fallback: minimal dump-shaped config so shouldUseStream + server load agree
+                    advConfig = { crawler_config: { type: 'CrawlerRunConfig', params: { stream: true } } };
                 } else {
                     updateStatus('error');
                     document.querySelector('#response-content code').textContent =

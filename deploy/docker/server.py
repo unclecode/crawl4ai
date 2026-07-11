@@ -482,8 +482,12 @@ def _config_from_json(data: dict) -> dict:
 app.include_router(init_job_router(redis, config, token_dep))
 
 # ── monitor router ──────────────────────────────────────────
+# Do not attach token_dep at router level: it is HTTP Request-only and breaks
+# the WebSocket upgrade on /monitor/ws (TypeError: _principal() missing 'request').
+# AuthGateMiddleware already authenticates HTTP + WS; destructive monitor
+# actions keep their own Depends(require_admin).
 from monitor_routes import router as monitor_router
-app.include_router(monitor_router, dependencies=[Depends(token_dep)])
+app.include_router(monitor_router)
 
 logger = logging.getLogger(__name__)
 
