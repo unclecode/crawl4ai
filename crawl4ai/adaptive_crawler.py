@@ -21,6 +21,7 @@ from pathlib import Path
 from crawl4ai.async_webcrawler import AsyncWebCrawler
 from crawl4ai.async_configs import CrawlerRunConfig, LinkPreviewConfig, LLMConfig
 from crawl4ai.models import Link, CrawlResult
+from crawl4ai.utils import normalize_url_for_deep_crawl
 import numpy as np
 
 @dataclass
@@ -1386,12 +1387,19 @@ class AdaptiveCrawler:
                     # Extract links from result - handle both dict and Links object formats
                     if hasattr(result, 'links') and result.links:
                         if isinstance(result.links, dict):
-                            # Extract internal and external links from dict
                             internal_links = [Link(**link) for link in result.links.get('internal', [])]
-                            self.state.pending_links.extend(internal_links)
                         else:
-                            # Handle Links object
-                            self.state.pending_links.extend(result.links.internal)
+                            internal_links = result.links.internal
+                        # Deduplicate: normalize URLs and avoid adding already-crawled or already-pending
+                        existing_pending = {l.href for l in self.state.pending_links}
+                        for link in internal_links:
+                            norm_url = normalize_url_for_deep_crawl(link.href, start_url) or link.href
+                            # Strip trailing slash for consistent dedup (normalize preserves it)
+                            norm_url = norm_url.rstrip('/')
+                            if norm_url not in self.state.crawled_urls and norm_url not in existing_pending:
+                                link.href = norm_url
+                                self.state.pending_links.append(link)
+                                existing_pending.add(norm_url)
                     
                     # Update state
                     await self.strategy.update_state(self.state, [result])
@@ -1441,17 +1449,20 @@ class AdaptiveCrawler:
                             if hasattr(result, 'links') and result.links:
                                 new_links = []
                                 if isinstance(result.links, dict):
-                                    # Extract internal and external links from dict
                                     internal_links = [Link(**link_data) for link_data in result.links.get('internal', [])]
                                     new_links = internal_links
                                 else:
-                                    # Handle Links object
                                     new_links = result.links.internal
                                 
-                                # Add new links to pending
+                                # Add new links to pending with deduplication
+                                existing_pending = {l.href for l in self.state.pending_links}
                                 for new_link in new_links:
-                                    if new_link.href not in self.state.crawled_urls:
+                                    norm_url = normalize_url_for_deep_crawl(new_link.href, link.href) or new_link.href
+                                    norm_url = norm_url.rstrip('/')
+                                    if norm_url not in self.state.crawled_urls and norm_url not in existing_pending:
+                                        new_link.href = norm_url
                                         self.state.pending_links.append(new_link)
+                                        existing_pending.add(norm_url)
                     
                     # Update state with new results
                     await self.strategy.update_state(self.state, new_results)
@@ -1479,6 +1490,11 @@ class AdaptiveCrawler:
             # by reaching max_depth
             if not self.state.metrics.get('stopped_reason'):
                 self.state.metrics['stopped_reason'] = 'max_depth_reached'
+
+            # Print stop reason to console for user visibility
+            print(f"[ADAPTIVE] Stopped: {self.state.metrics['stopped_reason']} | "
+                  f"Confidence: {self.state.metrics.get('confidence', 0):.2%} | "
+                  f"Pages: {len(self.state.crawled_urls)}")
             
             # Final save
             if self.config.save_state and self.config.state_path:
@@ -1917,14 +1933,20 @@ class AdaptiveCrawler:
         """Get most relevant content for the query"""
         if not self.state or not self.state.knowledge_base:
             return []
-        
-        # Simple relevance ranking based on term overlap
+
+        # Relevance ranking using consistent tokenization with the strategy
         scored_docs = []
-        query_terms = set(self.state.query.lower().split())
+        if isinstance(self.strategy, StatisticalStrategy):
+            query_terms = set(self.strategy._tokenize(self.state.query.lower()))
+        else:
+            query_terms = set(self.state.query.lower().split())
         
         for i, result in enumerate(self.state.knowledge_base):
             content = (result.markdown.raw_markdown or "").lower()
-            content_terms = set(content.split())
+            if isinstance(self.strategy, StatisticalStrategy):
+                content_terms = set(self.strategy._tokenize(content))
+            else:
+                content_terms = set(content.split())
             
             # Calculate relevance score
             overlap = len(query_terms & content_terms)

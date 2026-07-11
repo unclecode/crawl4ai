@@ -85,7 +85,8 @@ from .adaptive_crawler import (
     AdaptiveConfig,
     CrawlState,
     CrawlStrategy,
-    StatisticalStrategy
+    StatisticalStrategy,
+    EmbeddingStrategy,
 )
 
 # C4A Script Language Support
@@ -132,6 +133,7 @@ __all__ = [
     "CrawlState",
     "CrawlStrategy",
     "StatisticalStrategy",
+    "EmbeddingStrategy",
     "DeepCrawlStrategy",
     "BFSDeepCrawlStrategy",
     "BestFirstCrawlingStrategy",

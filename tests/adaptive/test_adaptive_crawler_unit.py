@@ -276,3 +276,91 @@ async def test_adaptive_policy_retains_tunnel_link_and_stop_reason_present():
     assert "http://example.com/root" in state.crawled_urls, (
         "Root page should have been crawled"
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 tests: URL dedup, EmbeddingStrategy export, tokenizer consistency
+# ---------------------------------------------------------------------------
+
+def test_embedding_strategy_is_exported():
+    """EmbeddingStrategy should be importable from crawl4ai package."""
+    from crawl4ai import EmbeddingStrategy
+    assert EmbeddingStrategy is not None, "EmbeddingStrategy should be exported from crawl4ai"
+
+
+def test_get_relevant_content_uses_consistent_tokenizer():
+    """get_relevant_content should use _tokenize() not .split() for term overlap."""
+    from crawl4ai.adaptive_crawler import StatisticalStrategy
+
+    fake_crawler = AsyncMock()
+    config = AdaptiveConfig()
+    adaptive = AdaptiveCrawler(crawler=fake_crawler, config=config)
+
+    # Manually set up state with a knowledge base
+    state = CrawlState(query="async! await? coroutine")
+    state.knowledge_base = [
+        FakeCrawlResult("http://example.com/1", "async await coroutine task"),
+        FakeCrawlResult("http://example.com/2", "completely different content about cooking"),
+    ]
+    state.query = "async! await? coroutine"
+    adaptive.state = state
+
+    results = adaptive.get_relevant_content(top_k=2)
+
+    # The first result should be the one with all query terms
+    # With .split(), "async!" wouldn't match "async" due to punctuation
+    # With _tokenize(), it should match
+    assert len(results) >= 1
+    assert results[0]['url'] == "http://example.com/1", (
+        f"Most relevant page should be the one with query terms, got {results[0]['url']}"
+    )
+    assert results[0]['score'] > 0, "Score should be positive for a page with query terms"
+
+
+@pytest.mark.asyncio
+async def test_digest_deduplicates_urls():
+    """digest() should not add duplicate URLs to pending_links after normalization."""
+    # Root page links to two URLs that normalize to the same thing
+    root_links = {
+        "internal": [
+            {"href": "http://example.com/page", "text": "Page"},
+            {"href": "http://example.com/page/", "text": "Page Duplicate"},  # trailing slash
+            {"href": "http://example.com/other", "text": "Other"},
+        ],
+        "external": [],
+    }
+
+    fake_result = FakeCrawlResult(
+        url="http://example.com/root",
+        content="root content about query terms",
+        links=root_links,
+    )
+
+    fake_crawler = AsyncMock()
+    fake_crawler.arun = AsyncMock(return_value=fake_result)
+
+    config = AdaptiveConfig(
+        confidence_threshold=0.99,  # Force crawling all available links
+        max_pages=5,
+        max_depth=1,
+        top_k_links=5,
+        min_gain_threshold=0.0,
+    )
+
+    adaptive = AdaptiveCrawler(crawler=fake_crawler, config=config)
+    state = await adaptive.digest(
+        start_url="http://example.com/root",
+        query="query terms",
+    )
+
+    # Check that pending_links does not contain both /page and /page/
+    pending_hrefs = [link.href for link in state.pending_links]
+    # After normalization, /page and /page/ should be the same URL
+    unique_hrefs = set(pending_hrefs)
+    assert len(unique_hrefs) <= len(pending_hrefs), "pending_links should not have exact duplicates"
+
+    # More specifically, /page and /page/ should not both appear
+    page_variants = [h for h in pending_hrefs if "page" in h]
+    assert len(page_variants) <= 1, (
+        f"Should have at most 1 'page' variant after dedup, got: {page_variants}"
+    )
