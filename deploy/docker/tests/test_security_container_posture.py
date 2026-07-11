@@ -57,6 +57,19 @@ class TestDockerfile:
         assert "/var/lib/crawl4ai/outputs" in dockerfile
         assert "chmod 700 /var/lib/crawl4ai/outputs" in dockerfile
 
+    def test_playwright_headless_shell_is_copied_to_runtime_cache(self, dockerfile):
+        # Playwright launches chromium_headless_shell for headless crawls. The
+        # image runs as appuser, so both Chromium artifacts must be copied out
+        # of root's install cache.
+        cache_copy = re.search(
+            r"cp -r(?P<artifacts>(?:(?!&&).)*)/home/appuser/\.cache/ms-playwright/",
+            dockerfile,
+            re.DOTALL,
+        )
+        assert cache_copy, "Dockerfile must copy Playwright artifacts into appuser's cache"
+        assert "chromium-*" in cache_copy.group("commands")
+        assert "chromium_headless_shell-*" in cache_copy.group("commands")
+
     def test_runs_as_non_root(self, dockerfile):
         assert re.search(r"^USER\s+appuser", dockerfile, re.MULTILINE)
 
