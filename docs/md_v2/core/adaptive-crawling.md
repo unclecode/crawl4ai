@@ -208,6 +208,47 @@ if result.metrics.get('is_irrelevant', False):
 
 ## When to Use Adaptive Crawling
 
+### Auditable Stopping Reasons
+
+The adaptive crawler records why it stopped in `state.metrics['stopped_reason']`. This makes termination auditable and reproducible.
+
+Possible stop reasons:
+
+| Reason | Meaning |
+|--------|---------|
+| `confidence_threshold_reached` | Confidence met the configured threshold — sufficient information gathered. |
+| `max_pages_reached` | Hit the `max_pages` limit before reaching confidence threshold. |
+| `no_pending_links` | No more links to crawl — frontier exhausted. |
+| `saturation_threshold_reached` | New pages are not adding new information — diminishing returns detected. |
+| `low_expected_gain` | Top-ranked link scored below `min_gain_threshold` — expected gain too low to continue. |
+| `max_depth_reached` | Reached the `max_depth` limit before any other stop condition triggered. |
+
+```python
+state = await adaptive.digest(start_url="https://example.com", query="oauth jwt")
+print(f"Stopped because: {state.metrics.get('stopped_reason')}")
+```
+
+### Configurable Confidence Weights
+
+The statistical strategy uses three metrics — coverage, consistency, and saturation — combined via configurable weights:
+
+```python
+config = AdaptiveConfig(
+    coverage_weight=0.5,     # Weight for query term coverage (default: 0.4)
+    consistency_weight=0.3,  # Weight for inter-page consistency (default: 0.3)
+    saturation_weight=0.2,   # Weight for diminishing returns detection (default: 0.3)
+)
+```
+
+Weights must sum to 1.0. Tune for your use case:
+- **Increase coverage_weight** when query precision matters most.
+- **Increase consistency_weight** when topic coherence matters.
+- **Increase saturation_weight** when you want to stop early on diminishing returns.
+
+### Link Preservation for Recall
+
+Links without `head_data` (metadata from a HEAD request preview) are **retained** in the pending frontier, not filtered out. This preserves recall and permits tunneling through sparse-metadata pages to reach highly relevant content. Links are ranked using available evidence: `intrinsic_score`, `contextual_score` (BM25), link text, and title. This aligns with focused-crawling research showing that over-aggressive frontier pruning silently misses valuable paths.
+
 ### Perfect For:
 - **Research Tasks**: Finding comprehensive information about a topic
 - **Question Answering**: Gathering sufficient context to answer specific queries

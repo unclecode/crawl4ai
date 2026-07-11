@@ -320,8 +320,16 @@ class StatisticalStrategy(CrawlStrategy):
         state.metrics['consistency'] = consistency
         state.metrics['saturation'] = saturation
 
-        # Weighted combination (weights from config not accessible here, using defaults)
-        confidence = 0.4 * coverage + 0.3 * consistency + 0.3 * saturation
+        # Weighted combination using config weights (falls back to defaults)
+        config = getattr(self, "config", None)
+        coverage_weight = getattr(config, "coverage_weight", 0.4)
+        consistency_weight = getattr(config, "consistency_weight", 0.3)
+        saturation_weight = getattr(config, "saturation_weight", 0.3)
+        confidence = (
+            coverage_weight * coverage
+            + consistency_weight * consistency
+            + saturation_weight * saturation
+        )
         
         return confidence
     
@@ -529,18 +537,22 @@ class StatisticalStrategy(CrawlStrategy):
         # Check confidence threshold
         confidence = state.metrics.get('confidence', 0.0)
         if confidence >= config.confidence_threshold:
+            state.metrics['stopped_reason'] = 'confidence_threshold_reached'
             return True
             
         # Check resource limits
         if len(state.crawled_urls) >= config.max_pages:
+            state.metrics['stopped_reason'] = 'max_pages_reached'
             return True
             
         # Check if we have any links left
         if not state.pending_links:
+            state.metrics['stopped_reason'] = 'no_pending_links'
             return True
             
         # Check saturation
         if state.metrics.get('saturation', 0.0) >= config.saturation_threshold:
+            state.metrics['stopped_reason'] = 'saturation_threshold_reached'
             return True
             
         return False
@@ -1008,6 +1020,7 @@ class EmbeddingStrategy(CrawlStrategy):
 
         # Store quick metrics
         state.metrics['coverage_score'] = score
+        state.metrics['learning_score'] = score
         state.metrics['avg_best_similarity'] = float(best.mean())
         state.metrics['median_best_similarity'] = float(np.median(best))
 
@@ -1402,6 +1415,8 @@ class AdaptiveCrawler:
                 
                 # Check minimum gain threshold
                 if ranked_links[0][1] < self.config.min_gain_threshold:
+                    self.state.metrics['stopped_reason'] = 'low_expected_gain'
+                    self.state.metrics['best_expected_gain'] = ranked_links[0][1]
                     break
                 
                 # Select top K links
@@ -1459,6 +1474,11 @@ class AdaptiveCrawler:
                 
             self.state.metrics['pages_crawled'] = len(self.state.crawled_urls)
             self.state.metrics['depth_reached'] = depth
+
+            # If no stop reason was set during the loop, the while loop exited
+            # by reaching max_depth
+            if not self.state.metrics.get('stopped_reason'):
+                self.state.metrics['stopped_reason'] = 'max_depth_reached'
             
             # Final save
             if self.config.save_state and self.config.state_path:
@@ -1492,11 +1512,10 @@ class AdaptiveCrawler:
             if hasattr(result, '_results') and result._results:
                 result = result._results[0]
 
-            # Filter our all links do not have head_date
-            if hasattr(result, 'links') and result.links:
-                result.links['internal'] = [link for link in result.links['internal'] if link.get('head_data')]
-                # For now let's ignore external links without head_data
-                # result.links['external'] = [link for link in result.links['external'] if link.get('head_data')]
+            # No-head links are retained for frontier recall: intrinsic/total
+            # scores and link text can still guide focused crawling, and the
+            # tunneling literature (Bergmark 2002) warns against over-aggressive
+            # frontier pruning based on missing metadata.
 
             return result
         except Exception as e:
