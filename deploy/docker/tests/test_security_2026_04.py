@@ -138,14 +138,17 @@ class TestPydanticPathValidator(unittest.TestCase):
 
 class TestMonitorAuthStructural(unittest.TestCase):
 
-    def test_monitor_router_has_auth(self):
+    def test_monitor_router_has_no_http_only_dep(self):
+        """Router-level token_dep was removed because it is HTTP-only and broke
+        the WebSocket upgrade on /monitor/ws.  Auth is enforced by
+        AuthGateMiddleware; destructive routes keep Depends(require_admin)."""
         with open(os.path.join(DEPLOY_DIR, "server.py")) as f:
             source = f.read()
-        # Find the line with monitor_router
         for line in source.splitlines():
             if "monitor_router" in line and "include_router" in line:
-                self.assertIn("dependencies=", line,
-                    "Monitor router must have dependencies=[Depends(token_dep)]")
+                self.assertNotIn("dependencies=", line,
+                    "Monitor router must NOT have router-level token_dep "
+                    "(breaks WS); auth is enforced by AuthGateMiddleware")
                 return
         self.fail("Could not find monitor_router include_router line")
 
