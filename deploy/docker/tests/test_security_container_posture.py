@@ -67,8 +67,8 @@ class TestDockerfile:
             re.DOTALL,
         )
         assert cache_copy, "Dockerfile must copy Playwright artifacts into appuser's cache"
-        assert "chromium-*" in cache_copy.group("commands")
-        assert "chromium_headless_shell-*" in cache_copy.group("commands")
+        assert "chromium-*" in cache_copy.group("artifacts")
+        assert "chromium_headless_shell-*" in cache_copy.group("artifacts")
 
     def test_runs_as_non_root(self, dockerfile):
         assert re.search(r"^USER\s+appuser", dockerfile, re.MULTILINE)
