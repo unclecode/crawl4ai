@@ -288,6 +288,38 @@ asyncio.run(main())
 
 4. **Frontier preserved:** 142 pending links remained after the crawl. This live site's `LinkPreview` system fetched `head_data` for all links successfully, so no no-head links were present in this particular crawl. The fix's value is most visible on sites where `head_data` extraction fails or times out, which the synthetic graph test covers.
 
+### Live Integration Crawl 2: quotes.toscrape.com
+
+A second live crawl was run against `https://quotes.toscrape.com` with query `"quotes authors tags inspiration love"` to test on a different site type (smaller, tag-based navigation).
+
+**Live results:**
+
+| Metric | Value |
+|--------|-------|
+| Pages crawled | 5 |
+| Depth reached | 2 |
+| Confidence | 0.7409 |
+| Coverage | 0.8440 |
+| Consistency | 0.3515 |
+| Saturation | 0.9930 |
+| **Stop reason** | **`saturation_threshold_reached`** |
+| Pending links | 122 |
+| **Links without `head_data`** | **5** |
+
+**Key finding:** 5 of 122 pending links lacked `head_data` (HEAD extraction failed or timed out for those URLs). **Before the fix, these 5 links would have been silently dropped from the frontier.** After the fix, they are retained and ranked using available evidence. This confirms the tunneling problem is real, not just theoretical — even on a well-structured site, HEAD extraction is not always successful.
+
+**Crawl order:**
+
+| # | URL | New terms |
+|---|-----|-----------|
+| 1 | `quotes.toscrape.com` | +142 |
+| 2 | `quotes.toscrape.com/` (duplicate) | +0 |
+| 3 | `quotes.toscrape.com/author/Albert-Einstein` | +277 |
+| 4 | `quotes.toscrape.com/tag/change/page/1/` | +1 |
+| 5 | `quotes.toscrape.com/tag/deep-thoughts/page/1/` | +0 |
+
+The saturation signal correctly fired at 0.9930 after pages 4 and 5 added only 1 and 0 new terms respectively — strong diminishing returns. The crawler stopped at confidence 0.7409, just below the 0.75 threshold, because saturation (0.9930) exceeded the 0.8 threshold first.
+
 | Test | Result |
 |------|--------|
 | `test_statistical_confidence_uses_configurable_weights` | PASS |
