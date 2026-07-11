@@ -1491,10 +1491,12 @@ class AdaptiveCrawler:
             if not self.state.metrics.get('stopped_reason'):
                 self.state.metrics['stopped_reason'] = 'max_depth_reached'
 
-            # Print stop reason to console for user visibility
+            # Print stop reason to console for user visibility (stderr so JSON output stays clean)
+            import sys
             print(f"[ADAPTIVE] Stopped: {self.state.metrics['stopped_reason']} | "
                   f"Confidence: {self.state.metrics.get('confidence', 0):.2%} | "
-                  f"Pages: {len(self.state.crawled_urls)}")
+                  f"Pages: {len(self.state.crawled_urls)}",
+                  file=sys.stderr)
             
             # Final save
             if self.config.save_state and self.config.state_path:
