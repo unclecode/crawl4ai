@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, HttpUrl
@@ -263,10 +263,24 @@ async def list_saved_requests():
         raise HTTPException(status_code=500, detail=f"Failed to list saved requests: {str(e)}")
 
 @app.delete("/saved-requests/{request_id}")
-async def delete_saved_request(request_id: str):
+async def delete_saved_request(request_id: str, x_api_key: Optional[str] = Header(None)):
     """Delete a saved API request."""
+    # Authorization: require a valid API key for destructive operations
+    api_secret = os.environ.get("API_SECRET_KEY")
+    if api_secret and x_api_key != api_secret:
+        raise HTTPException(status_code=403, detail="Forbidden: valid API key required")
+
+    # Validate request_id to prevent path traversal attacks.
+    # Expected format from save_api_request(): digits and underscores only (e.g. 20240101_120000_123)
+    if not request_id.replace("_", "").isdigit():
+        raise HTTPException(status_code=400, detail="Invalid request ID format")
+
     try:
-        file_path = os.path.join("saved_requests", f"{request_id}.json")
+        base_dir = os.path.realpath("saved_requests")
+        file_path = os.path.realpath(os.path.join("saved_requests", f"{request_id}.json"))
+        # Confirm the resolved path stays within the saved_requests directory
+        if not file_path.startswith(base_dir + os.sep):
+            raise HTTPException(status_code=403, detail="Access denied")
         if os.path.exists(file_path):
             os.remove(file_path)
             return {
@@ -275,6 +289,8 @@ async def delete_saved_request(request_id: str):
             }
         else:
             raise HTTPException(status_code=404, detail=f"Saved request '{request_id}' not found")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete saved request: {str(e)}")
 
@@ -338,11 +354,20 @@ async def save_model_config(request: ModelConfigRequest):
         raise HTTPException(status_code=500, detail=f"Failed to save model: {str(e)}")
 
 @app.delete("/models/{model_name}")
-async def delete_model_config(model_name: str):
+async def delete_model_config(model_name: str, x_api_key: Optional[str] = Header(None)):
     """Delete a model configuration."""
+    # Authorization: admin-level operation requires a valid API key
+    api_secret = os.environ.get("API_SECRET_KEY")
+    if api_secret and x_api_key != api_secret:
+        raise HTTPException(status_code=403, detail="Forbidden: valid API key required")
+
+    # Validate model_name to prevent injection attacks
+    if not all(c.isalnum() or c in "-_./:" for c in model_name):
+        raise HTTPException(status_code=400, detail="Invalid model name format")
+
     try:
         success = scraper_agent.delete_model_config(model_name)
-        
+
         if success:
             return {
                 "success": True,
@@ -350,7 +375,9 @@ async def delete_model_config(model_name: str):
             }
         else:
             raise HTTPException(status_code=404, detail=f"Model configuration '{model_name}' not found")
-    
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete model: {str(e)}")
 
