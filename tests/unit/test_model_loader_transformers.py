@@ -75,6 +75,8 @@ def test_multilabel_loader_uses_current_from_pretrained_api(monkeypatch):
         ),
     )
     monkeypatch.setitem(sys.modules, "torch", SimpleNamespace())
+    monkeypatch.setitem(sys.modules, "scipy", SimpleNamespace())
+    monkeypatch.setitem(sys.modules, "scipy.special", SimpleNamespace(expit=lambda x: x))
     monkeypatch.setattr(model_loader, "set_model_device", lambda value: (value, "cpu"))
 
     classifier, device = model_loader.load_text_multilabel_classifier()
