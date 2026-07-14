@@ -248,6 +248,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
 
             next_level: List[Tuple[str, Optional[str]]] = []
             urls = [url for url, _ in current_level]
+            visited.update(urls)
 
             # Clone the config to disable deep crawling recursion and enforce batch mode.
             batch_config = config.clone(deep_crawl_strategy=None, stream=False)
