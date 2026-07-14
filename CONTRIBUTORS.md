@@ -2,7 +2,7 @@
 
 We would like to thank the following people for their contributions to Crawl4AI:
 
-## Core Team
+## Maintainers
 
 - [Unclecode](https://github.com/unclecode) - Project Creator and Main Developer
 - [Nasrin](https://github.com/ntohidi) - Project Manager and Developer
