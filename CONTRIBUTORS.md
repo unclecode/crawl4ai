@@ -58,9 +58,11 @@ We would like to thank the following people for their contributions to Crawl4AI:
 - [microHoffman](https://github.com/microHoffman) - feat: add --json-ensure-ascii CLI flag for Unicode handling [#1668](https://github.com/unclecode/crawl4ai/pull/1668)
 - [fstark96](https://github.com/fstark96) - fix: skip channel='chromium' on Windows to prevent Chrome exit code 0 [#2051](https://github.com/unclecode/crawl4ai/pull/2051)
 - [TobiasWallura-xitaso](https://github.com/TobiasWallura-xitaso) - fix: use writable directories for supervisord pid and redis data in Docker [#2047](https://github.com/unclecode/crawl4ai/pull/2047)
-- [harshmathurx](https://github.com/harshmathurx) - fix: authenticate rate limit Redis storage in Docker [#2043](https://github.com/unclecode/crawl4ai/pull/2043)
+- [harshmathurx](https://github.com/harshmathurx) - fix: authenticate rate limit Redis storage in Docker [#2043](https://github.com/unclecode/crawl4ai/pull/2043), fix: add non-free apt source for nvidia-cuda-toolkit GPU builds [#2057](https://github.com/unclecode/crawl4ai/pull/2057)
 - [RajanChavada](https://github.com/RajanChavada) - chore: remove dead normalize_url definitions and accidental adaptive_crawler copy [#2042](https://github.com/unclecode/crawl4ai/pull/2042)
 - [bibi-creator](https://github.com/bibi-creator) - docs: split sponsors into Strategic Partners and Enterprise Sponsors [#2056](https://github.com/unclecode/crawl4ai/pull/2056), fix: update sponsor logos [#2052](https://github.com/unclecode/crawl4ai/pull/2052)
+- [reallav0](https://github.com/reallav0) - fix: clean up MemoryAdaptiveDispatcher tasks on stream close [#2072](https://github.com/unclecode/crawl4ai/pull/2072), fix: include Playwright headless shell in Docker image [#2067](https://github.com/unclecode/crawl4ai/pull/2067)
+- [Pitchfork-and-Torch](https://github.com/Pitchfork-and-Torch) - fix: Docker playground config type and monitor WebSocket auth [#2063](https://github.com/unclecode/crawl4ai/pull/2063)
 
 #### Feb-Alpha-1
 - [sufianuddin](https://github.com/sufianuddin) - fix: [Documentation for JsonCssExtractionStrategy](https://github.com/unclecode/crawl4ai/issues/651)

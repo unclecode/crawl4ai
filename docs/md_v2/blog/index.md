@@ -20,6 +20,20 @@ Ever wondered why your AI coding assistant struggles with your library despite c
 
 ## Latest Release
 
+### [Crawl4AI v0.9.2 – Maintenance Bug Fixes](../blog/release-v0.9.2.md)
+*July 2026*
+
+Crawl4AI v0.9.2 is a maintenance patch release with bug fixes across the dispatcher, Docker, and GPU builds.
+
+Key highlights:
+- **🧹 Dispatcher Cleanup**: `MemoryAdaptiveDispatcher` no longer leaks crawl tasks and browser pages when a streaming crawl is closed
+- **🐳 Docker Fixes**: Playground "Advanced Config" 400, Monitor WebSocket auth 500, and Playwright headless-shell packaging
+- **🖥️ GPU Builds**: `ENABLE_GPU=true` Docker builds fixed (CUDA toolkit `non-free` apt source)
+
+[Read full release notes →](../blog/release-v0.9.2.md)
+
+## Recent Releases
+
 ### [Crawl4AI v0.9.1 – Bug Fixes & PruningContentFilter Whitelist](../blog/release-v0.9.1.md)
 *July 2026*
 
@@ -31,8 +45,6 @@ Key highlights:
 - **📦 Dependency**: lxml ceiling widened to allow 6.x
 
 [Read full release notes →](../blog/release-v0.9.1.md)
-
-## Recent Releases
 
 ### [Crawl4AI v0.8.5 – Anti-Bot Detection, Shadow DOM & 60+ Bug Fixes](../blog/release-v0.8.5.md)
 *March 2026*
