@@ -78,8 +78,8 @@ class TestSupervisord:
     def test_redis_requires_password(self, supervisord):
         assert "--requirepass" in supervisord
 
-    def test_redis_bound_loopback(self, supervisord):
-        assert "--bind 127.0.0.1" in supervisord
+    def test_redis_bound_loopback_with_optional_ipv6(self, supervisord):
+        assert "--bind 127.0.0.1 -::1" in supervisord
 
     def test_gunicorn_bind_is_env_driven(self, supervisord):
         # entrypoint.sh resolves GUNICORN_BIND (loopback unless a credential).
