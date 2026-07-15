@@ -1,7 +1,7 @@
 FROM python:3.12-slim-bookworm AS build
 
 # C4ai version
-ARG C4AI_VER=0.9.1
+ARG C4AI_VER=0.9.2
 ENV C4AI_VERSION=$C4AI_VER
 LABEL c4ai.version=$C4AI_VER
 
@@ -90,9 +90,10 @@ RUN apt-get update && apt-get dist-upgrade -y \
     && rm -rf /var/lib/apt/lists/*
 
 RUN if [ "$ENABLE_GPU" = "true" ] && [ "$TARGETARCH" = "amd64" ] ; then \
-    apt-get update && apt-get install -y --no-install-recommends \
+    echo "deb http://deb.debian.org/debian bookworm contrib non-free" >> /etc/apt/sources.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
     nvidia-cuda-toolkit \
-    && apt-get clean \ 
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/* ; \
 else \
     echo "Skipping NVIDIA CUDA Toolkit installation (unsupported platform or GPU disabled)"; \
@@ -177,7 +178,9 @@ RUN crawl4ai-setup
 RUN playwright install --with-deps
 
 RUN mkdir -p /home/appuser/.cache/ms-playwright \
-    && cp -r /root/.cache/ms-playwright/chromium-* /home/appuser/.cache/ms-playwright/ \
+    && cp -r /root/.cache/ms-playwright/chromium-* \
+        /root/.cache/ms-playwright/chromium_headless_shell-* \
+        /home/appuser/.cache/ms-playwright/ \
     && chown -R appuser:appuser /home/appuser/.cache/ms-playwright
 
 RUN crawl4ai-doctor

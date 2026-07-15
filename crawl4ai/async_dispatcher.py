@@ -534,6 +534,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
     ) -> AsyncGenerator[CrawlerTaskResult, None]:
         self.crawler = crawler
+        active_tasks = []
         
         # Start the memory monitor task
         memory_monitor = asyncio.create_task(self._memory_monitor_task())
@@ -550,7 +551,6 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                 # Add to queue with initial priority 0, retry count 0, and current time
                 await self.task_queue.put((0, (url, task_id, 0, time.time())))
                 
-            active_tasks = []
             completed_count = 0
             total_urls = len(urls)
 
@@ -614,8 +614,24 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                 await self._update_queue_priorities()
                 
         finally:
-            # Clean up
+            # Cancel and await every task owned by this stream before returning
+            # control to the caller. Otherwise a closed stream can leave crawls
+            # using browser pages and contexts in the background.
+            for task in active_tasks:
+                if not task.done():
+                    task.cancel()
+            if active_tasks:
+                await asyncio.gather(*active_tasks, return_exceptions=True)
+
+            # Discard URLs that were queued by this stream but never started.
+            while True:
+                try:
+                    self.task_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+
             memory_monitor.cancel()
+            await asyncio.gather(memory_monitor, return_exceptions=True)
             if self.monitor:
                 self.monitor.stop()
                 
