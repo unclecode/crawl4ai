@@ -160,6 +160,8 @@ class CrawlResult(BaseModel):
     cache_status: Optional[str] = None  # "hit", "hit_validated", "hit_fallback", "miss"
     # Anti-bot retry/proxy usage stats
     crawl_stats: Optional[Dict[str, Any]] = None
+    # LLM token usage (populated when using LLMExtractionStrategy)
+    token_usage: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
