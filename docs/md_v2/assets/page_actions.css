@@ -1,0 +1,376 @@
+/* ==== File: assets/page_actions.css ==== */
+/* Page Actions Dropdown - Terminal Style */
+
+/* Wrapper - positioned in content area */
+.page-actions-wrapper {
+    position: absolute;
+    top: 1.3rem;
+    right: 1rem;
+    z-index: 1000;
+}
+
+/* Floating Action Button */
+.page-actions-button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #3f3f44;
+    border: 1px solid #50ffff;
+    color: #e8e9ed;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    font-family: 'Dank Mono', Monaco, monospace;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.page-actions-button:hover {
+    background: #50ffff;
+    color: #070708;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(80, 255, 255, 0.3);
+}
+
+.page-actions-button::before {
+    content: '▤';
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
+.page-actions-button::after {
+    content: '▼';
+    font-size: 0.6rem;
+    transition: transform 0.2s ease;
+}
+
+.page-actions-button.active::after {
+    transform: rotate(180deg);
+}
+
+/* Dropdown Menu */
+.page-actions-dropdown {
+    position: absolute;
+    top: 3.5rem;
+    right: 0;
+    z-index: 1001;
+    background: #1a1a1a;
+    border: 1px solid #3f3f44;
+    border-radius: 8px;
+    min-width: 280px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.2s ease;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+}
+
+.page-actions-dropdown.active {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.page-actions-dropdown::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    right: 1.5rem;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid #3f3f44;
+}
+
+/* Menu Header */
+.page-actions-header {
+    background: #3f3f44;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #50ffff;
+    font-family: 'Dank Mono', Monaco, monospace;
+    font-size: 0.7rem;
+    color: #a3abba;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.page-actions-header::before {
+    content: '┌─';
+    margin-right: 0.5rem;
+    color: #50ffff;
+}
+
+/* Menu Items */
+.page-actions-menu {
+    list-style: none;
+    margin: 0;
+    padding: 0.25rem 0;
+}
+
+.page-action-item {
+    display: block;
+    padding: 0;
+}
+
+ul>li.page-action-item::after{
+    content: '';
+}
+.page-action-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    color: #e8e9ed;
+    text-decoration: none !important;
+    font-family: 'Dank Mono', Monaco, monospace;
+    font-size: 0.8rem;
+    transition: all 0.15s ease;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+}
+
+.page-action-link:hover:not(.disabled) {
+    background: #3f3f44;
+    border-left-color: #50ffff;
+    color: #50ffff;
+    text-decoration: none;
+}
+
+.page-action-link.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.page-action-link.disabled:hover {
+    background: transparent;
+    color: #e8e9ed;
+    text-decoration: none;
+}
+
+/* Icons using ASCII/Terminal characters */
+.page-action-icon {
+    font-size: 1rem;
+    width: 1.5rem;
+    text-align: center;
+    font-weight: bold;
+    color: #50ffff;
+}
+
+.page-action-link:hover:not(.disabled) .page-action-icon {
+    color: #50ffff;
+}
+
+.page-action-link.disabled .page-action-icon {
+    color: #666;
+}
+
+/* Specific icons */
+.icon-copy::before {
+    content: '⎘'; /* Copy/duplicate symbol */
+}
+
+.icon-view::before {
+    content: '⎙'; /* Document symbol */
+}
+
+.icon-ai::before {
+    content: '⚡'; /* Lightning/AI symbol */
+}
+
+/* Action Text */
+.page-action-text {
+    flex: 1;
+}
+
+.page-action-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.05rem;
+    line-height: 1.3;
+}
+
+.page-action-description {
+    display: block;
+    font-size: 0.7rem;
+    color: #a3abba;
+    line-height: 1.2;
+}
+
+/* Badge */
+/* External link indicator */
+.page-action-external::after {
+    content: '→';
+    margin-left: 0.25rem;
+    font-size: 0.75rem;
+}
+
+/* Divider */
+.page-actions-divider {
+    height: 1px;
+    background: #3f3f44;
+    margin: 0.25rem 0;
+}
+
+/* Success/Copy feedback */
+.page-action-copied {
+    background: #50ff50 !important;
+    color: #070708 !important;
+    border-left-color: #50ff50 !important;
+}
+
+.page-action-copied .page-action-icon {
+    color: #070708 !important;
+}
+
+.page-action-copied .page-action-icon::before {
+    content: '✓';
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .page-actions-wrapper {
+        top: 0.5rem;
+        right: 0.5rem;
+    }
+
+    .page-actions-button {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.8rem;
+    }
+
+    .page-actions-dropdown {
+        min-width: 260px;
+        max-width: calc(100vw - 2rem);
+        right: -0.5rem;
+    }
+
+    .page-action-link {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.8rem;
+    }
+
+    .page-action-description {
+        font-size: 0.7rem;
+    }
+}
+
+/* Animation for tooltip/notification */
+@keyframes slideInFromTop {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.page-actions-notification {
+    position: fixed;
+    top: calc(var(--header-height) + 0.5rem);
+    right: 50%;
+    transform: translateX(50%);
+    z-index: 1100;
+    background: #50ff50;
+    color: #070708;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    font-family: 'Dank Mono', Monaco, monospace;
+    font-size: 0.875rem;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(80, 255, 80, 0.4);
+    animation: slideInFromTop 0.3s ease;
+    pointer-events: none;
+}
+
+.page-actions-notification::before {
+    content: '✓ ';
+    margin-right: 0.5rem;
+}
+
+/* Hide on print */
+@media print {
+    .page-actions-button,
+    .page-actions-dropdown {
+        display: none !important;
+    }
+}
+
+/* Overlay for mobile */
+.page-actions-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 998;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.page-actions-overlay.active {
+    display: block;
+    opacity: 1;
+}
+
+@media (max-width: 768px) {
+    .page-actions-overlay {
+        display: block;
+    }
+}
+
+/* Keyboard focus styles */
+.page-action-link:focus {
+    outline: 2px solid #50ffff;
+    outline-offset: -2px;
+}
+
+.page-actions-button:focus {
+    outline: 2px solid #50ffff;
+    outline-offset: 2px;
+}
+
+/* Loading state */
+.page-action-link.loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.page-action-link.loading .page-action-icon::before {
+    content: '⟳';
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Terminal-style border effect on hover */
+.page-actions-dropdown:hover {
+    border-color: #50ffff;
+}
+
+/* Footer info */
+.page-actions-footer {
+    background: #070708;
+    padding: 0.4rem 0.75rem;
+    border-top: 1px solid #3f3f44;
+    font-size: 0.65rem;
+    color: #666;
+    text-align: center;
+    font-family: 'Dank Mono', Monaco, monospace;
+}
+
+.page-actions-footer::before {
+    content: '└─';
+    margin-right: 0.5rem;
+    color: #3f3f44;
+}

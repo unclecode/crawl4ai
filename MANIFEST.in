@@ -1,0 +1,2 @@
+include requirements.txt
+recursive-include crawl4ai/js_snippet *.js

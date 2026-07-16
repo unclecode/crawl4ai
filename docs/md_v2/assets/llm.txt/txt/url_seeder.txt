@@ -1,0 +1,655 @@
+## URL Seeding
+
+Smart URL discovery for efficient large-scale crawling. Discover thousands of URLs instantly, filter by relevance, then crawl only what matters.
+
+### Why URL Seeding vs Deep Crawling
+
+```python
+# Deep Crawling: Real-time discovery (page by page)
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
+
+async def deep_crawl_example():
+    config = CrawlerRunConfig(
+        deep_crawl_strategy=BFSDeepCrawlStrategy(
+            max_depth=2,
+            include_external=False,
+            max_pages=50
+        )
+    )
+    
+    async with AsyncWebCrawler() as crawler:
+        results = await crawler.arun("https://example.com", config=config)
+        print(f"Discovered {len(results)} pages dynamically")
+
+# URL Seeding: Bulk discovery (thousands instantly)
+from crawl4ai import AsyncUrlSeeder, SeedingConfig
+
+async def url_seeding_example():
+    config = SeedingConfig(
+        source="sitemap+cc",
+        pattern="*/docs/*",
+        extract_head=True,
+        query="API documentation",
+        scoring_method="bm25",
+        max_urls=1000
+    )
+    
+    async with AsyncUrlSeeder() as seeder:
+        urls = await seeder.urls("example.com", config)
+        print(f"Discovered {len(urls)} URLs instantly")
+        # Now crawl only the most relevant ones
+```
+
+### Basic URL Discovery
+
+```python
+import asyncio
+from crawl4ai import AsyncUrlSeeder, SeedingConfig
+
+async def basic_discovery():
+    # Context manager handles cleanup automatically
+    async with AsyncUrlSeeder() as seeder:
+        
+        # Simple discovery from sitemaps
+        config = SeedingConfig(source="sitemap")
+        urls = await seeder.urls("example.com", config)
+        
+        print(f"Found {len(urls)} URLs from sitemap")
+        for url in urls[:5]:
+            print(f"  - {url['url']} (status: {url['status']})")
+
+# Manual cleanup (if needed)
+async def manual_cleanup():
+    seeder = AsyncUrlSeeder()
+    try:
+        config = SeedingConfig(source="cc")  # Common Crawl
+        urls = await seeder.urls("example.com", config)
+        print(f"Found {len(urls)} URLs from Common Crawl")
+    finally:
+        await seeder.close()
+
+asyncio.run(basic_discovery())
+```
+
+### Data Sources and Patterns
+
+```python
+# Different data sources
+configs = [
+    SeedingConfig(source="sitemap"),        # Fastest, official URLs
+    SeedingConfig(source="cc"),             # Most comprehensive
+    SeedingConfig(source="sitemap+cc"),     # Maximum coverage
+]
+
+# URL pattern filtering
+patterns = [
+    SeedingConfig(pattern="*/blog/*"),           # Blog posts only
+    SeedingConfig(pattern="*.html"),             # HTML files only
+    SeedingConfig(pattern="*/product/*"),        # Product pages
+    SeedingConfig(pattern="*/docs/api/*"),       # API documentation
+    SeedingConfig(pattern="*"),                  # Everything
+]
+
+# Advanced pattern usage
+async def pattern_filtering():
+    async with AsyncUrlSeeder() as seeder:
+        # Find all blog posts from 2024
+        config = SeedingConfig(
+            source="sitemap",
+            pattern="*/blog/2024/*.html",
+            max_urls=100
+        )
+        
+        blog_urls = await seeder.urls("example.com", config)
+        
+        # Further filter by keywords in URL
+        python_posts = [
+            url for url in blog_urls 
+            if "python" in url['url'].lower()
+        ]
+        
+        print(f"Found {len(python_posts)} Python blog posts")
+```
+
+### SeedingConfig Parameters
+
+```python
+from crawl4ai import SeedingConfig
+
+# Comprehensive configuration
+config = SeedingConfig(
+    # Data sources
+    source="sitemap+cc",              # "sitemap", "cc", "sitemap+cc"
+    pattern="*/docs/*",               # URL pattern filter
+    
+    # Metadata extraction
+    extract_head=True,                # Get <head> metadata
+    live_check=True,                  # Verify URLs are accessible
+    
+    # Performance controls
+    max_urls=1000,                    # Limit results (-1 = unlimited)
+    concurrency=20,                   # Parallel workers
+    hits_per_sec=10,                  # Rate limiting
+    
+    # Relevance scoring
+    query="API documentation guide",   # Search query
+    scoring_method="bm25",            # Scoring algorithm
+    score_threshold=0.3,              # Minimum relevance (0.0-1.0)
+    
+    # Cache and filtering
+    force=False,                      # Bypass cache
+    filter_nonsense_urls=True,        # Remove utility URLs
+    verbose=True                      # Debug output
+)
+
+# Quick configurations for common use cases
+blog_config = SeedingConfig(
+    source="sitemap",
+    pattern="*/blog/*", 
+    extract_head=True
+)
+
+api_docs_config = SeedingConfig(
+    source="sitemap+cc",
+    pattern="*/docs/*",
+    query="API reference documentation",
+    scoring_method="bm25",
+    score_threshold=0.5
+)
+
+product_pages_config = SeedingConfig(
+    source="cc",
+    pattern="*/product/*",
+    live_check=True,
+    max_urls=500
+)
+```
+
+### Metadata Extraction and Analysis
+
+```python
+async def metadata_extraction():
+    async with AsyncUrlSeeder() as seeder:
+        config = SeedingConfig(
+            source="sitemap",
+            extract_head=True,        # Extract <head> metadata
+            pattern="*/blog/*",
+            max_urls=50
+        )
+        
+        urls = await seeder.urls("example.com", config)
+        
+        # Analyze extracted metadata
+        for url in urls[:5]:
+            head_data = url['head_data']
+            print(f"\nURL: {url['url']}")
+            print(f"Title: {head_data.get('title', 'No title')}")
+            
+            # Standard meta tags
+            meta = head_data.get('meta', {})
+            print(f"Description: {meta.get('description', 'N/A')}")
+            print(f"Keywords: {meta.get('keywords', 'N/A')}")
+            print(f"Author: {meta.get('author', 'N/A')}")
+            
+            # Open Graph data
+            print(f"OG Image: {meta.get('og:image', 'N/A')}")
+            print(f"OG Type: {meta.get('og:type', 'N/A')}")
+            
+            # JSON-LD structured data
+            jsonld = head_data.get('jsonld', [])
+            if jsonld:
+                print(f"Structured data: {len(jsonld)} items")
+                for item in jsonld[:2]:
+                    if isinstance(item, dict):
+                        print(f"  Type: {item.get('@type', 'Unknown')}")
+                        print(f"  Name: {item.get('name', 'N/A')}")
+
+# Filter by metadata
+async def metadata_filtering():
+    async with AsyncUrlSeeder() as seeder:
+        config = SeedingConfig(
+            source="sitemap",
+            extract_head=True,
+            max_urls=100
+        )
+        
+        urls = await seeder.urls("news.example.com", config)
+        
+        # Filter by publication date (from JSON-LD)
+        from datetime import datetime, timedelta
+        recent_cutoff = datetime.now() - timedelta(days=7)
+        
+        recent_articles = []
+        for url in urls:
+            for jsonld in url['head_data'].get('jsonld', []):
+                if isinstance(jsonld, dict) and 'datePublished' in jsonld:
+                    try:
+                        pub_date = datetime.fromisoformat(
+                            jsonld['datePublished'].replace('Z', '+00:00')
+                        )
+                        if pub_date > recent_cutoff:
+                            recent_articles.append(url)
+                            break
+                    except:
+                        continue
+        
+        print(f"Found {len(recent_articles)} recent articles")
+```
+
+### BM25 Relevance Scoring
+
+```python
+async def relevance_scoring():
+    async with AsyncUrlSeeder() as seeder:
+        # Find pages about Python async programming
+        config = SeedingConfig(
+            source="sitemap",
+            extract_head=True,              # Required for content-based scoring
+            query="python async await concurrency",
+            scoring_method="bm25",
+            score_threshold=0.3,            # Only 30%+ relevant pages
+            max_urls=20
+        )
+        
+        urls = await seeder.urls("docs.python.org", config)
+        
+        # Results are automatically sorted by relevance
+        print("Most relevant Python async content:")
+        for url in urls[:5]:
+            score = url['relevance_score']
+            title = url['head_data'].get('title', 'No title')
+            print(f"[{score:.2f}] {title}")
+            print(f"        {url['url']}")
+
+# URL-based scoring (when extract_head=False)
+async def url_based_scoring():
+    async with AsyncUrlSeeder() as seeder:
+        config = SeedingConfig(
+            source="sitemap",
+            extract_head=False,             # Fast URL-only scoring
+            query="machine learning tutorial",
+            scoring_method="bm25",
+            score_threshold=0.2
+        )
+        
+        urls = await seeder.urls("example.com", config)
+        
+        # Scoring based on URL structure, domain, path segments
+        for url in urls[:5]:
+            print(f"[{url['relevance_score']:.2f}] {url['url']}")
+
+# Multi-concept queries
+async def complex_queries():
+    queries = [
+        "data science pandas numpy visualization",
+        "web scraping automation selenium",
+        "machine learning tensorflow pytorch",
+        "api documentation rest graphql"
+    ]
+    
+    async with AsyncUrlSeeder() as seeder:
+        all_results = []
+        
+        for query in queries:
+            config = SeedingConfig(
+                source="sitemap",
+                extract_head=True,
+                query=query,
+                scoring_method="bm25",
+                score_threshold=0.4,
+                max_urls=10
+            )
+            
+            urls = await seeder.urls("learning-site.com", config)
+            all_results.extend(urls)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_results = []
+        for url in all_results:
+            if url['url'] not in seen:
+                seen.add(url['url'])
+                unique_results.append(url)
+        
+        print(f"Found {len(unique_results)} unique pages across all topics")
+```
+
+### Live URL Validation
+
+```python
+async def url_validation():
+    async with AsyncUrlSeeder() as seeder:
+        config = SeedingConfig(
+            source="sitemap",
+            live_check=True,              # Verify URLs are accessible
+            concurrency=15,               # Parallel HEAD requests
+            hits_per_sec=8,              # Rate limiting
+            max_urls=100
+        )
+        
+        urls = await seeder.urls("example.com", config)
+        
+        # Analyze results
+        valid_urls = [u for u in urls if u['status'] == 'valid']
+        invalid_urls = [u for u in urls if u['status'] == 'not_valid']
+        
+        print(f"✅ Valid URLs: {len(valid_urls)}")
+        print(f"❌ Invalid URLs: {len(invalid_urls)}")
+        print(f"📊 Success rate: {len(valid_urls)/len(urls)*100:.1f}%")
+        
+        # Show some invalid URLs for debugging
+        if invalid_urls:
+            print("\nSample invalid URLs:")
+            for url in invalid_urls[:3]:
+                print(f"  - {url['url']}")
+
+# Combined validation and metadata
+async def comprehensive_validation():
+    async with AsyncUrlSeeder() as seeder:
+        config = SeedingConfig(
+            source="sitemap",
+            live_check=True,              # Verify accessibility
+            extract_head=True,            # Get metadata
+            query="tutorial guide",      # Relevance scoring
+            scoring_method="bm25",
+            score_threshold=0.2,
+            concurrency=10,
+            max_urls=50
+        )
+        
+        urls = await seeder.urls("docs.example.com", config)
+        
+        # Filter for valid, relevant tutorials
+        good_tutorials = [
+            url for url in urls 
+            if url['status'] == 'valid' and 
+               url['relevance_score'] > 0.3 and
+               'tutorial' in url['head_data'].get('title', '').lower()
+        ]
+        
+        print(f"Found {len(good_tutorials)} high-quality tutorials")
+```
+
+### Multi-Domain Discovery
+
+```python
+async def multi_domain_research():
+    async with AsyncUrlSeeder() as seeder:
+        # Research Python tutorials across multiple sites
+        domains = [
+            "docs.python.org",
+            "realpython.com",
+            "python-course.eu",
+            "tutorialspoint.com"
+        ]
+        
+        config = SeedingConfig(
+            source="sitemap",
+            extract_head=True,
+            query="python beginner tutorial basics",
+            scoring_method="bm25",
+            score_threshold=0.3,
+            max_urls=15  # Per domain
+        )
+        
+        # Discover across all domains in parallel
+        results = await seeder.many_urls(domains, config)
+        
+        # Collect and rank all tutorials
+        all_tutorials = []
+        for domain, urls in results.items():
+            for url in urls:
+                url['domain'] = domain
+                all_tutorials.append(url)
+        
+        # Sort by relevance across all domains
+        all_tutorials.sort(key=lambda x: x['relevance_score'], reverse=True)
+        
+        print(f"Top 10 Python tutorials across {len(domains)} sites:")
+        for i, tutorial in enumerate(all_tutorials[:10], 1):
+            score = tutorial['relevance_score']
+            title = tutorial['head_data'].get('title', 'No title')[:60]
+            domain = tutorial['domain']
+            print(f"{i:2d}. [{score:.2f}] {title}")
+            print(f"     {domain}")
+
+# Competitor analysis
+async def competitor_analysis():
+    competitors = ["competitor1.com", "competitor2.com", "competitor3.com"]
+    
+    async with AsyncUrlSeeder() as seeder:
+        config = SeedingConfig(
+            source="sitemap",
+            extract_head=True,
+            pattern="*/blog/*",
+            max_urls=50
+        )
+        
+        results = await seeder.many_urls(competitors, config)
+        
+        # Analyze content strategies
+        for domain, urls in results.items():
+            content_types = {}
+            
+            for url in urls:
+                # Extract content type from metadata
+                meta = url['head_data'].get('meta', {})
+                og_type = meta.get('og:type', 'unknown')
+                content_types[og_type] = content_types.get(og_type, 0) + 1
+            
+            print(f"\n{domain} content distribution:")
+            for ctype, count in sorted(content_types.items(), 
+                                     key=lambda x: x[1], reverse=True):
+                print(f"  {ctype}: {count}")
+```
+
+### Complete Pipeline: Discovery → Filter → Crawl
+
+```python
+async def smart_research_pipeline():
+    """Complete pipeline: discover URLs, filter by relevance, crawl top results"""
+    
+    async with AsyncUrlSeeder() as seeder:
+        # Step 1: Discover relevant URLs
+        print("🔍 Discovering URLs...")
+        config = SeedingConfig(
+            source="sitemap+cc",
+            extract_head=True,
+            query="machine learning deep learning tutorial",
+            scoring_method="bm25",
+            score_threshold=0.4,
+            max_urls=100
+        )
+        
+        urls = await seeder.urls("example.com", config)
+        print(f"   Found {len(urls)} relevant URLs")
+        
+        # Step 2: Select top articles
+        top_articles = sorted(urls, 
+                            key=lambda x: x['relevance_score'], 
+                            reverse=True)[:10]
+        
+        print(f"   Selected top {len(top_articles)} for crawling")
+        
+        # Step 3: Show what we're about to crawl
+        print("\n📋 Articles to crawl:")
+        for i, article in enumerate(top_articles, 1):
+            score = article['relevance_score']
+            title = article['head_data'].get('title', 'No title')[:60]
+            print(f"  {i}. [{score:.2f}] {title}")
+    
+    # Step 4: Crawl selected articles
+    from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+    
+    print(f"\n🕷️ Crawling {len(top_articles)} articles...")
+    
+    async with AsyncWebCrawler() as crawler:
+        config = CrawlerRunConfig(
+            only_text=True,
+            word_count_threshold=200,
+            stream=True  # Process results as they come
+        )
+        
+        # Extract URLs and crawl
+        article_urls = [article['url'] for article in top_articles]
+        
+        crawled_count = 0
+        async for result in await crawler.arun_many(article_urls, config=config):
+            if result.success:
+                crawled_count += 1
+                word_count = len(result.markdown.raw_markdown.split())
+                print(f"   ✅ [{crawled_count}/{len(article_urls)}] "
+                      f"{word_count} words from {result.url[:50]}...")
+            else:
+                print(f"   ❌ Failed: {result.url[:50]}...")
+        
+        print(f"\n✨ Successfully crawled {crawled_count} articles!")
+
+asyncio.run(smart_research_pipeline())
+```
+
+### Advanced Features and Performance
+
+```python
+# Cache management
+async def cache_management():
+    async with AsyncUrlSeeder() as seeder:
+        # First run - populate cache
+        config = SeedingConfig(
+            source="sitemap", 
+            extract_head=True,
+            force=True  # Bypass cache, fetch fresh
+        )
+        urls = await seeder.urls("example.com", config)
+        
+        # Subsequent runs - use cache (much faster)
+        config = SeedingConfig(
+            source="sitemap", 
+            extract_head=True,
+            force=False  # Use cache
+        )
+        urls = await seeder.urls("example.com", config)
+
+# Performance optimization
+async def performance_tuning():
+    async with AsyncUrlSeeder() as seeder:
+        # High-performance configuration
+        config = SeedingConfig(
+            source="cc",
+            concurrency=50,        # Many parallel workers
+            hits_per_sec=20,       # High rate limit
+            max_urls=10000,        # Large dataset
+            extract_head=False,    # Skip metadata for speed
+            filter_nonsense_urls=True  # Auto-filter utility URLs
+        )
+        
+        import time
+        start = time.time()
+        urls = await seeder.urls("large-site.com", config)
+        elapsed = time.time() - start
+        
+        print(f"Processed {len(urls)} URLs in {elapsed:.2f}s")
+        print(f"Speed: {len(urls)/elapsed:.0f} URLs/second")
+
+# Memory-safe processing for large domains
+async def large_domain_processing():
+    async with AsyncUrlSeeder() as seeder:
+        # Safe for domains with 1M+ URLs
+        config = SeedingConfig(
+            source="cc+sitemap",
+            concurrency=50,        # Bounded queue adapts to this
+            max_urls=100000,       # Process in batches
+            filter_nonsense_urls=True
+        )
+        
+        # The seeder automatically manages memory by:
+        # - Using bounded queues (prevents RAM spikes)
+        # - Applying backpressure when queue is full
+        # - Processing URLs as they're discovered
+        urls = await seeder.urls("huge-site.com", config)
+
+# Configuration cloning and reuse
+config_base = SeedingConfig(
+    source="sitemap",
+    extract_head=True,
+    concurrency=20
+)
+
+# Create variations
+blog_config = config_base.clone(pattern="*/blog/*")
+docs_config = config_base.clone(
+    pattern="*/docs/*",
+    query="API documentation",
+    scoring_method="bm25"
+)
+fast_config = config_base.clone(
+    extract_head=False,
+    concurrency=100,
+    hits_per_sec=50
+)
+```
+
+### Troubleshooting and Best Practices
+
+```python
+# Common issues and solutions
+async def troubleshooting_guide():
+    async with AsyncUrlSeeder() as seeder:
+        # Issue: No URLs found
+        try:
+            config = SeedingConfig(source="sitemap", pattern="*/nonexistent/*")
+            urls = await seeder.urls("example.com", config)
+            if not urls:
+                # Solution: Try broader pattern or different source
+                config = SeedingConfig(source="cc+sitemap", pattern="*")
+                urls = await seeder.urls("example.com", config)
+        except Exception as e:
+            print(f"Discovery failed: {e}")
+        
+        # Issue: Slow performance
+        config = SeedingConfig(
+            source="sitemap",  # Faster than CC
+            concurrency=10,    # Reduce if hitting rate limits
+            hits_per_sec=5,    # Add rate limiting
+            extract_head=False # Skip if metadata not needed
+        )
+        
+        # Issue: Low relevance scores
+        config = SeedingConfig(
+            query="specific detailed query terms",
+            score_threshold=0.1,  # Lower threshold
+            scoring_method="bm25"
+        )
+        
+        # Issue: Memory issues with large sites
+        config = SeedingConfig(
+            max_urls=10000,       # Limit results
+            concurrency=20,       # Reduce concurrency
+            source="sitemap"      # Use sitemap only
+        )
+
+# Performance benchmarks
+print("""
+Typical performance on standard connection:
+- Sitemap discovery: 100-1,000 URLs/second
+- Common Crawl discovery: 50-500 URLs/second  
+- HEAD checking: 10-50 URLs/second
+- Head extraction: 5-20 URLs/second
+- BM25 scoring: 10,000+ URLs/second
+""")
+
+# Best practices
+best_practices = """
+✅ Use context manager: async with AsyncUrlSeeder() as seeder
+✅ Start with sitemaps (faster), add CC if needed
+✅ Use extract_head=True only when you need metadata
+✅ Set reasonable max_urls to limit processing
+✅ Add rate limiting for respectful crawling
+✅ Cache results with force=False for repeated operations
+✅ Filter nonsense URLs (enabled by default)
+✅ Use specific patterns to reduce irrelevant results
+"""
+```
+
+**📖 Learn more:** [Complete URL Seeding Guide](https://docs.crawl4ai.com/core/url-seeding/), [SeedingConfig Reference](https://docs.crawl4ai.com/api/parameters/), [Multi-URL Crawling](https://docs.crawl4ai.com/advanced/multi-url-crawling/)

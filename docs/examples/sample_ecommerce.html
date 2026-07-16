@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sample E-commerce Page for JsonCssExtractionStrategy Testing</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }
+        .category { border: 1px solid #ddd; margin-bottom: 20px; padding: 10px; }
+        .product { border: 1px solid #eee; margin: 10px 0; padding: 10px; }
+        .product-details, .product-reviews, .related-products { margin-top: 10px; }
+        .review { background-color: #f9f9f9; margin: 5px 0; padding: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Sample E-commerce Product Catalog</h1>
+    <div id="catalog"></div>
+
+    <script>
+        const categories = ['Electronics', 'Home & Kitchen', 'Books'];
+        const products = [
+            {
+                name: 'Smartphone X',
+                price: '$999',
+                brand: 'TechCorp',
+                model: 'X-2000',
+                features: ['5G capable', '6.5" OLED screen', '128GB storage'],
+                reviews: [
+                    { reviewer: 'John D.', rating: '4.5', text: 'Great phone, love the camera!' },
+                    { reviewer: 'Jane S.', rating: '5', text: 'Best smartphone I\'ve ever owned.' }
+                ],
+                related: [
+                    { name: 'Phone Case', price: '$29.99' },
+                    { name: 'Screen Protector', price: '$9.99' }
+                ]
+            },
+            {
+                name: 'Laptop Pro',
+                price: '$1499',
+                brand: 'TechMaster',
+                model: 'LT-3000',
+                features: ['Intel i7 processor', '16GB RAM', '512GB SSD'],
+                reviews: [
+                    { reviewer: 'Alice W.', rating: '4', text: 'Powerful machine, but a bit heavy.' },
+                    { reviewer: 'Bob M.', rating: '5', text: 'Perfect for my development work!' }
+                ],
+                related: [
+                    { name: 'Laptop Bag', price: '$49.99' },
+                    { name: 'Wireless Mouse', price: '$24.99' }
+                ]
+            }
+        ];
+
+        function createProductHTML(product) {
+            return `
+                <div class="product">
+                    <h3 class="product-name">${product.name}</h3>
+                    <p class="product-price">${product.price}</p>
+                    <div class="product-details">
+                        <span class="brand">${product.brand}</span>
+                        <span class="model">${product.model}</span>
+                    </div>
+                    <ul class="product-features">
+                        ${product.features.map(feature => `<li>${feature}</li>`).join('')}
+                    </ul>
+                    <div class="product-reviews">
+                        ${product.reviews.map(review => `
+                            <div class="review">
+                                <span class="reviewer">${review.reviewer}</span>
+                                <span class="rating">${review.rating}</span>
+                                <p class="review-text">${review.text}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <ul class="related-products">
+                        ${product.related.map(item => `
+                            <li>
+                                <span class="related-name">${item.name}</span>
+                                <span class="related-price">${item.price}</span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+
+        function createCategoryHTML(category, products) {
+            return `
+                <div class="category">
+                    <h2 class="category-name">${category}</h2>
+                    ${products.map(createProductHTML).join('')}
+                </div>
+            `;
+        }
+
+        function populateCatalog() {
+            const catalog = document.getElementById('catalog');
+            categories.forEach(category => {
+                catalog.innerHTML += createCategoryHTML(category, products);
+            });
+        }
+
+        populateCatalog();
+    </script>
+</body>
+</html>

@@ -1,0 +1,603 @@
+## Docker Deployment Architecture and Workflows
+
+Visual representations of Crawl4AI Docker deployment, API architecture, configuration management, and service interactions.
+
+### Docker Deployment Decision Flow
+
+```mermaid
+flowchart TD
+    A[Start Docker Deployment] --> B{Deployment Type?}
+    
+    B -->|Quick Start| C[Pre-built Image]
+    B -->|Development| D[Docker Compose]
+    B -->|Custom Build| E[Manual Build]
+    B -->|Production| F[Production Setup]
+    
+    C --> C1[docker pull unclecode/crawl4ai]
+    C1 --> C2{Need LLM Support?}
+    C2 -->|Yes| C3[Setup .llm.env]
+    C2 -->|No| C4[Basic run]
+    C3 --> C5[docker run with --env-file]
+    C4 --> C6[docker run basic]
+    
+    D --> D1[git clone repository]
+    D1 --> D2[cp .llm.env.example .llm.env]
+    D2 --> D3{Build Type?}
+    D3 -->|Pre-built| D4[IMAGE=latest docker compose up]
+    D3 -->|Local Build| D5[docker compose up --build]
+    D3 -->|All Features| D6[INSTALL_TYPE=all docker compose up]
+    
+    E --> E1[docker buildx build]
+    E1 --> E2{Architecture?}
+    E2 -->|Single| E3[--platform linux/amd64]
+    E2 -->|Multi| E4[--platform linux/amd64,linux/arm64]
+    E3 --> E5[Build complete]
+    E4 --> E5
+    
+    F --> F1[Production configuration]
+    F1 --> F2[Custom config.yml]
+    F2 --> F3[Resource limits]
+    F3 --> F4[Health monitoring]
+    F4 --> F5[Production ready]
+    
+    C5 --> G[Service running on :11235]
+    C6 --> G
+    D4 --> G
+    D5 --> G
+    D6 --> G
+    E5 --> H[docker run custom image]
+    H --> G
+    F5 --> I[Production deployment]
+    
+    G --> J[Access playground at /playground]
+    G --> K[Health check at /health]
+    I --> L[Production monitoring]
+    
+    style A fill:#e1f5fe
+    style G fill:#c8e6c9
+    style I fill:#c8e6c9
+    style J fill:#fff3e0
+    style K fill:#fff3e0
+    style L fill:#e8f5e8
+```
+
+### Docker Container Architecture
+
+```mermaid
+graph TB
+    subgraph "Host Environment"
+        A[Docker Engine] --> B[Crawl4AI Container]
+        C[.llm.env] --> B
+        D[Custom config.yml] --> B
+        E[Port 11235] --> B
+        F[Shared Memory 1GB+] --> B
+    end
+    
+    subgraph "Container Services"
+        B --> G[FastAPI Server :8020]
+        B --> H[Gunicorn WSGI]
+        B --> I[Supervisord Process Manager]
+        B --> J[Redis Cache :6379]
+        
+        G --> K[REST API Endpoints]
+        G --> L[WebSocket Connections]
+        G --> M[MCP Protocol]
+        
+        H --> N[Worker Processes]
+        I --> O[Service Monitoring]
+        J --> P[Request Caching]
+    end
+    
+    subgraph "Browser Management"
+        B --> Q[Playwright Framework]
+        Q --> R[Chromium Browser]
+        Q --> S[Firefox Browser]
+        Q --> T[WebKit Browser]
+        
+        R --> U[Browser Pool]
+        S --> U
+        T --> U
+        
+        U --> V[Page Sessions]
+        U --> W[Context Management]
+    end
+    
+    subgraph "External Services"
+        X[OpenAI API] -.-> K
+        Y[Anthropic Claude] -.-> K
+        Z[Local Ollama] -.-> K
+        AA[Groq API] -.-> K
+        BB[Google Gemini] -.-> K
+    end
+    
+    subgraph "Client Interactions"
+        CC[Python SDK] --> K
+        DD[REST API Calls] --> K
+        EE[MCP Clients] --> M
+        FF[Web Browser] --> G
+        GG[Monitoring Tools] --> K
+    end
+    
+    style B fill:#e3f2fd
+    style G fill:#f3e5f5
+    style Q fill:#e8f5e8
+    style K fill:#fff3e0
+```
+
+### API Endpoints Architecture
+
+```mermaid
+graph LR
+    subgraph "Core Endpoints"
+        A[/crawl] --> A1[Single URL crawl]
+        A2[/crawl/stream] --> A3[Streaming multi-URL]
+        A4[/crawl/job] --> A5[Async job submission]
+        A6[/crawl/job/{id}] --> A7[Job status check]
+    end
+    
+    subgraph "Specialized Endpoints"
+        B[/html] --> B1[Preprocessed HTML]
+        B2[/screenshot] --> B3[PNG capture]
+        B4[/pdf] --> B5[PDF generation]
+        B6[/execute_js] --> B7[JavaScript execution]
+        B8[/md] --> B9[Markdown extraction]
+    end
+    
+    subgraph "Utility Endpoints"
+        C[/health] --> C1[Service status]
+        C2[/metrics] --> C3[Prometheus metrics]
+        C4[/schema] --> C5[API documentation]
+        C6[/playground] --> C7[Interactive testing]
+    end
+    
+    subgraph "LLM Integration"
+        D[/llm/{url}] --> D1[Q&A over URL]
+        D2[/ask] --> D3[Library context search]
+        D4[/config/dump] --> D5[Config validation]
+    end
+    
+    subgraph "MCP Protocol"
+        E[/mcp/sse] --> E1[Server-Sent Events]
+        E2[/mcp/ws] --> E3[WebSocket connection]
+        E4[/mcp/schema] --> E5[MCP tool definitions]
+    end
+    
+    style A fill:#e3f2fd
+    style B fill:#f3e5f5
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
+    style E fill:#fce4ec
+```
+
+### Request Processing Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant FastAPI
+    participant RequestValidator
+    participant BrowserPool
+    participant Playwright
+    participant ExtractionEngine
+    participant LLMProvider
+    
+    Client->>FastAPI: POST /crawl with config
+    FastAPI->>RequestValidator: Validate JSON structure
+    
+    alt Valid Request
+        RequestValidator-->>FastAPI: ✓ Validated
+        FastAPI->>BrowserPool: Request browser instance
+        BrowserPool->>Playwright: Launch browser/reuse session
+        Playwright-->>BrowserPool: Browser ready
+        BrowserPool-->>FastAPI: Browser allocated
+        
+        FastAPI->>Playwright: Navigate to URL
+        Playwright->>Playwright: Execute JS, wait conditions
+        Playwright-->>FastAPI: Page content ready
+        
+        FastAPI->>ExtractionEngine: Process content
+        
+        alt LLM Extraction
+            ExtractionEngine->>LLMProvider: Send content + schema
+            LLMProvider-->>ExtractionEngine: Structured data
+        else CSS Extraction
+            ExtractionEngine->>ExtractionEngine: Apply CSS selectors
+        end
+        
+        ExtractionEngine-->>FastAPI: Extraction complete
+        FastAPI->>BrowserPool: Release browser
+        FastAPI-->>Client: CrawlResult response
+        
+    else Invalid Request
+        RequestValidator-->>FastAPI: ✗ Validation error
+        FastAPI-->>Client: 400 Bad Request
+    end
+```
+
+### Configuration Management Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> ConfigLoading
+    
+    ConfigLoading --> DefaultConfig: Load default config.yml
+    ConfigLoading --> CustomConfig: Custom config mounted
+    ConfigLoading --> EnvOverrides: Environment variables
+    
+    DefaultConfig --> ConfigMerging
+    CustomConfig --> ConfigMerging
+    EnvOverrides --> ConfigMerging
+    
+    ConfigMerging --> ConfigValidation
+    
+    ConfigValidation --> Valid: Schema validation passes
+    ConfigValidation --> Invalid: Validation errors
+    
+    Invalid --> ConfigError: Log errors and exit
+    ConfigError --> [*]
+    
+    Valid --> ServiceInitialization
+    ServiceInitialization --> FastAPISetup
+    ServiceInitialization --> BrowserPoolInit
+    ServiceInitialization --> CacheSetup
+    
+    FastAPISetup --> Running
+    BrowserPoolInit --> Running
+    CacheSetup --> Running
+    
+    Running --> ConfigReload: Config change detected
+    ConfigReload --> ConfigValidation
+    
+    Running --> [*]: Service shutdown
+    
+    note right of ConfigMerging : Priority: ENV > Custom > Default
+    note right of ServiceInitialization : All services must initialize successfully
+```
+
+### Multi-Architecture Build Process
+
+```mermaid
+flowchart TD
+    A[Developer Push] --> B[GitHub Repository]
+    
+    B --> C[Docker Buildx]
+    C --> D{Build Strategy}
+    
+    D -->|Multi-arch| E[Parallel Builds]
+    D -->|Single-arch| F[Platform-specific Build]
+    
+    E --> G[AMD64 Build]
+    E --> H[ARM64 Build]
+    
+    F --> I[Target Platform Build]
+    
+    subgraph "AMD64 Build Process"
+        G --> G1[Ubuntu base image]
+        G1 --> G2[Python 3.11 install]
+        G2 --> G3[System dependencies]
+        G3 --> G4[Crawl4AI installation]
+        G4 --> G5[Playwright setup]
+        G5 --> G6[FastAPI configuration]
+        G6 --> G7[AMD64 image ready]
+    end
+    
+    subgraph "ARM64 Build Process"
+        H --> H1[Ubuntu ARM64 base]
+        H1 --> H2[Python 3.11 install]
+        H2 --> H3[ARM-specific deps]
+        H3 --> H4[Crawl4AI installation]
+        H4 --> H5[Playwright setup]
+        H5 --> H6[FastAPI configuration]
+        H6 --> H7[ARM64 image ready]
+    end
+    
+    subgraph "Single Architecture"
+        I --> I1[Base image selection]
+        I1 --> I2[Platform dependencies]
+        I2 --> I3[Application setup]
+        I3 --> I4[Platform image ready]
+    end
+    
+    G7 --> J[Multi-arch Manifest]
+    H7 --> J
+    I4 --> K[Platform Image]
+    
+    J --> L[Docker Hub Registry]
+    K --> L
+    
+    L --> M[Pull Request Auto-selects Architecture]
+    
+    style A fill:#e1f5fe
+    style J fill:#c8e6c9
+    style K fill:#c8e6c9
+    style L fill:#f3e5f5
+    style M fill:#e8f5e8
+```
+
+### MCP Integration Architecture
+
+```mermaid
+graph TB
+    subgraph "MCP Client Applications"
+        A[Claude Code] --> B[MCP Protocol]
+        C[Cursor IDE] --> B
+        D[Windsurf] --> B
+        E[Custom MCP Client] --> B
+    end
+    
+    subgraph "Crawl4AI MCP Server"
+        B --> F[MCP Endpoint Router]
+        F --> G[SSE Transport /mcp/sse]
+        F --> H[WebSocket Transport /mcp/ws]
+        F --> I[Schema Endpoint /mcp/schema]
+        
+        G --> J[MCP Tool Handler]
+        H --> J
+        
+        J --> K[Tool: md]
+        J --> L[Tool: html]
+        J --> M[Tool: screenshot]
+        J --> N[Tool: pdf]
+        J --> O[Tool: execute_js]
+        J --> P[Tool: crawl]
+        J --> Q[Tool: ask]
+    end
+    
+    subgraph "Crawl4AI Core Services"
+        K --> R[Markdown Generator]
+        L --> S[HTML Preprocessor]
+        M --> T[Screenshot Service]
+        N --> U[PDF Generator]
+        O --> V[JavaScript Executor]
+        P --> W[Batch Crawler]
+        Q --> X[Context Search]
+        
+        R --> Y[Browser Pool]
+        S --> Y
+        T --> Y
+        U --> Y
+        V --> Y
+        W --> Y
+        X --> Z[Knowledge Base]
+    end
+    
+    subgraph "External Resources"
+        Y --> AA[Playwright Browsers]
+        Z --> BB[Library Documentation]
+        Z --> CC[Code Examples]
+        AA --> DD[Web Pages]
+    end
+    
+    style B fill:#e3f2fd
+    style J fill:#f3e5f5
+    style Y fill:#e8f5e8
+    style Z fill:#fff3e0
+```
+
+### API Request/Response Flow Patterns
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant LoadBalancer
+    participant FastAPI
+    participant ConfigValidator
+    participant BrowserManager
+    participant CrawlEngine
+    participant ResponseBuilder
+    
+    Note over Client,ResponseBuilder: Basic Crawl Request
+    
+    Client->>LoadBalancer: POST /crawl
+    LoadBalancer->>FastAPI: Route request
+    
+    FastAPI->>ConfigValidator: Validate browser_config
+    ConfigValidator-->>FastAPI: ✓ Valid BrowserConfig
+    
+    FastAPI->>ConfigValidator: Validate crawler_config
+    ConfigValidator-->>FastAPI: ✓ Valid CrawlerRunConfig
+    
+    FastAPI->>BrowserManager: Allocate browser
+    BrowserManager-->>FastAPI: Browser instance
+    
+    FastAPI->>CrawlEngine: Execute crawl
+    
+    Note over CrawlEngine: Page processing
+    CrawlEngine->>CrawlEngine: Navigate & wait
+    CrawlEngine->>CrawlEngine: Extract content
+    CrawlEngine->>CrawlEngine: Apply strategies
+    
+    CrawlEngine-->>FastAPI: CrawlResult
+    
+    FastAPI->>ResponseBuilder: Format response
+    ResponseBuilder-->>FastAPI: JSON response
+    
+    FastAPI->>BrowserManager: Release browser
+    FastAPI-->>LoadBalancer: Response ready
+    LoadBalancer-->>Client: 200 OK + CrawlResult
+    
+    Note over Client,ResponseBuilder: Streaming Request
+    
+    Client->>FastAPI: POST /crawl/stream
+    FastAPI-->>Client: 200 OK (stream start)
+    
+    loop For each URL
+        FastAPI->>CrawlEngine: Process URL
+        CrawlEngine-->>FastAPI: Result ready
+        FastAPI-->>Client: NDJSON line
+    end
+    
+    FastAPI-->>Client: Stream completed
+```
+
+### Configuration Validation Workflow
+
+```mermaid
+flowchart TD
+    A[Client Request] --> B[JSON Payload]
+    B --> C{Pre-validation}
+    
+    C -->|✓ Valid JSON| D[Extract Configurations]
+    C -->|✗ Invalid JSON| E[Return 400 Bad Request]
+    
+    D --> F[BrowserConfig Validation]
+    D --> G[CrawlerRunConfig Validation]
+    
+    F --> H{BrowserConfig Valid?}
+    G --> I{CrawlerRunConfig Valid?}
+    
+    H -->|✓ Valid| J[Browser Setup]
+    H -->|✗ Invalid| K[Log Browser Config Errors]
+    
+    I -->|✓ Valid| L[Crawler Setup]
+    I -->|✗ Invalid| M[Log Crawler Config Errors]
+    
+    K --> N[Collect All Errors]
+    M --> N
+    N --> O[Return 422 Validation Error]
+    
+    J --> P{Both Configs Valid?}
+    L --> P
+    
+    P -->|✓ Yes| Q[Proceed to Crawling]
+    P -->|✗ No| O
+    
+    Q --> R[Execute Crawl Pipeline]
+    R --> S[Return CrawlResult]
+    
+    E --> T[Client Error Response]
+    O --> T
+    S --> U[Client Success Response]
+    
+    style A fill:#e1f5fe
+    style Q fill:#c8e6c9
+    style S fill:#c8e6c9
+    style U fill:#c8e6c9
+    style E fill:#ffcdd2
+    style O fill:#ffcdd2
+    style T fill:#ffcdd2
+```
+
+### Production Deployment Architecture
+
+```mermaid
+graph TB
+    subgraph "Load Balancer Layer"
+        A[NGINX/HAProxy] --> B[Health Check]
+        A --> C[Request Routing]
+        A --> D[SSL Termination]
+    end
+    
+    subgraph "Application Layer"
+        C --> E[Crawl4AI Instance 1]
+        C --> F[Crawl4AI Instance 2]
+        C --> G[Crawl4AI Instance N]
+        
+        E --> H[FastAPI Server]
+        F --> I[FastAPI Server]
+        G --> J[FastAPI Server]
+        
+        H --> K[Browser Pool 1]
+        I --> L[Browser Pool 2]
+        J --> M[Browser Pool N]
+    end
+    
+    subgraph "Shared Services"
+        N[Redis Cluster] --> E
+        N --> F
+        N --> G
+        
+        O[Monitoring Stack] --> P[Prometheus]
+        O --> Q[Grafana]
+        O --> R[AlertManager]
+        
+        P --> E
+        P --> F
+        P --> G
+    end
+    
+    subgraph "External Dependencies"
+        S[OpenAI API] -.-> H
+        T[Anthropic API] -.-> I
+        U[Local LLM Cluster] -.-> J
+    end
+    
+    subgraph "Persistent Storage"
+        V[Configuration Volume] --> E
+        V --> F
+        V --> G
+        
+        W[Cache Volume] --> N
+        X[Logs Volume] --> O
+    end
+    
+    style A fill:#e3f2fd
+    style E fill:#f3e5f5
+    style F fill:#f3e5f5
+    style G fill:#f3e5f5
+    style N fill:#e8f5e8
+    style O fill:#fff3e0
+```
+
+### Docker Resource Management
+
+```mermaid
+graph TD
+    subgraph "Resource Allocation"
+        A[Host Resources] --> B[CPU Cores]
+        A --> C[Memory GB]
+        A --> D[Disk Space]
+        A --> E[Network Bandwidth]
+        
+        B --> F[Container Limits]
+        C --> F
+        D --> F
+        E --> F
+    end
+    
+    subgraph "Container Configuration"
+        F --> G[--cpus=4]
+        F --> H[--memory=8g]
+        F --> I[--shm-size=2g]
+        F --> J[Volume Mounts]
+        
+        G --> K[Browser Processes]
+        H --> L[Browser Memory]
+        I --> M[Shared Memory for Browsers]
+        J --> N[Config & Cache Storage]
+    end
+    
+    subgraph "Monitoring & Scaling"
+        O[Resource Monitor] --> P[CPU Usage %]
+        O --> Q[Memory Usage %]
+        O --> R[Request Queue Length]
+        
+        P --> S{CPU > 80%?}
+        Q --> T{Memory > 90%?}
+        R --> U{Queue > 100?}
+        
+        S -->|Yes| V[Scale Up]
+        T -->|Yes| V
+        U -->|Yes| V
+        
+        V --> W[Add Container Instance]
+        W --> X[Update Load Balancer]
+    end
+    
+    subgraph "Performance Optimization"
+        Y[Browser Pool Tuning] --> Z[Max Pages: 40]
+        Y --> AA[Idle TTL: 30min]
+        Y --> BB[Concurrency Limits]
+        
+        Z --> CC[Memory Efficiency]
+        AA --> DD[Resource Cleanup]
+        BB --> EE[Throughput Control]
+    end
+    
+    style A fill:#e1f5fe
+    style F fill:#f3e5f5
+    style O fill:#e8f5e8
+    style Y fill:#fff3e0
+```
+
+**📖 Learn more:** [Docker Deployment Guide](https://docs.crawl4ai.com/core/docker-deployment/), [API Reference](https://docs.crawl4ai.com/api/), [MCP Integration](https://docs.crawl4ai.com/core/docker-deployment/#mcp-model-context-protocol-support), [Production Configuration](https://docs.crawl4ai.com/core/docker-deployment/#production-deployment)

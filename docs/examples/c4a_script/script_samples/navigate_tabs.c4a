@@ -1,0 +1,8 @@
+GO https://app.example.com
+WAIT `.nav-menu` 8
+CLICK `a[href="/products"]`
+WAIT 2
+CLICK `a[href="/about"]`
+WAIT 2
+BACK
+WAIT 1

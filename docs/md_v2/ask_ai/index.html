@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crawl4AI Assistant</title>
+    <!-- Link main styles first for variable access -->
+    <link rel="stylesheet" href="../assets/layout.css">
+    <link rel="stylesheet" href="../assets/styles.css">
+    <!-- Link specific AI styles -->
+    <link rel="stylesheet" href="../assets/highlight.css">
+    <link rel="stylesheet" href="ask-ai.css">
+</head>
+<body>
+    <div class="ai-assistant-container">
+
+        <!-- Left Sidebar: Conversation History -->
+        <aside id="history-panel" class="sidebar left-sidebar">
+            <header>
+                <h3>History</h3>
+                <button id="new-chat-button" class="btn btn-sm">New Chat</button>
+            </header>
+            <ul id="history-list">
+                <!-- History items populated by JS -->
+            </ul>
+        </aside>
+
+        <!-- Main Area: Chat Interface -->
+        <main id="chat-panel">
+            <div id="chat-messages">
+                <!-- Chat messages populated by JS -->
+                 <div class="message ai-message welcome-message">
+                    Welcome to the Crawl4AI Assistant! How can I help you today?
+                 </div>
+            </div>
+            <div id="chat-input-area">
+                <!-- Loading indicator for general waiting (optional) -->
+                <!-- <div class="loading-indicator" style="display: none;">Thinking...</div> -->
+                <textarea id="chat-input" placeholder="We will roll out this feature very soon." rows="2" disabled></textarea> 
+                <button id="send-button">Send</button>
+            </div>
+        </main>
+
+        <!-- Right Sidebar: Citations / Context -->
+        <aside id="citations-panel" class="sidebar right-sidebar">
+            <header>
+                <h3>Citations</h3>
+            </header>
+            <ul id="citations-list">
+                <!-- Citations populated by JS -->
+                <li class="no-citations">No citations for this response yet.</li>
+            </ul>
+        </aside>
+
+    </div>
+
+    <!-- Include Marked.js library -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="../assets/highlight.min.js"></script> 
+
+    <!-- Your AI Assistant Logic -->
+    <script src="ask-ai.js"></script>
+</body>
+</html>

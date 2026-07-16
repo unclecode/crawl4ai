@@ -1,0 +1,13 @@
+browser_type: "chromium"
+headless: true
+viewport_width: 1280
+viewport_height: 800
+user_agent_mode: "random"
+verbose: true
+text_mode: false
+light_mode: false
+ignore_https_errors: true
+java_script_enabled: true
+extra_args:
+  - "--disable-gpu"
+  - "--no-sandbox"

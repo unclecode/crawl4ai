@@ -1,0 +1,106 @@
+# Multi-step e-commerce workflow
+# Complete purchase flow with procedures and error handling
+
+# Reusable procedures
+PROC search_product
+  CLICK `input.search-bar`
+  TYPE $search_term
+  PRESS Enter
+  WAIT `.search-results` 10
+ENDPROC
+
+PROC add_first_item_to_cart
+  CLICK `.product-item:first-child .add-to-cart`
+  WAIT ".added-to-cart-notification" 3
+ENDPROC
+
+PROC go_to_checkout
+  CLICK `.cart-icon`
+  WAIT `.cart-drawer` 5
+  CLICK `button.proceed-to-checkout`
+  WAIT `.checkout-page` 10
+ENDPROC
+
+PROC fill_customer_info
+  # Billing information
+  CLICK `#billing-firstname`
+  TYPE $first_name
+  CLICK `#billing-lastname`
+  TYPE $last_name
+  CLICK `#billing-email`
+  TYPE $email
+  CLICK `#billing-phone`
+  TYPE $phone
+  
+  # Address
+  CLICK `#billing-address`
+  TYPE $address
+  CLICK `#billing-city`
+  TYPE $city
+  CLICK `#billing-state`
+  TYPE $state
+  CLICK `#billing-zip`
+  TYPE $zip
+ENDPROC
+
+PROC select_shipping
+  CLICK `input[value="standard"]`
+  WAIT 1
+ENDPROC
+
+# Set all required variables
+SET search_term = "wireless headphones"
+SET first_name = "John"
+SET last_name = "Doe"
+SET email = "john.doe@example.com"
+SET phone = "555-0123"
+SET address = "123 Main Street"
+SET city = "San Francisco"
+SET state = "CA"
+SET zip = "94105"
+
+# Main workflow starts here
+GO https://shop.example.com
+WAIT `.homepage-loaded` 10
+
+# Step 1: Search and add to cart
+search_product
+EVAL `console.log('Found', document.querySelectorAll('.product-item').length, 'products')`
+add_first_item_to_cart
+
+# Add a second item
+CLICK `.product-item:nth-child(2) .add-to-cart`
+WAIT 2
+
+# Step 2: Go to checkout
+go_to_checkout
+
+# Step 3: Fill customer information
+fill_customer_info
+
+# Step 4: Select shipping method
+select_shipping
+
+# Step 5: Continue to payment
+CLICK `button.continue-to-payment`
+WAIT `.payment-section` 10
+
+# Log order summary
+EVAL `
+  const orderTotal = document.querySelector('.order-total')?.textContent;
+  const itemCount = document.querySelectorAll('.order-item').length;
+  console.log('=== Order Summary ===');
+  console.log('Items:', itemCount);
+  console.log('Total:', orderTotal);
+  
+  // Get all items
+  const items = Array.from(document.querySelectorAll('.order-item')).map(item => ({
+    name: item.querySelector('.item-name')?.textContent,
+    quantity: item.querySelector('.item-quantity')?.textContent,
+    price: item.querySelector('.item-price')?.textContent
+  }));
+  console.log('Items:', JSON.stringify(items, null, 2));
+`
+
+# Note: Stopping here before actual payment submission
+EVAL `console.log('Workflow completed - stopped before payment submission')`

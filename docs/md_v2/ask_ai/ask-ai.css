@@ -1,0 +1,444 @@
+/* ==== File: docs/ask_ai/ask_ai.css ==== */
+
+/* --- Basic Reset & Font --- */
+body {
+    /* Attempt to inherit variables from parent window (iframe context) */
+    /* Fallback values if variables are not inherited */
+    --fallback-bg: #070708;
+    --fallback-font: #e8e9ed;
+    --fallback-secondary: #a3abba;
+    --fallback-primary: #50ffff;
+    --fallback-primary-dimmed: #09b5a5;
+    --fallback-border: #1d1d20;
+    --fallback-code-bg: #1e1e1e;
+    --fallback-invert-font: #222225;
+    --font-stack: dm, Monaco, Courier New, monospace, serif;
+
+    font-family: var(--font-stack, "Courier New", monospace); /* Use theme font stack */
+    background-color: var(--background-color, var(--fallback-bg));
+    color: var(--font-color, var(--fallback-font));
+    margin: 0;
+    padding: 0;
+    font-size: 14px; /* Match global font size */
+    line-height: 1.5em; /* Match global line height */
+    height: 100vh; /* Ensure body takes full height */
+    overflow: hidden; /* Prevent body scrollbars, panels handle scroll */
+    display: flex; /* Use flex for the main container */
+}
+
+a {
+    color: var(--secondary-color, var(--fallback-secondary));
+    text-decoration: none;
+    transition: color 0.2s;
+}
+a:hover {
+    color: var(--primary-color, var(--fallback-primary));
+}
+
+/* --- Main Container Layout --- */
+.ai-assistant-container {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    background-color: var(--background-color, var(--fallback-bg));
+}
+
+/* --- Sidebar Styling --- */
+.sidebar {
+    flex-shrink: 0; /* Prevent sidebars from shrinking */
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    /* background-color: var(--code-bg-color, var(--fallback-code-bg)); */
+    overflow-y: hidden; /* Header fixed, list scrolls */
+}
+
+.left-sidebar {
+    flex-basis: 240px; /* Width of history panel */
+    border-right: 1px solid var(--progress-bar-background, var(--fallback-border));
+}
+
+.right-sidebar {
+    flex-basis: 280px; /* Width of citations panel */
+    border-left: 1px solid var(--progress-bar-background, var(--fallback-border));
+}
+
+.sidebar header {
+    padding: 0.6em 1em;
+    border-bottom: 1px solid var(--progress-bar-background, var(--fallback-border));
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sidebar header h3 {
+    margin: 0;
+    font-size: 1.1em;
+    color: var(--font-color, var(--fallback-font));
+}
+
+.sidebar ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    overflow-y: auto; /* Enable scrolling for the list */
+    flex-grow: 1; /* Allow list to take remaining space */
+    padding: 0.5em 0;
+}
+
+.sidebar ul li {
+    padding: 0.3em 1em;
+}
+.sidebar ul li.no-citations,
+.sidebar ul li.no-history {
+    color: var(--secondary-color, var(--fallback-secondary));
+    font-style: italic;
+    font-size: 0.9em;
+    padding-left: 1em;
+}
+
+.sidebar ul li a {
+    color: var(--secondary-color, var(--fallback-secondary));
+    text-decoration: none;
+    display: block;
+    padding: 0.2em 0.5em;
+    border-radius: 3px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.sidebar ul li a:hover {
+    color: var(--primary-color, var(--fallback-primary));
+    background-color: rgba(80, 255, 255, 0.08); /* Use primary color with alpha */
+}
+/* Style for active history item */
+#history-list li.active a {
+    color: var(--primary-dimmed-color, var(--fallback-primary-dimmed));
+    font-weight: bold;
+    background-color: rgba(80, 255, 255, 0.12);
+}
+
+/* --- Chat Panel Styling --- */
+#chat-panel {
+    flex-grow: 1; /* Take remaining space */
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden; /* Prevent overflow, internal elements handle scroll */
+}
+
+#chat-messages {
+    flex-grow: 1;
+    overflow-y: auto; /* Scrollable chat history */
+    padding: 1em 1.5em;
+    border-bottom: 1px solid var(--progress-bar-background, var(--fallback-border));
+}
+
+.message {
+    margin-bottom: 1em;
+    padding: 0.8em 1.2em;
+    border-radius: 8px;
+    max-width: 90%; /* Slightly wider */
+    line-height: 1.6;
+    /* Apply pre-wrap for better handling of spaces/newlines AND wrapping */
+    white-space: pre-wrap;
+    word-wrap: break-word; /* Ensure long words break */
+}
+
+.user-message {
+    background-color: var(--progress-bar-background, var(--fallback-border)); /* User message background */
+    color: var(--font-color, var(--fallback-font));
+    margin-left: auto; /* Align user messages to the right */
+    text-align: left;
+}
+
+.ai-message {
+    background-color: var(--code-bg-color, var(--fallback-code-bg)); /* AI message background */
+    color: var(--font-color, var(--fallback-font));
+    margin-right: auto; /* Align AI messages to the left */
+    border: 1px solid var(--progress-bar-background, var(--fallback-border));
+}
+.ai-message.welcome-message {
+    border: none;
+    background-color: transparent;
+    max-width: 100%;
+    text-align: center;
+    color: var(--secondary-color, var(--fallback-secondary));
+    white-space: normal;
+}
+
+/* Styles for code within messages */
+.ai-message code {
+    background-color: var(--invert-font-color, var(--fallback-invert-font)) !important; /* Use light bg for code */
+    /* color: var(--background-color, var(--fallback-bg)) !important; Dark text */
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+.ai-message pre {
+    background-color: var(--invert-font-color, var(--fallback-invert-font)) !important;
+    color: var(--background-color, var(--fallback-bg)) !important;
+    padding: 1em;
+    border-radius: 5px;
+    overflow-x: auto;
+    margin: 0.8em 0;
+    white-space: pre;
+}
+.ai-message pre code {
+    background-color: transparent !important;
+    padding: 0;
+    font-size: inherit;
+}
+
+/* Override white-space for specific elements generated by Markdown */
+.ai-message p,
+.ai-message ul,
+.ai-message ol,
+.ai-message blockquote {
+    white-space: normal; /* Allow standard wrapping for block elements */
+}
+
+/* --- Markdown Element Styling within Messages --- */
+.message p {
+    margin-top: 0;
+    margin-bottom: 0.5em;
+}
+.message p:last-child {
+    margin-bottom: 0;
+}
+.message ul,
+.message ol {
+    margin: 0.5em 0 0.5em 1.5em;
+    padding: 0;
+}
+.message li {
+    margin-bottom: 0.2em;
+}
+
+/* Code block styling (adjusts previous rules slightly) */
+.message code {
+    /* Inline code */
+    background-color: var(--invert-font-color, var(--fallback-invert-font)) !important;
+    color: var(--font-color);
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+    font-size: 0.9em;
+    /* Ensure inline code breaks nicely */
+    word-break: break-all;
+    white-space: normal; /* Allow inline code to wrap if needed */
+}
+.message pre {
+    /* Code block container */
+    background-color: var(--invert-font-color, var(--fallback-invert-font)) !important;
+    color: var(--background-color, var(--fallback-bg)) !important;
+    padding: 1em;
+    border-radius: 5px;
+    overflow-x: auto;
+    margin: 0.8em 0;
+    font-size: 0.9em; /* Slightly smaller code blocks */
+}
+.message pre code {
+    /* Code within code block */
+    background-color: transparent !important;
+    padding: 0;
+    font-size: inherit;
+    word-break: normal; /* Don't break words in code blocks */
+    white-space: pre; /* Preserve whitespace strictly in code blocks */
+}
+
+/* Thinking indicator */
+.message-thinking {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    background-color: var(--primary-color, var(--fallback-primary));
+    border-radius: 50%;
+    margin-left: 8px;
+    vertical-align: middle;
+    animation: thinking 1s infinite ease-in-out;
+}
+@keyframes thinking {
+    0%,
+    100% {
+        opacity: 0.5;
+        transform: scale(0.8);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.2);
+    }
+}
+
+/* --- Thinking Indicator (Blinking Cursor Style) --- */
+.thinking-indicator-cursor {
+    display: inline-block;
+    width: 10px; /* Width of the cursor */
+    height: 1.1em; /* Match line height */
+    background-color: var(--primary-color, var(--fallback-primary));
+    margin-left: 5px;
+    vertical-align: text-bottom; /* Align with text baseline */
+    animation: blink-cursor 1s step-end infinite;
+}
+
+@keyframes blink-cursor {
+    from,
+    to {
+        background-color: transparent;
+    }
+    50% {
+        background-color: var(--primary-color, var(--fallback-primary));
+    }
+}
+
+#chat-input-area {
+    flex-shrink: 0; /* Prevent input area from shrinking */
+    padding: 1em 1.5em;
+    display: flex;
+    align-items: flex-end; /* Align items to bottom */
+    gap: 10px;
+    background-color: var(--code-bg-color, var(--fallback-code-bg)); /* Match sidebars */
+}
+
+#chat-input-area textarea {
+    flex-grow: 1;
+    padding: 0.8em 1em;
+    border: 1px solid var(--progress-bar-background, var(--fallback-border));
+    background-color: var(--background-color, var(--fallback-bg));
+    color: var(--font-color, var(--fallback-font));
+    border-radius: 5px;
+    resize: none; /* Disable manual resize */
+    font-family: inherit;
+    font-size: 1em;
+    line-height: 1.4;
+    max-height: 150px; /* Limit excessive height */
+    overflow-y: auto;
+    /* rows: 2; */
+}
+
+#chat-input-area button {
+    /* Basic button styling - maybe inherit from main theme? */
+    padding: 0.6em 1.2em;
+    border: 1px solid var(--primary-dimmed-color, var(--fallback-primary-dimmed));
+    background-color: var(--primary-dimmed-color, var(--fallback-primary-dimmed));
+    color: var(--background-color, var(--fallback-bg));
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background-color 0.2s, border-color 0.2s;
+    height: min-content; /* Align with bottom of textarea */
+}
+
+#chat-input-area button:hover {
+    background-color: var(--primary-color, var(--fallback-primary));
+    border-color: var(--primary-color, var(--fallback-primary));
+}
+#chat-input-area button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.loading-indicator {
+    font-size: 0.9em;
+    color: var(--secondary-color, var(--fallback-secondary));
+    margin-right: 10px;
+    align-self: center;
+}
+
+/* --- Buttons --- */
+/* Inherit some button styles if possible */
+.btn.btn-sm {
+    color: var(--font-color, var(--fallback-font));
+    padding: 0.2em 0.5em;
+    font-size: 0.8em;
+    border: 1px solid var(--secondary-color, var(--fallback-secondary));
+    background: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.btn.btn-sm:hover {
+    border-color: var(--font-color, var(--fallback-font));
+    background-color: var(--progress-bar-background, var(--fallback-border));
+}
+
+/* --- Basic Responsiveness --- */
+@media screen and (max-width: 900px) {
+    .left-sidebar {
+        flex-basis: 200px; /* Shrink history */
+    }
+    .right-sidebar {
+        flex-basis: 240px; /* Shrink citations */
+    }
+}
+
+@media screen and (max-width: 768px) {
+    /* Stack layout on mobile? Or hide sidebars? Hiding for now */
+    .sidebar {
+        display: none; /* Hide sidebars on small screens */
+    }
+    /* Could add toggle buttons later */
+}
+
+
+/* ==== File: docs/ask_ai/ask-ai.css (Updates V4 - Delete Button) ==== */
+
+
+.sidebar ul li {
+    /* Use flexbox to align link and delete button */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0; /* Remove padding from li, add to link/button */
+    margin: 0.1em 0; /* Small vertical margin */
+}
+
+.sidebar ul li a {
+    /* Link takes most space */
+    flex-grow: 1;
+    padding: 0.3em 0.5em 0.3em 1em; /* Adjust padding */
+    /* Make ellipsis work for long titles */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* Keep existing link styles */
+    color: var(--secondary-color, var(--fallback-secondary));
+    text-decoration: none;
+    display: block;
+    border-radius: 3px;
+    transition: background-color 0.2s, color 0.2s;
+}
+.sidebar ul li a:hover {
+    color: var(--primary-color, var(--fallback-primary));
+    background-color: rgba(80, 255, 255, 0.08);
+}
+
+/* Style for active history item's link */
+#history-list li.active a {
+    color: var(--primary-dimmed-color, var(--fallback-primary-dimmed));
+    font-weight: bold;
+    background-color: rgba(80, 255, 255, 0.12);
+}
+
+/* --- Delete Chat Button --- */
+.delete-chat-btn {
+    flex-shrink: 0; /* Don't shrink */
+    background: none;
+    border: none;
+    color: var(--secondary-color, var(--fallback-secondary));
+    cursor: pointer;
+    padding: 0.4em 0.8em; /* Padding around icon */
+    font-size: 0.9em;
+    opacity: 0.5; /* Dimmed by default */
+    transition: opacity 0.2s, color 0.2s;
+    margin-left: 5px; /* Space between link and button */
+    border-radius: 3px;
+}
+
+.sidebar ul li:hover .delete-chat-btn,
+.delete-chat-btn:hover {
+    opacity: 1; /* Show fully on hover */
+    color: var(--error-color, #ff3c74); /* Use error color on hover */
+}
+.delete-chat-btn:focus {
+    outline: 1px dashed var(--error-color, #ff3c74); /* Accessibility */
+     opacity: 1;
+}

@@ -1,0 +1,531 @@
+/* DankMono Font Faces */
+@font-face {
+    font-family: 'DankMono';
+    src: url('DankMono-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'DankMono';
+    src: url('DankMono-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'DankMono';
+    src: url('DankMono-Italic.woff2') format('woff2');
+    font-weight: 400;
+    font-style: italic;
+}
+
+/* Root Variables - Matching docs theme */
+:root {
+    --global-font-size: 14px;
+    --global-code-font-size: 13px;
+    --global-line-height: 1.5em;
+    --global-space: 10px;
+    --font-stack: DankMono, Monaco, Courier New, monospace;
+    --mono-font-stack: DankMono, Monaco, Courier New, monospace;
+
+    --background-color: #070708;
+    --font-color: #e8e9ed;
+    --invert-font-color: #222225;
+    --secondary-color: #d5cec0;
+    --tertiary-color: #a3abba;
+    --primary-color: #0fbbaa;
+    --error-color: #ff3c74;
+    --progress-bar-background: #3f3f44;
+    --progress-bar-fill: #09b5a5;
+    --code-bg-color: #3f3f44;
+    --block-background-color: #202020;
+    
+    --header-height: 55px;
+}
+
+/* Base Styles */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-stack);
+    font-size: var(--global-font-size);
+    line-height: var(--global-line-height);
+    color: var(--font-color);
+    background-color: var(--background-color);
+}
+
+/* Terminal Framework */
+.terminal {
+    min-height: 100vh;
+}
+
+.container {
+    width: 100%;
+    margin: 0 auto;
+}
+
+/* Header */
+.header-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--header-height);
+    background-color: var(--background-color);
+    border-bottom: 1px solid var(--progress-bar-background);
+    z-index: 1000;
+    padding: 0 calc(var(--global-space) * 2);
+}
+
+.terminal-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 100%;
+}
+
+.terminal-logo h1 {
+    margin: 0;
+    font-size: 1.2em;
+    color: var(--primary-color);
+    font-weight: 400;
+}
+
+.terminal-menu ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    gap: 2em;
+}
+
+.terminal-menu a {
+    color: var(--secondary-color);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.terminal-menu a:hover,
+.terminal-menu a.active {
+    color: var(--primary-color);
+}
+
+/* Main Container */
+.main-container {
+    padding-top: calc(var(--header-height) + 2em);
+    padding-left: 2em;
+    padding-right: 2em;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Tutorial Grid */
+.tutorial-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2em;
+    align-items: start;
+}
+
+/* Terminal Cards */
+.terminal-card {
+    background-color: var(--block-background-color);
+    border: 1px solid var(--progress-bar-background);
+    margin-bottom: 1.5em;
+}
+
+.terminal-card header {
+    background-color: var(--progress-bar-background);
+    padding: 0.8em 1em;
+    font-weight: 700;
+    color: var(--font-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.terminal-card > div {
+    padding: 1.5em;
+}
+
+/* Editor Section */
+.editor-controls {
+    display: flex;
+    gap: 0.5em;
+}
+
+.editor-container {
+    height: 300px;
+    overflow: hidden;
+}
+
+#c4a-editor {
+    width: 100%;
+    height: 100%;
+    font-family: var(--mono-font-stack);
+    font-size: var(--global-code-font-size);
+    background-color: var(--code-bg-color);
+    color: var(--font-color);
+    border: none;
+    padding: 1em;
+    resize: none;
+}
+
+/* JS Output */
+.js-output-container {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.js-output-container pre {
+    margin: 0;
+    padding: 1em;
+    background-color: var(--code-bg-color);
+}
+
+.js-output-container code {
+    font-family: var(--mono-font-stack);
+    font-size: var(--global-code-font-size);
+    color: var(--font-color);
+    white-space: pre-wrap;
+}
+
+/* Console Output */
+.console-output {
+    font-family: var(--mono-font-stack);
+    font-size: var(--global-code-font-size);
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 1em;
+}
+
+.console-line {
+    margin-bottom: 0.5em;
+}
+
+.console-prompt {
+    color: var(--primary-color);
+    margin-right: 0.5em;
+}
+
+.console-text {
+    color: var(--font-color);
+}
+
+.console-error {
+    color: var(--error-color);
+}
+
+.console-success {
+    color: var(--primary-color);
+}
+
+/* Playground */
+.playground-container {
+    height: 600px;
+    background-color: #fff;
+    border: 1px solid var(--progress-bar-background);
+}
+
+#playground-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+/* Execution Progress */
+.execution-progress {
+    padding: 1em;
+}
+
+.progress-item {
+    display: flex;
+    align-items: center;
+    gap: 0.8em;
+    margin-bottom: 0.8em;
+    color: var(--secondary-color);
+}
+
+.progress-item.active {
+    color: var(--primary-color);
+}
+
+.progress-item.completed {
+    color: var(--tertiary-color);
+}
+
+.progress-item.error {
+    color: var(--error-color);
+}
+
+.progress-icon {
+    font-size: 1.2em;
+}
+
+/* Buttons */
+.btn {
+    background-color: var(--primary-color);
+    color: var(--background-color);
+    border: none;
+    padding: 0.5em 1em;
+    font-family: var(--font-stack);
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn:hover {
+    background-color: var(--progress-bar-fill);
+}
+
+.btn-sm {
+    padding: 0.3em 0.8em;
+    font-size: 0.85em;
+}
+
+.btn-ghost {
+    background-color: transparent;
+    color: var(--secondary-color);
+    border: 1px solid var(--progress-bar-background);
+}
+
+.btn-ghost:hover {
+    background-color: var(--progress-bar-background);
+    color: var(--font-color);
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--block-background-color);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--progress-bar-background);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--secondary-color);
+}
+
+/* CodeMirror Theme Override */
+.CodeMirror {
+    font-family: var(--mono-font-stack) !important;
+    font-size: var(--global-code-font-size) !important;
+    background-color: var(--code-bg-color) !important;
+    color: var(--font-color) !important;
+    height: 100% !important;
+}
+
+.CodeMirror-gutters {
+    background-color: var(--progress-bar-background) !important;
+    border-right: 1px solid var(--progress-bar-background) !important;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .tutorial-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .playground-section {
+        order: -1;
+    }
+}
+
+/* Links */
+a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Lists */
+ul, ol {
+    padding-left: 2em;
+}
+
+li {
+    margin-bottom: 0.5em;
+}
+
+/* Code */
+code {
+    background-color: var(--code-bg-color);
+    padding: 0.2em 0.4em;
+    font-family: var(--mono-font-stack);
+    font-size: 0.9em;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 700;
+    margin-top: 1.5em;
+    margin-bottom: 0.8em;
+}
+
+h3 {
+    color: var(--primary-color);
+    font-size: 1.1em;
+}
+
+/* Tutorial Panel */
+.tutorial-panel {
+    position: absolute;
+    top: 60px;
+    right: 20px;
+    width: 380px;
+    background: #1a1a1b;
+    border: 1px solid #2a2a2c;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    transition: all 0.3s ease;
+}
+
+.tutorial-panel.hidden {
+    display: none;
+}
+
+.tutorial-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid #2a2a2c;
+}
+
+.tutorial-header h3 {
+    margin: 0;
+    color: #0fbbaa;
+    font-size: 18px;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: #8b8b8d;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.close-btn:hover {
+    background: #2a2a2c;
+    color: #e0e0e0;
+}
+
+.tutorial-content {
+    padding: 20px;
+}
+
+.tutorial-content p {
+    margin: 0 0 16px 0;
+    color: #e0e0e0;
+    line-height: 1.6;
+}
+
+.tutorial-progress {
+    margin-top: 16px;
+}
+
+.tutorial-progress span {
+    display: block;
+    margin-bottom: 8px;
+    color: #8b8b8d;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.progress-bar {
+    height: 4px;
+    background: #2a2a2c;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #0fbbaa;
+    transition: width 0.3s ease;
+}
+
+.tutorial-actions {
+    display: flex;
+    gap: 12px;
+    padding: 0 20px 20px;
+}
+
+.tutorial-btn {
+    flex: 1;
+    padding: 10px 16px;
+    background: #2a2a2c;
+    color: #e0e0e0;
+    border: 1px solid #3a3a3c;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tutorial-btn:hover:not(:disabled) {
+    background: #3a3a3c;
+    transform: translateY(-1px);
+}
+
+.tutorial-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.tutorial-btn.primary {
+    background: #0fbbaa;
+    color: #070708;
+    border-color: #0fbbaa;
+}
+
+.tutorial-btn.primary:hover {
+    background: #0da89a;
+    border-color: #0da89a;
+}
+
+/* Tutorial Highlights */
+.tutorial-highlight {
+    position: relative;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(15, 187, 170, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(15, 187, 170, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(15, 187, 170, 0);
+    }
+}
+
+.editor-card {
+    position: relative;
+}

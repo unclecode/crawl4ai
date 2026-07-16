@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="35" viewBox="0 0 120 35">
+  <g>
+    <defs>
+      <pattern id="halftoneLight" width="4" height="4" patternUnits="userSpaceOnUse">
+        <circle cx="2" cy="2" r="1" fill="#111" opacity="0.1"/>
+      </pattern>
+    </defs>
+    <!-- Dark border -->
+    <rect width="120" height="35" rx="5" fill="#DDD"/>
+    <!-- Light background -->
+    <rect x="2" y="2" width="116" height="31" rx="4" fill="#fff"/>
+    <rect x="2" y="2" width="116" height="31" rx="4" fill="url(#halftoneLight)"/>
+    
+    <!-- Logo -->
+    <path d="M30 17.5 a7.5 7.5 0 1 1 -15 0 a7.5 7.5 0 1 1 15 0" fill="none" stroke="#111" stroke-width="2"/>
+    <path d="M18 17.5 L27 17.5" stroke="#111" stroke-width="2"/>
+    <circle cx="22.5" cy="17.5" r="2" fill="#111"/>
+    
+    <text x="40" y="23" fill="#111" font-family="Arial, sans-serif" font-weight="500" font-size="14">Crawl4AI</text>
+  </g>
+</svg>

@@ -1,0 +1,7 @@
+GO https://news.example.com
+WAIT `.article-list` 5
+REPEAT (SCROLL DOWN 500, 3)
+WAIT 1
+REPEAT (CLICK `.load-more`, `document.querySelector('.load-more') !== null`)
+WAIT 2
+IF (`document.querySelectorAll('.article').length > 20`) THEN EVAL `console.log('Loaded enough articles')`

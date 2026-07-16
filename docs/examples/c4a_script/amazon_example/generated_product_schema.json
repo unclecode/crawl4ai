@@ -1,0 +1,47 @@
+{
+  "name": "Amazon Product Search Results",
+  "baseSelector": "div[data-component-type='s-impression-counter']",
+  "fields": [
+    {
+      "name": "title",
+      "selector": "h2.a-size-base-plus.a-spacing-none.a-color-base.a-text-normal span",
+      "type": "text"
+    },
+    {
+      "name": "price",
+      "selector": "span.a-price > span.a-offscreen",
+      "type": "text"
+    },
+    {
+      "name": "rating",
+      "selector": "i.a-icon-star-small span.a-icon-alt",
+      "type": "text"
+    },
+    {
+      "name": "number_of_reviews",
+      "selector": "a.a-link-normal.s-underline-text span.a-size-base",
+      "type": "text"
+    },
+    {
+      "name": "delivery_info",
+      "selector": "div[data-cy='delivery-recipe'] span.a-color-base",
+      "type": "text"
+    },
+    {
+      "name": "product_url",
+      "selector": "a.a-link-normal.s-no-outline",
+      "type": "attribute",
+      "attribute": "href"
+    },
+    {
+      "name": "sponsored",
+      "selector": "span.puis-label-popover-default span.a-color-secondary",
+      "type": "text"
+    },
+    {
+      "name": "small_business_badge",
+      "selector": "span.a-size-base.a-color-base",
+      "type": "text"
+    }
+  ]
+}

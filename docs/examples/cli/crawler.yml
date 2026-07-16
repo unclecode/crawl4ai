@@ -1,0 +1,13 @@
+cache_mode: "bypass"
+wait_until: "networkidle"
+page_timeout: 30000
+delay_before_return_html: 0.5
+word_count_threshold: 100
+scan_full_page: true
+scroll_delay: 0.3
+process_iframes: false
+remove_overlay_elements: true
+magic: true
+verbose: true
+exclude_external_links: true
+exclude_social_media_links: true

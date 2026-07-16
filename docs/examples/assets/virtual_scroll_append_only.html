@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Append-Only Scroll (Traditional Infinite Scroll)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        
+        .posts-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+        }
+        
+        .post {
+            background: #f9f9f9;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            border: 1px solid #eee;
+        }
+        
+        .post-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .post-content {
+            color: #555;
+            line-height: 1.6;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <h1>Traditional Infinite Scroll Demo</h1>
+    <p style="text-align: center; color: #666;">This appends new content without removing old content</p>
+    <div class="posts-container"></div>
+    
+    <script>
+        // Traditional infinite scroll - APPENDS content
+        const container = document.querySelector('.posts-container');
+        const totalPosts = 200;
+        const postsPerPage = 20;
+        let loadedPosts = 0;
+        let isLoading = false;
+        
+        // Generate fake post data
+        function generatePost(index) {
+            return {
+                id: index,
+                title: `Post Title #${index + 1}`,
+                content: `This is the content of post ${index + 1}. In traditional infinite scroll, new content is appended to existing content. The DOM keeps growing. Post ID: ${index}`
+            };
+        }
+        
+        // Load more posts - APPENDS to existing content
+        function loadMorePosts() {
+            if (isLoading || loadedPosts >= totalPosts) return;
+            
+            isLoading = true;
+            
+            // Show loading indicator
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'loading';
+            loadingDiv.textContent = 'Loading more posts...';
+            container.appendChild(loadingDiv);
+            
+            // Simulate network delay
+            setTimeout(() => {
+                // Remove loading indicator
+                container.removeChild(loadingDiv);
+                
+                // Add new posts
+                const fragment = document.createDocumentFragment();
+                const endIndex = Math.min(loadedPosts + postsPerPage, totalPosts);
+                
+                for (let i = loadedPosts; i < endIndex; i++) {
+                    const post = generatePost(i);
+                    const postElement = document.createElement('div');
+                    postElement.className = 'post';
+                    postElement.setAttribute('data-post-id', post.id);
+                    postElement.innerHTML = `
+                        <div class="post-title">${post.title}</div>
+                        <div class="post-content">${post.content}</div>
+                    `;
+                    fragment.appendChild(postElement);
+                }
+                
+                // APPEND new posts to existing ones
+                container.appendChild(fragment);
+                loadedPosts = endIndex;
+                isLoading = false;
+                
+                console.log(`Loaded ${loadedPosts} of ${totalPosts} posts`);
+            }, 300);
+        }
+        
+        // Initial load
+        loadMorePosts();
+        
+        // Load more on scroll
+        window.addEventListener('scroll', () => {
+            const scrollBottom = window.innerHeight + window.scrollY;
+            const threshold = document.body.offsetHeight - 500;
+            
+            if (scrollBottom >= threshold) {
+                loadMorePosts();
+            }
+        });
+    </script>
+</body>
+</html>

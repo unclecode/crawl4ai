@@ -1,0 +1,11 @@
+PROC fill_field
+  TYPE "test@example.com"
+  PRESS Tab
+ENDPROC
+
+GO https://forms.example.com
+WAIT `form` 5
+IF (EXISTS `input[type="email"]`) THEN CLICK `input[type="email"]`
+IF (EXISTS `input[type="email"]`) THEN fill_field
+REPEAT (PRESS Tab, `document.activeElement.type !== 'submit'`)
+CLICK `button[type="submit"]`

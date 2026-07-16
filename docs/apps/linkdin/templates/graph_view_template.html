@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="utf-8" />
+    <title>C4AI Insights</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
+    <!-- our tiny OpenAI wrapper -->
+    <script src="ai.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/split.js/1.6.5/split.min.js"></script>
+    <link href="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <style>
+        .vis-network canvas {
+            background-color: #1f1f1f !important;
+            background-image: 
+              linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
+        #chatDrawer {
+            max-height: 45vh;
+            height: 45vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #chatBody {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+            max-height: calc(45vh - 90px);
+        }
+
+        #chatInputContainer {
+            min-height: 60px;
+        }
+
+        /* Split.js vertical gutter */
+        .gutter.gutter-vertical {
+            cursor: row-resize;
+            height: 6px;
+            background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAFCAYAAABSIVz6AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH4AkKCQQBdo6l1QAAABl0RVh0Q29tbWVudABDcmVhdGVkIHdpdGggR0lNUFeBDhcAAAArSURBVCjPY2AYBfQMgVAFzGCGIpgBxTklpCgGQ0O54P//Y8zAs14lighENAAAVTsOYMqVl/QAAAAASUVORK5CYII=');
+        }
+
+        /* Split.js styles */
+        .gutter {
+            background-color: #2d2d2d;
+            background-repeat: no-repeat;
+            background-position: 50%;
+        }
+
+        .gutter.gutter-horizontal {
+            cursor: col-resize;
+            background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAeCAYAAADkftS9AAAAIklEQVQoU2M4c+bMfxAGAgYYmwGrIIiDjrELjpo5aiZeMwF+yNnOs5KSvgAAAABJRU5ErkJggg==');
+        }
+
+        /* Sidebar styles */
+        .sidebar-collapse-btn {
+            position: absolute;
+            top: 10px;
+            background-color: #2d2d2d;
+            color: #999;
+            border: none;
+            border-radius: 4px;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .sidebar-collapse-btn:hover {
+            background-color: #444;
+            color: #eee;
+        }
+
+        #leftSidebarToggle {
+            right: -12px;
+        }
+
+        #leftSidebarToggle.collapsed {
+            right: -20px;
+        }
+
+        #rightSidebarToggle {
+            left: -12px;
+        }
+
+        .collapsed {
+            width: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+        }
+
+        .full-width {
+            width: 100% !important;
+        }
+
+        .splitter-container {
+            height: 100%;
+            display: flex;
+        }
+    </style>
+
+    <!-- Toast notification style -->
+    <style>
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #2d2d2d;
+            color: #eee;
+            padding: 10px 20px;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        #toast.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body class="h-screen flex flex-col bg-neutral-900 text-neutral-100  overflow-hidden">
+    <!-- Toast notification -->
+    <div id="toast"></div>
+    
+    <!-- API Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-neutral-800 rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">API Settings</h3>
+                <button id="closeSettingsModal" class="text-neutral-400 hover:text-neutral-200">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            <div class="mb-4">
+                <label for="apiKeyInput" class="block text-sm font-medium text-neutral-300 mb-2">OpenAI API Key</label>
+                <input type="password" id="apiKeyInput" class="w-full p-2 rounded bg-neutral-700 text-neutral-100 border border-neutral-600 focus:border-blue-500 focus:outline-none" placeholder="sk-...">
+                <p class="text-xs text-neutral-400 mt-1">Your API key is stored locally in your browser and never sent to our servers.</p>
+            </div>
+            <div class="flex justify-end">
+                <button id="saveApiKey" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded transition-colors">
+                    Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="flex flex-1 splitter-container" id="mainSplitter">
+        <div id="leftSidebar" class="p-2 border-r border-neutral-700 relative w-72 overflow-y-auto">
+            <button id="leftSidebarToggle" class="sidebar-collapse-btn">
+                <i class="fa fa-chevron-left"></i>
+            </button>
+            <input id="search" class="w-full mb-3 p-2 border rounded bg-neutral-800 text-neutral-100 border-neutral-600"
+                placeholder="Search company">
+            <div class="text-xs text-neutral-400 mb-2 flex justify-between items-center">
+                <span>Companies</span>
+                <span id="companyCount">0 companies</span>
+            </div>
+            <ul id="companyList" class="space-y-3 text-sm"></ul>
+        </div>
+        <div id="mainContent" class="flex-1 relative">
+            <div class="absolute top-4 left-4 z-10 flex space-x-2">
+                <label class="bg-neutral-800 hover:bg-neutral-700 text-neutral-200 p-2 px-3 rounded-full shadow-lg transition-colors cursor-pointer flex items-center">
+                    <i class="fas fa-upload mr-2"></i>
+                    <span>Load Data</span>
+                    <input type="file" id="dataFileInput" accept=".json" class="hidden">
+                </label>
+                <button id="clearDataBtn" class="bg-red-800 hover:bg-red-700 text-neutral-200 p-2 px-3 rounded-full shadow-lg transition-colors flex items-center">
+                    <i class="fas fa-trash-alt mr-2"></i>
+                    <span>Clear Data</span>
+                </button>
+                <button id="settingsBtn" class="bg-neutral-800 hover:bg-neutral-700 text-neutral-200 p-2 px-3 rounded-full shadow-lg transition-colors flex items-center">
+                    <i class="fas fa-cog mr-2"></i>
+                    <span>Settings</span>
+                </button>
+            </div>
+            <div class="absolute top-4 right-4 z-10 flex space-x-2">
+                <button id="zoomInBtn"
+                    class="bg-neutral-800 hover:bg-neutral-700 text-neutral-200 p-2 px-3 rounded-full shadow-lg transition-colors">
+                    <i class="fas fa-search-plus"></i>
+                </button>
+                <button id="zoomOutBtn"
+                    class="bg-neutral-800 hover:bg-neutral-700 text-neutral-200 p-2  px-3 rounded-full shadow-lg transition-colors">
+                    <i class="fas fa-search-minus"></i>
+                </button>
+                <button id="resetViewBtn"
+                    class="bg-neutral-800 hover:bg-neutral-700 text-neutral-200 p-2  px-3 rounded-full shadow-lg transition-colors">
+                    <i class="fas fa-compress-arrows-alt"></i>
+                </button>
+            </div>
+            <div class="absolute bottom-4 left-4 z-10 text-xs text-neutral-500">
+                <div id="graphInfo" class="bg-neutral-800/70 backdrop-blur-sm p-2 rounded shadow-lg hidden">
+                    <div id="graphInfoContent"></div>
+                </div>
+            </div>
+            <div id="graph" class="w-full h-full"></div>
+            <!-- ───── Chat drawer (hidden by default) ───── -->
+            <div id="chatDrawer" class="absolute bottom-0 inset-x-0 bg-neutral-900 border-t
+    border-neutral-700 translate-y-full transition-transform
+    duration-300">
+                <div class="flex items-center px-3 py-2">
+                    <span class="font-semibold flex-1">🔮 Chat with C4AI Assistant</span>
+                    <button id="chatClose" class="text-neutral-400 hover:text-neutral-200">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+                <div id="chatBody" class="flex-1 overflow-y-auto p-3 space-y-2 text-sm max-h-full"></div>
+                <div class="p-2 border-t border-neutral-700">
+                    <input id="chatInput" class="w-full bg-neutral-800 p-2 rounded outline-none"
+                        placeholder="Ask something… (Enter to send)">
+                </div>
+            </div>
+
+        </div>
+        <div id="rightSidebar" class="bg-neutral-800 shadow-lg relative w-80 overflow-y-auto">
+            <button id="rightSidebarToggle" class="sidebar-collapse-btn">
+                <i class="fa fa-chevron-right"></i>
+            </button>
+            <div id="rightPane" class="h-full">
+                <div class="flex flex-col items-center justify-center h-full p-8 text-center">
+                    <div class="text-neutral-500 mb-4">
+                        <i class="fas fa-sitemap text-4xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">Organization Details</h3>
+                    <p class="text-neutral-400 text-sm">Select a company to view its organization structure and key
+                        decision makers.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- chat floating action button -->
+    <button id="chatFab" class="fixed bottom-6 right-6 bg-emerald-500 hover:bg-emerald-400
+                 p-3 rounded-full shadow-lg focus:outline-none" style="padding: 0.65rem 0.75rem">
+        <i class="fa fa-comments text-neutral-900"></i>
+    </button>
+
+
+    <script>
+        // Check localStorage first, otherwise fetch default data
+        let data;
+        // Toast notification function
+        function showToast(message, duration = 3000) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, duration);
+        }
+
+        const loadDataFromSource = () => {
+            const savedData = localStorage.getItem('companyGraphData');
+
+            if (savedData) {
+                try {
+                    data = JSON.parse(savedData);
+                    console.log('Loaded data from localStorage');
+                    initializeGraph(data);
+                    showToast('Using data from local storage. Click "Clear Data" to revert to default.');
+                } catch (error) {
+                    console.error('Error parsing stored data:', error);
+                    fetchDefaultData();
+                }
+            } else {
+                fetchDefaultData();
+            }
+        };
+
+        const fetchDefaultData = () => {
+            fetch('./company_graph.json')
+                .then(response => response.json())
+                .then(data => {
+                    initializeGraph(data);
+                })
+                .catch(error => console.error('Error loading default JSON:', error));
+        };
+
+        // File input handler
+        document.getElementById('dataFileInput').addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    // Validate data structure
+                    if (!data.nodes || !data.edges) {
+                        alert('Invalid data format. File must contain nodes and edges arrays.');
+                        return;
+                    }
+
+                    // Save to localStorage
+                    localStorage.setItem('companyGraphData', JSON.stringify(data));
+
+                    // Show notification before reload
+                    showToast('Data file loaded successfully! Refreshing page...', 1500);
+
+                    // Reload the page to initialize with new data
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } catch (error) {
+                    alert('Error parsing JSON file: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // Clear data button
+        document.getElementById('clearDataBtn').addEventListener('click', () => {
+            if (confirm('Are you sure you want to clear the loaded data? This will revert to the default dataset.')) {
+                // Clear the localStorage data
+                localStorage.removeItem('companyGraphData');
+                
+                // Force clear the current data from memory
+                window.companyGraphData = null;
+                
+                showToast('Custom data cleared! Loading default dataset...', 1500);
+                
+                // Completely reload the page to ensure fresh start
+                setTimeout(() => {
+                    window.location.href = window.location.href.split('?')[0] + '?nocache=' + new Date().getTime();
+                }, 1500);
+            }
+        });
+
+        // Initialize
+        loadDataFromSource();
+
+        function initializeGraph(data) {
+            window.companyGraphData = data          // expose globally
+
+            // lazy-load people.jsonl once so chat can reference raw rows
+            let peopleRows = null
+            async function getPeopleRows() {
+                if (peopleRows) return peopleRows
+                try {
+                    const txt = await fetch("people.jsonl").then(r => r.text())
+                    peopleRows = txt.trim().split("\n").map(l => JSON.parse(l))
+                } catch { peopleRows = [] }
+                return peopleRows
+            }
+            const container = document.getElementById('graph')
+            // Create node objects with enhanced styling and tooltips
+            const nodes = new vis.DataSet(data.nodes.map(n => ({
+                id: n.id,
+                label: n.name,
+                title: `${n.name}\n${n.industry || 'Industry: N/A'}\n${n.followers?.toLocaleString() || '0'} followers`,
+                shape: 'dot',
+                font: {
+                    color: '#ffffff',
+                    face: 'Inter, system-ui, sans-serif',
+                    size: 16,
+                    strokeWidth: 2,
+                    strokeColor: '#222222'
+                },
+                size: Math.max(15, Math.log10((n.followers || 1)) * 6 + 10),
+                borderWidth: 2,
+                borderWidthSelected: 4,
+                color: {
+                    background: '#3b82f6',  // blue-500
+                    border: '#1e40af',      // blue-800
+                    highlight: {
+                        background: '#60a5fa',  // blue-400
+                        border: '#ffffff'
+                    },
+                    hover: {
+                        background: '#93c5fd',  // blue-300
+                        border: '#ffffff'
+                    }
+                },
+                shadow: {
+                    enabled: true,
+                    color: 'rgba(0,0,0,0.3)',
+                    size: 10,
+                    x: 0,
+                    y: 0
+                }
+            })))
+
+            // Create edge objects with enhanced styling
+            const edges = new vis.DataSet(data.edges.map(e => ({
+                from: e.source,
+                to: e.target,
+                width: Math.max(1, Math.min(8, e.weight * 4)),
+                selectionWidth: 2,
+                color: {
+                    color: '#6b7280',       // gray-500
+                    highlight: '#10b981',   // emerald-500
+                    hover: '#a3e635'        // lime-400
+                },
+                arrows: {
+                    to: {
+                        enabled: e.weight > 0.3,  // Only show arrows for stronger connections
+                        scaleFactor: 0.5
+                    }
+                },
+                smooth: {
+                    type: 'continuous',
+                    forceDirection: 'none',
+                    roundness: 0.2
+                }
+            })))
+
+            // Configure and create the network
+            const network = new vis.Network(container, { nodes, edges }, {
+                physics: {
+                    barnesHut: {
+                        gravitationalConstant: -2000,
+                        springLength: 120,
+                        springConstant: 0.05,
+                        avoidOverlap: 0.5,
+                        damping: 0.09
+                    },
+                    stabilization: {
+                        iterations: 200,
+                        updateInterval: 25
+                    },
+                    enabled: true,
+                    timestep: 0.5,
+                    adaptiveTimestep: true
+                },
+                interaction: {
+                    hover: true,
+                    navigationButtons: false,
+                    keyboard: true,
+                    tooltipDelay: 100,
+                    hideEdgesOnDrag: false,  // Keep edges visible when dragging
+                    multiselect: false,
+                    selectable: true,
+                    dragNodes: true,
+                    dragView: true,
+                    zoomView: true,
+                    zoomSpeed: 0.15           // Reduced from default 1.0
+                },
+                nodes: {
+                    font: {
+                        size: 16,
+                        strokeWidth: 2,
+                        strokeColor: '#222222'
+                    },
+                    fixed: false
+                },
+                edges: {
+                    smooth: {
+                        type: 'continuous',
+                        forceDirection: 'none',
+                        roundness: 0.2
+                    },
+                    hoverWidth: 1.5,
+                    selectionWidth: 2
+                }
+            })
+
+            window.network = network;
+
+            network.once('stabilized', () => {
+                console.log('Network stabilized')
+                // Freeze layout so nodes stop running away and dragging feels crisp
+                network.setOptions({ physics: false });
+
+                // get id of first node
+                let firstNodeId = data.nodes[0].id;
+                // network.focus(firstNodeId, { animation: true, scale: 1.5 });
+
+                // Automatically select the first company in the list
+                if (data.nodes.length > 0) {
+                    focusCompany(firstNodeId);
+                    // Highlight the first company in the sidebar
+                    const firstCompanyElement = document.querySelector('#companyList li');
+                    if (firstCompanyElement) {
+                        firstCompanyElement.classList.add('border-blue-500');
+                    }
+                }
+            });
+
+            const companyList = document.getElementById('companyList')
+            const companyCount = document.getElementById('companyCount')
+            companyCount.textContent = `${data.nodes.length} companies`
+
+            data.nodes.forEach(n => {
+                const li = document.createElement('li')
+                li.className = 'p-3 rounded bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 transition-colors'
+                li.innerHTML = `
+                        <div class="flex justify-between items-start mb-1">
+                            <h3 class="font-semibold text-blue-400 cursor-pointer">${n.name}</h3>
+                            <span class="px-2 py-0.5 bg-neutral-700 rounded-full text-xs">${n.industry || 'N/A'}</span>
+                        </div>
+                        <p class="text-xs text-neutral-300 mb-2">${n.about || 'No description available'}</p>
+                        <div class="flex justify-between items-center text-xs">
+                            <div class="flex items-center">
+                                <i class="fa fa-users mr-1 text-neutral-400"></i>
+                                <span>${n.followers?.toLocaleString() || '0'} followers</span>
+                            </div>
+                            <a href="https://www.linkedin.com${n.handle}" target="_blank" class="text-emerald-400 hover:text-emerald-300">
+                                <i class="fab fa-linkedin mr-1"></i>View on LinkedIn
+                            </a>
+                        </div>
+                    `
+                // Make the entire card clickable for better UX
+                li.style.cursor = 'pointer'
+                li.onclick = (e) => {
+                    // Don't trigger if clicking on the LinkedIn link
+                    if (e.target.tagName === 'A' || e.target.closest('a')) return
+                    focusCompany(n.id)
+                    // Add active state visual indicator
+                    document.querySelectorAll('#companyList li').forEach(el =>
+                        el.classList.remove('border-blue-500'))
+                    li.classList.add('border-blue-500')
+                }
+                companyList.appendChild(li)
+            })
+
+            // Add search functionality
+            const searchInput = document.getElementById('search')
+            searchInput.addEventListener('input', () => {
+                const query = searchInput.value.toLowerCase()
+                const items = companyList.querySelectorAll('li')
+                let visibleCount = 0
+
+                items.forEach(item => {
+                    const companyName = item.querySelector('h3').textContent.toLowerCase()
+                    const industryText = item.querySelector('span').textContent.toLowerCase()
+                    const aboutText = item.querySelector('p').textContent.toLowerCase()
+
+                    if (companyName.includes(query) || industryText.includes(query) || aboutText.includes(query)) {
+                        item.style.display = ''
+                        visibleCount++
+                    } else {
+                        item.style.display = 'none'
+                    }
+                })
+
+                companyCount.textContent = `${visibleCount} of ${data.nodes.length} companies`
+            })
+
+            function focusCompany(id) {
+                network.focus(id, { scale: 1.5, animation: true, })
+                loadOrgChart(id)
+            }
+
+            async function loadOrgChart(id) {
+                const pane = document.getElementById('rightPane')
+                pane.innerHTML = '<div class="p-4 text-sm">Loading…</div>'
+                if (rightSidebar.classList.contains('collapsed')) {
+                    toggleRightSidebar()
+                }
+                try {
+                    const chart = await fetch(`org_chart_${id.replace(/\//g, "_")}.json`).then(r => r.json())
+                    currentCompany = id
+                    currentChart = chart
+
+                    // Clear any previously selected person
+                    selectedPerson = null
+
+                    renderOrg(chart, pane)
+                } catch (e) {
+                    pane.innerHTML = `
+                            <div class="flex flex-col items-center justify-center h-full p-8 text-center">
+                                <div class="text-red-500 mb-3">
+                                    <i class="fas fa-exclamation-circle text-4xl"></i>
+                                </div>
+                                <h3 class="text-lg font-semibold mb-2">Organization Chart Not Found</h3>
+                                <p class="text-neutral-400 text-sm">Data for this company is not available.</p>
+                            </div>`
+                }
+            }
+
+            // REMOVED - Using colorForScore instead
+
+            function renderOrg(chart, pane) {
+                // Format company info from chart metadata
+                const companyName = chart.meta?.company || 'Company';
+                const employeeCount = chart.nodes.length;
+                const decisionMakers = chart.nodes.filter(n => n.decision_score >= 0.5);
+
+                pane.innerHTML = `
+  <div class="p-4 border-b border-neutral-700 bg-neutral-800">
+    <div class="flex justify-between items-center">
+      <h2 class="font-semibold text-lg text-blue-400">${companyName}</h2>
+      <span class="px-2 py-1 bg-neutral-700 rounded-full text-xs">${employeeCount} employees</span>
+    </div>
+  </div>
+  <div id="orgNet" style="height:320px" class="border-b border-neutral-700"></div>
+  <div class="p-4 bg-neutral-800">
+     <div class="flex justify-between items-center mb-3">
+       <h3 class="font-semibold">Decision Makers</h3>
+       <span class="px-2 py-0.5 bg-emerald-700 text-emerald-100 rounded-full text-xs">${decisionMakers.length} key people</span>
+     </div>
+     <ul class="text-sm space-y-2 max-h-60 overflow-y-auto pr-1 mb-4">
+       ${decisionMakers.map(n => `
+         <li class="p-2 rounded bg-neutral-700 hover:bg-neutral-600 transition-colors flex justify-between items-center">
+           <div>
+             <div class="font-medium">${n.name}</div>
+             <div class="text-xs text-neutral-300">${n.title}</div>
+           </div>
+           <div class="flex items-center gap-2">
+             <span class="text-xs px-2 py-0.5 rounded-full" style="background-color:${colorForScore(n.decision_score)}">${(n.decision_score * 100).toFixed(0)}%</span>
+             <a href="${n.profile_url}" target="_blank" class="text-emerald-400 hover:text-emerald-300 text-xs">
+               <i class="fab fa-linkedin"></i>
+             </a>
+           </div>
+         </li>`).join('')}
+     </ul>
+     <div class="mt-4 text-xs border-t border-neutral-700 pt-3">
+       <div class="font-semibold mb-2">Influence Scale</div>
+       <div class="h-2 w-full rounded-full mb-1" style="background: linear-gradient(to right, rgb(255,0,100), rgb(0,255,100))"></div>
+       <div class="flex justify-between text-xs text-neutral-400">
+         <span>Low influence (0%)</span>
+         <span>High influence (100%)</span>
+       </div>
+     </div>
+  </div>
+  <div id="personPane" class="p-4 border-t border-neutral-700 text-sm bg-neutral-900 hidden"></div>`
+
+                const n = new vis.DataSet(chart.nodes.map(p => ({
+                    id: p.id,
+                    label: p.name,
+                    title: `${p.name} - ${p.title || 'Employee'} (${(p.decision_score * 100).toFixed(0)}%)`,
+                    shape: 'box',
+                    color: {
+                        background: colorForScore(p.decision_score || 0),
+                        border: '#333333',
+                        highlight: {
+                            background: '#4ade80',
+                            border: '#ffffff'
+                        }
+                    },
+                    borderWidth: 2
+                })))
+
+                const e = new vis.DataSet(chart.edges.map(e => ({ from: e.source, to: e.target, arrows: 'to' })))
+
+                const orgNet = new vis.Network(
+                    pane.querySelector('#orgNet'),
+                    { nodes: n, edges: e },
+                    {
+                        layout: {
+                            hierarchical: {
+                                direction: 'UD',
+                                sortMethod: 'directed',
+                                levelSeparation: 100
+                            }
+                        },
+                        nodes: {
+                            color: { border: '#333333' },
+                            font: { color: '#ffffff', size: 14 },
+                            shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 5 }
+                        },
+                        edges: {
+                            color: { color: '#555555' },
+                            width: 2,
+                            smooth: { type: 'cubicBezier' }
+                        },
+                        interaction: {
+                            hover: true,
+                            tooltipDelay: 200
+                        },
+                        physics: {
+                            enabled: false
+                        }
+                    }
+                )
+
+                let currentChart = chart        // stash for click handler
+
+                orgNet.on('click', params => {
+                    if (!params.nodes.length) return
+
+                    // Reset any previously highlighted nodes
+                    orgNet.selectNodes([]);
+
+                    // Get the selected person
+                    const person = currentChart.nodes.find(x => x.id === params.nodes[0])
+                    if (person) {
+                        // Highlight the selected node
+                        orgNet.selectNodes([person.id]);
+
+                        selectedPerson = person
+                        showPersonDetails(person)
+
+                        // Scroll right sidebar to the person details
+                        const rightSidebar = document.getElementById('rightSidebar');
+                        rightSidebar.scrollTo({
+                            top: rightSidebar.scrollHeight,
+                            behavior: 'smooth'
+                        });
+                    }
+                })
+            }
+
+            function colorForScore(s) {                // 0 → gray, 1 → emerald
+                const g = Math.round(200 * (1 - s))
+                return `rgb(${g},${255 - g},120)`
+            }
+
+            function showPersonDetails(p) {
+                const box = document.getElementById('personPane')
+                box.classList.remove('hidden')
+
+                // Render decision score badge with appropriate color
+                const scoreColor = colorForScore(p.decision_score || 0)
+                const scorePercentage = (p.decision_score * 100).toFixed(1)
+
+                box.innerHTML = `
+                    <div class="bg-neutral-800 rounded-lg p-4">
+                      <div class="flex items-start space-x-3">
+                        <img src="${p.avatar_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(p.name)}" 
+                             class="h-16 w-16 rounded-full object-cover border-2 border-neutral-700"/>
+                        <div class="flex-1">
+                          <div class="flex justify-between items-start">
+                            <div>
+                              <div class="font-semibold text-lg">${p.name}</div>
+                              <div class="text-neutral-300 text-sm">${p.title || 'Employee'}</div>
+                            </div>
+                            <span class="px-2 py-1 rounded-full text-sm font-medium" 
+                                  style="background-color:${scoreColor}">
+                              ${scorePercentage}% influence
+                            </span>
+                          </div>
+                          
+                          <div class="mt-3 grid grid-cols-2 gap-2 text-xs text-neutral-300">
+                            <div class="flex items-center">
+                              <i class="fas fa-sitemap w-5 text-neutral-500"></i>
+                              <span class="ml-1">${p.dept || 'Department not specified'}</span>
+                            </div>
+                            <div class="flex items-center">
+                              <i class="fas fa-calendar-alt w-5 text-neutral-500"></i>
+                              <span class="ml-1">${p.yoe_current || '?'} years at company</span>
+                            </div>
+                            <div class="flex items-center">
+                              <i class="fas fa-briefcase w-5 text-neutral-500"></i>
+                              <span class="ml-1">${p.title_level || 'Level not specified'}</span>
+                            </div>
+                            <div class="flex items-center">
+                              <i class="fas fa-user-friends w-5 text-neutral-500"></i>
+                              <span class="ml-1">${p.connection_count || '?'} connections</span>
+                            </div>
+                          </div>
+                          
+                          <div class="mt-3 flex justify-end">
+                            <a href="${p.id}" target="_blank" 
+                               class="bg-emerald-800 hover:bg-emerald-700 text-emerald-100 px-3 py-1 rounded text-xs flex items-center transition-colors">
+                              <i class="fab fa-linkedin mr-1"></i> View on LinkedIn
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    </div>`
+            }
+
+            // ───── Chat drawer logic ─────
+            const chatFab = document.getElementById('chatFab')
+            const chatDrawer = document.getElementById('chatDrawer')
+            const chatClose = document.getElementById('chatClose')
+            const chatBody = document.getElementById('chatBody')
+            const chatInput = document.getElementById('chatInput')
+
+            chatFab.onclick = () => {
+                chatDrawer.style.transform = 'translateY(0)';
+                chatFab.style.display = 'none';
+            }
+
+            chatClose.onclick = () => {
+                chatDrawer.style.transform = 'translateY(100%)'
+                chatFab.style.display = 'block';
+            }
+
+            chatInput.addEventListener('keydown', e => {
+                if (e.key === 'Enter' && chatInput.value.trim()) {
+                    sendChat(chatInput.value.trim())
+                    chatInput.value = ''
+                }
+            })
+
+            // context vars
+            let currentCompany = null, currentChart = null, companyMeta = null,
+                decisionMakers = null, similarCompanies = null, selectedPerson = null
+            function loadOrgChart(id) {
+                const pane = document.getElementById('rightPane')
+                pane.innerHTML = '<div class="p-4 text-sm">Loading…</div>'
+                pane.style.transform = 'translateX(0)'
+                try {
+                    fetch(`org_chart_${id.replace(/\//g, "_")}.json`)
+                        .then(r => r.json())
+                        .then(chart => {
+                            currentChart = chart
+                            currentCompany = id
+                            companyMeta = data.nodes.find(n => n.id === id) || {}
+                            decisionMakers = chart.nodes.filter(n => n.decision_score >= 0.5)
+                            similarCompanies = data.edges.filter(e => e.source === id)
+                                .sort((a, b) => b.weight - a.weight)
+                                .slice(0, 3).map(e => e.target)
+
+                            renderOrg(chart, pane)
+                        })
+                } catch (e) { pane.innerHTML = '<div class="p-4 text-red-600">Org chart not found</div>' }
+            }
+
+            async function sendChat(userMsg) {
+                appendMsg("you", userMsg)
+                try {
+                    const msgs = []
+                    const context = {
+                        company: companyMeta,
+                        orgChart: currentChart,
+                        decisionMakers,
+                        // similarCompanies,
+                        selectedPerson,
+                        rawEmployees: (await getPeopleRows()).filter(p => p.company_handle.replace(/\/$/, '') === currentCompany)
+                    }
+                    // remove desc_embed from company
+                    context.company.desc_embed = ""
+
+                    msgs.push({ role: "system", content: `CONTEXT:\n${JSON.stringify(context)}` })
+                    msgs.push({ role: "user", content: userMsg })
+
+                    for await (const chunk of API.chatStream(msgs)) {
+                        appendMsg("ai", chunk, true)
+                    }
+                } catch (err) { appendMsg("ai", `[error: ${err.message}]`) }
+            }
+
+            function appendMsg(sender, text, streaming = false) {
+                let el = chatBody.lastElementChild
+                if (streaming && el && el.dataset.sender === sender) {
+                    // Just append raw text for streaming mode
+                    el.lastChild.innerHTML += text.replace(/\n/g, "<br>")
+                } else {
+                    el = document.createElement('div')
+                    el.className = 'chat-message'
+                    el.dataset.sender = sender
+
+                    // Create sender element
+                    const senderEl = document.createElement('span')
+                    senderEl.className = sender === 'you' ? 'text-emerald-400' : 'text-cyan-400'
+                    senderEl.textContent = `${sender}:`
+
+                    // Create content element
+                    const contentEl = document.createElement('div')
+                    contentEl.className = 'ml-1 mt-1'
+
+                    // Apply markdown parsing
+                    contentEl.innerHTML = marked.parse(text)
+
+                    // Style markdown elements
+                    const style = document.createElement('style')
+                    style.textContent = `
+          .chat-message a { color: #34D399; text-decoration: underline; }
+          .chat-message p { margin-bottom: 0.5rem; }
+          .chat-message h1, .chat-message h2, .chat-message h3 { 
+            font-weight: bold; 
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+          }
+          .chat-message code {
+            background-color: #222;
+            padding: 0.1rem 0.3rem;
+            border-radius: 0.25rem;
+            font-family: monospace;
+          }
+          .chat-message pre {
+            background-color: #222;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            overflow-x: auto;
+            margin: 0.5rem 0;
+          }
+          .chat-message pre code {
+            background-color: transparent;
+            padding: 0;
+          }
+          .chat-message ul, .chat-message ol {
+            margin-left: 1.5rem;
+            margin-bottom: 0.5rem;
+          }
+          .chat-message ul { list-style-type: disc; }
+          .chat-message ol { list-style-type: decimal; }
+        `
+                    document.head.appendChild(style)
+
+                    // Append elements
+                    el.appendChild(senderEl)
+                    el.appendChild(contentEl)
+                    chatBody.appendChild(el)
+                }
+                chatBody.scrollTop = chatBody.scrollHeight
+            }
+
+            // Settings modal and API key management
+            const settingsBtn = document.getElementById('settingsBtn');
+            const settingsModal = document.getElementById('settingsModal');
+            const closeSettingsModal = document.getElementById('closeSettingsModal');
+            const apiKeyInput = document.getElementById('apiKeyInput');
+            const saveApiKey = document.getElementById('saveApiKey');
+            
+            // Check for saved API key in localStorage
+            const savedApiKey = localStorage.getItem('openai_api_key');
+            if (savedApiKey) {
+                API.setApiKey(savedApiKey);
+                apiKeyInput.value = savedApiKey;
+            } else {
+                // Show settings modal on page load if no API key is set
+                setTimeout(() => {
+                    settingsModal.classList.remove('hidden');
+                }, 500);
+            }
+            
+            // Open settings modal when settings button is clicked
+            settingsBtn.addEventListener('click', () => {
+                settingsModal.classList.remove('hidden');
+            });
+            
+            // Close settings modal
+            closeSettingsModal.addEventListener('click', () => {
+                settingsModal.classList.add('hidden');
+            });
+            
+            // Close modal when clicking outside of it
+            settingsModal.addEventListener('click', (e) => {
+                if (e.target === settingsModal) {
+                    settingsModal.classList.add('hidden');
+                }
+            });
+            
+            // Save API key
+            saveApiKey.addEventListener('click', () => {
+                const apiKey = apiKeyInput.value.trim();
+                if (apiKey) {
+                    localStorage.setItem('openai_api_key', apiKey);
+                    API.setApiKey(apiKey);
+                    settingsModal.classList.add('hidden');
+                    showToast('API key saved successfully', 2000);
+                } else {
+                    showToast('Please enter a valid API key', 2000);
+                }
+            });
+            
+            // Allow Enter key to submit API key
+            apiKeyInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    saveApiKey.click();
+                }
+            });
+
+
+            // ───── Split.js and sidebar setup ─────
+            const leftSidebar = document.getElementById('leftSidebar');
+            const rightSidebar = document.getElementById('rightSidebar');
+            const mainContent = document.getElementById('mainContent');
+            const leftSidebarToggle = document.getElementById('leftSidebarToggle');
+            const rightSidebarToggle = document.getElementById('rightSidebarToggle');
+
+            // Load saved splitter sizes
+            const savedSizes = localStorage.getItem('mainSplitSizes');
+            const defaultSizes = [20, 80, 0];
+
+            // Initialize Split.js
+            const split = Split(['#mainContent', '#rightSidebar'], {
+                sizes: savedSizes ? JSON.parse(savedSizes) : defaultSizes,
+                minSize: [0, 300, 0],
+                gutterSize: 5,
+                snapOffset: 0,
+                dragInterval: 1,
+                direction: 'horizontal',
+                elementStyle: function (dimension, size, gutterSize) {
+                    return {
+                        'flex-basis': `calc(${size}% - ${gutterSize}px)`,
+                    }
+                },
+                gutterStyle: function (dimension, gutterSize) {
+                    return {
+                        'flex-basis': `${gutterSize}px`,
+                    }
+                },
+                onDragEnd: function (sizes) {
+                    localStorage.setItem('mainSplitSizes', JSON.stringify(sizes));
+                }
+            });
+
+            // Set initial sidebar states based on saved sizes
+            if (savedSizes) {
+                const sizes = JSON.parse(savedSizes);
+                if (sizes[0] < 1) {
+                    leftSidebar.classList.add('collapsed');
+                    leftSidebarToggle.innerHTML = '<i class="fa fa-chevron-right"></i>';
+                }
+                if (sizes[2] < 1) {
+                    rightSidebar.classList.add('collapsed');
+                    rightSidebarToggle.innerHTML = '<i class="fa fa-chevron-left"></i>';
+                }
+            }
+
+            // Toggle left sidebar
+            function toggleLeftSidebar() {
+                const isCollapsed = leftSidebar.classList.toggle('collapsed');
+                leftSidebarToggle.innerHTML = isCollapsed
+                    ? '<i class="fa fa-chevron-right"></i>'
+                    : '<i class="fa fa-chevron-left"></i>';
+
+                // if (isCollapsed) {
+                //     split.setSizes([0, rightSidebar.classList.contains('collapsed') ? 100 : 70, 30]);
+                // } else {
+                //     split.setSizes([20, rightSidebar.classList.contains('collapsed') ? 80 : 50, 30]);
+                // }
+
+                // Save current sizes
+                localStorage.setItem('mainSplitSizes', JSON.stringify(split.getSizes()));
+
+                // Resize graph when sidebar toggles
+                setTimeout(resizeGraph, 300);
+            }
+
+            // Toggle right sidebar
+            function toggleRightSidebar() {
+                const isCollapsed = rightSidebar.classList.toggle('collapsed');
+
+                if (isCollapsed) {
+                    // read current value of "flex-basis"
+                    let flexBasis = getComputedStyle(rightSidebar).flexBasis;
+                    rightSidebar.dataset.flexBasis = flexBasis;
+                    rightSidebar.style.flexBasis = '0px';
+                } else {
+                    // restore the value of "flex-basis" from the dataset
+                    rightSidebar.style.flexBasis = rightSidebar.dataset.flexBasis;
+                }
+
+                rightSidebarToggle.innerHTML = isCollapsed
+                    ? '<i class="fa fa-chevron-left"></i>'
+                    : '<i class="fa fa-chevron-right"></i>';
+
+                // Save current sizes
+                localStorage.setItem('mainSplitSizes', JSON.stringify(split.getSizes()));
+
+                // Resize graph when sidebar toggles
+                setTimeout(resizeGraph, 300);
+            }
+
+            // Add event listeners for toggle buttons
+            leftSidebarToggle.addEventListener('click', toggleLeftSidebar);
+            rightSidebarToggle.addEventListener('click', toggleRightSidebar);
+
+            // Resize the network graph when window or splitter changes
+            function resizeGraph() {
+                if (network) {
+                    const container = document.getElementById('graph');
+                    const availableWidth = container.clientWidth;
+                    const availableHeight = container.clientHeight;
+
+                    // Apply smart fit with appropriate scale and offset
+                    // get the current selected node id
+                    let selectedNodeId = network.getSelectedNodes()[0]
+                    // if no node is selected, use the first node
+                    if (!selectedNodeId) {
+                        const firstNode = data.nodes[0]
+                        selectedNodeId = firstNode.id
+                        // select the first node
+                        network.selectNodes([selectedNodeId])
+                        loadOrgChart(selectedNodeId)
+                    } else {
+                        network.focus(selectedNodeId, {
+                            animation: true,
+                            scale: Math.min(1.5, Math.max(0.5, Math.min(availableWidth, availableHeight) / 500))
+                        });
+                    }
+                }
+            }
+
+            window.resizeGraph = resizeGraph;
+            window.addEventListener('resize', resizeGraph);
+
+            // Add zoom control buttons functionality
+            const ZOOM_STEP = 0.2         // relative factor
+            document.getElementById('zoomInBtn').addEventListener('click', () => {
+                network.moveTo({
+                    scale: network.getScale() + ZOOM_STEP,
+                    animation: { duration: 300, easingFunction: 'easeInOutQuad' }
+                })
+            })
+            document.getElementById('zoomOutBtn').addEventListener('click', () => {
+                network.moveTo({
+                    scale: Math.max(0.1, network.getScale() - ZOOM_STEP),
+                    animation: { duration: 300, easingFunction: 'easeInOutQuad' }
+                })
+            });
+
+            document.getElementById('resetViewBtn').addEventListener('click', () => {
+                network.fit({
+                    animation: { duration: 800, easingFunction: 'easeInOutQuad' }
+                })
+            });
+
+            // Add hover information for nodes
+            network.on('hoverNode', params => {
+                const nodeId = params.node;
+                const node = data.nodes.find(n => n.id === nodeId);
+                if (node) {
+                    const graphInfo = document.getElementById('graphInfo');
+                    const graphInfoContent = document.getElementById('graphInfoContent');
+
+                    graphInfoContent.innerHTML = `
+                            <div class="font-semibold text-neutral-200">${node.name}</div>
+                            <div class="text-neutral-400">${node.industry || 'Industry: N/A'}</div>
+                            <div class="flex items-center mt-1">
+                                <i class="fas fa-users mr-1 text-blue-400"></i>
+                                <span>${node.followers?.toLocaleString() || '0'} followers</span>
+                            </div>
+                            <div class="mt-1">${node.about || ''}</div>
+                        `;
+
+                    graphInfo.classList.remove('hidden');
+                }
+            });
+
+            network.on('blurNode', () => {
+                document.getElementById('graphInfo').classList.add('hidden');
+            });
+
+            // Add selected node styling
+            network.on('selectNode', params => {
+                const nodeId = params.nodes[0];
+                if (nodeId) {
+                    // Focus on the selected node
+                    network.focus(nodeId, {
+                        scale: 1.2,
+                        animation: true,
+                    });
+
+                    // Also load the org chart for the selected company
+                    focusCompany(nodeId);
+
+                    // Add visual indicator in the sidebar
+                    document.querySelectorAll('#companyList li').forEach(el => {
+                        el.classList.remove('border-blue-500');
+                        // Find the corresponding company in the sidebar
+                        if (el.querySelector('h3').textContent === data.nodes.find(n => n.id === nodeId)?.name) {
+                            el.classList.add('border-blue-500');
+                            // Scroll the sidebar to show the selected company
+                            el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
+                    });
+                }
+            });
+
+            // Initial fit after a short delay to ensure the network is properly initialized
+            setTimeout(resizeGraph, 500);
+        }
+
+    </script>
+</body>
+
+</html>

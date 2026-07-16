@@ -1,0 +1,32 @@
+# Infinite Scroll Product Loading
+# Load all products using scroll automation
+
+# Navigate to catalog
+CLICK `#catalog-link`
+WAIT `.product-grid` 3
+
+# Switch to infinite scroll mode
+CLICK `#infinite-scroll-btn`
+
+# Define scroll procedure
+PROC load_more_products
+  # Get current product count
+  EVAL `window.initialCount = document.querySelectorAll('.product-card').length`
+  
+  # Scroll down
+  SCROLL DOWN 1000
+  WAIT 2
+  
+  # Check if more products loaded
+  EVAL `
+    const newCount = document.querySelectorAll('.product-card').length;
+    console.log('Products loaded: ' + newCount);
+    window.moreLoaded = newCount > window.initialCount;
+  `
+ENDPROC
+
+# Load products until no more
+REPEAT (load_more_products, `window.moreLoaded !== false`)
+
+# Final count
+EVAL `console.log('✅ Total products: ' + document.querySelectorAll('.product-card').length)`

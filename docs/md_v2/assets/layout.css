@@ -1,0 +1,576 @@
+/* ==== File: assets/layout.css (Non-Fluid Centered Layout) ==== */
+
+:root {
+    --header-height: 55px; /* Adjust if needed */
+    --sidebar-width: 280px; /* Adjust if needed */
+    --toc-width: 340px; /* As specified */
+    --content-max-width: 90em; /* Max width for the centered content */
+    --layout-transition-speed: 0.2s;
+    --global-space: 10px;
+}
+
+/* --- Basic Setup --- */
+html {
+    scroll-behavior: smooth;
+    scroll-padding-top: calc(var(--header-height) + 15px);
+    box-sizing: border-box;
+}
+*, *:before, *:after {
+    box-sizing: inherit;
+}
+
+body {
+    padding-top: 0;
+    padding-bottom: 0;
+    background-color: var(--background-color);
+    color: var(--font-color);
+    /* Prevents horizontal scrollbars during transitions */
+    overflow-x: hidden;
+}
+
+/* --- Fixed Header --- */
+/* Full width, fixed header */
+.terminal .container:first-child { /* Assuming this targets the header container */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--header-height);
+    background-color: var(--background-color);
+    z-index: 1000;
+    border-bottom: 1px solid var(--progress-bar-background);
+    max-width: none; /* Override any container max-width */
+    padding: 0 calc(var(--global-space) * 2);
+}
+
+/* --- Main Layout Container (Below Header) --- */
+/* This container just provides space for the fixed header */
+.container:has(.terminal-mkdocs-main-grid) {
+    margin: 0 auto;
+    padding: 0;
+    padding-top: var(--header-height); /* Space for fixed header */
+}
+
+/* --- Flex Container: Grid holding content and toc (CENTERED) --- */
+/* THIS is the main centered block */
+.terminal-mkdocs-main-grid {
+    display: flex;
+    align-items: flex-start;
+    /* Enforce max-width and center */
+    max-width: var(--content-max-width);
+    margin-left: auto;
+    margin-right: auto;
+    position: relative;
+    /* Apply side padding within the centered block */
+    padding-left: calc(var(--global-space) * 2);
+    padding-right: calc(var(--global-space) * 2);
+    /* Add margin-left to clear the fixed sidebar - ONLY ON DESKTOP */
+    margin-left: var(--sidebar-width);
+}
+
+/* --- 1. Fixed Left Sidebar (Viewport Relative) --- */
+#terminal-mkdocs-side-panel {
+    position: fixed;
+    top: var(--header-height);
+    left: max(0px, calc((90vw - var(--content-max-width)) / 2)); 
+    bottom: 0;
+    width: var(--sidebar-width);
+    background-color: var(--background-color);
+    border-right: 1px solid var(--progress-bar-background);
+    overflow-y: auto;
+    z-index: 900;
+    padding: 1em calc(var(--global-space) * 2);
+    padding-bottom: 2em;
+    transition: left var(--layout-transition-speed) ease-in-out;
+}
+
+/* --- 2. Main Content Area (Within Centered Grid) --- */
+#terminal-mkdocs-main-content {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 0; /* Flexbox shrink fix */
+
+    /* No left/right margins needed here - handled by parent grid */
+    margin-left: 0;
+    margin-right: 0;
+
+    /* Internal Padding */
+    padding: 1.5em 2em;
+
+    position: relative;
+    z-index: 1;
+}
+
+/* --- 3. Right Table of Contents (Sticky, Within Centered Grid) --- */
+#toc-sidebar {
+    flex-basis: var(--toc-width);
+    flex-shrink: 0;
+    width: var(--toc-width);
+
+    position: sticky; /* Sticks within the centered grid */
+    top: var(--header-height);
+    align-self: stretch;
+    height: calc(100vh - var(--header-height));
+    overflow-y: auto;
+
+    padding: 1.5em 1em;
+    font-size: 0.85em;
+    border-left: 1px solid var(--progress-bar-background);
+    z-index: 800;
+    /* display: none; /* JS handles */
+}
+
+/* (ToC link styles remain the same) */
+#toc-sidebar h4 { margin-top: 0; margin-bottom: 1em; font-size: 1.1em; color: var(--secondary-color); padding-left: 0.8em; }
+#toc-sidebar ul { list-style: none; padding: 0; margin: 0; }
+#toc-sidebar ul li a { display: block; padding: 0.3em 0; color: var(--secondary-color); text-decoration: none; border-left: 3px solid transparent; padding-left: 0.8em; transition: all 0.1s ease-in-out; line-height: 1.4; word-break: break-word; }
+#toc-sidebar ul li.toc-level-3 a { padding-left: 1.8em; }
+#toc-sidebar ul li.toc-level-4 a { padding-left: 2.8em; }
+#toc-sidebar ul li a:hover { color: var(--font-color); background-color: rgba(255, 255, 255, 0.05); }
+#toc-sidebar ul li a.active { color: var(--primary-color); border-left-color: var(--primary-color); background-color: rgba(80, 255, 255, 0.08); }
+
+
+/* --- Footer Styling (Respects Centered Layout) --- */
+footer {
+    background-color: var(--code-bg-color);
+    color: var(--secondary-color);
+    position: relative;
+    z-index: 10;
+    margin-top: 2em;
+
+    /* Apply margin-left to clear the fixed sidebar */
+    margin-left: var(--sidebar-width);
+
+    /* Constrain width relative to the centered grid it follows */
+    max-width: calc(var(--content-max-width) - var(--sidebar-width));
+    margin-right: auto; /* Keep it left-aligned within the space next to sidebar */
+
+    /* Use padding consistent with the grid */
+    padding: 2em calc(var(--global-space) * 2);
+}
+
+/* Adjust footer grid if needed */
+.terminal-mkdocs-footer-grid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 1em;
+    align-items: center;
+}
+
+/* ==========================================================================
+   RESPONSIVENESS (Adapting the Non-Fluid Layout)
+   ========================================================================== */
+
+/* --- Medium screens: Hide ToC --- */
+@media screen and (max-width: 1200px) {
+    #toc-sidebar {
+        display: none;
+    }
+
+    .terminal-mkdocs-main-grid {
+        /* Grid adjusts automatically as ToC is removed */
+        /* Ensure grid padding remains */
+         padding-left: calc(var(--global-space) * 2);
+         padding-right: calc(var(--global-space) * 2);
+    }
+
+    #terminal-mkdocs-main-content {
+        /* Content area naturally expands */
+    }
+
+    footer {
+        /* Footer still respects the left sidebar and overall max width */
+        margin-left: var(--sidebar-width);
+        max-width: calc(var(--content-max-width) - var(--sidebar-width));
+        /* Padding remains consistent */
+         padding-left: calc(var(--global-space) * 2);
+         padding-right: calc(var(--global-space) * 2);
+    }
+}
+
+/* --- Mobile Menu Styles --- */
+.mobile-menu-toggle {
+    display: none; /* Hidden by default, shown in mobile */
+    background: none;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+    z-index: 1200;
+    margin-right: 10px;
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    /* Make sure it doesn't get moved */
+    min-width: 30px;
+    min-height: 30px;
+}
+
+.hamburger-line {
+    display: block;
+    width: 22px;
+    height: 2px;
+    margin: 5px 0;
+    background-color: var(--font-color);
+    transition: transform 0.3s, opacity 0.3s;
+}
+
+/* Hamburger animation */
+.mobile-menu-toggle.is-active .hamburger-line:nth-child(1) {
+    transform: translateY(7px) rotate(45deg);
+}
+
+.mobile-menu-toggle.is-active .hamburger-line:nth-child(2) {
+    opacity: 0;
+}
+
+.mobile-menu-toggle.is-active .hamburger-line:nth-child(3) {
+    transform: translateY(-7px) rotate(-45deg);
+}
+
+.mobile-menu-close {
+    display: none; /* Hidden by default, shown in mobile */
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: var(--font-color);
+    font-size: 24px;
+    cursor: pointer;
+    z-index: 1200;
+    padding: 5px 10px;
+}
+
+.mobile-menu-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1050;
+}
+
+/* --- Small screens: Hide left sidebar, full width content & footer --- */
+@media screen and (max-width: 768px) {
+    /* Hide the terminal-menu from theme */
+    .terminal-menu {
+        display: none !important;
+    }
+    
+    /* Add padding to site name to prevent hamburger overlap */
+    .terminal-mkdocs-site-name,
+    .terminal-logo a,
+    .terminal-nav .logo {
+        padding-left: 40px !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    /* Show mobile menu toggle button */
+    .mobile-menu-toggle {
+        display: block;
+    }
+    
+    /* Show mobile menu close button */
+    .mobile-menu-close {
+        display: block;
+    }
+
+    #terminal-mkdocs-side-panel {
+        left: -100%; /* Hide completely off-screen */
+        z-index: 1100;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+        top: 0; /* Start from top edge */
+        height: 100%; /* Full height */
+        transition: left 0.3s ease-in-out;
+        padding-top: 50px; /* Space for close button */
+        overflow-y: auto;
+        width: 85%; /* Wider on mobile */
+        max-width: 320px; /* Maximum width */
+        background-color: var(--background-color); /* Ensure solid background */
+    }
+    
+    #terminal-mkdocs-side-panel.sidebar-visible {
+        left: 0;
+    }
+    
+    /* Make navigation links more touch-friendly */
+    #terminal-mkdocs-side-panel a {
+        padding: 6px 15px;
+        display: block;
+        /* No border as requested */
+    }
+    
+    #terminal-mkdocs-side-panel ul {
+        padding-left: 0;
+    }
+    
+    #terminal-mkdocs-side-panel ul ul a {
+        padding-left: 10px;
+    }
+
+    .terminal-mkdocs-main-grid {
+        /* Grid now takes full width (minus body padding) */
+        margin-left: 0 !important; /* Override sidebar margin with !important */
+        margin-right: 0; /* Override auto margin */
+        max-width: 100%; /* Allow full width */
+        padding-left: var(--global-space); /* Reduce padding */
+        padding-right: var(--global-space);
+    }
+
+    #terminal-mkdocs-main-content {
+        padding: 1.5em 1em; /* Adjust internal padding */
+    }
+
+    footer {
+        margin-left: 0; /* Full width footer */
+        max-width: 100%; /* Allow full width */
+        padding: 2em 1em; /* Adjust internal padding */
+    }
+
+    .terminal-mkdocs-footer-grid {
+         grid-template-columns: 1fr; /* Stack footer items */
+         text-align: center;
+         gap: 0.5em;
+    }
+}
+
+
+/* ==== GitHub Stats Badge Styling ==== */
+
+.github-stats-badge {
+    display: inline-block; /* Or flex if needed */
+    margin-left: 2em; /* Adjust spacing */
+    vertical-align: middle; /* Align with other header items */
+    font-size: 0.9em; /* Slightly smaller font */
+}
+
+.github-stats-badge a {
+    color: var(--secondary-color); /* Use secondary color */
+    text-decoration: none;
+    display: flex; /* Use flex for alignment */
+    align-items: center;
+    gap: 0.8em; /* Space between items */
+    padding: 0.2em 0.5em;
+    border: 1px solid var(--progress-bar-background); /* Subtle border */
+    border-radius: 4px;
+    transition: color 0.2s, background-color 0.2s;
+}
+
+.github-stats-badge a:hover {
+    color: var(--font-color); /* Brighter color on hover */
+    background-color: var(--progress-bar-background); /* Subtle background on hover */
+}
+
+.github-stats-badge .repo-name {
+    color: var(--font-color); /* Make repo name stand out slightly */
+    font-weight: 500; /* Optional bolder weight */
+}
+
+.github-stats-badge .stat {
+    /* Styles for individual stats (version, stars, forks) */
+    white-space: nowrap; /* Prevent wrapping */
+}
+
+.github-stats-badge .stat i {
+    /* Optional: Style for FontAwesome icons */
+    margin-right: 0.3em;
+    color: var(--secondary-dimmed-color); /* Dimmer color for icons */
+}
+
+
+/* Adjust positioning relative to search/nav if needed */
+/* Example: If search is floated right */
+/* .terminal-nav { float: left; } */
+/* .github-stats-badge { float: left; } */
+/* #mkdocs-search-query { float: right; } */
+
+/* --- Responsive adjustments --- */
+@media screen and (max-width: 900px) { /* Example breakpoint */
+    .github-stats-badge .repo-name {
+        display: none; /* Hide full repo name on smaller screens */
+    }
+    .github-stats-badge {
+        margin-left: 1em;
+    }
+     .github-stats-badge a {
+        gap: 0.5em;
+    }
+}
+@media screen and (max-width: 768px) {
+    /* Further hide or simplify on mobile if needed */
+     .github-stats-badge {
+        display: none; /* Example: Hide completely on smallest screens */
+     }
+}
+
+/* --- Ask AI Selection Button --- */
+.ask-ai-selection-button {
+    background-color: var(--primary-dimmed-color, #09b5a5);
+    color: var(--background-color, #070708);
+    border: none;
+    padding: 6px 10px;
+    font-size: 0.8em;
+    border-radius: 4px;
+    cursor: pointer;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+    transition: background-color 0.2s ease, transform 0.15s ease;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+    animation: askAiButtonAppear 0.2s ease-out;
+}
+
+@keyframes askAiButtonAppear {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.ask-ai-selection-button:hover {
+    background-color: var(--primary-color, #50ffff);
+    transform: scale(1.05);
+}
+
+/* Mobile styles for Ask AI button */
+@media screen and (max-width: 768px) {
+    .ask-ai-selection-button {
+        padding: 8px 12px; /* Larger touch target on mobile */
+        font-size: 0.9em; /* Slightly larger text */
+    }
+}
+
+/* ==== File: docs/assets/layout.css (Additions) ==== */
+
+/* ... (keep all existing layout CSS) ... */
+
+/* --- Copy Code Button Styling --- */
+
+/* Ensure the parent <pre> can contain the absolutely positioned button */
+#terminal-mkdocs-main-content pre {
+    position: relative; /* Needed for absolute positioning of child */
+    /* Add a little padding top/right to make space for the button */
+    padding-top: 2.5em;
+    padding-right: 1em; /* Ensure padding is sufficient */
+}
+
+.copy-code-button {
+    position: absolute;
+    top: 0.5em; /* Adjust spacing from top */
+    left: 0.5em; /* Adjust spacing from left */
+    z-index: 1; /* Sit on top of code */
+
+    background-color: var(--progress-bar-background, #444); /* Use a background */
+    color: var(--font-color, #eaeaea);
+    border: 1px solid var(--secondary-color, #727578);
+    padding: 3px 8px;
+    font-size: 0.8em;
+    font-family: var(--font-stack, monospace);
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0; /* Hidden by default */
+    transition: opacity 0.2s ease-in-out, background-color 0.2s ease, color 0.2s ease;
+    white-space: nowrap;
+}
+
+/* Show button on hover of the <pre> container */
+#terminal-mkdocs-main-content pre:hover .copy-code-button {
+    opacity: 0.8; /* Show partially */
+}
+
+.copy-code-button:hover {
+    opacity: 1; /* Fully visible on button hover */
+    background-color: var(--secondary-color, #727578);
+}
+
+.copy-code-button:focus {
+     opacity: 1; /* Ensure visible when focused */
+     outline: 1px dashed var(--primary-color);
+}
+
+
+/* Style for "Copied!" state */
+.copy-code-button.copied {
+    background-color: var(--primary-dimmed-color, #09b5a5);
+    color: var(--background-color, #070708);
+    border-color: var(--primary-dimmed-color, #09b5a5);
+    opacity: 1; /* Ensure visible */
+}
+.copy-code-button.copied:hover {
+     background-color: var(--primary-dimmed-color, #09b5a5); /* Prevent hover change */
+}
+
+/* ==== File: docs/assets/layout.css (Additions) ==== */
+
+/* ... (keep all existing layout CSS) ... */
+
+/* --- Floating Ask AI Button --- */
+.floating-ask-ai-button {
+    position: fixed;
+    bottom: 25px;
+    right: 25px;
+    z-index: 1050; /* Below modals, above most content */
+
+    background-color: var(--primary-dimmed-color, #09b5a5);
+    color: var(--background-color, #070708);
+    border: none;
+    border-radius: 50%; /* Make it circular */
+    width: 60px; /* Adjust size */
+    height: 60px; /* Adjust size */
+    padding: 10px; /* Adjust padding */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+
+    display: flex;
+    flex-direction: column; /* Stack icon and text */
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    text-align: center;
+}
+
+.floating-ask-ai-button svg {
+    width: 24px; /* Control icon size */
+    height: 24px;
+}
+
+.floating-ask-ai-button span {
+    font-size: 0.7em;
+    margin-top: 2px; /* Space between icon and text */
+    display: block; /* Ensure it takes space */
+     line-height: 1;
+}
+
+
+.floating-ask-ai-button:hover {
+    background-color: var(--primary-color, #50ffff);
+    transform: scale(1.05); /* Slight grow effect */
+}
+
+.floating-ask-ai-button:focus {
+     outline: 2px solid var(--primary-color);
+     outline-offset: 2px;
+}
+
+/* Optional: Hide text on smaller screens if needed */
+@media screen and (max-width: 768px) {
+     .floating-ask-ai-button span {
+        /* display: none; */ /* Uncomment to hide text */
+     }
+     .floating-ask-ai-button {
+        width: 55px;
+        height: 55px;
+        bottom: 20px;
+        right: 20px;
+     }
+}

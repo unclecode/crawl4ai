@@ -1,0 +1,27 @@
+{
+  "name": "ArticleExtractor",
+  "baseSelector": ".cards[data-tax=news] .card__data",
+  "fields": [
+    {
+      "name": "title",
+      "selector": "h4.card__title",
+      "type": "text"
+    },
+    {
+      "name": "link",
+      "selector": "h4.card__title a", 
+      "type": "attribute",
+      "attribute": "href"
+    },
+    {
+      "name": "details",
+      "selector": ".card__details",
+      "type": "text"
+    },
+    {
+      "name": "topics",
+      "selector": ".card__topics.topics",
+      "type": "text"
+    }
+  ]
+}

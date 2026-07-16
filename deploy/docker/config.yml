@@ -1,0 +1,133 @@
+# Application Configuration
+app:
+  title: "Crawl4AI API"
+  version: "1.0.0"
+  # Loopback by default. Exposing on 0.0.0.0 requires a credential
+  # (CRAWL4AI_API_TOKEN); the startup auth guard refuses an open non-loopback
+  # bind without one. Put a TLS-terminating reverse proxy in front for exposure.
+  host: "127.0.0.1"
+  port: 11235
+  reload: False
+  workers: 1
+  timeout_keep_alive: 300
+
+# Default LLM Configuration
+llm:
+  provider: "openai/gpt-4o-mini"
+  # api_key: sk-...  # If you pass the API key directly (not recommended)
+
+# Redis Configuration
+# Set task_ttl_seconds to automatically expire task data in Redis.
+# This prevents unbounded memory growth from accumulated task results.
+# Default: 3600 (1 hour). Set to 0 to disable TTL (not recommended).
+# Can be overridden with REDIS_TASK_TTL environment variable.
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  password: ""
+  task_ttl_seconds: 3600  # TTL for task data (1 hour default)
+  ssl: False
+  ssl_cert_reqs: None
+  ssl_ca_certs: None
+  ssl_certfile: None
+  ssl_keyfile: None
+
+# Resource governance (DoS protection). Any limit set to 0 means "unbounded"
+# (the pre-hardening behavior), so you can relax or disable each one.
+limits:
+  max_body_bytes: 10485760  # 10 MiB request body cap (413 if exceeded); 0 = unbounded
+  max_pages: 100            # deep-crawl page budget clamp (defense in depth)
+  max_depth: 5              # deep-crawl depth clamp
+  wall_clock_s: 0           # per-crawl deadline in seconds (504 on timeout); 0 = no deadline
+  queue:                    # background job queue for /crawl/job and /llm/job
+    maxsize: 1000           # max queued jobs (503 when full); 0 = unbounded
+    workers: 4              # concurrent background workers
+    per_principal: 0        # max concurrent jobs per caller (429 over cap); 0 = unlimited
+
+# Rate Limiting Configuration
+rate_limiting:
+  enabled: True
+  default_limit: "1000/minute"
+  trusted_proxies: []
+  storage_uri: "memory://"  # Use "redis://localhost:6379" for production
+
+# Security Configuration
+# WARNING: For production deployments, enable security and use proper SECRET_KEY:
+#   - Set jwt_enabled: true for authentication
+#   - Set SECRET_KEY environment variable to a secure random value
+#   - Set CRAWL4AI_HOOKS_ENABLED=true only if you need hooks (RCE risk)
+security:
+  enabled: true
+  jwt_enabled: false
+  api_token: ""  # When set, /token endpoint requires this secret to issue JWTs
+  https_redirect: false
+  trusted_hosts: ["*"]
+  cors_allow_origins: []  # deny-by-default; list explicit origins to allow CORS
+  headers:
+    x_content_type_options: "nosniff"
+    x_frame_options: "DENY"
+    content_security_policy: "default-src 'self'"
+    strict_transport_security: "max-age=63072000; includeSubDomains"
+
+# Crawler Configuration
+crawler:
+  base_config:
+    simulate_user: true
+  memory_threshold_percent: 95.0
+  rate_limiter:
+    enabled: true
+    base_delay: [1.0, 2.0]
+  timeouts:
+    stream_init: 30.0  # Timeout for stream initialization
+    batch_process: 300.0  # Timeout for batch processing
+  pool:
+    max_pages: 40                          # ← GLOBAL_SEM permits
+    idle_ttl_sec: 300                     # ← 30 min janitor cutoff
+  browser:
+    kwargs:
+      headless: true
+      text_mode: true
+    extra_args:
+      # - "--single-process"
+      # SECURITY: --no-sandbox disables the Chromium renderer sandbox (a renderer
+      # exploit can then reach the container). It is required only because the
+      # container runs as non-root without a usable sandbox. To remove it, run
+      # the container with an unprivileged user namespace
+      # (host: unprivileged_userns_clone=1) OR a verified seccomp profile
+      # (compose: security_opt: seccomp=...), then delete this flag and confirm
+      # Chromium still starts. Tracked as a build-gated hardening item.
+      - "--no-sandbox"
+      - "--disable-dev-shm-usage"
+      - "--disable-gpu"
+      - "--disable-software-rasterizer"
+      # --disable-web-security removed for security (enables cross-origin access)
+      # --allow-insecure-localhost / --ignore-certificate-errors removed: they
+      # disabled TLS verification for every crawl (MITM / SSRF-to-internal-TLS).
+      # Set CRAWL4AI_ALLOW_INSECURE_TLS=true only for trusted internal testing.
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Observability Configuration
+observability:
+  prometheus:
+    enabled: True
+    endpoint: "/metrics"
+  health_check:
+    endpoint: "/health"
+
+# Webhook Configuration
+webhooks:
+  enabled: true
+  default_url: null  # Optional: default webhook URL for all jobs
+  data_in_payload: false  # Optional: default behavior for including data
+  retry:
+    max_attempts: 5
+    initial_delay_ms: 1000  # 1s, 2s, 4s, 8s, 16s exponential backoff
+    max_delay_ms: 32000
+    timeout_ms: 30000  # 30s timeout per webhook call
+  headers:  # Optional: default headers to include
+    User-Agent: "Crawl4AI-Webhook/1.0"

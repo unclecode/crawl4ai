@@ -1,0 +1,41 @@
+# Multi-step Form Wizard
+# Complete a complex form with multiple steps
+
+# Navigate to forms section
+CLICK `a[href="#forms"]`
+WAIT `#survey-form` 2
+
+# Step 1: Basic Information
+CLICK `#full-name`
+TYPE "John Doe"
+
+CLICK `#survey-email`  
+TYPE "john.doe@example.com"
+
+# Go to next step
+CLICK `.next-step`
+WAIT 1
+
+# Step 2: Select Interests
+# Select multiple options
+CLICK `#interests`
+CLICK `option[value="tech"]`
+CLICK `option[value="music"]`
+CLICK `option[value="travel"]`
+
+# Continue to final step
+CLICK `.next-step`
+WAIT 1
+
+# Step 3: Review and Submit
+# Verify we're on the last step
+IF (EXISTS `#submit-survey`) THEN EVAL `console.log('📋 On final step')`
+
+# Submit the form
+CLICK `#submit-survey`
+
+# Wait for success message
+WAIT `.success-message` 5
+
+# Verify submission
+IF (EXISTS `.success-message`) THEN EVAL `console.log('✅ Survey submitted successfully!')`

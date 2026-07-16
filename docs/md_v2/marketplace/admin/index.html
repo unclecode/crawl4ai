@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Crawl4AI Marketplace</title>
+    <link rel="stylesheet" href="../frontend/marketplace.css?v=1759329000">
+    <link rel="stylesheet" href="admin.css?v=1759329000">
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Login Screen -->
+        <div id="login-screen" class="login-screen">
+            <div class="login-box">
+                <img src="../../assets/images/logo.png" alt="Crawl4AI" class="login-logo">
+                <h1>[ Admin Access ]</h1>
+                <div id="login-form">
+                    <input type="password" id="password" placeholder="Enter admin password" autofocus onkeypress="if(event.key==='Enter'){document.getElementById('login-btn').click()}">
+                    <button type="button" id="login-btn">→ Login</button>
+                </div>
+                <div id="login-error" class="error-msg"></div>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard -->
+        <div id="admin-dashboard" class="admin-dashboard hidden">
+            <!-- Header -->
+            <header class="admin-header">
+                <div class="header-content">
+                    <div class="header-left">
+                        <img src="../../assets/images/logo.png" alt="Crawl4AI" class="header-logo">
+                        <h1>[ Admin Dashboard ]</h1>
+                    </div>
+                    <div class="header-right">
+                        <span class="admin-user">Administrator</span>
+                        <button id="logout-btn" class="logout-btn">↗ Logout</button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Layout -->
+            <div class="admin-layout">
+                <!-- Sidebar -->
+                <aside class="admin-sidebar">
+                    <nav class="sidebar-nav">
+                        <button class="nav-btn active" data-section="stats">
+                            <span class="nav-icon">▓</span> Dashboard
+                        </button>
+                        <button class="nav-btn" data-section="apps">
+                            <span class="nav-icon">◆</span> Apps
+                        </button>
+                        <button class="nav-btn" data-section="articles">
+                            <span class="nav-icon">■</span> Articles
+                        </button>
+                        <button class="nav-btn" data-section="categories">
+                            <span class="nav-icon">□</span> Categories
+                        </button>
+                        <button class="nav-btn" data-section="sponsors">
+                            <span class="nav-icon">◆</span> Sponsors
+                        </button>
+                    </nav>
+
+                    <div class="sidebar-actions">
+                        <button id="export-btn" class="action-btn">
+                            <span>↓</span> Export Data
+                        </button>
+                        <button id="backup-btn" class="action-btn">
+                            <span>▪</span> Backup DB
+                        </button>
+                    </div>
+                </aside>
+
+                <!-- Main Content -->
+                <main class="admin-main">
+                    <!-- Stats Section -->
+                    <section id="stats-section" class="content-section active">
+                        <h2>Dashboard Overview</h2>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-icon">◆</div>
+                                <div class="stat-info">
+                                    <div class="stat-number" id="stat-apps">--</div>
+                                    <div class="stat-label">Total Apps</div>
+                                    <div class="stat-detail">
+                                        <span id="stat-featured">--</span> featured,
+                                        <span id="stat-sponsored">--</span> sponsored
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">■</div>
+                                <div class="stat-info">
+                                    <div class="stat-number" id="stat-articles">--</div>
+                                    <div class="stat-label">Articles</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">◆</div>
+                                <div class="stat-info">
+                                    <div class="stat-number" id="stat-sponsors">--</div>
+                                    <div class="stat-label">Active Sponsors</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">●</div>
+                                <div class="stat-info">
+                                    <div class="stat-number" id="stat-views">--</div>
+                                    <div class="stat-label">Total Views</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h3>Quick Actions</h3>
+                        <div class="quick-actions">
+                            <button class="quick-btn" onclick="admin.showAddForm('apps')">
+                                <span>→</span> Add New App
+                            </button>
+                            <button class="quick-btn" onclick="admin.showAddForm('articles')">
+                                <span>→</span> Write Article
+                            </button>
+                            <button class="quick-btn" onclick="admin.showAddForm('sponsors')">
+                                <span>→</span> Add Sponsor
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Apps Section -->
+                    <section id="apps-section" class="content-section">
+                        <div class="section-header">
+                            <h2>Apps Management</h2>
+                            <div class="header-actions">
+                                <input type="text" id="apps-search" class="search-input" placeholder="Search apps...">
+                                <select id="apps-filter" class="filter-select">
+                                    <option value="">All Categories</option>
+                                </select>
+                                <button class="add-btn" onclick="admin.showAddForm('apps')">
+                                    <span>→</span> Add App
+                                </button>
+                            </div>
+                        </div>
+                        <div class="data-table" id="apps-table">
+                            <!-- Apps table will be populated here -->
+                        </div>
+                    </section>
+
+                    <!-- Articles Section -->
+                    <section id="articles-section" class="content-section">
+                        <div class="section-header">
+                            <h2>Articles Management</h2>
+                            <div class="header-actions">
+                                <input type="text" id="articles-search" class="search-input" placeholder="Search articles...">
+                                <button class="add-btn" onclick="admin.showAddForm('articles')">
+                                    <span>→</span> Add Article
+                                </button>
+                            </div>
+                        </div>
+                        <div class="data-table" id="articles-table">
+                            <!-- Articles table will be populated here -->
+                        </div>
+                    </section>
+
+                    <!-- Categories Section -->
+                    <section id="categories-section" class="content-section">
+                        <div class="section-header">
+                            <h2>Categories Management</h2>
+                            <div class="header-actions">
+                                <button class="add-btn" onclick="admin.showAddForm('categories')">
+                                    <span>→</span> Add Category
+                                </button>
+                            </div>
+                        </div>
+                        <div class="data-table" id="categories-table">
+                            <!-- Categories table will be populated here -->
+                        </div>
+                    </section>
+
+                    <!-- Sponsors Section -->
+                    <section id="sponsors-section" class="content-section">
+                        <div class="section-header">
+                            <h2>Sponsors Management</h2>
+                            <div class="header-actions">
+                                <button class="add-btn" onclick="admin.showAddForm('sponsors')">
+                                    <span>→</span> Add Sponsor
+                                </button>
+                            </div>
+                        </div>
+                        <div class="data-table" id="sponsors-table">
+                            <!-- Sponsors table will be populated here -->
+                        </div>
+                    </section>
+                </main>
+            </div>
+        </div>
+
+        <!-- Modal for Add/Edit Forms -->
+        <div id="form-modal" class="modal hidden">
+            <div class="modal-content large">
+                <div class="modal-header">
+                    <h2 id="modal-title">Add/Edit</h2>
+                    <button class="modal-close" onclick="admin.closeModal()">✕</button>
+                </div>
+                <div class="modal-body" id="modal-body">
+                    <!-- Dynamic form content -->
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-cancel" onclick="admin.closeModal()">Cancel</button>
+                    <button class="btn-save" id="save-btn">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js?v=1759335000"></script>
+</body>
+</html>

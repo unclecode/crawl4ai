@@ -1,0 +1,8 @@
+GO https://news.site.com
+WAIT `.article-list` 10
+SCROLL DOWN 500
+WAIT 1
+SCROLL DOWN 500
+WAIT 1
+CLICK `.article:nth-child(5)`
+WAIT `.article-content` 5

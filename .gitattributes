@@ -1,0 +1,12 @@
+# Documentation
+*.html linguist-documentation
+docs/* linguist-documentation
+docs/examples/* linguist-documentation
+docs/md_v2/* linguist-documentation
+
+# Explicitly mark Python as the main language
+*.py linguist-detectable=true
+*.py linguist-language=Python
+
+# Exclude HTML from language statistics
+*.html linguist-detectable=false

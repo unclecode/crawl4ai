@@ -1,0 +1,68 @@
+version: '3.8'
+
+# Shared configuration for all environments
+x-base-config: &base-config
+  ports:
+    - "11235:11235"  # Gunicorn port
+  env_file:
+    - .llm.env       # API keys (create from .llm.env.example)
+  # Uncomment to set default environment variables (will overwrite .llm.env)
+  # environment:
+  #   - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+  #   - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+  #   - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+  #   - GROQ_API_KEY=${GROQ_API_KEY:-}
+  #   - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
+  #   - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+  #   - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+  #   - LLM_PROVIDER=${LLM_PROVIDER:-}  # Optional: Override default provider (e.g., "anthropic/claude-3-opus")
+  # Chromium needs shared memory but the host /dev/shm bind was a shared,
+  # writable mount; use a private sized tmpfs instead.
+  shm_size: "1gb"
+  # Least privilege: drop all capabilities, forbid privilege escalation, cap PIDs.
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  pids_limit: 512
+  # Read-only root filesystem; only these paths are writable (tmpfs).
+  read_only: true
+  tmpfs:
+    - /tmp
+    - /var/lib/redis:uid=999,gid=999,mode=0700
+    - /var/lib/crawl4ai/outputs:uid=999,gid=999,mode=0700
+    - /home/appuser/.crawl4ai:uid=999,gid=999,mode=0700
+    # Keep the baked Playwright browser under ~/.cache/ms-playwright visible.
+    - /home/appuser/.cache/url_seeder:uid=999,gid=999,mode=0700
+    - /home/appuser/.gunicorn:uid=999,gid=999,mode=0700
+  deploy:
+    resources:
+      limits:
+        memory: 4G
+      reservations:
+        memory: 1G
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:11235/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+  user: "appuser"
+
+services:
+  crawl4ai:
+    # 1. Default: Pull multi-platform test image from Docker Hub
+    # 2. Override with local image via: IMAGE=local-test docker compose up
+    image: ${IMAGE:-unclecode/crawl4ai:${TAG:-latest}}
+    
+    # Local build config (used with --build)
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        INSTALL_TYPE: ${INSTALL_TYPE:-default}
+        ENABLE_GPU: ${ENABLE_GPU:-false}
+    
+    # Inherit shared config
+    <<: *base-config

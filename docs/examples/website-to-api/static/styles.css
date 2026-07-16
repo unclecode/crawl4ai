@@ -1,0 +1,765 @@
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #000000;
+    color: #FFFFFF;
+    line-height: 1.6;
+    font-size: 16px;
+}
+
+/* Header */
+.header {
+    border-bottom: 1px solid #333;
+    padding: 1rem 0;
+    background: #000000;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #FFFFFF;
+}
+
+.logo-image {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    object-fit: contain;
+}
+
+.nav-links {
+    display: flex;
+    gap: 2rem;
+}
+
+.nav-link {
+    color: #CCCCCC;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.nav-link:hover,
+.nav-link.active {
+    color: #FFFFFF;
+}
+
+/* Main Content */
+.main-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.page {
+    display: none;
+}
+
+.page.active {
+    display: block;
+}
+
+/* Hero Section */
+.hero-section {
+    text-align: center;
+    margin-bottom: 4rem;
+    padding: 2rem 0;
+}
+
+.hero-title {
+    font-size: 3rem;
+    font-weight: 700;
+    color: #FFFFFF;
+    margin-bottom: 1rem;
+    line-height: 1.2;
+}
+
+.hero-subtitle {
+    font-size: 1.25rem;
+    color: #CCCCCC;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* Workflow Demo */
+.workflow-demo {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 2rem;
+    align-items: start;
+    margin-bottom: 4rem;
+}
+
+.workflow-step {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.step-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #FFFFFF;
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.workflow-arrow {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #09b5a5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 20rem;
+}
+
+/* Request Box */
+.request-box {
+    border: 2px solid #333;
+    border-radius: 8px;
+    padding: 2rem;
+    background: #111111;
+}
+
+.input-group {
+    margin-bottom: 1.5rem;
+}
+
+.input-group label {
+    display: block;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    color: #FFFFFF;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.input-group input,
+.input-group textarea,
+.input-group select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #333;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    background: #1A1A1A;
+    color: #FFFFFF;
+    transition: border-color 0.2s ease;
+}
+
+.input-group input:focus,
+.input-group textarea:focus,
+.input-group select:focus {
+    outline: none;
+    border-color: #09b5a5;
+}
+
+.input-group textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.form-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.option-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.option-group label {
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    color: #FFFFFF;
+    font-size: 0.9rem;
+}
+
+.option-group input[type="checkbox"] {
+    width: auto;
+    margin-right: 0.5rem;
+}
+
+.extract-btn {
+    width: 100%;
+    padding: 1rem;
+    background: #09b5a5;
+    color: #000000;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.extract-btn:hover {
+    background: #09b5a5;
+}
+
+/* Dropdown specific styling */
+select,
+.input-group select,
+.option-group select {
+    cursor: pointer !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    -ms-appearance: none !important;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFFFFF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.75rem center !important;
+    background-size: 1rem !important;
+    padding-right: 2.5rem !important;
+    border: 1px solid #333 !important;
+    border-radius: 4px !important;
+    font-family: 'Courier New', monospace !important;
+    font-size: 0.9rem !important;
+    background-color: #1A1A1A !important;
+    color: #FFFFFF !important;
+}
+
+select:hover,
+.input-group select:hover,
+.option-group select:hover {
+    border-color: #09b5a5 !important;
+}
+
+select:focus,
+.input-group select:focus,
+.option-group select:focus {
+    outline: none !important;
+    border-color: #09b5a5 !important;
+}
+
+select option,
+.input-group select option,
+.option-group select option {
+    background: #1A1A1A !important;
+    color: #FFFFFF !important;
+    padding: 0.5rem !important;
+}
+
+/* Response Container */
+.response-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.api-request-box,
+.json-response-box {
+    border: 2px solid #333;
+    border-radius: 8px;
+    padding: 1.5rem;
+    background: #111111;
+}
+
+.api-request-box label,
+.json-response-box label {
+    display: block;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    color: #FFFFFF;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.api-request-box pre,
+.json-response-box pre {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: #FFFFFF;
+    background: #1A1A1A;
+    padding: 1rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* Results Section */
+.results-section {
+    border: 2px solid #333;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 2rem;
+    background: #111111;
+}
+
+.results-header {
+    background: #1A1A1A;
+    color: #FFFFFF;
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #333;
+}
+
+.results-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #FFFFFF;
+}
+
+.copy-btn {
+    background: #09b5a5;
+    color: #000000;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background-color 0.2s ease;
+}
+
+.copy-btn:hover {
+    background: #09b5a5;
+}
+
+.results-content {
+    padding: 1.5rem;
+}
+
+.result-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #1A1A1A;
+    border-radius: 4px;
+    border: 1px solid #333;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.info-item .label {
+    font-weight: 600;
+    color: #FFFFFF;
+    font-size: 0.9rem;
+}
+
+.info-item .value {
+    color: #CCCCCC;
+    word-break: break-all;
+}
+
+.json-display {
+    background: #1A1A1A;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid #333;
+}
+
+.json-display pre {
+    color: #FFFFFF;
+    padding: 1.5rem;
+    margin: 0;
+    overflow-x: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+/* Loading State */
+.loading {
+    text-align: center;
+    padding: 3rem;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #333;
+    border-top: 3px solid #09b5a5;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Models Page */
+.models-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.models-header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #FFFFFF;
+    margin-bottom: 1rem;
+}
+
+.models-header p {
+    font-size: 1.1rem;
+    color: #CCCCCC;
+}
+
+/* API Requests Page */
+.requests-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.requests-header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #FFFFFF;
+    margin-bottom: 1rem;
+}
+
+.requests-header p {
+    font-size: 1.1rem;
+    color: #CCCCCC;
+}
+
+.requests-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.requests-list {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.request-card {
+    border: 2px solid #333;
+    border-radius: 8px;
+    padding: 1.5rem;
+    background: #111111;
+    transition: border-color 0.2s ease;
+}
+
+.request-card:hover {
+    border-color: #09b5a5;
+}
+
+.request-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #333;
+}
+
+.request-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.request-url {
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    color: #09b5a5;
+    font-size: 1.1rem;
+    word-break: break-all;
+}
+
+.request-query {
+    color: #CCCCCC;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+    word-break: break-all;
+}
+
+.request-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.request-curl {
+    background: #1A1A1A;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.request-curl h4 {
+    color: #FFFFFF;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    font-family: 'Courier New', monospace;
+}
+
+.request-curl pre {
+    color: #CCCCCC;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    background: #111111;
+    padding: 0.75rem;
+    border-radius: 4px;
+    border: 1px solid #333;
+}
+
+.models-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.model-form-section {
+    border: 2px solid #333;
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    background: #111111;
+}
+
+.model-form-section h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #FFFFFF;
+    margin-bottom: 1.5rem;
+}
+
+.model-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.save-btn {
+    padding: 1rem;
+    background: #09b5a5;
+    color: #000000;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.save-btn:hover {
+    background: #09b5a5;
+}
+
+.saved-models-section h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #FFFFFF;
+    margin-bottom: 1.5rem;
+}
+
+.models-list {
+    display: grid;
+    gap: 1rem;
+}
+
+.model-card {
+    border: 2px solid #333;
+    border-radius: 8px;
+    padding: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: border-color 0.2s ease;
+    background: #111111;
+}
+
+.model-card:hover {
+    border-color: #09b5a5;
+}
+
+.model-info {
+    flex: 1;
+}
+
+.model-name {
+    font-weight: 600;
+    color: #FFFFFF;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+
+.model-provider {
+    color: #CCCCCC;
+    font-size: 0.9rem;
+}
+
+.model-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-danger {
+    background: #FF4444;
+    color: #FFFFFF;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-danger:hover {
+    background: #CC3333;
+}
+
+
+
+/* Toast Notifications */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+.toast {
+    background: #111111;
+    border: 2px solid #333;
+    border-radius: 4px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    animation: slideIn 0.3s ease;
+    max-width: 400px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    color: #FFFFFF;
+}
+
+.toast.success {
+    border-color: #09b5a5;
+    background: #0A1A1A;
+}
+
+.toast.error {
+    border-color: #FF4444;
+    background: #1A0A0A;
+}
+
+.toast.info {
+    border-color: #09b5a5;
+    background: #0A1A1A;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .header-content {
+        padding: 0 1rem;
+    }
+    
+    .main-content {
+        padding: 1rem;
+    }
+    
+    .hero-title {
+        font-size: 2rem;
+    }
+    
+    .workflow-demo {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .workflow-arrow {
+        transform: rotate(90deg);
+        margin: 1rem 0;
+    }
+    
+    .form-options {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .result-info {
+        grid-template-columns: 1fr;
+    }
+    
+    .model-card {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+    
+    .model-actions {
+        width: 100%;
+        justify-content: center;
+    }
+}

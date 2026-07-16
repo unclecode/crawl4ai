@@ -1,0 +1,59 @@
+title: "[Feature Request]: "
+labels: ["⚙️ New"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for your interest in suggesting a new feature! Before you submit, please take a moment to check if already exists in
+        this discussions category to avoid duplicates. 😊
+
+  - type: textarea
+    id: needs_to_be_done
+    attributes:
+      label: What needs to be done?
+      description: Please describe the feature or functionality you'd like to see.
+      placeholder: "e.g., Return alt text along with images scraped from a webpages in Result"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem_to_solve
+    attributes:
+      label: What problem does this solve?
+      description: Explain the pain point or issue this feature will help address.
+      placeholder: "e.g., Bypass Captchas added by cloudflare"
+    validations:
+      required: true
+
+  - type: textarea
+    id: target_users
+    attributes:
+      label: Target users/beneficiaries
+      description: Who would benefit from this feature? (e.g., specific teams, developers, users, etc.)
+      placeholder: "e.g., Marketing teams, developers"
+    validations:
+      required: false
+
+  - type: textarea
+    id: current_workarounds
+    attributes:
+      label: Current alternatives/workarounds
+      description: Are there any existing solutions or workarounds? How does this feature improve upon them?
+      placeholder: "e.g., Users manually select the css classes mapped to data fields to extract them"
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ### 💡 Implementation Ideas
+
+  - type: textarea
+    id: proposed_approach
+    attributes:
+      label: Proposed approach
+      description: Share any ideas you have for how this feature could be implemented. Point out any challenges your foresee
+       and the success metrics for this feature
+      placeholder: "e.g., Implement a breadth first traversal algorithm for scraper"
+    validations:
+      required: false
