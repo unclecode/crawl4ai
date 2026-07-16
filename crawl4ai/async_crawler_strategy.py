@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import re
 import time
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Any, List, Union
@@ -959,6 +960,26 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         params={"timeout": scan_timeout},
                     )
 
+            # --- Phase 0: Frameset follow (before any JS/DOM processing) ---
+            # If the page is a single full-viewport frameset wrapper, navigate
+            # to the child frame's URL so all subsequent phases (JS execution,
+            # overlay removal, HTML capture, screenshots) operate on real content.
+            if config.follow_frames:
+                frame_url = await self._detect_frameset_redirect(page)
+                if frame_url:
+                    self.logger.info(
+                        message="Detected frameset redirect → {url}",
+                        tag="FETCH",
+                        params={"url": frame_url},
+                    )
+                    response = await page.goto(
+                        frame_url, wait_until=config.wait_until, timeout=config.page_timeout
+                    )
+                    redirected_url = page.url
+                    if response:
+                        status_code = response.status
+                        response_headers = response.headers
+
             # --- Phase 1: Pre-wait JS and interaction ---
 
             # Execute js_code_before_wait (for triggering loading that wait_for checks)
@@ -1506,6 +1527,55 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 tag="ERROR",
                 params={"error": str(e)},
             )
+
+    async def _detect_frameset_redirect(self, page: Page) -> str | None:
+        """
+        Detects single full-viewport frameset pages and returns the child
+        frame's URL for re-navigation.
+
+        Qualifies if:
+          - Exactly one child frame exists (page.frames has 2 entries)
+          - The HTML contains a <frameset> tag
+          - The frameset uses rows/cols="100%" or "*", or omits them entirely
+
+        Returns:
+            The child frame URL if a frameset redirect was detected, None otherwise.
+        """
+        try:
+            if len(page.frames) != 2:
+                return None
+
+            html = await page.content()
+            if "<frameset" not in html.lower():
+                return None
+
+            match = re.search(r'<frameset([^>]*)>', html, re.IGNORECASE)
+            if not match:
+                return None
+
+            attrs = match.group(1).lower()
+            rows = re.search(r'rows=["\']([^"\']+)["\']', attrs)
+            cols = re.search(r'cols=["\']([^"\']+)["\']', attrs)
+
+            def is_full_viewport(val: str) -> bool:
+                parts = [p.strip() for p in val.split(",")]
+                return len(parts) == 1 and parts[0] in ("100%", "*")
+
+            if rows and not is_full_viewport(rows.group(1)):
+                return None
+            if cols and not is_full_viewport(cols.group(1)):
+                return None
+
+            child_url = page.frames[1].url
+            return child_url if child_url else None
+
+        except Exception as e:
+            self.logger.warning(
+                message="Frameset detection failed: {error}",
+                tag="FETCH",
+                params={"error": str(e)},
+            )
+            return None
 
     async def remove_overlay_elements(self, page: Page) -> None:
         """

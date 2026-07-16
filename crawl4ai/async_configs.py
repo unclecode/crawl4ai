@@ -1471,6 +1471,12 @@ class CrawlerRunConfig():
                                          If None, scrolls until the entire page is loaded. Default: None.
         process_iframes (bool): If True, attempts to process and inline iframe content.
                                 Default: False.
+        follow_frames (bool): If True, detects when the fetched page is a single full-viewport
+                               frameset (rows="100%" or cols="100%") and transparently captures
+                               the child frame's content and URL instead — equivalent to how
+                               HTTP redirects are followed automatically. No second HTTP request
+                               is made; Playwright has already loaded the frame.
+                               Default: True.
         flatten_shadow_dom (bool): If True, flatten shadow DOM content into the light DOM
                                     before HTML capture so page.content() includes it.
                                     Also injects an init script to force-open closed shadow roots.
@@ -1644,6 +1650,7 @@ class CrawlerRunConfig():
         scroll_delay: float = 0.2,
         max_scroll_steps: Optional[int] = None,
         process_iframes: bool = False,
+        follow_frames: bool = True,
         flatten_shadow_dom: bool = False,
         remove_overlay_elements: bool = False,
         remove_consent_popups: bool = False,
@@ -1774,6 +1781,7 @@ class CrawlerRunConfig():
         self.scroll_delay = scroll_delay
         self.max_scroll_steps = max_scroll_steps
         self.process_iframes = process_iframes
+        self.follow_frames = follow_frames
         self.flatten_shadow_dom = flatten_shadow_dom
         self.remove_overlay_elements = remove_overlay_elements
         self.remove_consent_popups = remove_consent_popups
@@ -2141,6 +2149,7 @@ class CrawlerRunConfig():
             "scroll_delay": self.scroll_delay,
             "max_scroll_steps": self.max_scroll_steps,
             "process_iframes": self.process_iframes,
+            "follow_frames": self.follow_frames,
             "flatten_shadow_dom": self.flatten_shadow_dom,
             "remove_overlay_elements": self.remove_overlay_elements,
             "remove_consent_popups": self.remove_consent_popups,
