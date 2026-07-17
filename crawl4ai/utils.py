@@ -2866,11 +2866,15 @@ def compute_head_fingerprint(head_html: str) -> str:
     if not head_html:
         return ""
 
-    head_lower = head_html.lower()
     signals = []
 
+    # Match tags/attributes case-insensitively, but extract values from the
+    # ORIGINAL head: lowercasing the whole head first would fold a case-only
+    # title/meta change (e.g. "iPhone" -> "IPHONE") to the same fingerprint, so
+    # the cache validator would treat a genuinely changed page as unchanged.
+
     # Extract title
-    title_match = re.search(r'<title[^>]*>(.*?)</title>', head_lower, re.DOTALL)
+    title_match = re.search(r'<title[^>]*>(.*?)</title>', head_html, re.DOTALL | re.IGNORECASE)
     if title_match:
         signals.append(title_match.group(1).strip())
 
@@ -2892,7 +2896,7 @@ def compute_head_fingerprint(head_html: str) -> str:
             rf'<meta[^>]*content=["\']([^"\']*)["\'][^>]*{attr_type}=["\']{re.escape(attr_value)}["\']',
         ]
         for pattern in patterns:
-            match = re.search(pattern, head_lower)
+            match = re.search(pattern, head_html, re.IGNORECASE)
             if match:
                 signals.append(match.group(1).strip())
                 break  # Found this tag, move to next
