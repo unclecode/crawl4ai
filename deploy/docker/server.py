@@ -205,7 +205,13 @@ async def lifespan(_: FastAPI):
     app.state.janitor = asyncio.create_task(janitor())
     app.state.timeline_updater = asyncio.create_task(_timeline_updater())
 
-    yield
+    # Start MCP Streamable-HTTP session manager (if attach_mcp was called)
+    mcp_instance = getattr(app.state, '_mcp_instance', None)
+    if mcp_instance:
+        async with mcp_instance.session_manager.run():
+            yield
+    else:
+        yield
 
     # Cleanup
     app.state.janitor.cancel()
@@ -797,7 +803,20 @@ async def execute_js(
         results = await crawler.arun(url=body.url, config=cfg)
         if not results[0].success:
             raise HTTPException(500, detail=results[0].error_message or "Crawl failed")
-        data = results[0].model_dump()
+        result = results[0]
+        md = result.markdown
+        data = {
+            "url": result.url,
+            "success": result.success,
+            "markdown": md.fit_markdown if md and md.fit_markdown else (md.raw_markdown if md else None),
+            "js_execution_result": result.js_execution_result,
+            "links": result.links,
+            "media": result.media,
+            "metadata": result.metadata,
+            "error_message": result.error_message,
+            "status_code": result.status_code,
+            "redirected_url": result.redirected_url,
+        }
         return JSONResponse(data)
     except Exception as e:
         raise HTTPException(500, detail=str(e))
@@ -1087,8 +1106,8 @@ async def get_context(
     return JSONResponse(results)
 
 
-# attach MCP layer (adds /mcp/ws, /mcp/sse, /mcp/schema)
-print(f"MCP server running on {config['app']['host']}:{config['app']['port']}")
+# attach MCP layer (adds POST /mcp Streamable-HTTP + /mcp/schema)
+print(f"MCP Streamable-HTTP endpoint: http://{config['app']['host']}:{config['app']['port']}/mcp")
 attach_mcp(
     app,
     # Internal MCP tool calls go over loopback to our own gated endpoints,

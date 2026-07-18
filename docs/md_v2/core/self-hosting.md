@@ -327,18 +327,21 @@ MCP is an open protocol that standardizes how applications provide context to LL
 
 ### Connecting via MCP
 
-The Crawl4AI server exposes two MCP endpoints:
+The Crawl4AI server exposes a **Streamable HTTP** MCP endpoint:
 
-- **Server-Sent Events (SSE)**: `http://localhost:11235/mcp/sse`
-- **WebSocket**: `ws://localhost:11235/mcp/ws`
+- **Streamable HTTP**: `http://localhost:11235/mcp`
+
+> The MCP specification has deprecated the SSE transport in favor of Streamable
+> HTTP and removed the WebSocket transport. Crawl4AI now uses the standard
+> Streamable HTTP transport.
 
 ### Using with Claude Code
 
-You can add Crawl4AI as an MCP tool provider in Claude Code with a simple command:
+You can add Crawl4AI as an MCP tool provider in Claude Code:
 
 ```bash
 # Add the Crawl4AI server as an MCP provider
-claude mcp add --transport sse c4ai-sse http://localhost:11235/mcp/sse
+claude mcp add --transport streamable-http c4ai http://localhost:11235/mcp
 
 # List all MCP providers to verify it was added
 claude mcp list
