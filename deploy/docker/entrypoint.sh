@@ -21,6 +21,11 @@ export REDIS_PASSWORD
 if [[ -z "${CRAWL4AI_API_TOKEN:-}" && -f /run/secrets/api_token ]]; then
     export CRAWL4AI_API_TOKEN="$(cat /run/secrets/api_token)"
 fi
+if [[ -z "${CRAWL4AI_API_TOKEN:-}" ]]; then
+    CRAWL4AI_API_TOKEN="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+    export CRAWL4AI_API_TOKEN
+    echo "entrypoint: no CRAWL4AI_API_TOKEN provided; generated an ephemeral one." >&2
+fi
 
 # --- Bind resolution: loopback unless a credential is present. ---------------
 PORT="${CRAWL4AI_PORT:-11235}"
