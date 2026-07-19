@@ -1749,6 +1749,7 @@ def perform_completion_with_backoff(
     max_attempts=3,
     exponential_factor=2,
     messages=None,
+    provider_config=None,
     **kwargs,
 ):
     """
@@ -1782,6 +1783,29 @@ def perform_completion_with_backoff(
     extra_args = {"temperature": 0.01, "api_key": api_token, "base_url": base_url}
     if json_response:
         extra_args["response_format"] = {"type": "json_object"}
+
+    if provider.startswith("bedrock/"):
+        pc = provider_config or {}
+
+        region = pc.get("aws_region_name") or os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION")
+        if region:
+            extra_args["aws_region_name"] = region
+
+        profile = pc.get("aws_profile_name") or os.getenv("AWS_PROFILE")
+        if profile:
+            extra_args["aws_profile_name"] = profile
+
+        access_key = pc.get("aws_access_key_id") or os.getenv("AWS_ACCESS_KEY_ID")
+        if access_key:
+            extra_args["aws_access_key_id"] = access_key
+
+        secret_key = pc.get("aws_secret_access_key") or os.getenv("AWS_SECRET_ACCESS_KEY")
+        if secret_key:
+            extra_args["aws_secret_access_key"] = secret_key
+
+        session_token = pc.get("aws_session_token") or os.getenv("AWS_SESSION_TOKEN")
+        if session_token:
+            extra_args["aws_session_token"] = session_token
 
     if kwargs.get("extra_args"):
         extra_args.update(kwargs["extra_args"])
@@ -1841,6 +1865,7 @@ async def aperform_completion_with_backoff(
     max_attempts=3,
     exponential_factor=2,
     messages=None,
+    provider_config=None,
     **kwargs,
 ):
     """
@@ -1875,6 +1900,29 @@ async def aperform_completion_with_backoff(
     extra_args = {"temperature": 0.01, "api_key": api_token, "base_url": base_url}
     if json_response:
         extra_args["response_format"] = {"type": "json_object"}
+
+    if provider.startswith("bedrock/"):
+        pc = provider_config or {}
+
+        region = pc.get("aws_region_name") or os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION")
+        if region:
+            extra_args["aws_region_name"] = region
+
+        profile = pc.get("aws_profile_name") or os.getenv("AWS_PROFILE")
+        if profile:
+            extra_args["aws_profile_name"] = profile
+
+        access_key = pc.get("aws_access_key_id") or os.getenv("AWS_ACCESS_KEY_ID")
+        if access_key:
+            extra_args["aws_access_key_id"] = access_key
+
+        secret_key = pc.get("aws_secret_access_key") or os.getenv("AWS_SECRET_ACCESS_KEY")
+        if secret_key:
+            extra_args["aws_secret_access_key"] = secret_key
+
+        session_token = pc.get("aws_session_token") or os.getenv("AWS_SESSION_TOKEN")
+        if session_token:
+            extra_args["aws_session_token"] = session_token
 
     if kwargs.get("extra_args"):
         extra_args.update(kwargs["extra_args"])

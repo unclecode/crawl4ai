@@ -2219,6 +2219,7 @@ class LLMConfig:
         provider: str = DEFAULT_PROVIDER,
         api_token: Optional[str] = None,
         base_url: Optional[str] = None,
+        provider_config: Optional[Dict] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         top_p: Optional[float] = None,
@@ -2259,6 +2260,7 @@ class LLMConfig:
             self.backoff_exponential_factor = backoff_exponential_factor if backoff_exponential_factor is not None else 2
             return
         self.provider = provider
+        self.provider_config = provider_config or {}
         if api_token and not api_token.startswith("env:"):
             self.api_token = api_token
         elif api_token and api_token.startswith("env:"):
@@ -2294,6 +2296,7 @@ class LLMConfig:
             provider=kwargs.get("provider", DEFAULT_PROVIDER),
             api_token=kwargs.get("api_token"),
             base_url=kwargs.get("base_url"),
+            provider_config=kwargs.get("provider_config"),
             temperature=kwargs.get("temperature"),
             max_tokens=kwargs.get("max_tokens"),
             top_p=kwargs.get("top_p"),
@@ -2311,6 +2314,7 @@ class LLMConfig:
             "provider": self.provider,
             "api_token": self.api_token,
             "base_url": self.base_url,
+            "provider_config": self.provider_config,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
             "top_p": self.top_p,
