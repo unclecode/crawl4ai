@@ -12,6 +12,16 @@
 [![Downloads](https://static.pepy.tech/badge/crawl4ai/month)](https://pepy.tech/project/crawl4ai)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/unclecode?style=flat&logo=GitHub-Sponsors&label=Sponsors&color=pink)](https://github.com/sponsors/unclecode)
 
+<!-- Keep these links. Translations will automatically update with the README. -->
+[Deutsch](https://zdoc.app/de/unclecode/crawl4ai) | 
+[Español](https://zdoc.app/es/unclecode/crawl4ai) | 
+[français](https://zdoc.app/fr/unclecode/crawl4ai) | 
+[日本語](https://zdoc.app/ja/unclecode/crawl4ai) | 
+[한국어](https://zdoc.app/ko/unclecode/crawl4ai) | 
+[Português](https://zdoc.app/pt/unclecode/crawl4ai) | 
+[Русский](https://zdoc.app/ru/unclecode/crawl4ai) | 
+[中文](https://zdoc.app/zh/unclecode/crawl4ai)
+
 ---
 #### 🚀 Crawl4AI Cloud API — Closed Beta (Launching Soon)
 Reliable, large-scale web extraction, now built to be _**drastically more cost-effective**_ than any of the existing solutions.
