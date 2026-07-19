@@ -724,8 +724,23 @@ def split_and_parse_json_objects(json_string):
     segments = []
     depth = 0
     start_index = 0
+    in_string = False
+    escape = False
 
     for i, char in enumerate(json_string):
+        # Skip the character escaped by a preceding backslash (e.g. \" or \\).
+        if escape:
+            escape = False
+            continue
+        if char == "\\":
+            escape = True
+            continue
+        if char == '"':
+            in_string = not in_string
+            continue
+        # Braces inside string values must not affect the depth count.
+        if in_string:
+            continue
         if char == "{":
             if depth == 0:
                 start_index = i
