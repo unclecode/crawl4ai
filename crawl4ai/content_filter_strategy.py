@@ -583,7 +583,7 @@ class PruningContentFilter(RelevantContentFilter):
             preserve_classes (list): CSS class names to always keep regardless of score (optional).
             preserve_tags (list): HTML tag names to always keep regardless of score (optional).
         """
-        super().__init__(None)
+        super().__init__(user_query=user_query)
         self.min_word_threshold = min_word_threshold
         self.threshold_type = threshold_type
         self.threshold = threshold
@@ -851,7 +851,7 @@ class LLMContentFilter(RelevantContentFilter):
         api_base: Optional[str] = None,
         extra_args: Dict = None,
     ):
-        super().__init__(None)
+        super().__init__(user_query=user_query)
         self.provider = provider
         self.api_token = api_token
         self.base_url = base_url or api_base
