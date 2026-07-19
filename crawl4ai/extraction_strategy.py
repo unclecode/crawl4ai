@@ -1282,6 +1282,9 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
             str: The transformed value.
         """
 
+        if value is None:
+            return value
+
         if transform == "lowercase":
             return value.lower()
         elif transform == "uppercase":
