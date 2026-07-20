@@ -198,26 +198,25 @@ def merge_chunks(
     if not total_tokens:
         return []
 
-    # Pre-allocate chunks
-    num_chunks = max(1, (total_tokens + target_size - 1) // target_size)
-    chunks: List[List[str]] = [[] for _ in range(num_chunks)]
-    
-    curr_chunk = 0
+    # Chunks grow on demand instead of being pre-allocated from total_tokens // target_size:
+    # that estimate doesn't account for the tokens re-injected at every overlap boundary, so a
+    # fixed chunk count silently runs out and the last chunk absorbs all remaining tokens
+    # uncapped (growing without bound as the document gets longer).
+    chunks: List[List[str]] = [[]]
     curr_size = 0
-    
+
     # Distribute tokens
     for tokens in chain.from_iterable(all_tokens):
-        if curr_size >= target_size and curr_chunk < num_chunks - 1:
+        if curr_size >= target_size:
             if overlap > 0:
-                overlap_tokens = chunks[curr_chunk][-overlap:]
-                curr_chunk += 1
-                chunks[curr_chunk].extend(overlap_tokens)
+                overlap_tokens = chunks[-1][-overlap:]
+                chunks.append(list(overlap_tokens))
                 curr_size = len(overlap_tokens)
             else:
-                curr_chunk += 1
+                chunks.append([])
                 curr_size = 0
-                
-        chunks[curr_chunk].append(tokens)
+
+        chunks[-1].append(tokens)
         curr_size += 1
 
     # Return only non-empty chunks
