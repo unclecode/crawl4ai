@@ -264,7 +264,8 @@ UNTRUSTED_FIELD_ALLOWLIST = {
         "verbose", "log_console", "capture_network_requests",
         "capture_console_messages", "method", "stream", "prefetch", "url",
         "check_robots_txt", "user_agent", "user_agent_mode",
-        "user_agent_generator_config", "url_matcher", "match_mode", "max_retries",
+        "user_agent_generator_config", "url_matcher", "match_mode",
+        "check_blocked", "max_retries",
     },
 }
 
@@ -1430,6 +1431,7 @@ class CrawlerRunConfig():
                                       Default: False.
         cache_validation_timeout (float): Timeout in seconds for cache validation HTTP requests.
                                           Default: 10.0.
+        check_blocked (bool): Whether anti-bot matches fail the crawl. Default: True.
 
         # Page Navigation and Timing Parameters
         wait_until (str): The condition to wait for when navigating, e.g. "domcontentloaded".
@@ -1701,6 +1703,7 @@ class CrawlerRunConfig():
         # Experimental Parameters
         experimental: Dict[str, Any] = None,
         # Anti-Bot Retry Parameters
+        check_blocked: bool = True,
         max_retries: int = 0,
         fallback_fetch_function: Optional[Callable[[str], Awaitable[str]]] = None,
     ):
@@ -1898,6 +1901,7 @@ class CrawlerRunConfig():
         self.experimental = experimental or {}
 
         # Anti-Bot Retry Parameters
+        self.check_blocked = check_blocked
         self.max_retries = max_retries
         self.fallback_fetch_function = fallback_fetch_function
 
@@ -2184,6 +2188,7 @@ class CrawlerRunConfig():
             "url_matcher": self.url_matcher,
             "match_mode": self.match_mode,
             "experimental": self.experimental,
+            "check_blocked": self.check_blocked,
             "max_retries": self.max_retries,
         }
 
