@@ -1107,13 +1107,19 @@ class AsyncWebCrawler:
 
         if stream:
             async def result_transformer():
+                # Hold an explicit reference so aclose() on the public generator
+                # always awaits dispatcher-owned task cleanup (#2083). Relying
+                # only on async-for teardown can release the proxy session while
+                # crawl tasks from the closed stream are still running.
+                stream_gen = dispatcher.run_urls_stream(
+                    crawler=self, urls=urls, config=config
+                )
                 try:
-                    async for task_result in dispatcher.run_urls_stream(
-                        crawler=self, urls=urls, config=config
-                    ):
+                    async for task_result in stream_gen:
                         yield transform_result(task_result)
                 finally:
-                    # Auto-release session after streaming completes
+                    await stream_gen.aclose()
+                    # Auto-release session after dispatcher cleanup finishes
                     await maybe_release_session()
 
             return result_transformer()
