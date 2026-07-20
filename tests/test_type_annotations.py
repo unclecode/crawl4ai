@@ -119,35 +119,21 @@ class TestAnnotationConsistency:
 
     def test_arun_actually_returns_what_annotation_says(self):
         """
-        Whatever arun()'s return annotation says, verify that
-        CrawlResultContainer is compatible with it.
+        arun() should be annotated as returning CrawlResult directly.
         """
         from crawl4ai import AsyncWebCrawler
-        from crawl4ai.models import CrawlResultContainer
+        from crawl4ai.models import CrawlResult
 
         hints = typing.get_type_hints(AsyncWebCrawler.arun)
         ret = hints.get("return")
         if ret is None:
             pytest.skip("No return annotation to check")
 
-        # Get all types in the annotation
-        origin = getattr(ret, "__origin__", None)
-        if origin is Union:
-            allowed_types = [
-                getattr(arg, "__origin__", arg) for arg in ret.__args__
-            ]
-        else:
-            allowed_types = [getattr(ret, "__origin__", ret)]
+        # Get the actual type (unwrap generics if needed)
+        actual_type = getattr(ret, "__origin__", ret)
 
-        # CrawlResultContainer should be in the allowed types
-        is_compatible = any(
-            t is CrawlResultContainer
-            or (isinstance(t, type) and issubclass(CrawlResultContainer, t))
-            for t in allowed_types
-        )
-        assert is_compatible, (
-            f"arun() returns CrawlResultContainer at runtime, but annotation {ret} "
-            f"doesn't include it. Allowed types: {allowed_types}"
+        assert actual_type is CrawlResult, (
+            f"arun() should return CrawlResult, but annotation is {ret}"
         )
 
     def test_config_classes_init_params_match_attributes(self):
