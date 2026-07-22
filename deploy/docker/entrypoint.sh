@@ -31,6 +31,8 @@ else
     # No credential -> refuse to expose; serve loopback only.
     GUNICORN_BIND="127.0.0.1:${PORT}"
     echo "entrypoint: no CRAWL4AI_API_TOKEN set; binding loopback only (${GUNICORN_BIND})." >&2
+    echo "entrypoint: WARNING: this is the CONTAINER's loopback - published ports (-p ${PORT}:${PORT}) will NOT work; connections from the host will be reset." >&2
+    echo "entrypoint: to make the server reachable, set CRAWL4AI_API_TOKEN (docker run -e CRAWL4AI_API_TOKEN=..., or the .llm.env file with docker compose) and restart." >&2
 fi
 export GUNICORN_BIND
 

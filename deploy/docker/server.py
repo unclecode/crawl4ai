@@ -392,7 +392,7 @@ def _current_api_token() -> str:
 app.add_middleware(
     AuthGateMiddleware,
     token_provider=_current_api_token,
-    public_paths={HEALTH_PATH, "/token"},
+    public_paths={HEALTH_PATH, "/token", "/"},
     public_prefixes=_UI_PREFIXES,
 )
 
@@ -660,6 +660,17 @@ async def get_artifact(artifact_id: str, _td: Dict = Depends(token_dep)):
 
 # Screenshot endpoint
 
+_OUTPUT_PATH_WARNING = (
+    "output_path was removed in 0.9.0 and is ignored - no file was written. "
+    "The result is stored server-side; fetch it with an authenticated "
+    "GET /artifacts/{artifact_id}."
+)
+
+_HOOKS_CODE_WARNING = (
+    "Inline hook code (hooks.code) was removed in 0.9.0 and was NOT executed. "
+    "Use declarative hook actions instead (GET /hooks/info for the schema)."
+)
+
 
 @app.post("/screenshot")
 @limiter.limit(config["rate_limiting"]["default_limit"])
@@ -684,7 +695,12 @@ async def generate_screenshot(
             raise HTTPException(500, detail=results[0].error_message or "Crawl failed")
         screenshot_data = results[0].screenshot
         art = _store_artifact("png", base64.b64decode(screenshot_data))
-        return {"success": True, "screenshot": screenshot_data, **art}
+        response = {"success": True, "screenshot": screenshot_data, **art}
+        # Legacy 0.8.x key, no longer a schema field: peek at the raw body
+        # (already parsed and cached by FastAPI) to warn that it was ignored.
+        if (await request.json()).get("output_path"):
+            response["warning"] = _OUTPUT_PATH_WARNING
+        return response
     except HTTPException:
         raise
     except Exception as e:
@@ -719,7 +735,12 @@ async def generate_pdf(
             raise HTTPException(500, detail=results[0].error_message or "Crawl failed")
         pdf_data = results[0].pdf
         art = _store_artifact("pdf", pdf_data)
-        return {"success": True, "pdf": base64.b64encode(pdf_data).decode(), **art}
+        response = {"success": True, "pdf": base64.b64encode(pdf_data).decode(), **art}
+        # Legacy 0.8.x key, no longer a schema field: peek at the raw body
+        # (already parsed and cached by FastAPI) to warn that it was ignored.
+        if (await request.json()).get("output_path"):
+            response["warning"] = _OUTPUT_PATH_WARNING
+        return response
     except HTTPException:
         raise
     except Exception as e:
@@ -889,7 +910,7 @@ async def crawl(
         raise HTTPException(400, f"Rejected config: {e}")
     if crawler_config.stream:
         return await stream_process(crawl_request=crawl_request)
-    
+
     # Prepare hooks config if provided
     hooks_config = None
     if crawl_request.hooks:
@@ -897,7 +918,7 @@ async def crawl(
             'hooks': crawl_request.hooks.hooks,
             'timeout': crawl_request.hooks.timeout
         }
-    
+
     results = await handle_crawl_request(
         urls=crawl_request.urls,
         browser_config=crawl_request.browser_config,
@@ -906,6 +927,11 @@ async def crawl(
         hooks_config=hooks_config,
         crawler_configs=crawl_request.crawler_configs,
     )
+    if crawl_request.hooks and crawl_request.hooks.code:
+        hooks_resp = results.setdefault("hooks", {"attached": []})
+        if not crawl_request.hooks.hooks:
+            hooks_resp["status"] = "ignored"
+        hooks_resp["warning"] = _HOOKS_CODE_WARNING
     # check if all of the results are not successful
     if all(not result["success"] for result in results["results"]):
         raise HTTPException(500, f"Crawl request failed: {results['results'][0]['error_message']}")
@@ -927,7 +953,7 @@ async def crawl_stream(
     return await stream_process(crawl_request=crawl_request)
 
 async def stream_process(crawl_request: CrawlRequestWithHooks):
-    
+
     # Prepare hooks config if provided# Prepare hooks config if provided
     hooks_config = None
     if crawl_request.hooks:
@@ -953,6 +979,8 @@ async def stream_process(crawl_request: CrawlRequestWithHooks):
     if hooks_info:
         import json
         headers["X-Hooks-Status"] = json.dumps(hooks_info['status']['status'])
+    if crawl_request.hooks and crawl_request.hooks.code:
+        headers["X-Hooks-Warning"] = _HOOKS_CODE_WARNING
     
     return StreamingResponse(
         stream_results(crawler, gen),
