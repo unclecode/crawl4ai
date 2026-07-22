@@ -617,6 +617,17 @@
             }
         }
 
+        // Build a useful error message from a failed HTTP response
+        function httpErrorMessage(response, data) {
+            let msg = (data && (data.detail || data.error)) || `HTTP ${response.status}`;
+            if (response.status === 401) {
+                msg += getToken()
+                    ? ' — token rejected; check the API token in the token bar (top right)'
+                    : ' — set your API token in the token bar (top right)';
+            }
+            return msg;
+        }
+
         // Generate code snippets
         function generateSnippets(api, payload, method = 'POST') {
             // Python snippet
@@ -751,7 +762,7 @@
                     const time = Math.round(performance.now() - startTime);
                     if (!response.ok) {
                         updateStatus('error', time);
-                        throw new Error(responseData.error || 'Request failed');
+                        throw new Error(httpErrorMessage(response, responseData));
                     }
                     updateStatus('success', time);
                     document.querySelector('#response-content code').textContent = JSON.stringify(responseData, null, 2);
@@ -764,6 +775,12 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
+
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        updateStatus('error', Math.round(performance.now() - startTime));
+                        throw new Error(httpErrorMessage(response, errData));
+                    }
 
                     const reader = response.body.getReader();
                     let text = '';
@@ -809,7 +826,7 @@
 
                     if (!response.ok) {
                         updateStatus('error', time);
-                        throw new Error(responseData.error || 'Request failed');
+                        throw new Error(httpErrorMessage(response, responseData));
                     }
 
                     updateStatus(

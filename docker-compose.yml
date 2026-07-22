@@ -24,7 +24,6 @@ x-base-config: &base-config
     - ALL
   security_opt:
     - no-new-privileges:true
-  pids_limit: 512
   # Read-only root filesystem; only these paths are writable (tmpfs).
   read_only: true
   tmpfs:
@@ -39,6 +38,9 @@ x-base-config: &base-config
     resources:
       limits:
         memory: 4G
+        # PID cap; expressed here (not as pids_limit) so the file stays valid
+        # on Compose v5+, which rejects pids_limit alongside a limits block.
+        pids: 512
       reservations:
         memory: 1G
   restart: unless-stopped

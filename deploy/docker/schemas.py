@@ -42,6 +42,14 @@ class HookConfig(BaseModel):
         le=120,
         description="Timeout in seconds for each hook execution",
     )
+    # Legacy 0.8.x field: inline-Python hook code, removed in 0.9.0 (it was an
+    # exec()-based RCE surface). Captured here (instead of being dropped by
+    # pydantic) solely so the server can tell the caller it was NOT executed;
+    # it is never run.
+    code: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="REMOVED in 0.9.0: inline hook code is accepted for compatibility but never executed",
+    )
 
     class Config:
         json_schema_extra = {
