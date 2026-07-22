@@ -175,15 +175,16 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 RUN crawl4ai-setup
 
-RUN playwright install --with-deps
-
-RUN mkdir -p /home/appuser/.cache/ms-playwright \
+RUN playwright install --with-deps \
+    && mkdir -p /home/appuser/.cache/ms-playwright \
     && cp -r /root/.cache/ms-playwright/chromium-* \
         /root/.cache/ms-playwright/chromium_headless_shell-* \
         /home/appuser/.cache/ms-playwright/ \
-    && chown -R appuser:appuser /home/appuser/.cache/ms-playwright
+    && chown -R appuser:appuser /home/appuser/.cache/ms-playwright \
+    && rm -rf /root/.cache/ms-playwright
 
-RUN crawl4ai-doctor
+RUN crawl4ai-doctor \
+    && find "${APP_HOME}" -maxdepth 1 -type f -name '*.core' -delete
 
 # Ensure all cache directories belong to appuser
 # This fixes permission issues with .cache/url_seeder and other runtime cache dirs
