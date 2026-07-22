@@ -25,11 +25,23 @@ loopback by default and will not expose itself without a credential.
 export CRAWL4AI_API_TOKEN="$(openssl rand -hex 32)"
 ```
 
+> ⚠️ **Docker Compose users:** `export` alone does **not** work — the shipped
+> `docker-compose.yml` does not forward host environment variables. Set the
+> token in the `.llm.env` file at the project root instead (the example file
+> ships an empty `CRAWL4AI_API_TOKEN=` line — fill it in).
+>
+> For plain `docker run`, pass it explicitly:
+> `-e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN"` (the value-less shorthand
+> `-e CRAWL4AI_API_TOKEN` silently passes empty from a shell where the variable
+> isn't set).
+
 - With a token set, you may expose the server (put a TLS-terminating reverse
   proxy in front) and must send `Authorization: Bearer <token>` on every
   request except `GET /health`.
-- With **no** token set, the server binds `127.0.0.1` only and prints a one-off
-  token at startup for local use.
+- With **no** token set, the server binds `127.0.0.1` only (the **container's**
+  loopback — published ports answer with *connection reset* even though the
+  container reports healthy) and prints a one-off token at startup for
+  in-container use.
 
 WebSocket clients (MCP, monitor) that can't set headers may pass `?token=...`.
 
@@ -60,6 +72,10 @@ safe maximums.
 
 ### Hooks: declarative actions instead of code
 
+Hooks are now **disabled by default** — enable them with
+`CRAWL4AI_HOOKS_ENABLED=true` in the container environment, or any request
+containing `hooks` returns HTTP 403.
+
 `hooks.code` (Python strings) is replaced by a fixed set of declarative actions:
 
 ```jsonc
@@ -77,6 +93,13 @@ Available actions: `block_resources`, `add_cookies`, `set_headers`,
 `scroll_to_bottom`, `wait_for_timeout`. Call `GET /hooks/info` for the parameter
 schemas. Arbitrary hook code is available in a self-hosted in-process build.
 
+> ⚠️ **Legacy `hooks.code` requests fail silently.** With hooks enabled, a
+> request in the old format returns HTTP 200 with
+> `"hooks": {"status": "success", "attached": []}` — the inline code is
+> dropped without error. If `attached` is empty, your hooks did not run.
+> (With hooks disabled, the same request returns the generic 403, whose
+> "enable hooks" hint will not make code hooks work either.)
+
 ### Screenshot / PDF: artifact id instead of `output_path`
 
 `output_path` is removed. The server stores the result and returns an id + URL:
@@ -88,6 +111,10 @@ schemas. Arbitrary hook code is available in a self-hosted in-process build.
 
 Fetch the file with `GET /artifacts/{artifact_id}` (authenticated). Artifacts
 have a TTL and a storage quota.
+
+> ⚠️ A request that still includes `output_path` is **silently ignored** — it
+> returns `success: true` with an artifact id, but no file is written to the
+> requested path. Update your code to fetch from `/artifacts/{artifact_id}`.
 
 ### LLM endpoints: provider by name
 
