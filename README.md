@@ -121,6 +121,67 @@ crwl https://docs.crawl4ai.com --deep-crawl bfs --max-pages 10
 crwl https://www.example.com/products -q "Extract all product prices"
 ```
 
+### Use `crwl` with a remote Crawl4AI API
+
+If Crawl4AI runs on another machine, in Docker, or as a hosted service, the
+dependency-light remote client can send the same crawl configuration to its
+HTTP API. Save credentials once in `~/.crawl4ai/remote.json`:
+
+```bash
+crwl-remote config
+crwl-remote https://www.nbcnews.com/business -o markdown
+```
+
+The credential file is created with user-only permissions. For automation,
+`CRAWL4AI_API_URL` and `CRAWL4AI_API_TOKEN` override saved credentials, and
+`--api-url` / `--api-token` take highest priority.
+
+Browser settings, including an upstream proxy, can be supplied through a
+configuration file:
+
+```json
+{
+  "proxy_config": {
+    "server": "http://proxy.example:8080",
+    "username": "proxy-user",
+    "password": "proxy-password"
+  }
+}
+```
+
+```bash
+crwl-remote https://ipv4.webshare.io -B browser.json -o markdown
+```
+
+The server's static `CRAWL4AI_API_TOKEN` is an operator credential, so browser
+and crawler configuration supplied with it is trusted, including proxy
+settings. Protect proxy credentials with the same care as the remote API token
+and do not commit the browser configuration file.
+
+To install only the command without Crawl4AI's local browser dependencies:
+
+```bash
+pip install --no-deps 'crawl4ai[crwl-remote]'
+```
+
+The `crwl-remote` executable is also installed. The `--no-deps` flag is
+necessary because Python extras can add dependencies but cannot subtract the
+normal Crawl4AI dependencies.
+
+To make remote crawling the shell default while keeping agent and script
+commands written as `crwl ...`:
+
+```bash
+# Bash or Zsh
+alias crwl='crwl-remote'
+
+# Fish
+alias crwl 'crwl-remote'
+
+# PowerShell
+function crwl { & crwl-remote @args }
+```
+
 ## 💖 Support Crawl4AI
 
 > 🎉 **Sponsorship Program Now Open!** After powering 51K+ developers and 1 year of growth, Crawl4AI is launching dedicated support for **startups** and **enterprises**. Be among the first 50 **Founding Sponsors** for permanent recognition in our Hall of Fame.

@@ -92,6 +92,19 @@ import psutil, time
 
 logger = logging.getLogger(__name__)
 
+
+def _load_browser_config(
+    data: dict,
+    provenance: Provenance = Provenance.UNTRUSTED,
+) -> BrowserConfig:
+    """Load browser configuration at the caller's established trust level."""
+    browser_config = BrowserConfig.load(data, provenance=provenance)
+    if provenance == Provenance.UNTRUSTED:
+        from egress_broker import enforce_egress
+        enforce_egress(browser_config)
+    return browser_config
+
+
 # --- Helper to get memory ---
 def _get_memory_mb():
     try:
@@ -651,6 +664,7 @@ async def handle_crawl_request(
     config: dict,
     hooks_config: Optional[dict] = None,
     crawler_configs: Optional[List[dict]] = None,
+    provenance: Provenance = Provenance.UNTRUSTED,
 ) -> dict:
     """Handle non-streaming crawl requests with optional hooks."""
     # Track request start
@@ -671,10 +685,12 @@ async def handle_crawl_request(
 
     try:
         urls = _normalize_and_validate_seeds(urls)
-        browser_config = BrowserConfig.load(browser_config, provenance=Provenance.UNTRUSTED)
-        crawler_config = CrawlerRunConfig.load(crawler_config, provenance=Provenance.UNTRUSTED)
-        from egress_broker import enforce_egress
-        enforce_egress(browser_config)
+        browser_config = _load_browser_config(
+            browser_config, provenance=provenance
+        )
+        crawler_config = CrawlerRunConfig.load(
+            crawler_config, provenance=provenance
+        )
         from governor import clamp_deep_crawl
         clamp_deep_crawl(crawler_config)
 
@@ -699,7 +715,10 @@ async def handle_crawl_request(
         # Build the config(s) to pass to arun/arun_many
         if crawler_configs and len(urls) > 1:
             # Per-URL config list: deserialize each and apply base_config
-            config_list = [CrawlerRunConfig.load(cc, provenance=Provenance.UNTRUSTED) for cc in crawler_configs]
+            config_list = [
+                CrawlerRunConfig.load(cc, provenance=provenance)
+                for cc in crawler_configs
+            ]
             for cfg in config_list:
                 for key, value in base_config.items():
                     if hasattr(cfg, key):
@@ -855,7 +874,8 @@ async def handle_stream_crawl_request(
     browser_config: dict,
     crawler_config: dict,
     config: dict,
-    hooks_config: Optional[dict] = None
+    hooks_config: Optional[dict] = None,
+    provenance: Provenance = Provenance.UNTRUSTED,
 ) -> Tuple[AsyncWebCrawler, AsyncGenerator, Optional[Dict]]:
     """Handle streaming crawl requests with optional hooks."""
     hooks_info = None
@@ -865,12 +885,14 @@ async def handle_stream_crawl_request(
         # mirroring handle_crawl_request. The streaming path previously skipped
         # this, leaving /crawl/stream (and /crawl with stream=true) unguarded.
         urls = _normalize_and_validate_seeds(urls)
-        browser_config = BrowserConfig.load(browser_config, provenance=Provenance.UNTRUSTED)
+        browser_config = _load_browser_config(
+            browser_config, provenance=provenance
+        )
         # browser_config.verbose = True # Set to False or remove for production stress testing
         browser_config.verbose = False
-        from egress_broker import enforce_egress
-        enforce_egress(browser_config)
-        crawler_config = CrawlerRunConfig.load(crawler_config, provenance=Provenance.UNTRUSTED)
+        crawler_config = CrawlerRunConfig.load(
+            crawler_config, provenance=provenance
+        )
         from governor import clamp_deep_crawl
         clamp_deep_crawl(crawler_config)
         crawler_config.scraping_strategy = LXMLWebScrapingStrategy()

@@ -881,14 +881,21 @@ async def crawl(
     if crawl_request.hooks and not HOOKS_ENABLED:
         raise HTTPException(403, "Hooks are disabled. Set CRAWL4AI_HOOKS_ENABLED=true to enable.")
     # Check whether it is a redirection for a streaming request
+    provenance = (
+        Provenance.TRUSTED
+        if _td and _td.get("via") == "api_token"
+        else Provenance.UNTRUSTED
+    )
     try:
         crawler_config = CrawlerRunConfig.load(
-            crawl_request.crawler_config, provenance=Provenance.UNTRUSTED
+            crawl_request.crawler_config, provenance=provenance
         )
     except UntrustedConfigError as e:
         raise HTTPException(400, f"Rejected config: {e}")
     if crawler_config.stream:
-        return await stream_process(crawl_request=crawl_request)
+        return await stream_process(
+            crawl_request=crawl_request, provenance=provenance
+        )
     
     # Prepare hooks config if provided
     hooks_config = None
@@ -905,6 +912,7 @@ async def crawl(
         config=config,
         hooks_config=hooks_config,
         crawler_configs=crawl_request.crawler_configs,
+        provenance=provenance,
     )
     # check if all of the results are not successful
     if all(not result["success"] for result in results["results"]):
@@ -924,9 +932,19 @@ async def crawl_stream(
     if crawl_request.hooks and not HOOKS_ENABLED:
         raise HTTPException(403, "Hooks are disabled. Set CRAWL4AI_HOOKS_ENABLED=true to enable.")
 
-    return await stream_process(crawl_request=crawl_request)
+    return await stream_process(
+        crawl_request=crawl_request,
+        provenance=(
+            Provenance.TRUSTED
+            if _td and _td.get("via") == "api_token"
+            else Provenance.UNTRUSTED
+        ),
+    )
 
-async def stream_process(crawl_request: CrawlRequestWithHooks):
+async def stream_process(
+    crawl_request: CrawlRequestWithHooks,
+    provenance: Provenance = Provenance.UNTRUSTED,
+):
     
     # Prepare hooks config if provided# Prepare hooks config if provided
     hooks_config = None
@@ -941,7 +959,8 @@ async def stream_process(crawl_request: CrawlRequestWithHooks):
         browser_config=crawl_request.browser_config,
         crawler_config=crawl_request.crawler_config,
         config=config,
-        hooks_config=hooks_config
+        hooks_config=hooks_config,
+        provenance=provenance,
     )
     
     # Add hooks info to response headers if available

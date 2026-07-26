@@ -1,0 +1,4 @@
+interface:
+  display_name: "Crawl with crwl"
+  short_description: "Crawl web pages through the crwl command"
+  default_prompt: "Use $crawl-with-crwl to crawl a URL and return its relevant content."
