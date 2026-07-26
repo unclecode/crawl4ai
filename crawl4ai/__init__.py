@@ -111,6 +111,20 @@ from .utils import (
     hooks_to_string
 )
 
+# CrewAI Integration (optional)
+try:
+    from .crewai_tool import (
+        create_crawl4ai_tools,
+        crawl_website,
+        extract_data_from_url,
+        crawl_multiple_urls,
+        search_and_crawl,
+        cleanup_crawler
+    )
+except ImportError:
+    # CrewAI is not installed, skip this import
+    pass
+
 __all__ = [
     "AsyncLoggerBase",
     "AsyncLogger",
@@ -204,7 +218,14 @@ __all__ = [
     "BrowserAdapter",
     "PlaywrightAdapter", 
     "UndetectedAdapter",
-    "LinkPreviewConfig"
+    "LinkPreviewConfig",
+    # CrewAI Integration
+    "create_crawl4ai_tools",
+    "crawl_website",
+    "extract_data_from_url",
+    "crawl_multiple_urls",
+    "search_and_crawl",
+    "cleanup_crawler"
 ]
 
 
