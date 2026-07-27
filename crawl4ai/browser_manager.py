@@ -159,6 +159,19 @@ class ManagedBrowser:
             cdp_url (str or None): CDP URL to connect to the browser. Default: None.
             browser_config (BrowserConfig): Configuration object containing all browser settings. Default: None.
         """
+        if browser_config is None:
+            # The legacy keyword arguments above are still part of this
+            # signature and are documented in the docstring; honour them
+            # instead of raising an opaque AttributeError on ``None``.
+            browser_config = BrowserConfig(
+                browser_type=browser_type,
+                user_data_dir=user_data_dir,
+                headless=headless,
+                host=host,
+                debugging_port=debugging_port,
+                cdp_url=cdp_url,
+            )
+
         self.browser_type = browser_config.browser_type
         self.user_data_dir = browser_config.user_data_dir
         self.headless = browser_config.headless
