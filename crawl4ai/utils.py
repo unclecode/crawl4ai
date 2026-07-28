@@ -2552,12 +2552,18 @@ def is_external_url(url: str, base_domain: str) -> bool:
         if not parsed.netloc:  # Relative URL
             return False
 
-        # Strip port and 'www.' from both domains for comparison
-        url_domain = parsed.netloc.lower().split(":")[0].replace("www.", "")
-        base = base_domain.lower().split(":")[0].replace("www.", "")
+        # Strip port and a leading 'www.' from both domains for comparison.
+        # removeprefix (not replace) so a host containing 'www.' somewhere
+        # other than the front is left untouched.
+        url_domain = parsed.netloc.lower().split(":")[0].removeprefix("www.")
+        base = base_domain.lower().split(":")[0].removeprefix("www.")
 
-        # Check if URL domain ends with base domain
-        return not url_domain.endswith(base)
+        # Internal means the base domain itself or one of its subdomains. A
+        # bare endswith(base) also matches look-alike domains that merely end
+        # with the base string (notexample.com for example.com), which are
+        # genuinely different sites an attacker can register.
+        is_internal = url_domain == base or url_domain.endswith(f".{base}")
+        return not is_internal
     except Exception:
         return False
 
