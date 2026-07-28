@@ -15,6 +15,7 @@ from crawl4ai.utils import (
     efficient_normalize_url_for_deep_crawl,
     sanitize_input_encode,
     generate_content_hash,
+    is_external_url,
 )
 from crawl4ai.cache_context import CacheContext, CacheMode
 
@@ -498,3 +499,48 @@ class TestImageScoring:
         """IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD should exist."""
         from crawl4ai.config import IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD
         assert isinstance(IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD, (int, float))
+
+
+# ===================================================================
+# is_external_url
+# ===================================================================
+
+class TestIsExternalUrl:
+    """Verify is_external_url only treats the base domain and its subdomains
+    as internal, and does not mistake look-alike domains for internal ones."""
+
+    def test_base_domain_is_internal(self):
+        """The base domain itself is internal."""
+        assert is_external_url("http://example.com", "example.com") is False
+
+    def test_subdomain_is_internal(self):
+        """A real subdomain of the base domain is internal."""
+        assert is_external_url("http://blog.example.com", "example.com") is False
+
+    def test_www_is_internal(self):
+        """A leading www. is stripped, so www.example.com is internal."""
+        assert is_external_url("http://www.example.com", "example.com") is False
+
+    def test_prefixed_lookalike_is_external(self):
+        """A host that merely ends with the base string is a different site."""
+        assert is_external_url("http://malicious-example.com", "example.com") is True
+
+    def test_bare_lookalike_is_external(self):
+        """notexample.com is not a subdomain of example.com."""
+        assert is_external_url("http://notexample.com/path", "example.com") is True
+
+    def test_base_as_prefix_is_external(self):
+        """The base domain appearing as a prefix is a different site."""
+        assert is_external_url("http://example.com.evil.com", "example.com") is True
+
+    def test_unrelated_domain_is_external(self):
+        """An unrelated domain is external."""
+        assert is_external_url("http://other.org", "example.com") is True
+
+    def test_relative_url_is_internal(self):
+        """A relative URL has no netloc and is treated as internal."""
+        assert is_external_url("/path/page", "example.com") is False
+
+    def test_mailto_is_external(self):
+        """Non-http schemes such as mailto: are external."""
+        assert is_external_url("mailto:hi@example.com", "example.com") is True
