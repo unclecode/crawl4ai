@@ -173,17 +173,15 @@ RUN pip install --no-cache-dir --upgrade pip && \
     python -c "import crawl4ai; print('✅ crawl4ai is ready to rock!')" && \
     python -c "from playwright.sync_api import sync_playwright; print('✅ Playwright is feeling dramatic!')"
 
-RUN crawl4ai-setup
-
-RUN playwright install --with-deps \
+RUN crawl4ai-setup \
+    && playwright install --with-deps chromium \
+    && crawl4ai-doctor \
     && mkdir -p /home/appuser/.cache/ms-playwright \
     && cp -r /root/.cache/ms-playwright/chromium-* \
         /root/.cache/ms-playwright/chromium_headless_shell-* \
         /home/appuser/.cache/ms-playwright/ \
     && chown -R appuser:appuser /home/appuser/.cache/ms-playwright \
-    && rm -rf /root/.cache/ms-playwright
-
-RUN crawl4ai-doctor \
+    && rm -rf /root/.cache/ms-playwright \
     && find "${APP_HOME}" -maxdepth 1 -type f -name '*.core' -delete
 
 # Ensure all cache directories belong to appuser

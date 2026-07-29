@@ -74,19 +74,25 @@ class TestDockerfile:
         assert "chromium_headless_shell-*" in cache_copy.group("artifacts")
 
     def test_build_artifacts_removed_before_layer_commit(self, dockerfile):
-        for command, cleanup in (
-            ("playwright install --with-deps", "rm -rf /root/.cache/ms-playwright"),
-            ("crawl4ai-doctor", "-name '*.core' -delete"),
+        layer = re.search(
+            r"^RUN crawl4ai-setup(?P<body>(?:(?!^[A-Z]+\s).)*)",
+            dockerfile,
+            re.MULTILINE | re.DOTALL,
+        )
+        assert layer, "Dockerfile must run crawl4ai-setup"
+        positions = []
+        for command in (
+            "playwright install --with-deps chromium",
+            "crawl4ai-doctor",
+            "cp -r /root/.cache/ms-playwright/chromium-*",
+            "rm -rf /root/.cache/ms-playwright",
+            "-name '*.core' -delete",
         ):
-            layer = re.search(
-                rf"^RUN {re.escape(command)}(?P<body>(?:(?!^[A-Z]+\s).)*)",
-                dockerfile,
-                re.MULTILINE | re.DOTALL,
-            )
-            assert layer, f"Dockerfile must run {command}"
-            assert cleanup in layer.group(
+            assert command in layer.group(
                 "body"
-            ), f"{cleanup} must run in the {command} layer"
+            ), f"{command} must run in the crawl4ai-setup layer"
+            positions.append(layer.group("body").index(command))
+        assert positions == sorted(positions), "Docker build steps must remain ordered"
 
     def test_runs_as_non_root(self, dockerfile):
         assert re.search(r"^USER\s+appuser", dockerfile, re.MULTILINE)
