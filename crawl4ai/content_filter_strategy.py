@@ -712,6 +712,14 @@ class PruningContentFilter(RelevantContentFilter):
         if self._is_preserved(node):
             return
 
+        # Skip pruning inside <pre>/<code> blocks where whitespace is significant.
+        # Syntax highlighters wrap every token in <span> (including whitespace-only
+        # spans like <span class="w"> </span>) which score far below any threshold
+        # and get decomposed, corrupting code. Mirrors the scraper-side guard in
+        # WebScrapingStrategy.remove_empty_elements_fast (#1181).
+        if node.name in ("pre", "code"):
+            return
+
         text_len = len(node.get_text(strip=True))
         tag_len = len(node.encode_contents().decode("utf-8"))
         link_text_len = sum(
