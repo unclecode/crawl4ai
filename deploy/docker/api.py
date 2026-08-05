@@ -644,6 +644,19 @@ def _normalize_and_validate_seeds(urls: List[str]) -> List[str]:
     return urls
 
 
+def _apply_base_config(cfg, base_config: dict, raw: Optional[dict]) -> None:
+    """Apply the server-side base_config to fields absent from the raw payload.
+
+    Only the raw keys tell "omitted" apart from "sent, equal to the default" —
+    a default of False or 0 is indistinguishable from unset once loaded. The
+    payload is either a flat dict or {"type": ..., "params": {...}}.
+    """
+    provided = set(raw.get("params", raw)) if raw else set()
+    for key, value in base_config.items():
+        if key not in provided and hasattr(cfg, key):
+            setattr(cfg, key, value)
+
+
 async def handle_crawl_request(
     urls: List[str],
     browser_config: dict,
@@ -671,6 +684,7 @@ async def handle_crawl_request(
 
     try:
         urls = _normalize_and_validate_seeds(urls)
+        raw_crawler_config = crawler_config
         browser_config = BrowserConfig.load(browser_config, provenance=Provenance.UNTRUSTED)
         crawler_config = CrawlerRunConfig.load(crawler_config, provenance=Provenance.UNTRUSTED)
         from egress_broker import enforce_egress
@@ -700,20 +714,12 @@ async def handle_crawl_request(
         if crawler_configs and len(urls) > 1:
             # Per-URL config list: deserialize each and apply base_config
             config_list = [CrawlerRunConfig.load(cc, provenance=Provenance.UNTRUSTED) for cc in crawler_configs]
-            for cfg in config_list:
-                for key, value in base_config.items():
-                    if hasattr(cfg, key):
-                        current_value = getattr(cfg, key)
-                        if current_value is None or current_value == "":
-                            setattr(cfg, key, value)
+            for cfg, raw in zip(config_list, crawler_configs):
+                _apply_base_config(cfg, base_config, raw)
             effective_config = config_list
         else:
             # Single config (original behavior)
-            for key, value in base_config.items():
-                if hasattr(crawler_config, key):
-                    current_value = getattr(crawler_config, key)
-                    if current_value is None or current_value == "":
-                        setattr(crawler_config, key, value)
+            _apply_base_config(crawler_config, base_config, raw_crawler_config)
             effective_config = crawler_config
 
         results = []
