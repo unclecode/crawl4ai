@@ -9,7 +9,7 @@ import json
 import asyncio
 
 # from contextlib import nullcontext, asynccontextmanager
-from contextlib import asynccontextmanager
+from contextlib import aclosing, asynccontextmanager
 from .models import (
     CrawlResult,
     MarkdownGenerationResult,
@@ -1108,10 +1108,13 @@ class AsyncWebCrawler:
         if stream:
             async def result_transformer():
                 try:
-                    async for task_result in dispatcher.run_urls_stream(
-                        crawler=self, urls=urls, config=config
-                    ):
-                        yield transform_result(task_result)
+                    async with aclosing(
+                        dispatcher.run_urls_stream(
+                            crawler=self, urls=urls, config=config
+                        )
+                    ) as task_results:
+                        async for task_result in task_results:
+                            yield transform_result(task_result)
                 finally:
                     # Auto-release session after streaming completes
                     await maybe_release_session()
