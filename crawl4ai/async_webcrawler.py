@@ -505,7 +505,7 @@ class AsyncWebCrawler:
 
                                 # Check if blocked (skip for raw: URLs —
                                 # caller-provided content, anti-bot N/A)
-                                if _is_raw_url:
+                                if _is_raw_url or not config.check_blocked:
                                     _blocked = False
                                     _block_reason = ""
                                 else:
@@ -554,7 +554,8 @@ class AsyncWebCrawler:
                     if _fallback_fn and not _done and not _is_raw_url:
                         _needs_fallback = (
                             crawl_result is None  # All proxies threw exceptions
-                            or is_blocked(crawl_result.status_code, crawl_result.html or "")[0]
+                            or (config.check_blocked and is_blocked(
+                                crawl_result.status_code, crawl_result.html or "")[0])
                         )
                         if _needs_fallback:
                             self.logger.warning(
@@ -625,7 +626,12 @@ class AsyncWebCrawler:
                         # empty by design, and is_blocked() would misread "0 bytes
                         # html" as a block.
                         _has_download = bool(getattr(crawl_result, "downloaded_files", None))
-                        if not _fallback_succeeded and not _is_raw_url and not _has_download:
+                        if (
+                            config.check_blocked
+                            and not _fallback_succeeded
+                            and not _is_raw_url
+                            and not _has_download
+                        ):
                             _blocked, _block_reason = is_blocked(
                                 crawl_result.status_code, crawl_result.html or "")
                             if _blocked:
