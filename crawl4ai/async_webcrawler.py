@@ -408,6 +408,7 @@ class AsyncWebCrawler:
                     _block_reason = ""
                     _done = False
                     crawl_result = None
+                    _is_pdf_response = False
                     _crawl_stats = {
                         "attempts": 0,
                         "retries": 0,
@@ -458,6 +459,13 @@ class AsyncWebCrawler:
 
                                 async_response = await self.crawler_strategy.crawl(
                                     url, config=config)
+                                _is_pdf_response = any(
+                                    key.lower() == "content-type"
+                                    and "application/pdf" in str(value).lower()
+                                    for key, value in (
+                                        async_response.response_headers or {}
+                                    ).items()
+                                )
 
                                 html = sanitize_input_encode(async_response.html)
                                 screenshot_data = async_response.screenshot
@@ -505,7 +513,7 @@ class AsyncWebCrawler:
 
                                 # Check if blocked (skip for raw: URLs —
                                 # caller-provided content, anti-bot N/A)
-                                if _is_raw_url:
+                                if _is_raw_url or _is_pdf_response:
                                     _blocked = False
                                     _block_reason = ""
                                 else:
@@ -625,7 +633,12 @@ class AsyncWebCrawler:
                         # empty by design, and is_blocked() would misread "0 bytes
                         # html" as a block.
                         _has_download = bool(getattr(crawl_result, "downloaded_files", None))
-                        if not _fallback_succeeded and not _is_raw_url and not _has_download:
+                        if (
+                            not _fallback_succeeded
+                            and not _is_raw_url
+                            and not _has_download
+                            and not _is_pdf_response
+                        ):
                             _blocked, _block_reason = is_blocked(
                                 crawl_result.status_code, crawl_result.html or "")
                             if _blocked:
