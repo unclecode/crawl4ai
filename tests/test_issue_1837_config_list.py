@@ -105,7 +105,7 @@ class TestConfigListLogic:
         """Base config should be applied to each config in the list."""
         with open("deploy/docker/api.py") as f:
             source = f.read()
-        assert "for cfg in config_list:" in source
+        assert "for cfg, raw in zip(config_list, crawler_configs):" in source
 
 
 # -- Server endpoint passes crawler_configs --
