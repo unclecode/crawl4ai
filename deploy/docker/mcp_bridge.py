@@ -92,9 +92,7 @@ def attach_mcp(
 ) -> None:
     """Call once after all routes are declared to expose WS+SSE MCP endpoints."""
     server_name = name or app.title or "FastAPI-MCP"
-    mcp = Server(server_name)
 
-    # tools: Dict[str, Callable] = {}
     tools: Dict[str, Tuple[Callable, Callable]] = {}
     resources: Dict[str, Callable] = {}
     templates: Dict[str, Callable] = {}
@@ -130,9 +128,8 @@ def attach_mcp(
                 return a
         return None
 
-    # MCP handlers
-    @mcp.list_tools()
-    async def _list_tools() -> List[t.Tool]:
+    # data builders (shared by the MCP handlers and the /schema endpoint)
+    def _tools_data() -> List[t.Tool]:
         out = []
         for k, (proxy, orig_fn) in tools.items():
             desc   = getattr(orig_fn, "__mcp_description__", None) or inspect.getdoc(orig_fn) or ""
@@ -141,38 +138,14 @@ def attach_mcp(
                 t.Tool(name=k, description=desc, inputSchema=schema)
             )
         return out
-             
 
-    @mcp.call_tool()
-    async def _call_tool(name: str, arguments: Dict | None) -> List[t.TextContent]:
-        if name not in tools:
-            raise HTTPException(404, "tool not found")
-        
-        proxy, _ = tools[name]
-        try:
-            res = await proxy(**(arguments or {}))
-        except HTTPException as exc:
-            # map server‑side errors into MCP "text/error" payloads
-            err = {"error": exc.status_code, "detail": exc.detail}
-            return [t.TextContent(type = "text", text=json.dumps(err, ensure_ascii=False))]
-        return [t.TextContent(type = "text", text=json.dumps(res, default=str, ensure_ascii=False))]
-
-    @mcp.list_resources()
-    async def _list_resources() -> List[t.Resource]:
+    def _resources_data() -> List[t.Resource]:
         return [
             t.Resource(name=k, description=inspect.getdoc(f) or "", mime_type="application/json")
             for k, f in resources.items()
         ]
 
-    @mcp.read_resource()
-    async def _read_resource(name: str) -> List[t.TextContent]:
-        if name not in resources:
-            raise HTTPException(404, "resource not found")
-        res = resources[name]()
-        return [t.TextContent(type = "text", text=json.dumps(res, default=str, ensure_ascii=False))]
-
-    @mcp.list_resource_templates()
-    async def _list_templates() -> List[t.ResourceTemplate]:
+    def _templates_data() -> List[t.ResourceTemplate]:
         return [
             t.ResourceTemplate(
                 name=k,
@@ -183,6 +156,49 @@ def attach_mcp(
             )
             for k, f in templates.items()
         ]
+
+    # ── MCP handlers (mcp v2 constructor-based registration) ─────
+    async def _list_tools(ctx, params=None) -> t.ListToolsResult:
+        return t.ListToolsResult(tools=_tools_data())
+
+    async def _call_tool(ctx, params) -> t.CallToolResult:
+        name, arguments = params.name, params.arguments or {}
+        if name not in tools:
+            raise HTTPException(404, "tool not found")
+
+        proxy, _ = tools[name]
+        try:
+            res = await proxy(**arguments)
+        except HTTPException as exc:
+            # map server‑side errors into MCP "text/error" payloads
+            err = {"error": exc.status_code, "detail": exc.detail}
+            return t.CallToolResult(content=[t.TextContent(type="text", text=json.dumps(err, ensure_ascii=False))])
+        return t.CallToolResult(content=[t.TextContent(type="text", text=json.dumps(res, default=str, ensure_ascii=False))])
+
+    async def _list_resources(ctx, params=None) -> t.ListResourcesResult:
+        return t.ListResourcesResult(resources=_resources_data())
+
+    async def _read_resource(ctx, params) -> t.ReadResourceResult:
+        uri = params.uri
+        if uri not in resources:
+            raise HTTPException(404, "resource not found")
+        res = resources[uri]()
+        return t.ReadResourceResult(contents=[
+            t.TextResourceContents(uri=uri, mime_type="application/json",
+                                   text=json.dumps(res, default=str, ensure_ascii=False))
+        ])
+
+    async def _list_templates(ctx, params=None) -> t.ListResourceTemplatesResult:
+        return t.ListResourceTemplatesResult(resource_templates=_templates_data())
+
+    mcp = Server(
+        server_name,
+        on_list_tools=_list_tools,
+        on_call_tool=_call_tool,
+        on_list_resources=_list_resources,
+        on_read_resource=_read_resource,
+        on_list_resource_templates=_list_templates,
+    )
 
     init_opts = InitializationOptions(
         server_name=server_name,
@@ -202,6 +218,7 @@ def attach_mcp(
 
         from pydantic import TypeAdapter
         from mcp.types import JSONRPCMessage
+        from mcp.shared.message import SessionMessage
         adapter = TypeAdapter(JSONRPCMessage)
 
         init_done = anyio.Event()
@@ -210,7 +227,7 @@ def attach_mcp(
             first = True 
             try:
                 async for msg in s2c_recv:
-                    await ws.send_json(msg.model_dump())
+                    await ws.send_json(msg.message.model_dump())
                     if first:
                         init_done.set()
                         first = False
@@ -224,11 +241,11 @@ def attach_mcp(
             try:
                 # 1st frame is always "initialize"
                 first = adapter.validate_python(await ws.receive_json())
-                await c2s_send.send(first)
+                await c2s_send.send(SessionMessage(message=first))
                 await init_done.wait()          # block until server ready
                 while True:
                     data = await ws.receive_json()
-                    await c2s_send.send(adapter.validate_python(data))
+                    await c2s_send.send(SessionMessage(message=adapter.validate_python(data)))
             except WebSocketDisconnect:
                 await c2s_send.aclose()
 
@@ -256,9 +273,9 @@ def attach_mcp(
     @app.get(f"{base}/schema")
     async def _schema_endpoint():
         return JSONResponse({
-            "tools": [x.model_dump() for x in await _list_tools()],
-            "resources": [x.model_dump() for x in await _list_resources()],
-            "resource_templates": [x.model_dump() for x in await _list_templates()],
+            "tools": [x.model_dump() for x in _tools_data()],
+            "resources": [x.model_dump() for x in _resources_data()],
+            "resource_templates": [x.model_dump() for x in _templates_data()],
         })
 
 
