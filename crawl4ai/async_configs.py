@@ -1686,6 +1686,11 @@ class CrawlerRunConfig():
         url: str = None,
         base_url: str = None,  # Base URL for markdown link resolution (used with raw: HTML)
         check_robots_txt: bool = False,
+        # SSRF protection (opt-in): block crawl targets on internal/private
+        # networks (loopback, private, link-local incl. cloud metadata, etc.).
+        # See crawl4ai/url_safety.py. Disabled by default to preserve the
+        # user-agent contract.
+        block_internal_urls: bool = False,
         user_agent: str = None,
         user_agent_mode: str = None,
         user_agent_generator_config: dict = {},
@@ -1828,6 +1833,9 @@ class CrawlerRunConfig():
 
         # Robots.txt Handling Parameters
         self.check_robots_txt = check_robots_txt
+
+        # SSRF protection (opt-in)
+        self.block_internal_urls = block_internal_urls
 
         # User Agent Parameters
         self.user_agent = user_agent
@@ -2175,6 +2183,7 @@ class CrawlerRunConfig():
             "prefetch": self.prefetch,
             "process_in_browser": self.process_in_browser,
             "check_robots_txt": self.check_robots_txt,
+            "block_internal_urls": self.block_internal_urls,
             "user_agent": self.user_agent,
             "user_agent_mode": self.user_agent_mode,
             "user_agent_generator_config": self.user_agent_generator_config,

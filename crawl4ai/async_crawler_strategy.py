@@ -23,6 +23,7 @@ from .ssl_certificate import SSLCertificate
 from .user_agent_generator import ValidUAGenerator, UAGen
 from .browser_manager import BrowserManager
 from .browser_adapter import BrowserAdapter, PlaywrightAdapter, UndetectedAdapter
+from .url_safety import check_url_destination, BlockedURLError
 
 import aiofiles
 import aiohttp
@@ -455,6 +456,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         response_headers = {}
         status_code = 200  # Default for local/raw HTML
         screenshot_data = None
+
+        if config.block_internal_urls and url.startswith(("http://", "https://")):
+            check_url_destination(url)
 
         if url.startswith(("http://", "https://", "view-source:")):
             return await self._crawl_web(url, config)
@@ -2808,7 +2812,10 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
         
         if scheme not in self.VALID_SCHEMES:
             raise ValueError(f"Unsupported URL scheme: {scheme}")
-            
+
+        if config.block_internal_urls and scheme in ("http", "https"):
+            check_url_destination(url)
+
         try:
             if scheme == 'file':
                 return await self._handle_file(parsed.path)
