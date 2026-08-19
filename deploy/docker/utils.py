@@ -419,11 +419,19 @@ def get_container_memory_percent() -> float:
             usage_path = Path("/sys/fs/cgroup/memory/memory.usage_in_bytes")
             limit_path = Path("/sys/fs/cgroup/memory/memory.limit_in_bytes")
 
-        usage = int(usage_path.read_text())
-        limit = int(limit_path.read_text())
+        usage = int(usage_path.read_text().strip())
+        raw_limit = limit_path.read_text().strip()
+
+        # cgroup v2 reports an unset memory limit as the literal string "max"
+        # (the "unlimited" sentinel this branch already knew about on v1,
+        # > 1e18). int("max") used to raise a ValueError that the bare except
+        # swallowed, so the guard silently reported the HOST's percentage
+        # instead of container usage vs host total. Normalize it to the same
+        # sentinel as the v1 unlimited value.
+        limit = float("inf") if raw_limit == "max" else int(raw_limit)
 
         # Handle unlimited (v2: "max", v1: > 1e18)
-        if limit > 1e18:
+        if limit == float("inf") or limit > 1e18:
             import psutil
             limit = psutil.virtual_memory().total
 
