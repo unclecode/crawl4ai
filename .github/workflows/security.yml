@@ -40,6 +40,10 @@ jobs:
         run: |
           pytest deploy/docker/tests/test_security_*.py -q
 
+      - name: Run docker utility unit tests
+        run: |
+          pytest deploy/docker/tests/test_utils_*.py -q
+
   posture-gate:
     # The headline secure-by-default acceptance gate, isolated so it can be a
     # required status check. xfail-marked items (e.g. the build-gated
