@@ -808,6 +808,21 @@ class BrowserManager:
             # Initialize playwright
             self.playwright = await async_playwright().start()
 
+        try:
+            await self._launch_browser()
+        except Exception:
+            # If browser launch fails, ensure Playwright process is cleaned up
+            # to avoid leaking the "node cli.js run-driver" subprocess.
+            if self.playwright is not None and not self._using_cached_cdp:
+                try:
+                    await self.playwright.stop()
+                except Exception:
+                    pass
+                self.playwright = None
+            raise
+
+    async def _launch_browser(self):
+        """Launch or connect to the browser after Playwright is initialized."""
         # ── Persistent context via Playwright's native API ──────────────
         # When use_persistent_context is set and we're not connecting to an
         # external CDP endpoint, use launch_persistent_context() instead of

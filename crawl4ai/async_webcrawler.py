@@ -180,7 +180,15 @@ class AsyncWebCrawler:
         Returns:
             AsyncWebCrawler: The initialized crawler instance
         """
-        await self.crawler_strategy.__aenter__()
+        try:
+            await self.crawler_strategy.__aenter__()
+        except Exception:
+            # Ensure partial resources are cleaned up on failure
+            try:
+                await self.crawler_strategy.__aexit__(None, None, None)
+            except Exception:
+                pass
+            raise
         self.logger.info(f"Crawl4AI {crawl4ai_version}", tag="INIT")
         self.ready = True
         return self
