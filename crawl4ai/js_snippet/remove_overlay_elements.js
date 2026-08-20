@@ -60,6 +60,8 @@ async () => {
 
             if (
                 isVisible(elem) &&
+                elem.tagName !== 'HTML' &&
+                elem.tagName !== 'BODY' &&
                 (zIndex > 999 || position === "fixed" || position === "absolute") &&
                 (elem.offsetWidth > window.innerWidth * 0.5 ||
                     elem.offsetHeight > window.innerHeight * 0.5 ||
@@ -74,7 +76,7 @@ async () => {
         for (const selector of commonSelectors) {
             const elements = document.querySelectorAll(selector);
             elements.forEach((elem) => {
-                if (isVisible(elem)) {
+                if (isVisible(elem) && elem.tagName !== 'HTML' && elem.tagName !== 'BODY') {
                     elem.remove();
                 }
             });
