@@ -683,10 +683,11 @@ class PruningContentFilter(RelevantContentFilter):
             element.extract()
 
     def _remove_unwanted_tags(self, soup):
-        """Removes unwanted tags"""
+        """Removes unwanted tags, but respects preserve_tags/preserve_classes whitelist."""
         for tag in self.excluded_tags:
             for element in soup.find_all(tag):
-                element.decompose()
+                if not self._is_preserved(element):
+                    element.decompose()
 
     def _is_preserved(self, node):
         """Check if a node matches the preserve whitelist."""
