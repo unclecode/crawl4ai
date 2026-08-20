@@ -842,6 +842,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
                 if not config.ignore_body_visibility:
                     raise Error(f"Body element is hidden: {visibility_info}")
+                else:
+                    self.logger.debug(
+                        message="Body visibility check timed out (ignored, use body_visibility_timeout to adjust)",
+                        tag="DEBUG",
+                    )
 
             # try:
             #     await page.wait_for_selector("body", state="attached", timeout=30000)
