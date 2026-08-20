@@ -5,6 +5,10 @@ async () => {
         return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
     };
 
+    // html/body must never be removed: doing so wipes the whole page and is
+    // always a worse outcome than leaving a popup in place.
+    const isProtected = (elem) => elem === document.documentElement || elem === document.body;
+
     // Common selectors for popups and overlays
     const commonSelectors = [
         // Close buttons first
@@ -59,6 +63,7 @@ async () => {
             const position = style.position;
 
             if (
+                !isProtected(elem) &&
                 isVisible(elem) &&
                 (zIndex > 999 || position === "fixed" || position === "absolute") &&
                 (elem.offsetWidth > window.innerWidth * 0.5 ||
@@ -74,7 +79,7 @@ async () => {
         for (const selector of commonSelectors) {
             const elements = document.querySelectorAll(selector);
             elements.forEach((elem) => {
-                if (isVisible(elem)) {
+                if (!isProtected(elem) && isVisible(elem)) {
                     elem.remove();
                 }
             });
@@ -89,7 +94,7 @@ async () => {
         const elements = document.querySelectorAll("*");
         elements.forEach((elem) => {
             const style = window.getComputedStyle(elem);
-            if ((style.position === "fixed" || style.position === "sticky") && isVisible(elem)) {
+            if (!isProtected(elem) && (style.position === "fixed" || style.position === "sticky") && isVisible(elem)) {
                 elem.remove();
             }
         });
