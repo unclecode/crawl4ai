@@ -378,5 +378,22 @@ async def test_remove_overlay_elements(crawler_strategy):
     assert response.status_code == 200
     assert "Accept all cookies" not in response.html
 
+@pytest.mark.asyncio
+async def test_remove_overlay_elements_preserves_body_with_popup_class(crawler_strategy):
+    # Regression test: some WP themes (e.g. Bridge) put a "popup" substring in
+    # the body's own class, which matched the generic `[class*="popup" i]`
+    # overlay selector and deleted the whole body, leaving an empty page.
+    raw_html = (
+        "raw://<html><body class=\"qode_popup_menu_push_text_right\">"
+        "<main><h1>Real content</h1><p>This should survive.</p></main>"
+        "</body></html>"
+    )
+    config = CrawlerRunConfig(remove_overlay_elements=True)
+
+    response = await crawler_strategy.crawl(raw_html, config)
+
+    assert "<body" in response.html
+    assert "Real content" in response.html
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
