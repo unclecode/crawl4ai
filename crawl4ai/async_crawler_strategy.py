@@ -826,9 +826,16 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     timeout=30000,
                 )
 
-                if not is_visible and not config.ignore_body_visibility:
+                if not is_visible:
                     visibility_info = await self.check_visibility(page)
-                    raise Error(f"Body element is hidden: {visibility_info}")
+                    if not config.ignore_body_visibility:
+                        raise Error(f"Body element is hidden: {visibility_info}")
+                    else:
+                        self.logger.warning(
+                            message="Body visibility timeout ({elapsed:.1f}s); ignored because ignore_body_visibility=True. Set body_visibility_timeout lower or ignore_body_visibility=False to surface this.",
+                            tag="BODY_VIS",
+                            params={"elapsed": 30.0},
+                        )
 
             except Error:
                 visibility_info = await self.check_visibility(page)
