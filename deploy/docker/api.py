@@ -148,8 +148,9 @@ async def handle_llm_qa(
         crawler = await get_crawler(browser_cfg)
         result = await crawler.arun(url)
         if not result.success:
+            status_code = status.HTTP_403_FORBIDDEN if "Blocked by anti-bot" in (result.error_message or "") else status.HTTP_500_INTERNAL_SERVER_ERROR
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                status_code=status_code,
                 detail=result.error_message
             )
         content = result.markdown.fit_markdown or result.markdown.raw_markdown
