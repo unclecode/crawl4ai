@@ -419,8 +419,10 @@ def get_container_memory_percent() -> float:
             usage_path = Path("/sys/fs/cgroup/memory/memory.usage_in_bytes")
             limit_path = Path("/sys/fs/cgroup/memory/memory.limit_in_bytes")
 
-        usage = int(usage_path.read_text())
-        limit = int(limit_path.read_text())
+        usage_str = usage_path.read_text().strip()
+        usage = int(usage_str) if usage_str.isdigit() else 0
+        limit_str = limit_path.read_text().strip()
+        limit = int(limit_str) if limit_str.isdigit() else 0
 
         # Handle unlimited (v2: "max", v1: > 1e18)
         if limit > 1e18:
