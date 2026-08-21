@@ -906,9 +906,8 @@ async def crawl(
         hooks_config=hooks_config,
         crawler_configs=crawl_request.crawler_configs,
     )
-    # check if all of the results are not successful
-    if all(not result["success"] for result in results["results"]):
-        raise HTTPException(500, f"Crawl request failed: {results['results'][0]['error_message']}")
+    # Return results with per-URL error information instead of raising 500.
+    # This allows clients to see which URLs failed and why.
     return JSONResponse(results)
 
 
