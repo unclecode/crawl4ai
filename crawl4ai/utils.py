@@ -12,7 +12,15 @@ from .prompts import PROMPT_EXTRACT_BLOCKS
 from array import array
 from .html2text import html2text, CustomHTML2Text
 # from .config import *
-from .config import MIN_WORD_THRESHOLD, IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD, IMAGE_SCORE_THRESHOLD, DEFAULT_PROVIDER, PROVIDER_MODELS
+from .config import (
+    MIN_WORD_THRESHOLD,
+    IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
+    IMAGE_SCORE_THRESHOLD,
+    DEFAULT_PROVIDER,
+    PROVIDER_MODELS,
+    ORCAROUTER_BASE_URL,
+    orcarouter_litellm_params,
+)
 import httpx
 from socket import gaierror
 from pathlib import Path
@@ -1786,6 +1794,11 @@ def perform_completion_with_backoff(
     if kwargs.get("extra_args"):
         extra_args.update(kwargs["extra_args"])
 
+    # Named OrcaRouter provider: route the OpenAI-compatible gateway while
+    # keeping the full `orcarouter/<model>` id (LiteLLM has no native prefix).
+    orca_params = orcarouter_litellm_params(provider, api_token, base_url)
+    extra_args.update(orca_params)
+
     for attempt in range(max_attempts):
         try:
             response = completion(
@@ -1878,6 +1891,11 @@ async def aperform_completion_with_backoff(
 
     if kwargs.get("extra_args"):
         extra_args.update(kwargs["extra_args"])
+
+    # Named OrcaRouter provider: route the OpenAI-compatible gateway while
+    # keeping the full `orcarouter/<model>` id (LiteLLM has no native prefix).
+    orca_params = orcarouter_litellm_params(provider, api_token, base_url)
+    extra_args.update(orca_params)
 
     for attempt in range(max_attempts):
         try:
@@ -1993,6 +2011,13 @@ def extract_blocks_batch(batch_data, provider="groq/llama3-70b-8192", api_token=
     api_token = os.getenv("GROQ_API_KEY", None) if not api_token else api_token
     from litellm import batch_completion
 
+    # Named OrcaRouter provider: route the OpenAI-compatible gateway while
+    # keeping the full `orcarouter/<model>` id (LiteLLM has no native prefix),
+    # and default the token to ORCAROUTER_API_KEY.
+    if not api_token and provider and provider.startswith("orcarouter/"):
+        api_token = os.getenv("ORCAROUTER_API_KEY", None)
+    orca_params = orcarouter_litellm_params(provider, api_token, None)
+
     messages = []
 
     for url, _html in batch_data:
@@ -2009,7 +2034,9 @@ def extract_blocks_batch(batch_data, provider="groq/llama3-70b-8192", api_token=
 
         messages.append([{"role": "user", "content": prompt_with_variables}])
 
-    responses = batch_completion(model=provider, messages=messages, temperature=0.01)
+    responses = batch_completion(
+        model=provider, messages=messages, temperature=0.01, **orca_params
+    )
 
     all_blocks = []
     for response in responses:
@@ -3535,19 +3562,26 @@ async def get_text_embeddings(
         # Get embedding model from config or use default
         embedding_model = llm_config.get('provider', 'text-embedding-3-small')
         api_base = llm_config.get('base_url', llm_config.get('api_base'))
-        
+
         # Prepare kwargs
         kwargs = {
             'model': embedding_model,
             'input': texts,
             'api_key': llm_config.get('api_token', llm_config.get('api_key'))
         }
-        
+
         if api_base:
             kwargs['api_base'] = api_base
-            
-        # Handle OpenAI-compatible endpoints
-        if api_base and 'openai/' not in embedding_model:
+
+        # Named OrcaRouter provider: OrcaRouter exposes OpenAI-compatible
+        # embedding models (e.g. `openai/text-embedding-3-small`) at
+        # https://api.orcarouter.ai/v1. Keep the `openai/` prefix so LiteLLM
+        # routes through the OpenAI provider, and default the base URL to the
+        # gateway when a user sets `orcarouter` as the embedding provider.
+        if embedding_model and embedding_model.startswith('orcarouter/'):
+            kwargs['model'] = f"openai/{embedding_model[len('orcarouter/'):]}"
+            kwargs['api_base'] = api_base or ORCAROUTER_BASE_URL
+        elif api_base and 'openai/' not in embedding_model:
             kwargs['model'] = f"openai/{embedding_model}"
         
         # Get embeddings

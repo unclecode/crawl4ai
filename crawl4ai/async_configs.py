@@ -15,6 +15,7 @@ from .config import (
     PAGE_TIMEOUT,
     IMAGE_SCORE_THRESHOLD,
     SOCIAL_MEDIA_DOMAINS,
+    ORCAROUTER_BASE_URL,
 )
 
 from .user_agent_generator import UAGen, ValidUAGenerator  # , OnlineUAGenerator
@@ -2284,10 +2285,14 @@ class LLMConfig:
                     (prefix for prefix in prefixes if provider.startswith(prefix)),
                     None,
                 )
-                self.api_token = PROVIDER_MODELS_PREFIXES.get(selected_prefix)                    
+                self.api_token = PROVIDER_MODELS_PREFIXES.get(selected_prefix)
             else:
                 self.provider = DEFAULT_PROVIDER
                 self.api_token = os.getenv(DEFAULT_PROVIDER_API_KEY)
+        # Named OrcaRouter provider: default the gateway base URL when the
+        # provider uses the `orcarouter/<model>` prefix.
+        if provider.startswith("orcarouter/") and not base_url:
+            base_url = ORCAROUTER_BASE_URL
         self.base_url = base_url
         self.temperature = temperature
         self.max_tokens = max_tokens

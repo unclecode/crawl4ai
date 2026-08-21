@@ -33,7 +33,7 @@ from crawl4ai import (
     BestFirstCrawlingStrategy,
 )
 from crawl4ai.browser_profiler import ShrinkLevel, _format_size
-from crawl4ai.config import USER_SETTINGS
+from crawl4ai.config import USER_SETTINGS, orcarouter_litellm_params
 from crawl4ai.cloud import cloud_cmd
 from litellm import completion
 from pathlib import Path
@@ -65,7 +65,7 @@ def setup_llm_config() -> tuple[str, str]:
     
     if not provider:
         click.echo("\nNo default LLM provider configured.")
-        click.echo("Provider format: 'company/model' (e.g., 'openai/gpt-4o', 'anthropic/claude-3-sonnet')")
+        click.echo("Provider format: 'company/model' (e.g., 'openai/gpt-4o', 'anthropic/claude-3-sonnet', 'orcarouter/auto')")
         click.echo("See available providers at: https://docs.litellm.ai/docs/providers")
         provider = click.prompt("Enter provider")
         
@@ -84,7 +84,7 @@ def setup_llm_config() -> tuple[str, str]:
     return provider, token
 
 async def stream_llm_response(url: str, markdown: str, query: str, provider: str, token: str):
-    response = completion(
+    completion_kwargs = dict(
         model=provider,
         api_key=token,
         messages=[
@@ -99,6 +99,10 @@ async def stream_llm_response(url: str, markdown: str, query: str, provider: str
         ],
         stream=True,
     )
+    # Named OrcaRouter provider: route the OpenAI-compatible gateway while
+    # keeping the full `orcarouter/<model>` id (LiteLLM has no native prefix).
+    completion_kwargs.update(orcarouter_litellm_params(provider, token, None))
+    response = completion(**completion_kwargs)
     
     for chunk in response:
         if content := chunk["choices"][0]["delta"].get("content"):

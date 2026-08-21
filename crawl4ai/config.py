@@ -36,8 +36,41 @@ PROVIDER_MODELS_PREFIXES = {
     "anthropic": os.getenv("ANTHROPIC_API_KEY"),
     "gemini": os.getenv("GEMINI_API_KEY"),
     "deepseek": os.getenv("DEEPSEEK_API_KEY"),
+    "orcarouter": os.getenv("ORCAROUTER_API_KEY"),
     "bedrock": None,  # Bedrock uses AWS credential chain (SigV4) or explicit api_token for bearer auth
 }
+
+# OrcaRouter gateway defaults. OrcaRouter is an OpenAI-compatible gateway:
+# https://api.orcarouter.ai/v1. Model ids use the `orcarouter/<model>` prefix
+# (e.g. `orcarouter/auto`, `orcarouter/free`).
+ORCAROUTER_BASE_URL = "https://api.orcarouter.ai/v1"
+
+
+def orcarouter_litellm_params(provider, api_token, base_url=None):
+    """Return LiteLLM kwargs that route an ``orcarouter/<model>`` provider string.
+
+    The pinned ``unclecode-litellm`` build has no native ``orcarouter/`` provider
+    prefix, so LiteLLM rejects ``orcarouter/auto`` with "LLM Provider NOT
+    provided". OrcaRouter is OpenAI-compatible, so we route through the
+    ``openai`` provider while keeping the full ``orcarouter/<model>`` id intact
+    (OrcaRouter routes on that prefix) and pointing ``base_url`` at the gateway.
+
+    Args:
+        provider (str): The provider string, e.g. "orcarouter/auto".
+        api_token (str): The OrcaRouter API token.
+        base_url (Optional[str]): Override for the gateway base URL.
+
+    Returns:
+        dict: Extra kwargs to pass to ``litellm.completion``/``acompletion``.
+            Empty dict when ``provider`` is not an OrcaRouter model.
+    """
+    if not provider or not provider.startswith("orcarouter/"):
+        return {}
+    return {
+        "custom_llm_provider": "openai",
+        "api_key": api_token,
+        "base_url": base_url or ORCAROUTER_BASE_URL,
+    }
 
 # Chunk token threshold
 CHUNK_TOKEN_THRESHOLD = 2**11  # 2048 tokens
