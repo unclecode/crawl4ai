@@ -165,6 +165,17 @@ class TestPruningContentFilter:
         second_run = filter.filter_content(basic_html)
         assert first_run == second_run, "Output should be consistent"
 
+    def test_preserves_whitespace_only_nodes_inside_code_blocks(self):
+        html = """<html><body><article><pre><code>if ready:
+<span>    </span>return value</code></pre></article></body></html>"""
+        filter = PruningContentFilter(
+            threshold_type="fixed", threshold=0, min_word_threshold=2
+        )
+
+        contents = filter.filter_content(html)
+
+        assert '<span>    </span>' in "".join(contents)
+
 
 if __name__ == "__main__":
     pytest.main([__file__])
