@@ -5,6 +5,12 @@ async () => {
         return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
     };
 
+    // Removing any of these nodes destroys the document rather than dismissing
+    // an overlay. Themes can put popup/modal classes or fixed positioning on
+    // document-level elements while a menu or dialog is open.
+    const isDocumentStructure = (elem) =>
+        ["HTML", "HEAD", "BODY"].includes(elem?.tagName);
+
     // Common selectors for popups and overlays
     const commonSelectors = [
         // Close buttons first
@@ -60,8 +66,7 @@ async () => {
 
             if (
                 isVisible(elem) &&
-                elem.tagName !== 'HTML' &&
-                elem.tagName !== 'BODY' &&
+                !isDocumentStructure(elem) &&
                 (zIndex > 999 || position === "fixed" || position === "absolute") &&
                 (elem.offsetWidth > window.innerWidth * 0.5 ||
                     elem.offsetHeight > window.innerHeight * 0.5 ||
@@ -76,7 +81,7 @@ async () => {
         for (const selector of commonSelectors) {
             const elements = document.querySelectorAll(selector);
             elements.forEach((elem) => {
-                if (isVisible(elem) && elem.tagName !== 'HTML' && elem.tagName !== 'BODY') {
+                if (isVisible(elem) && !isDocumentStructure(elem)) {
                     elem.remove();
                 }
             });
@@ -91,7 +96,9 @@ async () => {
         const elements = document.querySelectorAll("*");
         elements.forEach((elem) => {
             const style = window.getComputedStyle(elem);
-            if ((style.position === "fixed" || style.position === "sticky") && isVisible(elem)) {
+            if (!isDocumentStructure(elem) &&
+                (style.position === "fixed" || style.position === "sticky") &&
+                isVisible(elem)) {
                 elem.remove();
             }
         });
