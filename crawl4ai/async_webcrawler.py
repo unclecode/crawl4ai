@@ -505,11 +505,10 @@ class AsyncWebCrawler:
 
                                 # Check if blocked (skip for raw: URLs —
                                 # caller-provided content, anti-bot N/A;
-                                # skip for non-HTML Content-Type like application/pdf
-                                # where minimal HTML is expected by design)
+                                # skip for application/pdf where stub HTML is expected by design)
                                 _ct = async_response.response_headers.get("Content-Type", "")
-                                _non_html = _ct and not _ct.startswith("text/html")
-                                if _is_raw_url or _non_html:
+                                _is_pdf = _ct and "application/pdf" in _ct
+                                if _is_raw_url or _is_pdf:
                                     _blocked = False
                                     _block_reason = ""
                                 else:
@@ -557,10 +556,10 @@ class AsyncWebCrawler:
                     _fallback_fn = getattr(config, "fallback_fetch_function", None)
                     if _fallback_fn and not _done and not _is_raw_url:
                         _ct2 = (getattr(crawl_result, "response_headers", None) or {}).get("Content-Type", "")
-                        _non_html2 = _ct2 and not _ct2.startswith("text/html")
+                        _is_pdf2 = _ct2 and "application/pdf" in _ct2
                         _needs_fallback = (
                             crawl_result is None  # All proxies threw exceptions
-                            or (not _non_html2 and is_blocked(crawl_result.status_code, crawl_result.html or "")[0])
+                            or (not _is_pdf2 and is_blocked(crawl_result.status_code, crawl_result.html or "")[0])
                         )
                         if _needs_fallback:
                             self.logger.warning(
@@ -632,8 +631,8 @@ class AsyncWebCrawler:
                         # html" as a block.
                         _has_download = bool(getattr(crawl_result, "downloaded_files", None))
                         _ct3 = (crawl_result.response_headers or {}).get("Content-Type", "")
-                        _non_html3 = _ct3 and not _ct3.startswith("text/html")
-                        if not _fallback_succeeded and not _is_raw_url and not _has_download and not _non_html3:
+                        _is_pdf3 = _ct3 and "application/pdf" in _ct3
+                        if not _fallback_succeeded and not _is_raw_url and not _has_download and not _is_pdf3:
                             _blocked, _block_reason = is_blocked(
                                 crawl_result.status_code, crawl_result.html or "")
                             if _blocked:
