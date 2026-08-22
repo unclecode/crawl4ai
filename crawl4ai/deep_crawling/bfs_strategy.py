@@ -66,8 +66,8 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         """
         try:
             parsed = urlparse(url)
-            if not parsed.scheme or not parsed.netloc:
-                raise ValueError("Missing scheme or netloc")
+            if not parsed.scheme or not parsed.hostname:
+                raise ValueError("Missing scheme or hostname")
             if parsed.scheme not in ("http", "https"):
                 raise ValueError("Invalid scheme")
             # Single-label hostnames (e.g. "name" without a dot) are valid
