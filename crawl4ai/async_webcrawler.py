@@ -182,7 +182,7 @@ class AsyncWebCrawler:
         """
         try:
             await self.crawler_strategy.__aenter__()
-        except Exception:
+        except BaseException:
             # Ensure partial resources are cleaned up on failure
             try:
                 await self.crawler_strategy.__aexit__(None, None, None)

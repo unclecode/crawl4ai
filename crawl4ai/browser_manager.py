@@ -810,7 +810,7 @@ class BrowserManager:
 
         try:
             await self._launch_browser()
-        except Exception:
+        except BaseException:
             # If browser launch fails, ensure Playwright process is cleaned up
             # to avoid leaking the "node cli.js run-driver" subprocess.
             if self.playwright is not None and not self._using_cached_cdp:
