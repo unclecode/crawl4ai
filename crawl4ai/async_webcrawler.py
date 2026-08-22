@@ -1108,14 +1108,19 @@ class AsyncWebCrawler:
 
         if stream:
             async def result_transformer():
+                inner = dispatcher.run_urls_stream(
+                    crawler=self, urls=urls, config=config
+                )
                 try:
-                    async for task_result in dispatcher.run_urls_stream(
-                        crawler=self, urls=urls, config=config
-                    ):
+                    async for task_result in inner:
                         yield transform_result(task_result)
                 finally:
-                    # Auto-release session after streaming completes
-                    await maybe_release_session()
+                    try:
+                        await inner.aclose()
+                    finally:
+                        # Auto-release only after dispatcher cleanup completes,
+                        # even if closing the inner stream raises.
+                        await maybe_release_session()
 
             return result_transformer()
         else:

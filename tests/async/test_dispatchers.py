@@ -105,6 +105,47 @@ class TestDispatchStrategies:
         assert dispatcher.concurrent_sessions == 0
         assert dispatcher.task_queue.empty()
 
+    async def test_arun_many_stream_closure_cleans_up_dispatcher_tasks(self):
+        class TrackingDispatcher(MemoryAdaptiveDispatcher):
+            def __init__(self):
+                super().__init__(max_session_permit=3)
+                self.tasks = {}
+
+            async def crawl_url(self, url, config, task_id, retry_count=0):
+                self.tasks[url] = asyncio.current_task()
+                return await super().crawl_url(url, config, task_id, retry_count)
+
+        async def controlled_arun(url, config=None, session_id=None):
+            if url == "fast":
+                return SimpleNamespace(
+                    url=url,
+                    success=True,
+                    status_code=200,
+                    error_message="",
+                )
+            await asyncio.Event().wait()
+
+        crawler = AsyncWebCrawler()
+        crawler.arun = controlled_arun
+        dispatcher = TrackingDispatcher()
+        stream = await crawler.arun_many(
+            ["fast", "blocked-1", "blocked-2"],
+            config=CrawlerRunConfig(stream=True),
+            dispatcher=dispatcher,
+        )
+
+        first = await asyncio.wait_for(stream.__anext__(), timeout=1)
+        assert first.url == "fast"
+
+        await asyncio.wait_for(stream.aclose(), timeout=1)
+
+        assert set(dispatcher.tasks) == {"fast", "blocked-1", "blocked-2"}
+        assert all(task.done() for task in dispatcher.tasks.values())
+        assert dispatcher.tasks["blocked-1"].cancelled()
+        assert dispatcher.tasks["blocked-2"].cancelled()
+        assert dispatcher.concurrent_sessions == 0
+        assert dispatcher.task_queue.empty()
+
     async def test_semaphore_basic(self, browser_config, run_config, test_urls):
         async with AsyncWebCrawler(config=browser_config) as crawler:
             dispatcher = SemaphoreDispatcher(semaphore_count=2)
