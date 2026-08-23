@@ -1,4 +1,10 @@
 async () => {
+    // Never remove html or body — they are the document root.
+    const isProtected = (elem) => {
+        const tag = elem.tagName;
+        return tag === 'HTML' || tag === 'BODY';
+    };
+
     // Function to check if element is visible
     const isVisible = (elem) => {
         const style = window.getComputedStyle(elem);
@@ -59,6 +65,7 @@ async () => {
             const position = style.position;
 
             if (
+                !isProtected(elem) &&
                 isVisible(elem) &&
                 (zIndex > 999 || position === "fixed" || position === "absolute") &&
                 (elem.offsetWidth > window.innerWidth * 0.5 ||
@@ -74,7 +81,7 @@ async () => {
         for (const selector of commonSelectors) {
             const elements = document.querySelectorAll(selector);
             elements.forEach((elem) => {
-                if (isVisible(elem)) {
+                if (!isProtected(elem) && isVisible(elem)) {
                     elem.remove();
                 }
             });
@@ -89,7 +96,7 @@ async () => {
         const elements = document.querySelectorAll("*");
         elements.forEach((elem) => {
             const style = window.getComputedStyle(elem);
-            if ((style.position === "fixed" || style.position === "sticky") && isVisible(elem)) {
+            if (!isProtected(elem) && (style.position === "fixed" || style.position === "sticky") && isVisible(elem)) {
                 elem.remove();
             }
         });
