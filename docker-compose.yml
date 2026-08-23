@@ -24,7 +24,6 @@ x-base-config: &base-config
     - ALL
   security_opt:
     - no-new-privileges:true
-  pids_limit: 512
   # Read-only root filesystem; only these paths are writable (tmpfs).
   read_only: true
   tmpfs:
@@ -39,6 +38,7 @@ x-base-config: &base-config
     resources:
       limits:
         memory: 4G
+        pids: 512
       reservations:
         memory: 1G
   restart: unless-stopped
