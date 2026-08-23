@@ -148,9 +148,11 @@ async def handle_llm_qa(
         crawler = await get_crawler(browser_cfg)
         result = await crawler.arun(url)
         if not result.success:
+            err = result.error_message or "Crawl failed"
+            code = status.HTTP_403_FORBIDDEN if "blocked" in err.lower() or "anti-bot" in err.lower() else status.HTTP_500_INTERNAL_SERVER_ERROR
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=result.error_message
+                status_code=code,
+                detail=err
             )
         content = result.markdown.fit_markdown or result.markdown.raw_markdown
 
@@ -390,9 +392,11 @@ async def handle_markdown_request(
         )
 
         if not result.success:
+            err = result.error_message or "Crawl failed"
+            code = status.HTTP_403_FORBIDDEN if "blocked" in err.lower() or "anti-bot" in err.lower() else status.HTTP_500_INTERNAL_SERVER_ERROR
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=result.error_message
+                status_code=code,
+                detail=err
             )
 
         return (result.markdown.raw_markdown
