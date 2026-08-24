@@ -671,6 +671,10 @@ async def handle_crawl_request(
 
     try:
         urls = _normalize_and_validate_seeds(urls)
+        # Preserve raw client config dict to detect which fields the client
+        # explicitly sent — needed so base_config defaults apply correctly
+        # for boolean/int fields that have non-None/non-empty defaults. (#2121)
+        raw_crawler_config = crawler_config if isinstance(crawler_config, dict) else {}
         browser_config = BrowserConfig.load(browser_config, provenance=Provenance.UNTRUSTED)
         crawler_config = CrawlerRunConfig.load(crawler_config, provenance=Provenance.UNTRUSTED)
         from egress_broker import enforce_egress
@@ -701,19 +705,19 @@ async def handle_crawl_request(
             # Per-URL config list: deserialize each and apply base_config
             config_list = [CrawlerRunConfig.load(cc, provenance=Provenance.UNTRUSTED) for cc in crawler_configs]
             for cfg in config_list:
+                raw_cfg = cc if isinstance(cc, dict) else {}
                 for key, value in base_config.items():
-                    if hasattr(cfg, key):
-                        current_value = getattr(cfg, key)
-                        if current_value is None or current_value == "":
-                            setattr(cfg, key, value)
+                    if hasattr(cfg, key) and key not in raw_cfg:
+                        setattr(cfg, key, value)
             effective_config = config_list
         else:
             # Single config (original behavior)
+            # Apply server defaults for keys the client did NOT send.
+            # Previous check (current_value is None or == "") missed
+            # boolean defaults like simulate_user=False.  See #2121.
             for key, value in base_config.items():
-                if hasattr(crawler_config, key):
-                    current_value = getattr(crawler_config, key)
-                    if current_value is None or current_value == "":
-                        setattr(crawler_config, key, value)
+                if hasattr(crawler_config, key) and key not in raw_crawler_config:
+                    setattr(crawler_config, key, value)
             effective_config = crawler_config
 
         results = []
