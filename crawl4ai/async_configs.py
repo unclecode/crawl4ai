@@ -1010,7 +1010,7 @@ class BrowserConfig:
         config_dict.update(kwargs)
         return BrowserConfig.from_kwargs(config_dict)
 
-    # Create a funciton returns dict of the object
+    # Create a function returns dict of the object
     def dump(self) -> dict:
         # Serialize the object to a dictionary
         return to_serializable_dict(self)
@@ -2081,7 +2081,7 @@ class CrawlerRunConfig():
         valid = inspect.signature(CrawlerRunConfig.__init__).parameters.keys() - {"self"}
         return CrawlerRunConfig(**{k: v for k, v in kwargs.items() if k in valid})
 
-    # Create a funciton returns dict of the object
+    # Create a function returns dict of the object
     def dump(self) -> dict:
         # Serialize the object to a dictionary
         return to_serializable_dict(self)
