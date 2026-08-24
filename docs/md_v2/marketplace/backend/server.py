@@ -95,18 +95,17 @@ async def get_apps(
     offset: int = Query(default=0)
 ):
     """Get apps with optional filters"""
-    where_clauses = []
+    filters = {}
     if category:
-        where_clauses.append(f"category = '{category}'")
+        filters["category"] = category
     if type:
-        where_clauses.append(f"type = '{type}'")
+        filters["type"] = type
     if featured is not None:
-        where_clauses.append(f"featured = {1 if featured else 0}")
+        filters["featured"] = int(featured)
     if sponsored is not None:
-        where_clauses.append(f"sponsored = {1 if sponsored else 0}")
+        filters["sponsored"] = int(sponsored)
 
-    where = " AND ".join(where_clauses) if where_clauses else None
-    apps = db.get_all('apps', limit=limit, offset=offset, where=where)
+    apps = db.get_all("apps", limit=limit, offset=offset, where=filters or None)
 
     # Parse JSON fields
     for app in apps:
@@ -118,7 +117,7 @@ async def get_apps(
 @router.get("/apps/{slug}")
 async def get_app(slug: str):
     """Get single app by slug"""
-    apps = db.get_all('apps', where=f"slug = '{slug}'", limit=1)
+    apps = db.get_all("apps", where={"slug": slug}, limit=1)
     if not apps:
         raise HTTPException(status_code=404, detail="App not found")
 
@@ -135,8 +134,8 @@ async def get_articles(
     offset: int = Query(default=0)
 ):
     """Get articles with optional category filter"""
-    where = f"category = '{category}'" if category else None
-    articles = db.get_all('articles', limit=limit, offset=offset, where=where)
+    filters = {"category": category} if category else None
+    articles = db.get_all("articles", limit=limit, offset=offset, where=filters)
 
     # Parse JSON fields
     for article in articles:
@@ -150,7 +149,7 @@ async def get_articles(
 @router.get("/articles/{slug}")
 async def get_article(slug: str):
     """Get single article by slug"""
-    articles = db.get_all('articles', where=f"slug = '{slug}'", limit=1)
+    articles = db.get_all("articles", where={"slug": slug}, limit=1)
     if not articles:
         raise HTTPException(status_code=404, detail="Article not found")
 
@@ -174,8 +173,8 @@ async def get_categories():
 @router.get("/sponsors")
 async def get_sponsors(active: Optional[bool] = True):
     """Get sponsors, default active only"""
-    where = f"active = {1 if active else 0}" if active is not None else None
-    sponsors = db.get_all('sponsors', where=where, limit=20)
+    filters = {"active": int(active)} if active is not None else None
+    sponsors = db.get_all("sponsors", where=filters, limit=20)
 
     # Filter by date if active
     if active:
@@ -211,10 +210,10 @@ async def search(q: str = Query(min_length=2)):
 async def get_stats():
     """Get marketplace statistics"""
     stats = {
-        "total_apps": len(db.get_all('apps', limit=10000)),
-        "total_articles": len(db.get_all('articles', limit=10000)),
-        "total_categories": len(db.get_all('categories', limit=1000)),
-        "active_sponsors": len(db.get_all('sponsors', where="active = 1", limit=1000))
+        "total_apps": len(db.get_all("apps", limit=10000)),
+        "total_articles": len(db.get_all("articles", limit=10000)),
+        "total_categories": len(db.get_all("categories", limit=1000)),
+        "active_sponsors": len(db.get_all("sponsors", where={"active": 1}, limit=1000)),
     }
     return json_response(stats, cache_time=1800)
 
@@ -279,13 +278,13 @@ async def get_admin_stats():
     stats = {
         "apps": {
             "total": len(db.get_all('apps', limit=10000)),
-            "featured": len(db.get_all('apps', where="featured = 1", limit=10000)),
-            "sponsored": len(db.get_all('apps', where="sponsored = 1", limit=10000))
+            "featured": len(db.get_all("apps", where={"featured": 1}, limit=10000)),
+            "sponsored": len(db.get_all("apps", where={"sponsored": 1}, limit=10000))
         },
         "articles": len(db.get_all('articles', limit=10000)),
         "categories": len(db.get_all('categories', limit=1000)),
         "sponsors": {
-            "active": len(db.get_all('sponsors', where="active = 1", limit=1000)),
+            "active": len(db.get_all("sponsors", where={"active": 1}, limit=1000)),
             "total": len(db.get_all('sponsors', limit=10000))
         },
         "total_views": sum(app.get('views', 0) for app in db.get_all('apps', limit=10000))
