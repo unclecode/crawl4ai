@@ -808,40 +808,44 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 response_headers = {}
 
             # Wait for body element and visibility
-            try:
-                await page.wait_for_selector("body", state="attached", timeout=30000)
+            # Skip entirely when ignore_body_visibility=True (the default)
+            # to avoid a hardcoded 30s penalty on pages where body is never visible
+            # (e.g., AngularJS ng-cloak, Vue v-cloak).  See #2129.
+            if not config.ignore_body_visibility:
+                try:
+                    await page.wait_for_selector("body", state="attached", timeout=30000)
 
-                # Use the new check_visibility function with csp_compliant_wait
-                is_visible = await self.csp_compliant_wait(
-                    page,
-                    """() => {
-                        const element = document.body;
-                        if (!element) return false;
-                        const style = window.getComputedStyle(element);
-                        const isVisible = style.display !== 'none' && 
-                                        style.visibility !== 'hidden' && 
-                                        style.opacity !== '0';
-                        return isVisible;
-                    }""",
-                    timeout=30000,
-                )
-
-                if not is_visible and not config.ignore_body_visibility:
-                    visibility_info = await self.check_visibility(page)
-                    raise Error(f"Body element is hidden: {visibility_info}")
-
-            except Error:
-                visibility_info = await self.check_visibility(page)
-
-                if self.browser_config.verbose:
-                    self.logger.debug(
-                        message="Body visibility info: {info}",
-                        tag="DEBUG",
-                        params={"info": visibility_info},
+                    # Use the new check_visibility function with csp_compliant_wait
+                    is_visible = await self.csp_compliant_wait(
+                        page,
+                        """() => {
+                            const element = document.body;
+                            if (!element) return false;
+                            const style = window.getComputedStyle(element);
+                            const isVisible = style.display !== 'none' &&
+                                            style.visibility !== 'hidden' &&
+                                            style.opacity !== '0';
+                            return isVisible;
+                        }"",
+                        timeout=30000,
                     )
 
-                if not config.ignore_body_visibility:
+                    if not is_visible:
+                        visibility_info = await self.check_visibility(page)
+                        raise Error(f"Body element is hidden: {visibility_info}")
+
+                except Error:
+                    visibility_info = await self.check_visibility(page)
+
+                    if self.browser_config.verbose:
+                        self.logger.debug(
+                            message="Body visibility info: {info}",
+                            tag="DEBUG",
+                            params={"info": visibility_info},
+                        )
+
                     raise Error(f"Body element is hidden: {visibility_info}")
+
 
             # try:
             #     await page.wait_for_selector("body", state="attached", timeout=30000)
