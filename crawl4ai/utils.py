@@ -1,3 +1,5 @@
+import ipaddress
+import socket
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup, Comment, element, Tag, NavigableString
@@ -48,6 +50,46 @@ from urllib.parse import (
     parse_qsl, urlencode, quote, unquote
 )
 import inspect
+
+
+def _validate_public_http_url(url: str) -> tuple[str, int | None]:
+    """Return hostname/port only when the URL resolves to a public address."""
+    parsed = urlparse(url)
+    if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
+        raise ValueError("robots URL must use http(s) and include a hostname")
+    if parsed.username is not None or parsed.password is not None:
+        raise ValueError("robots URL must not contain user information")
+
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("robots URL contains an invalid port") from exc
+
+    try:
+        addresses = [ipaddress.ip_address(parsed.hostname)]
+    except ValueError:
+        try:
+            addresses = [
+                ipaddress.ip_address(info[4][0])
+                for info in socket.getaddrinfo(
+                    parsed.hostname, port, type=socket.SOCK_STREAM
+                )
+            ]
+        except (OSError, ValueError) as exc:
+            raise ValueError("robots hostname could not be resolved") from exc
+
+    if not addresses or any(
+        address.is_private
+        or address.is_loopback
+        or address.is_link_local
+        or address.is_reserved
+        or address.is_multicast
+        or address.is_unspecified
+        for address in addresses
+    ):
+        raise ValueError("robots URL resolves to a private or reserved address")
+
+    return parsed.hostname, port
 
 
 # Monkey patch to fix wildcard handling in urllib.robotparser
@@ -327,7 +369,8 @@ class RobotsParser:
             domain = parsed.netloc
             if not domain:
                 return True
-        except Exception as _ex:
+            hostname, port = _validate_public_http_url(url)
+        except (TypeError, ValueError):
             return True
 
         # Fast path - check cache first
@@ -336,12 +379,18 @@ class RobotsParser:
         # If rules not found or stale, fetch new ones
         if not is_fresh:
             try:
-                # Ensure we use the same scheme as the input URL
-                scheme = parsed.scheme or 'http'
-                robots_url = f"{scheme}://{domain}/robots.txt"
-                
+                # Use the validated hostname/port and never follow a
+                # redirect to an address that was not checked above.
+                scheme = parsed.scheme.lower()
+                netloc = f"[{hostname}]" if ":" in hostname else hostname
+                if port:
+                    netloc = f"{netloc}:{port}"
+                robots_url = f"{scheme}://{netloc}/robots.txt"
+
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(robots_url, timeout=2, ssl=False) as response:
+                    async with session.get(
+                        robots_url, timeout=2, allow_redirects=False
+                    ) as response:
                         if response.status == 200:
                             rules = await response.text()
                             self._cache_rules(domain, rules)
