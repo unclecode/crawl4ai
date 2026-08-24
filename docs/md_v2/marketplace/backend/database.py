@@ -77,14 +77,44 @@ class DatabaseManager:
 
         self.conn.commit()
 
-    def get_all(self, table: str, limit: int = 100, offset: int = 0, where: str = None) -> List[Dict]:
-        cursor = self.conn.cursor()
-        query = f"SELECT * FROM {table}"
-        if where:
-            query += f" WHERE {where}"
-        query += f" LIMIT {limit} OFFSET {offset}"
+    def get_all(
+        self,
+        table: str,
+        limit: int = 100,
+        offset: int = 0,
+        where: Dict[str, Any] | None = None,
+    ) -> List[Dict]:
+        """Return rows using schema-validated equality filters.
 
-        cursor.execute(query)
+        SQL identifiers cannot be bound as parameters, so table and filter
+        column names are validated against the loaded schema before they are
+        interpolated. Filter values, limits, and offsets remain bound
+        parameters; callers must not pass raw SQL fragments.
+        """
+        if table not in self.schema["tables"]:
+            raise ValueError(f"Unknown table: {table}")
+
+        filters = where or {}
+        if not isinstance(filters, dict):
+            raise TypeError("where must be a mapping of column names to values")
+
+        allowed_columns = set(self.schema["tables"][table]["columns"])
+        clauses = []
+        params = []
+        for column, value in filters.items():
+            if column not in allowed_columns:
+                raise ValueError(f"Unknown filter column for {table}: {column}")
+            clauses.append(f'"{column}" = ?')
+            params.append(value)
+
+        query = f'SELECT * FROM "{table}"'
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        query += " LIMIT ? OFFSET ?"
+        params.extend([max(0, int(limit)), max(0, int(offset))])
+
+        cursor = self.conn.cursor()
+        cursor.execute(query, params)
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
 
