@@ -270,9 +270,44 @@ UNTRUSTED_FIELD_ALLOWLIST = {
 }
 
 # Upper bounds applied to attacker-influenced quantities after filtering.
-_MAX_TIMEOUT_MS = 60_000
+_DEFAULT_MAX_TIMEOUT_MS = 60_000
 _MAX_SCROLL_STEPS = 1000
 _MAX_VIEWPORT = 4000
+
+
+def _max_timeout_ms() -> int:
+    """Ceiling for the untrusted timeout fields, in milliseconds.
+
+    60s is the right bound for a server reachable by untrusted callers, and
+    stays the default. An operator whose deployment is not public — a crawler
+    on a private network fetching pages that legitimately take minutes — can
+    raise it with CRAWL4AI_MAX_TIMEOUT_MS, or lower it to tighten the bound.
+
+    Read per call rather than captured at import so the setting applies
+    wherever the process picked its environment up, and so a test can set it
+    without reloading the module. A value that is not a positive integer is
+    refused loudly and the default kept: a typo here would silently widen a
+    DoS bound, which is the one outcome worse than the timeout being fixed.
+    """
+    raw = os.getenv("CRAWL4AI_MAX_TIMEOUT_MS")
+
+    if raw is None or raw == "":
+        return _DEFAULT_MAX_TIMEOUT_MS
+
+    try:
+        ceiling = int(raw)
+    except ValueError:
+        ceiling = 0
+
+    if ceiling <= 0:
+        warnings.warn(
+            f"CRAWL4AI_MAX_TIMEOUT_MS={raw!r} is not a positive integer; "
+            f"keeping the {_DEFAULT_MAX_TIMEOUT_MS}ms default.",
+            stacklevel=2,
+        )
+        return _DEFAULT_MAX_TIMEOUT_MS
+
+    return ceiling
 
 
 def _filter_untrusted_fields(type_name: str, params: dict) -> dict:
@@ -293,11 +328,13 @@ def _filter_untrusted_fields(type_name: str, params: dict) -> dict:
 
 def _clamp_untrusted(type_name: str, params: dict) -> dict:
     """Clamp attacker-influenced quantities to safe upper bounds."""
+    ceiling = _max_timeout_ms()
+
     def _cap_timeout(v):
         # 0 historically meant "no timeout"; treat as the cap, never unbounded.
         if not isinstance(v, (int, float)) or v <= 0:
-            return _MAX_TIMEOUT_MS
-        return min(int(v), _MAX_TIMEOUT_MS)
+            return ceiling
+        return min(int(v), ceiling)
 
     if type_name == "CrawlerRunConfig":
         for f in ("page_timeout", "wait_for_timeout", "body_visibility_timeout"):
