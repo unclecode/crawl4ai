@@ -1,4 +1,3 @@
-import dns.resolver
 import logging
 import yaml
 import os
@@ -400,6 +399,7 @@ def validate_webhook_url(url: str) -> None:
 
 
 def verify_email_domain(email: str) -> bool:
+    import dns.resolver  # imported here so this module loads without dnspython
     try:
         domain = email.split('@')[1]
         # Try to resolve MX records for the domain.

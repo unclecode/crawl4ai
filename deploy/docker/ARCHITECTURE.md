@@ -272,20 +272,30 @@ async def janitor():
         await asyncio.sleep(interval)
 
         async with LOCK:
-            # Clean cold pool first (less valuable)
-            for sig in list(COLD_POOL.keys()):
-                if now - LAST_USED[sig] > cold_ttl:
-                    await COLD_POOL[sig].close()
-                    del COLD_POOL[sig], LAST_USED[sig], USAGE_COUNT[sig]
-                    await track_janitor_event("close_cold", sig, {...})
-
-            # Clean hot pool (more conservative)
-            for sig in list(HOT_POOL.keys()):
-                if now - LAST_USED[sig] > hot_ttl:
-                    await HOT_POOL[sig].close()
-                    del HOT_POOL[sig], LAST_USED[sig], USAGE_COUNT[sig]
-                    await track_janitor_event("close_hot", sig, {...})
+            # Both pools, same rule (cold first; hot gets the longer TTL):
+            for sig in list(pool.keys()):
+                idle = now - LAST_USED[sig]
+                if idle <= ttl:
+                    continue                      # used recently
+                if pool[sig].active_requests > 0:
+                    if idle <= STALE_CEILING:
+                        continue                  # genuinely serving a request
+                    log.error("Leaked request counter ... force-closing")
+                    # busy past the ceiling = a hung/leaked request pinned it
+                _close_in_background(pool[sig])   # close() can hang; NEVER awaited under LOCK
+                del pool[sig], LAST_USED[sig], USAGE_COUNT[sig]
+                await track_janitor_event("close_cold"/"close_hot", sig, {...})
 ```
+
+Two safeguards keep the pool un-pinnable (issue #2202):
+
+- **Stale-lease backstop**: `active_requests` is only trusted while the browser was
+  touched within `STALE_CEILING` (`pool.stale_lease_s`; `0` = auto
+  `max(2 × limits.wall_clock_s, 21600)`). A counter stuck past that means a request
+  hung or leaked, so the browser is force-closed instead of pinned forever.
+- **Background close**: `close()` on a wedged browser can hang, so the janitor never
+  awaits it while holding LOCK. Closes run as fire-and-forget tasks with a 60s cap;
+  `close_all()` drains them (65s cap) so shutdown is clean.
 
 **Config Signature Generation:**
 
@@ -812,6 +822,7 @@ crawler:
 
   pool:
     idle_ttl_sec: 300  # Base TTL for cold pool (5 min)
+    stale_lease_s: 0   # Leak-backstop ceiling; 0 = auto: max(2 x limits.wall_clock_s, 21600)
 
   rate_limiter:
     enabled: true

@@ -22,6 +22,12 @@ MEM_LIMIT = CONFIG.get("crawler", {}).get("memory_threshold_percent", 95.0)
 BASE_IDLE_TTL = CONFIG.get("crawler", {}).get("pool", {}).get("idle_ttl_sec", 300)
 DEFAULT_CONFIG_SIG = None  # Cached sig for default config
 
+# Leak-backstop ceiling: a "busy" browser untouched past it is force-closed.
+# 6h floor: streams have no deadline and nothing refreshes LAST_USED mid-crawl.
+def _pos(v): return v if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 else 0
+_WALL_CLOCK = _pos(CONFIG.get("limits", {}).get("wall_clock_s", 0))
+STALE_CEILING = _pos(CONFIG.get("crawler", {}).get("pool", {}).get("stale_lease_s", 0)) or max(2 * _WALL_CLOCK, 21600)
+
 
 def get_pool_snapshot() -> dict:
     """Return a point-in-time snapshot of pool state for monitoring.
@@ -125,9 +131,9 @@ async def release_crawler(crawler: AsyncWebCrawler):
     obtained via get_crawler() so the janitor knows when it's safe
     to close idle browsers.
     """
-    async with LOCK:
-        if hasattr(crawler, 'active_requests'):
-            crawler.active_requests = max(0, crawler.active_requests - 1)
+    # No lock and no await: a cancelled request must never skip this decrement.
+    if hasattr(crawler, 'active_requests'):
+        crawler.active_requests = max(0, crawler.active_requests - 1)
 
 async def init_permanent(cfg: BrowserConfig):
     """Initialize permanent default browser."""
@@ -145,16 +151,42 @@ async def init_permanent(cfg: BrowserConfig):
 async def close_all():
     """Close all browsers."""
     async with LOCK:
-        tasks = []
+        # Through _close_in_background so one wedged browser can't hang shutdown
+        # while holding LOCK; the drain below is the single bounded wait point.
         if PERMANENT:
-            tasks.append(PERMANENT.close())
-        tasks.extend([c.close() for c in HOT_POOL.values()])
-        tasks.extend([c.close() for c in COLD_POOL.values()])
-        await asyncio.gather(*tasks, return_exceptions=True)
+            _close_in_background(PERMANENT)
+        for c in list(HOT_POOL.values()) + list(COLD_POOL.values()):
+            _close_in_background(c)
         HOT_POOL.clear()
         COLD_POOL.clear()
         LAST_USED.clear()
         USAGE_COUNT.clear()
+    # Drain all closes (janitor's included) so shutdown doesn't destroy live tasks.
+    if _CLOSE_TASKS:
+        with suppress(Exception):
+            await asyncio.wait_for(
+                asyncio.gather(*list(_CLOSE_TASKS), return_exceptions=True), timeout=65
+            )
+
+_CLOSE_TASKS = set()
+
+def _close_in_background(crawler: AsyncWebCrawler):
+    """Close a browser without holding the pool LOCK.
+
+    close() on a wedged browser can hang; awaiting it under LOCK would freeze
+    get_crawler() and every future janitor pass for the whole server.
+    """
+    async def _close():
+        try:
+            # 60s gives Playwright's own graceful-then-SIGKILL cycle room to finish
+            await asyncio.wait_for(crawler.close(), timeout=60)
+        except asyncio.TimeoutError:
+            logger.warning("⚠️ Browser close timed out after 60s - abandoning (its processes may linger)")
+        except Exception:
+            pass
+    task = asyncio.create_task(_close())
+    _CLOSE_TASKS.add(task)
+    task.add_done_callback(_CLOSE_TASKS.discard)
 
 async def janitor():
     """Adaptive cleanup based on memory pressure."""
@@ -177,12 +209,14 @@ async def janitor():
             for sig in list(COLD_POOL.keys()):
                 if now - LAST_USED.get(sig, now) > cold_ttl:
                     crawler = COLD_POOL[sig]
-                    if getattr(crawler, 'active_requests', 0) > 0:
-                        continue  # still serving requests, skip
                     idle_time = now - LAST_USED[sig]
-                    logger.info(f"🧹 Closing cold browser (sig={sig[:8]}, idle={idle_time:.0f}s)")
-                    with suppress(Exception):
-                        await crawler.close()
+                    if getattr(crawler, 'active_requests', 0) > 0:
+                        if idle_time <= STALE_CEILING:
+                            continue  # still serving requests, skip
+                        logger.error(f"🚨 Leaked request counter (sig={sig[:8]}, active={crawler.active_requests}, idle={idle_time:.0f}s > {STALE_CEILING}s) - force-closing")
+                    else:
+                        logger.info(f"🧹 Closing cold browser (sig={sig[:8]}, idle={idle_time:.0f}s)")
+                    _close_in_background(crawler)  # close() can hang; never await it under LOCK
                     COLD_POOL.pop(sig, None)
                     LAST_USED.pop(sig, None)
                     USAGE_COUNT.pop(sig, None)
@@ -191,19 +225,21 @@ async def janitor():
                     try:
                         from monitor import get_monitor
                         await get_monitor().track_janitor_event("close_cold", sig, {"idle_seconds": int(idle_time), "ttl": cold_ttl})
-                    except:
+                    except Exception:  # bare except would swallow CancelledError and outlive shutdown
                         pass
 
             # Clean hot pool (more conservative)
             for sig in list(HOT_POOL.keys()):
                 if now - LAST_USED.get(sig, now) > hot_ttl:
                     crawler = HOT_POOL[sig]
-                    if getattr(crawler, 'active_requests', 0) > 0:
-                        continue  # still serving requests, skip
                     idle_time = now - LAST_USED[sig]
-                    logger.info(f"🧹 Closing hot browser (sig={sig[:8]}, idle={idle_time:.0f}s)")
-                    with suppress(Exception):
-                        await crawler.close()
+                    if getattr(crawler, 'active_requests', 0) > 0:
+                        if idle_time <= STALE_CEILING:
+                            continue  # still serving requests, skip
+                        logger.error(f"🚨 Leaked request counter (sig={sig[:8]}, active={crawler.active_requests}, idle={idle_time:.0f}s > {STALE_CEILING}s) - force-closing")
+                    else:
+                        logger.info(f"🧹 Closing hot browser (sig={sig[:8]}, idle={idle_time:.0f}s)")
+                    _close_in_background(crawler)  # close() can hang; never await it under LOCK
                     HOT_POOL.pop(sig, None)
                     LAST_USED.pop(sig, None)
                     USAGE_COUNT.pop(sig, None)
@@ -212,7 +248,7 @@ async def janitor():
                     try:
                         from monitor import get_monitor
                         await get_monitor().track_janitor_event("close_hot", sig, {"idle_seconds": int(idle_time), "ttl": hot_ttl})
-                    except:
+                    except Exception:  # bare except would swallow CancelledError and outlive shutdown
                         pass
 
             # Log pool stats

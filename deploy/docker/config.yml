@@ -39,7 +39,7 @@ limits:
   max_body_bytes: 10485760  # 10 MiB request body cap (413 if exceeded); 0 = unbounded
   max_pages: 100            # deep-crawl page budget clamp (defense in depth)
   max_depth: 5              # deep-crawl depth clamp
-  wall_clock_s: 0           # per-crawl deadline in seconds (504 on timeout); 0 = no deadline
+  wall_clock_s: 1800        # per-crawl deadline in seconds (504 on timeout); 0 = no deadline
   queue:                    # background job queue for /crawl/job and /llm/job
     maxsize: 1000           # max queued jobs (503 when full); 0 = unbounded
     workers: 4              # concurrent background workers
@@ -84,6 +84,9 @@ crawler:
   pool:
     max_pages: 40                          # ← GLOBAL_SEM permits
     idle_ttl_sec: 300                     # ← 30 min janitor cutoff
+    stale_lease_s: 0                      # leak backstop ceiling; 0 = auto: max(2 x limits.wall_clock_s, 21600).
+                                          # If you set wall_clock_s: 0 for very long crawls, raise this above
+                                          # your longest crawl or the janitor may force-close it mid-flight.
   browser:
     kwargs:
       headless: true
