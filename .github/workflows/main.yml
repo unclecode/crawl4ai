@@ -34,7 +34,11 @@ jobs:
           fi
 
       - name: Discord Notification
-        uses: Ilshidur/action-discord@master
+        # Pinned to a commit rather than a branch: `@master` is resolved at run time,
+        # so the code that runs here can change with no change to this repository.
+        # This commit is what `master` points at today and is also tag 0.4.0,
+        # so nothing about the current behaviour changes.
+        uses: Ilshidur/action-discord@d2594079a10f1d6739ee50a2471f0ca57418b554 # 0.4.0
         env:
           DISCORD_WEBHOOK: ${{ steps.set-webhook.outputs.webhook }}
         with:
