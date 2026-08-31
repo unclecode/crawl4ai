@@ -40,13 +40,17 @@ _我们将分阶段引入用户，并与早期用户紧密合作。名额有限�
 
 Crawl4AI 将互联网转化为干净、可供大语言模型（LLM）使用的 Markdown 格式，适用于 RAG、智能体（Agents）和数据流水线。速度快、可控性强，经受过 50k+ 星标社区的实战检验。
 
-[✨ 查看最新更新 v0.8.0](#-最近更新)
+[✨ 查看最新更新 v0.9.2](#-最近更新)
 
-✨ **v0.8.0 新特性**：崩溃恢复与预取模式！深度爬取（Deep crawl）现支持崩溃恢复，通过 `resume_state` 和 `on_state_change` 回调确保护理长时运行的爬取任务。新增 `prefetch=True` 模式，使 URL 发现速度提升 5-10 倍。针对 Docker API 的关键安全修复（默认禁用 Hook，屏蔽 file:// 协议 URL）。[发布日志 →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.0.md)
+✨ **v0.9.2 新特性**：维护补丁版本！修复了流式爬取关闭时的 `MemoryAdaptiveDispatcher` 任务/页面泄漏问题、Docker Playground“高级配置”与 Monitor WebSocket 认证问题、Playwright headless-shell 打包，以及 GPU（`ENABLE_GPU=true`）Docker 镜像构建。[发布日志 →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.2.md)
 
-✨ **近期 v0.7.8**：稳定性与 Bug 修复版本！修复了 11 个 Bug，涵盖 Docker API 问题、LLM 提取改进、URL 处理修复以及依赖更新。[发布日志 →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.8.md)
+✨ **近期 v0.9.0**：Docker API 服务器的重大“默认安全”（Secure-by-Default）版本。默认开启身份认证，除非提供 Token 否则服务器仅绑定本地回环（Loopback），并将网络请求体视为不可信信任边界。[发布日志 →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.0.md)
 
-✨ **前一版本 v0.7.7**：具备实时监控功能的完整自托管平台！企业级监控仪表盘、全面的 REST API、WebSocket 流式传输以及智能浏览器池管理。[发布日志 →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.7.md)
+✨ **近期 v0.8.7**：安全加固版本。修复了 Docker API 关键漏洞（RCE、SSRF、认证绕过、文件写入、XSS、硬编码 JWT 密钥），新增 DomainMapper 域名映射功能，并发布了一系列网页抓取、深度爬取和 LLM 修复。[发布日志 →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.7.md)
+
+✨ **前一版本 v0.8.0**：崩溃恢复与预取模式！深度爬取（Deep crawl）现支持崩溃恢复，通过 `resume_state` 和 `on_state_change` 回调确保护理长时运行的爬取任务。新增 `prefetch=True` 模式，使 URL 发现速度提升 5-10 倍。[发布日志 →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.0.md)
+
+✨ **前一版本 v0.7.8**：稳定性与 Bug 修复版本！修复了 11 个 Bug，涵盖 Docker API 问题、LLM 提取改进、URL 处理修复以及依赖更新。[发布日志 →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.8.md)
 
 <details>
   <summary>🤓 <strong>我的个人故事</strong></summary>
@@ -566,6 +570,113 @@ async def test_news_crawl():
 ## ✨ 最近更新
 
 <details open>
+<summary><strong>版本 0.9.2 发布亮点 - 维护补丁与 Bug 修复</strong></summary>
+
+一个聚焦稳定性的维护补丁版本。修复了关闭流式爬取时的 `MemoryAdaptiveDispatcher` 任务/页面泄漏问题、Docker Playground“高级配置”与 Monitor WebSocket 身份验证问题、Playwright headless-shell 打包，以及 GPU（`ENABLE_GPU=true`）Docker 镜像构建。
+
+```bash
+pip install -U crawl4ai
+```
+
+[完整 v0.9.2 发布日志 →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.2.md)
+
+</details>
+
+<details>
+<summary><strong>版本 0.9.1 发布亮点 - Bug 修复与 PruningContentFilter 白名单</strong></summary>
+
+包含 12 项 Bug 修复和 1 项新功能的补丁版本。`PruningContentFilter` 新增了 `preserve_classes` / `preserve_tags` 参数，允许您将永远不应被修剪的 CSS 类或 HTML 标签加入白名单 —— 这对于保护作者姓名和时间戳等简短元数据元素非常实用。
+
+修复范围涵盖 Docker（认证网关 UI、supervisord/redis 目录、FastAPI 兼容性、Redis 认证）、浏览器（Windows channel 崩溃、上下文快照泄漏）、核心组件（HTTP 超时单位不匹配、最优优先排序）以及提取（html2text 表格属性）。
+
+```bash
+pip install -U crawl4ai
+```
+
+[完整 v0.9.1 发布日志 →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.1.md)
+
+</details>
+
+<details>
+<summary><strong>版本 0.9.0 发布亮点 - 默认安全的 Docker API 服务器</strong></summary>
+
+Docker API 服务器的重大“默认安全”（Secure-by-Default）版本。开箱即用的部署具备纵深防御加固：默认启用身份认证，除非显式提供 Token 否则服务器仅绑定本地回环接口（127.0.0.1），并将网络请求体作为不可信信任边界进行处理。
+
+```bash
+pip install -U crawl4ai
+```
+
+[迁移指南 →](https://github.com/unclecode/crawl4ai/blob/main/deploy/docker/MIGRATION.md) · [完整 v0.9.0 发布日志 →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.0.md)
+
+</details>
+
+<details>
+<summary><strong>版本 0.8.7 发布亮点 - 安全加固、DomainMapper 与社区修复</strong></summary>
+
+全面的安全加固版本。修复了关键的 Docker API 漏洞（AST 沙箱逃逸 RCE、Hook 沙箱 RCE、硬编码 JWT 密钥、Webhook 和爬取端点上的 SSRF、任意文件写入、Monitor 认证绕过、存储型 XSS 以及未认证 JS 执行），新增 DomainMapper 域名映射功能，并发布了一批网页抓取、深度爬取和 LLM 修复。如果您自建托管 Docker API，请立即升级。
+
+```bash
+pip install -U crawl4ai
+```
+
+[完整 v0.8.7 发布日志 →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.7.md)
+
+</details>
+
+<details>
+<summary><strong>版本 0.8.6 - 安全热修复：litellm 供应链修复</strong></summary>
+
+由于原软件包受到 PyPI 供应链安全事件影响，将 `litellm` 依赖替换为 `unclecode-litellm`。如果您使用的是 v0.8.5 或更早版本，请立即升级。
+
+```bash
+pip install -U crawl4ai
+```
+
+</details>
+
+<details>
+<summary><strong>版本 0.8.5 发布亮点 - 反爬虫检测、Shadow DOM 与 60+ 项 Bug 修复</strong></summary>
+
+自 v0.8.0 以来最大的一次版本更新。包含带代理升级的反爬虫检测、Shadow DOM 扁平化、深度爬取取消以及超过 60 项 Bug 修复。
+
+- **🛡️ 反爬虫检测与代理升级**：
+  - 3 级检测：已知反爬供应商、通用拦截特征、结构完整性检查
+  - 支持代理链和回退抓取函数的自动重试
+  ```python
+  from crawl4ai import CrawlerRunConfig
+  from crawl4ai.async_configs import ProxyConfig
+
+  config = CrawlerRunConfig(
+      proxy_config=[ProxyConfig.DIRECT, ProxyConfig(server="http://my-proxy:8080")],
+      max_retries=2,
+      fallback_fetch_function=my_web_unlocker,
+  )
+  ```
+
+- **🌑 Shadow DOM 扁平化**：
+  - 提取隐藏在 Shadow DOM 组件内部的内容
+  ```python
+  config = CrawlerRunConfig(flatten_shadow_dom=True)
+  ```
+
+- **🛑 深度爬取取消**：
+  - 通过 `cancel()` 或 `should_cancel` 回调优雅停止长时间运行的爬取任务
+  - 兼容 BFS、DFS 和 BestFirst 策略
+
+- **⚙️ 配置默认值 API**：
+  - 在 BrowserConfig 和 CrawlerRunConfig 上支持 `set_defaults()` / `get_defaults()` / `reset_defaults()`
+
+- **🔒 关键安全修复**：
+  - 修复 Docker `/crawl` 端点中因反序列化导致的 RCE —— 移除 `eval()` 并引入白名单
+  - 修复 Redis CVE-2025-49844（CVSS 10.0）—— 升级至 7.2.7
+
+- **60+ 项 Bug 修复**：涵盖浏览器管理、代理、深度爬取、内容提取、CLI 及 Docker
+
+[完整 v0.8.5 发布日志 →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.5.md)
+
+</details>
+
+<details>
 <summary><strong>版本 0.8.0 发布亮点 - 崩溃恢复与预取模式</strong></summary>
 
 此版本引入了针对深度爬取的崩溃恢复功能、用于快速 URL 发现的新预取模式，以及针对 Docker 部署的关键安全修复。
