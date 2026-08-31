@@ -1,0 +1,21 @@
+# Demo: Login Flow with Blockly
+# This script can be created visually using Blockly blocks
+
+GO https://example.com/login
+WAIT `#login-form` 5
+
+# Check if already logged in
+IF (EXISTS `.user-avatar`) THEN GO https://example.com/dashboard
+
+# Fill login form
+CLICK `#email`
+TYPE "demo@example.com"
+CLICK `#password`
+TYPE "password123"
+
+# Submit form
+CLICK `button[type="submit"]`
+WAIT `.dashboard` 10
+
+# Success message
+EVAL `console.log('Login successful!')`

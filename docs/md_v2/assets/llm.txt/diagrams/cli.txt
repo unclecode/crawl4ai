@@ -1,0 +1,425 @@
+## CLI Workflows and Profile Management
+
+Visual representations of command-line interface operations, browser profile management, and identity-based crawling workflows.
+
+### CLI Command Flow Architecture
+
+```mermaid
+flowchart TD
+    A[crwl command] --> B{Command Type?}
+    
+    B -->|URL Crawling| C[Parse URL & Options]
+    B -->|Profile Management| D[profiles subcommand]
+    B -->|CDP Browser| E[cdp subcommand]
+    B -->|Browser Control| F[browser subcommand]
+    B -->|Configuration| G[config subcommand]
+    
+    C --> C1{Output Format?}
+    C1 -->|Default| C2[HTML/Markdown]
+    C1 -->|JSON| C3[Structured Data]
+    C1 -->|markdown| C4[Clean Markdown]
+    C1 -->|markdown-fit| C5[Filtered Content]
+    
+    C --> C6{Authentication?}
+    C6 -->|Profile Specified| C7[Load Browser Profile]
+    C6 -->|No Profile| C8[Anonymous Session]
+    
+    C7 --> C9[Launch with User Data]
+    C8 --> C10[Launch Clean Browser]
+    
+    C9 --> C11[Execute Crawl]
+    C10 --> C11
+    
+    C11 --> C12{Success?}
+    C12 -->|Yes| C13[Return Results]
+    C12 -->|No| C14[Error Handling]
+    
+    D --> D1[Interactive Profile Menu]
+    D1 --> D2{Menu Choice?}
+    D2 -->|Create| D3[Open Browser for Setup]
+    D2 -->|List| D4[Show Existing Profiles]
+    D2 -->|Delete| D5[Remove Profile]
+    D2 -->|Use| D6[Crawl with Profile]
+    
+    E --> E1[Launch CDP Browser]
+    E1 --> E2[Remote Debugging Active]
+    
+    F --> F1{Browser Action?}
+    F1 -->|start| F2[Start Builtin Browser]
+    F1 -->|stop| F3[Stop Builtin Browser]
+    F1 -->|status| F4[Check Browser Status]
+    F1 -->|view| F5[Open Browser Window]
+    
+    G --> G1{Config Action?}
+    G1 -->|list| G2[Show All Settings]
+    G1 -->|set| G3[Update Setting]
+    G1 -->|get| G4[Read Setting]
+    
+    style A fill:#e1f5fe
+    style C13 fill:#c8e6c9
+    style C14 fill:#ffcdd2
+    style D3 fill:#fff3e0
+    style E2 fill:#f3e5f5
+```
+
+### Profile Management Workflow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI
+    participant ProfileManager
+    participant Browser
+    participant FileSystem
+    
+    User->>CLI: crwl profiles
+    CLI->>ProfileManager: Initialize profile manager
+    ProfileManager->>FileSystem: Scan for existing profiles
+    FileSystem-->>ProfileManager: Profile list
+    ProfileManager-->>CLI: Show interactive menu
+    CLI-->>User: Display options
+    
+    Note over User: User selects "Create new profile"
+    
+    User->>CLI: Create profile "linkedin-auth"
+    CLI->>ProfileManager: create_profile("linkedin-auth")
+    ProfileManager->>FileSystem: Create profile directory
+    ProfileManager->>Browser: Launch with new user data dir
+    Browser-->>User: Opens browser window
+    
+    Note over User: User manually logs in to LinkedIn
+    
+    User->>Browser: Navigate and authenticate
+    Browser->>FileSystem: Save cookies, session data
+    User->>CLI: Press 'q' to save profile
+    CLI->>ProfileManager: finalize_profile()
+    ProfileManager->>FileSystem: Lock profile settings
+    ProfileManager-->>CLI: Profile saved
+    CLI-->>User: Profile "linkedin-auth" created
+    
+    Note over User: Later usage
+    
+    User->>CLI: crwl https://linkedin.com/feed -p linkedin-auth
+    CLI->>ProfileManager: load_profile("linkedin-auth")
+    ProfileManager->>FileSystem: Read profile data
+    FileSystem-->>ProfileManager: User data directory
+    ProfileManager-->>CLI: Profile configuration
+    CLI->>Browser: Launch with existing profile
+    Browser-->>CLI: Authenticated session ready
+    CLI->>Browser: Navigate to target URL
+    Browser-->>CLI: Crawl results with auth context
+    CLI-->>User: Authenticated content
+```
+
+### Browser Management State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> Stopped: Initial state
+    
+    Stopped --> Starting: crwl browser start
+    Starting --> Running: Browser launched
+    Running --> Viewing: crwl browser view
+    Viewing --> Running: Close window
+    Running --> Stopping: crwl browser stop
+    Stopping --> Stopped: Cleanup complete
+    
+    Running --> Restarting: crwl browser restart
+    Restarting --> Running: New browser instance
+    
+    Stopped --> CDP_Mode: crwl cdp
+    CDP_Mode --> CDP_Running: Remote debugging active
+    CDP_Running --> CDP_Mode: Manual close
+    CDP_Mode --> Stopped: Exit CDP
+    
+    Running --> StatusCheck: crwl browser status
+    StatusCheck --> Running: Return status
+    
+    note right of Running : Port 9222 active\nBuiltin browser available
+    note right of CDP_Running : Remote debugging\nManual control enabled
+    note right of Viewing : Visual browser window\nDirect interaction
+```
+
+### Authentication Workflow for Protected Sites
+
+```mermaid
+flowchart TD
+    A[Protected Site Access Needed] --> B[Create Profile Strategy]
+    
+    B --> C{Existing Profile?}
+    C -->|Yes| D[Test Profile Validity]
+    C -->|No| E[Create New Profile]
+    
+    D --> D1{Profile Valid?}
+    D1 -->|Yes| F[Use Existing Profile]
+    D1 -->|No| E
+    
+    E --> E1[crwl profiles]
+    E1 --> E2[Select Create New Profile]
+    E2 --> E3[Enter Profile Name]
+    E3 --> E4[Browser Opens for Auth]
+    
+    E4 --> E5{Authentication Method?}
+    E5 -->|Login Form| E6[Fill Username/Password]
+    E5 -->|OAuth| E7[OAuth Flow]
+    E5 -->|2FA| E8[Handle 2FA]
+    E5 -->|Session Cookie| E9[Import Cookies]
+    
+    E6 --> E10[Manual Login Process]
+    E7 --> E10
+    E8 --> E10
+    E9 --> E10
+    
+    E10 --> E11[Verify Authentication]
+    E11 --> E12{Auth Successful?}
+    E12 -->|Yes| E13[Save Profile - Press q]
+    E12 -->|No| E10
+    
+    E13 --> F
+    F --> G[Execute Authenticated Crawl]
+    
+    G --> H[crwl URL -p profile-name]
+    H --> I[Load Profile Data]
+    I --> J[Launch Browser with Auth]
+    J --> K[Navigate to Protected Content]
+    K --> L[Extract Authenticated Data]
+    L --> M[Return Results]
+    
+    style E4 fill:#fff3e0
+    style E10 fill:#e3f2fd
+    style F fill:#e8f5e8
+    style M fill:#c8e6c9
+```
+
+### CDP Browser Architecture
+
+```mermaid
+graph TB
+    subgraph "CLI Layer"
+        A[crwl cdp command] --> B[CDP Manager]
+        B --> C[Port Configuration]
+        B --> D[Profile Selection]
+    end
+    
+    subgraph "Browser Process"
+        E[Chromium/Firefox] --> F[Remote Debugging]
+        F --> G[WebSocket Endpoint]
+        G --> H[ws://localhost:9222]
+    end
+    
+    subgraph "Client Connections"
+        I[Manual Browser Control] --> H
+        J[DevTools Interface] --> H
+        K[External Automation] --> H
+        L[Crawl4AI Crawler] --> H
+    end
+    
+    subgraph "Profile Data"
+        M[User Data Directory] --> E
+        N[Cookies & Sessions] --> M
+        O[Extensions] --> M
+        P[Browser State] --> M
+    end
+    
+    A --> E
+    C --> H
+    D --> M
+    
+    style H fill:#e3f2fd
+    style E fill:#f3e5f5
+    style M fill:#e8f5e8
+```
+
+### Configuration Management Hierarchy
+
+```mermaid
+graph TD
+    subgraph "Global Configuration"
+        A[~/.crawl4ai/config.yml] --> B[Default Settings]
+        B --> C[LLM Providers]
+        B --> D[Browser Defaults]
+        B --> E[Output Preferences]
+    end
+    
+    subgraph "Profile Configuration"
+        F[Profile Directory] --> G[Browser State]
+        F --> H[Authentication Data]
+        F --> I[Site-Specific Settings]
+    end
+    
+    subgraph "Command-Line Overrides"
+        J[-b browser_config] --> K[Runtime Browser Settings]
+        L[-c crawler_config] --> M[Runtime Crawler Settings]
+        N[-o output_format] --> O[Runtime Output Format]
+    end
+    
+    subgraph "Configuration Files"
+        P[browser.yml] --> Q[Browser Config Template]
+        R[crawler.yml] --> S[Crawler Config Template]
+        T[extract.yml] --> U[Extraction Config]
+    end
+    
+    subgraph "Resolution Order"
+        V[Command Line Args] --> W[Config Files]
+        W --> X[Profile Settings]
+        X --> Y[Global Defaults]
+    end
+    
+    J --> V
+    L --> V
+    N --> V
+    P --> W
+    R --> W
+    T --> W
+    F --> X
+    A --> Y
+    
+    style V fill:#ffcdd2
+    style W fill:#fff3e0
+    style X fill:#e3f2fd
+    style Y fill:#e8f5e8
+```
+
+### Identity-Based Crawling Decision Tree
+
+```mermaid
+flowchart TD
+    A[Target Website Assessment] --> B{Authentication Required?}
+    
+    B -->|No| C[Standard Anonymous Crawl]
+    B -->|Yes| D{Authentication Type?}
+    
+    D -->|Login Form| E[Create Login Profile]
+    D -->|OAuth/SSO| F[Create OAuth Profile] 
+    D -->|API Key/Token| G[Use Headers/Config]
+    D -->|Session Cookies| H[Import Cookie Profile]
+    
+    E --> E1[crwl profiles → Manual login]
+    F --> F1[crwl profiles → OAuth flow]
+    G --> G1[Configure headers in crawler config]
+    H --> H1[Import cookies to profile]
+    
+    E1 --> I[Test Authentication]
+    F1 --> I
+    G1 --> I
+    H1 --> I
+    
+    I --> J{Auth Test Success?}
+    J -->|Yes| K[Production Crawl Setup]
+    J -->|No| L[Debug Authentication]
+    
+    L --> L1{Common Issues?}
+    L1 -->|Rate Limiting| L2[Add delays/user simulation]
+    L1 -->|Bot Detection| L3[Enable stealth mode]
+    L1 -->|Session Expired| L4[Refresh authentication]
+    L1 -->|CAPTCHA| L5[Manual intervention needed]
+    
+    L2 --> M[Retry with Adjustments]
+    L3 --> M
+    L4 --> E1
+    L5 --> N[Semi-automated approach]
+    
+    M --> I
+    N --> O[Manual auth + automated crawl]
+    
+    K --> P[Automated Authenticated Crawling]
+    O --> P
+    C --> P
+    
+    P --> Q[Monitor & Maintain Profiles]
+    
+    style I fill:#fff3e0
+    style K fill:#e8f5e8
+    style P fill:#c8e6c9
+    style L fill:#ffcdd2
+    style N fill:#f3e5f5
+```
+
+### CLI Usage Patterns and Best Practices
+
+```mermaid
+timeline
+    title CLI Workflow Evolution
+    
+    section Setup Phase
+        Installation : pip install crawl4ai
+                    : crawl4ai-setup
+        Basic Test   : crwl https://example.com
+        Config Setup : crwl config set defaults
+    
+    section Profile Creation
+        Site Analysis    : Identify auth requirements
+        Profile Creation : crwl profiles
+        Manual Login     : Authenticate in browser
+        Profile Save     : Press 'q' to save
+    
+    section Development Phase
+        Test Crawls      : crwl URL -p profile -v
+        Config Tuning    : Adjust browser/crawler settings
+        Output Testing   : Try different output formats
+        Error Handling   : Debug authentication issues
+    
+    section Production Phase
+        Automated Crawls : crwl URL -p profile -o json
+        Batch Processing : Multiple URLs with same profile
+        Monitoring       : Check profile validity
+        Maintenance      : Update profiles as needed
+```
+
+### Multi-Profile Management Strategy
+
+```mermaid
+graph LR
+    subgraph "Profile Categories"
+        A[Social Media Profiles]
+        B[Work/Enterprise Profiles]
+        C[E-commerce Profiles]
+        D[Research Profiles]
+    end
+    
+    subgraph "Social Media"
+        A --> A1[linkedin-personal]
+        A --> A2[twitter-monitor]
+        A --> A3[facebook-research]
+        A --> A4[instagram-brand]
+    end
+    
+    subgraph "Enterprise"
+        B --> B1[company-intranet]
+        B --> B2[github-enterprise]
+        B --> B3[confluence-docs]
+        B --> B4[jira-tickets]
+    end
+    
+    subgraph "E-commerce"
+        C --> C1[amazon-seller]
+        C --> C2[shopify-admin]
+        C --> C3[ebay-monitor]
+        C --> C4[marketplace-competitor]
+    end
+    
+    subgraph "Research"
+        D --> D1[academic-journals]
+        D --> D2[data-platforms]
+        D --> D3[survey-tools]
+        D --> D4[government-portals]
+    end
+    
+    subgraph "Usage Patterns"
+        E[Daily Monitoring] --> A2
+        E --> B1
+        F[Weekly Reports] --> C3
+        F --> D2
+        G[On-Demand Research] --> D1
+        G --> D4
+        H[Competitive Analysis] --> C4
+        H --> A4
+    end
+    
+    style A1 fill:#e3f2fd
+    style B1 fill:#f3e5f5
+    style C1 fill:#e8f5e8
+    style D1 fill:#fff3e0
+```
+
+**📖 Learn more:** [CLI Reference](https://docs.crawl4ai.com/core/cli/), [Identity-Based Crawling](https://docs.crawl4ai.com/advanced/identity-based-crawling/), [Profile Management](https://docs.crawl4ai.com/advanced/session-management/), [Authentication Strategies](https://docs.crawl4ai.com/advanced/hooks-auth/)

@@ -1,0 +1,472 @@
+## HTTP Crawler Strategy Workflows
+
+Visual representations of HTTP-based crawling architecture, request flows, and performance characteristics compared to browser-based strategies.
+
+### HTTP vs Browser Strategy Decision Tree
+
+```mermaid
+flowchart TD
+    A[Content Crawling Need] --> B{Content Type Analysis}
+    
+    B -->|Static HTML| C{JavaScript Required?}
+    B -->|Dynamic SPA| D[Browser Strategy Required]
+    B -->|API Endpoints| E[HTTP Strategy Optimal]
+    B -->|Mixed Content| F{Primary Content Source?}
+    
+    C -->|No JS Needed| G[HTTP Strategy Recommended]
+    C -->|JS Required| H[Browser Strategy Required]
+    C -->|Unknown| I{Performance Priority?}
+    
+    I -->|Speed Critical| J[Try HTTP First]
+    I -->|Accuracy Critical| K[Use Browser Strategy]
+    
+    F -->|Mostly Static| G
+    F -->|Mostly Dynamic| D
+    
+    G --> L{Resource Constraints?}
+    L -->|Memory Limited| M[HTTP Strategy - Lightweight]
+    L -->|CPU Limited| N[HTTP Strategy - No Browser]
+    L -->|Network Limited| O[HTTP Strategy - Efficient]
+    L -->|No Constraints| P[Either Strategy Works]
+    
+    J --> Q[Test HTTP Results]
+    Q --> R{Content Complete?}
+    R -->|Yes| S[Continue with HTTP]
+    R -->|No| T[Switch to Browser Strategy]
+    
+    D --> U[Browser Strategy Features]
+    H --> U
+    K --> U
+    T --> U
+    
+    U --> V[JavaScript Execution]
+    U --> W[Screenshots/PDFs]
+    U --> X[Complex Interactions]
+    U --> Y[Session Management]
+    
+    M --> Z[HTTP Strategy Benefits]
+    N --> Z
+    O --> Z
+    S --> Z
+    
+    Z --> AA[10x Faster Processing]
+    Z --> BB[Lower Memory Usage]
+    Z --> CC[Higher Concurrency]
+    Z --> DD[Simpler Deployment]
+    
+    style G fill:#c8e6c9
+    style M fill:#c8e6c9
+    style N fill:#c8e6c9
+    style O fill:#c8e6c9
+    style S fill:#c8e6c9
+    style D fill:#e3f2fd
+    style H fill:#e3f2fd
+    style K fill:#e3f2fd
+    style T fill:#e3f2fd
+    style U fill:#e3f2fd
+```
+
+### HTTP Request Lifecycle Sequence
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant HTTPStrategy as HTTP Strategy
+    participant Session as HTTP Session
+    participant Server as Target Server
+    participant Processor as Content Processor
+    
+    Client->>HTTPStrategy: crawl(url, config)
+    HTTPStrategy->>HTTPStrategy: validate_url()
+    
+    alt URL Type Check
+        HTTPStrategy->>HTTPStrategy: handle_file_url()
+        Note over HTTPStrategy: file:// URLs
+    else
+        HTTPStrategy->>HTTPStrategy: handle_raw_content()
+        Note over HTTPStrategy: raw:// content
+    else
+        HTTPStrategy->>Session: prepare_request()
+        Session->>Session: apply_config()
+        Session->>Session: set_headers()
+        Session->>Session: setup_auth()
+        
+        Session->>Server: HTTP Request
+        Note over Session,Server: GET/POST/PUT with headers
+        
+        alt Success Response
+            Server-->>Session: HTTP 200 + Content
+            Session-->>HTTPStrategy: response_data
+        else Redirect Response
+            Server-->>Session: HTTP 3xx + Location
+            Session->>Server: Follow redirect
+            Server-->>Session: HTTP 200 + Content
+            Session-->>HTTPStrategy: final_response
+        else Error Response
+            Server-->>Session: HTTP 4xx/5xx
+            Session-->>HTTPStrategy: error_response
+        end
+    end
+    
+    HTTPStrategy->>Processor: process_content()
+    Processor->>Processor: clean_html()
+    Processor->>Processor: extract_metadata()
+    Processor->>Processor: generate_markdown()
+    Processor-->>HTTPStrategy: processed_result
+    
+    HTTPStrategy-->>Client: CrawlResult
+    
+    Note over Client,Processor: Fast, lightweight processing
+    Note over HTTPStrategy: No browser overhead
+```
+
+### HTTP Strategy Architecture
+
+```mermaid
+graph TB
+    subgraph "HTTP Crawler Strategy"
+        A[AsyncHTTPCrawlerStrategy] --> B[Session Manager]
+        A --> C[Request Builder]
+        A --> D[Response Handler]
+        A --> E[Error Manager]
+        
+        B --> B1[Connection Pool]
+        B --> B2[DNS Cache]
+        B --> B3[SSL Context]
+        
+        C --> C1[Headers Builder]
+        C --> C2[Auth Handler]
+        C --> C3[Payload Encoder]
+        
+        D --> D1[Content Decoder]
+        D --> D2[Redirect Handler]
+        D --> D3[Status Validator]
+        
+        E --> E1[Retry Logic]
+        E --> E2[Timeout Handler]
+        E --> E3[Exception Mapper]
+    end
+    
+    subgraph "Content Processing"
+        F[Raw HTML] --> G[HTML Cleaner]
+        G --> H[Markdown Generator]
+        H --> I[Link Extractor]
+        I --> J[Media Extractor]
+        J --> K[Metadata Parser]
+    end
+    
+    subgraph "External Resources"
+        L[Target Websites]
+        M[Local Files]
+        N[Raw Content]
+    end
+    
+    subgraph "Output"
+        O[CrawlResult]
+        O --> O1[HTML Content]
+        O --> O2[Markdown Text]
+        O --> O3[Extracted Links]
+        O --> O4[Media References]
+        O --> O5[Status Information]
+    end
+    
+    A --> F
+    L --> A
+    M --> A
+    N --> A
+    K --> O
+    
+    style A fill:#e3f2fd
+    style B fill:#f3e5f5
+    style F fill:#e8f5e8
+    style O fill:#fff3e0
+```
+
+### Performance Comparison Flow
+
+```mermaid
+graph LR
+    subgraph "HTTP Strategy Performance"
+        A1[Request Start] --> A2[DNS Lookup: 50ms]
+        A2 --> A3[TCP Connect: 100ms]
+        A3 --> A4[HTTP Request: 200ms]
+        A4 --> A5[Content Download: 300ms]
+        A5 --> A6[Processing: 50ms]
+        A6 --> A7[Total: ~700ms]
+    end
+    
+    subgraph "Browser Strategy Performance"
+        B1[Request Start] --> B2[Browser Launch: 2000ms]
+        B2 --> B3[Page Navigation: 1000ms]
+        B3 --> B4[JS Execution: 500ms]
+        B4 --> B5[Content Rendering: 300ms]
+        B5 --> B6[Processing: 100ms]
+        B6 --> B7[Total: ~3900ms]
+    end
+    
+    subgraph "Resource Usage"
+        C1[HTTP Memory: ~50MB]
+        C2[Browser Memory: ~500MB]
+        C3[HTTP CPU: Low]
+        C4[Browser CPU: High]
+        C5[HTTP Concurrency: 100+]
+        C6[Browser Concurrency: 10-20]
+    end
+    
+    A7 --> D[5.5x Faster]
+    B7 --> D
+    C1 --> E[10x Less Memory]
+    C2 --> E
+    C5 --> F[5x More Concurrent]
+    C6 --> F
+    
+    style A7 fill:#c8e6c9
+    style B7 fill:#ffcdd2
+    style C1 fill:#c8e6c9
+    style C2 fill:#ffcdd2
+    style C5 fill:#c8e6c9
+    style C6 fill:#ffcdd2
+```
+
+### HTTP Request Types and Configuration
+
+```mermaid
+stateDiagram-v2
+    [*] --> HTTPConfigSetup
+    
+    HTTPConfigSetup --> MethodSelection
+    
+    MethodSelection --> GET: Simple data retrieval
+    MethodSelection --> POST: Form submission
+    MethodSelection --> PUT: Data upload
+    MethodSelection --> DELETE: Resource removal
+    
+    GET --> HeaderSetup: Set Accept headers
+    POST --> PayloadSetup: JSON or form data
+    PUT --> PayloadSetup: File or data upload
+    DELETE --> AuthSetup: Authentication required
+    
+    PayloadSetup --> JSONPayload: application/json
+    PayloadSetup --> FormPayload: form-data
+    PayloadSetup --> RawPayload: custom content
+    
+    JSONPayload --> HeaderSetup
+    FormPayload --> HeaderSetup
+    RawPayload --> HeaderSetup
+    
+    HeaderSetup --> AuthSetup
+    AuthSetup --> SSLSetup
+    SSLSetup --> RedirectSetup
+    RedirectSetup --> RequestExecution
+    
+    RequestExecution --> [*]: Request complete
+    
+    note right of GET : Default method for most crawling
+    note right of POST : API interactions, form submissions
+    note right of JSONPayload : Structured data transmission
+    note right of HeaderSetup : User-Agent, Accept, Custom headers
+```
+
+### Error Handling and Retry Workflow
+
+```mermaid
+flowchart TD
+    A[HTTP Request] --> B{Response Received?}
+    
+    B -->|No| C[Connection Error]
+    B -->|Yes| D{Status Code Check}
+    
+    C --> C1{Timeout Error?}
+    C1 -->|Yes| C2[ConnectionTimeoutError]
+    C1 -->|No| C3[Network Error]
+    
+    D -->|2xx| E[Success Response]
+    D -->|3xx| F[Redirect Response]
+    D -->|4xx| G[Client Error]
+    D -->|5xx| H[Server Error]
+    
+    F --> F1{Follow Redirects?}
+    F1 -->|Yes| F2[Follow Redirect]
+    F1 -->|No| F3[Return Redirect Response]
+    F2 --> A
+    
+    G --> G1{Retry on 4xx?}
+    G1 -->|No| G2[HTTPStatusError]
+    G1 -->|Yes| I[Check Retry Count]
+    
+    H --> H1{Retry on 5xx?}
+    H1 -->|Yes| I
+    H1 -->|No| H2[HTTPStatusError]
+    
+    C2 --> I
+    C3 --> I
+    
+    I --> J{Retries < Max?}
+    J -->|No| K[Final Error]
+    J -->|Yes| L[Calculate Backoff]
+    
+    L --> M[Wait Backoff Time]
+    M --> N[Increment Retry Count]
+    N --> A
+    
+    E --> O[Process Content]
+    F3 --> O
+    O --> P[Return CrawlResult]
+    
+    G2 --> Q[Error CrawlResult]
+    H2 --> Q
+    K --> Q
+    
+    style E fill:#c8e6c9
+    style P fill:#c8e6c9
+    style G2 fill:#ffcdd2
+    style H2 fill:#ffcdd2
+    style K fill:#ffcdd2
+    style Q fill:#ffcdd2
+```
+
+### Batch Processing Architecture
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant BatchManager as Batch Manager
+    participant HTTPPool as Connection Pool
+    participant Workers as HTTP Workers
+    participant Targets as Target Servers
+    
+    Client->>BatchManager: batch_crawl(urls)
+    BatchManager->>BatchManager: create_semaphore(max_concurrent)
+    
+    loop For each URL batch
+        BatchManager->>HTTPPool: acquire_connection()
+        HTTPPool->>Workers: assign_worker()
+        
+        par Concurrent Processing
+            Workers->>Targets: HTTP Request 1
+            Workers->>Targets: HTTP Request 2
+            Workers->>Targets: HTTP Request N
+        end
+        
+        par Response Handling
+            Targets-->>Workers: Response 1
+            Targets-->>Workers: Response 2
+            Targets-->>Workers: Response N
+        end
+        
+        Workers->>HTTPPool: return_connection()
+        HTTPPool->>BatchManager: batch_results()
+    end
+    
+    BatchManager->>BatchManager: aggregate_results()
+    BatchManager-->>Client: final_results()
+    
+    Note over Workers,Targets: 20-100 concurrent connections
+    Note over BatchManager: Memory-efficient processing
+    Note over HTTPPool: Connection reuse optimization
+```
+
+### Content Type Processing Pipeline
+
+```mermaid
+graph TD
+    A[HTTP Response] --> B{Content-Type Detection}
+    
+    B -->|text/html| C[HTML Processing]
+    B -->|application/json| D[JSON Processing]
+    B -->|text/plain| E[Text Processing]
+    B -->|application/xml| F[XML Processing]
+    B -->|Other| G[Binary Processing]
+    
+    C --> C1[Parse HTML Structure]
+    C1 --> C2[Extract Text Content]
+    C2 --> C3[Generate Markdown]
+    C3 --> C4[Extract Links/Media]
+    
+    D --> D1[Parse JSON Structure]
+    D1 --> D2[Extract Data Fields]
+    D2 --> D3[Format as Readable Text]
+    
+    E --> E1[Clean Text Content]
+    E1 --> E2[Basic Formatting]
+    
+    F --> F1[Parse XML Structure]
+    F1 --> F2[Extract Text Nodes]
+    F2 --> F3[Convert to Markdown]
+    
+    G --> G1[Save Binary Content]
+    G1 --> G2[Generate Metadata]
+    
+    C4 --> H[Content Analysis]
+    D3 --> H
+    E2 --> H
+    F3 --> H
+    G2 --> H
+    
+    H --> I[Link Extraction]
+    H --> J[Media Detection]
+    H --> K[Metadata Parsing]
+    
+    I --> L[CrawlResult Assembly]
+    J --> L
+    K --> L
+    
+    L --> M[Final Output]
+    
+    style C fill:#e8f5e8
+    style H fill:#fff3e0
+    style L fill:#e3f2fd
+    style M fill:#c8e6c9
+```
+
+### Integration with Processing Strategies
+
+```mermaid
+graph LR
+    subgraph "HTTP Strategy Core"
+        A[HTTP Request] --> B[Raw Content]
+        B --> C[Content Decoder]
+    end
+    
+    subgraph "Processing Pipeline"
+        C --> D[HTML Cleaner]
+        D --> E[Markdown Generator]
+        E --> F{Content Filter?}
+        
+        F -->|Yes| G[Pruning Filter]
+        F -->|Yes| H[BM25 Filter]
+        F -->|No| I[Raw Markdown]
+        
+        G --> J[Fit Markdown]
+        H --> J
+    end
+    
+    subgraph "Extraction Strategies"
+        I --> K[CSS Extraction]
+        J --> K
+        I --> L[XPath Extraction]
+        J --> L
+        I --> M[LLM Extraction]
+        J --> M
+    end
+    
+    subgraph "Output Generation"
+        K --> N[Structured JSON]
+        L --> N
+        M --> N
+        
+        I --> O[Clean Markdown]
+        J --> P[Filtered Content]
+        
+        N --> Q[Final CrawlResult]
+        O --> Q
+        P --> Q
+    end
+    
+    style A fill:#e3f2fd
+    style C fill:#f3e5f5
+    style E fill:#e8f5e8
+    style Q fill:#c8e6c9
+```
+
+**📖 Learn more:** [HTTP vs Browser Strategies](https://docs.crawl4ai.com/core/browser-crawler-config/), [Performance Optimization](https://docs.crawl4ai.com/advanced/multi-url-crawling/), [Error Handling](https://docs.crawl4ai.com/api/async-webcrawler/)

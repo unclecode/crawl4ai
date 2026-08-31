@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>News Feed with Mixed Scroll Behavior</title>
+    <style>
+        body {
+            font-family: Georgia, serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f8f8;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #1a1a1a;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        .description {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+        }
+        
+        #newsContainer {
+            max-width: 900px;
+            margin: 0 auto;
+            height: 700px;
+            overflow-y: auto;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        
+        .article {
+            margin-bottom: 30px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .article:last-child {
+            border-bottom: none;
+        }
+        
+        .article-header {
+            margin-bottom: 15px;
+        }
+        
+        .category {
+            display: inline-block;
+            background: #ff6b6b;
+            color: white;
+            padding: 4px 12px;
+            font-size: 12px;
+            text-transform: uppercase;
+            border-radius: 3px;
+            margin-bottom: 10px;
+        }
+        
+        .headline {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1a1a1a;
+            margin: 10px 0;
+            line-height: 1.3;
+        }
+        
+        .meta {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        
+        .content {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #333;
+        }
+        
+        .featured {
+            background: #fff9e6;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+        }
+        
+        .featured .category {
+            background: #ffa500;
+        }
+    </style>
+</head>
+<body>
+    <h1>📰 Dynamic News Feed</h1>
+    <p class="description">Mixed behavior: Featured articles stay, regular articles use virtual scroll</p>
+    <div id="newsContainer"></div>
+    
+    <script>
+        const container = document.getElementById('newsContainer');
+        const totalArticles = 100;
+        const articlesPerPage = 5;
+        let currentRegularIndex = 0;
+        
+        // Categories for variety
+        const categories = ['Politics', 'Technology', 'Business', 'Science', 'Sports', 'Entertainment'];
+        
+        // Generate article data
+        const featuredArticles = [];
+        const regularArticles = [];
+        
+        // 3 featured articles that always stay
+        for (let i = 0; i < 3; i++) {
+            featuredArticles.push({
+                id: `featured-${i}`,
+                category: 'Featured',
+                headline: `Breaking: Major Story ${i + 1} That Stays Visible`,
+                date: new Date().toLocaleDateString(),
+                content: `This is featured article ${i + 1}. Featured articles remain in the DOM and are not replaced during scrolling. They provide important persistent content.`
+            });
+        }
+        
+        // Regular articles that get virtualized
+        for (let i = 0; i < totalArticles; i++) {
+            regularArticles.push({
+                id: `article-${i}`,
+                category: categories[i % categories.length],
+                headline: `${categories[i % categories.length]} News: Article ${i + 1} of ${totalArticles}`,
+                date: new Date(Date.now() - i * 86400000).toLocaleDateString(),
+                content: `This is regular article ${i + 1}. These articles are replaced as you scroll to maintain performance. Only a subset is shown at any time. Article ID: ${i}`
+            });
+        }
+        
+        // Render articles - Featured stay, regular ones are replaced
+        function renderArticles(regularStartIndex) {
+            const html = [];
+            
+            // Always show featured articles
+            featuredArticles.forEach(article => {
+                html.push(`
+                    <div class="article featured" data-article-id="${article.id}">
+                        <div class="article-header">
+                            <span class="category">${article.category}</span>
+                            <h2 class="headline">${article.headline}</h2>
+                            <div class="meta">📅 ${article.date}</div>
+                        </div>
+                        <div class="content">${article.content}</div>
+                    </div>
+                `);
+            });
+            
+            // Add divider
+            html.push('<div style="text-align: center; color: #999; margin: 20px 0;">— Latest News —</div>');
+            
+            // Show current page of regular articles (virtual scroll)
+            const endIndex = Math.min(regularStartIndex + articlesPerPage, totalArticles);
+            for (let i = regularStartIndex; i < endIndex; i++) {
+                const article = regularArticles[i];
+                html.push(`
+                    <div class="article" data-article-id="${article.id}">
+                        <div class="article-header">
+                            <span class="category" style="background: ${getCategoryColor(article.category)}">${article.category}</span>
+                            <h2 class="headline">${article.headline}</h2>
+                            <div class="meta">📅 ${article.date}</div>
+                        </div>
+                        <div class="content">${article.content}</div>
+                    </div>
+                `);
+            }
+            
+            container.innerHTML = html.join('');
+            currentRegularIndex = regularStartIndex;
+        }
+        
+        function getCategoryColor(category) {
+            const colors = {
+                'Politics': '#e74c3c',
+                'Technology': '#3498db',
+                'Business': '#2ecc71',
+                'Science': '#9b59b6',
+                'Sports': '#f39c12',
+                'Entertainment': '#e91e63'
+            };
+            return colors[category] || '#95a5a6';
+        }
+        
+        // Initial render
+        renderArticles(0);
+        
+        // Handle scroll
+        container.addEventListener('scroll', () => {
+            const scrollTop = container.scrollTop;
+            const scrollHeight = container.scrollHeight;
+            const clientHeight = container.clientHeight;
+            
+            // When near bottom, load next page of regular articles
+            if (scrollTop + clientHeight >= scrollHeight - 200) {
+                const nextIndex = currentRegularIndex + articlesPerPage;
+                if (nextIndex < totalArticles) {
+                    renderArticles(nextIndex);
+                    // Scroll to where regular articles start
+                    const regularStart = document.querySelector('.article:not(.featured)');
+                    if (regularStart) {
+                        container.scrollTop = regularStart.offsetTop - 100;
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

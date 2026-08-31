@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marketplace - Crawl4AI</title>
+    <link rel="stylesheet" href="marketplace.css">
+</head>
+<body>
+    <div class="marketplace-container">
+        <!-- Header -->
+        <header class="marketplace-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="logo-title">
+                        <img src="../assets/images/logo.png" alt="Crawl4AI" class="header-logo">
+                        <h1>
+                            <span class="ascii-border">[</span>
+                            Marketplace
+                            <span class="ascii-border">]</span>
+                        </h1>
+                    </div>
+                    <p class="tagline">Tools, Integrations & Resources for Web Crawling</p>
+                </div>
+                <div class="header-stats" id="stats">
+                    <span class="stat-item">Apps: <span id="total-apps">--</span></span>
+                    <span class="stat-item">Articles: <span id="total-articles">--</span></span>
+                    <span class="stat-item">Downloads: <span id="total-downloads">--</span></span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Search and Category Bar -->
+        <div class="search-filter-bar">
+            <div class="search-box">
+                <span class="search-icon">></span>
+                <input type="text" id="search-input" placeholder="Search apps, articles, tools..." />
+                <kbd>/</kbd>
+            </div>
+            <div class="category-filter" id="category-filter">
+                <button class="filter-btn active" data-category="all">All</button>
+                <!-- Categories will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Magazine Grid Layout -->
+        <main class="magazine-layout">
+            <!-- Hero Featured Section -->
+            <section class="hero-featured">
+                <div id="featured-hero" class="featured-hero-card">
+                    <!-- Large featured card with big image -->
+                </div>
+            </section>
+
+            <!-- Secondary Featured -->
+            <section class="secondary-featured">
+                <div id="featured-secondary" class="featured-secondary-cards">
+                    <!-- 2-3 medium featured cards with images -->
+                </div>
+            </section>
+
+            <!-- Sponsored Section -->
+            <section class="sponsored-section">
+                <div class="section-label">SPONSORED</div>
+                <div id="sponsored-content" class="sponsored-cards">
+                    <!-- Sponsored content cards -->
+                </div>
+            </section>
+
+            <!-- Main Content Grid -->
+            <section class="main-content">
+                <!-- Apps Column -->
+                <div class="apps-column">
+                    <div class="column-header">
+                        <h2><span class="ascii-icon">></span> Latest Apps</h2>
+                        <select id="type-filter" class="mini-filter">
+                            <option value="">All</option>
+                            <option value="Open Source">Open Source</option>
+                            <option value="Paid">Paid</option>
+                        </select>
+                    </div>
+                    <div id="apps-grid" class="apps-compact-grid">
+                        <!-- Compact app cards -->
+                    </div>
+                </div>
+
+                <!-- Articles Column -->
+                <div class="articles-column">
+                    <div class="column-header">
+                        <h2><span class="ascii-icon">></span> Latest Articles</h2>
+                    </div>
+                    <div id="articles-list" class="articles-compact-list">
+                        <!-- Article items -->
+                    </div>
+                </div>
+
+                <!-- Trending/Tools Column -->
+                <div class="trending-column">
+                    <div class="column-header">
+                        <h2><span class="ascii-icon">#</span> Trending</h2>
+                    </div>
+                    <div id="trending-list" class="trending-items">
+                        <!-- Trending items -->
+                    </div>
+
+                    <div class="submit-box">
+                        <h3><span class="ascii-icon">+</span> Submit Your Tool</h3>
+                        <p>Share your integration</p>
+                        <a href="mailto:marketplace@crawl4ai.com" class="submit-btn">Submit →</a>
+                    </div>
+                </div>
+            </section>
+
+            <!-- More Apps Grid -->
+            <section class="more-apps">
+                <div class="section-header">
+                    <h2><span class="ascii-icon">></span> More Apps</h2>
+                    <button id="load-more" class="load-more-btn">Load More ↓</button>
+                </div>
+                <div id="more-apps-grid" class="more-apps-grid">
+                    <!-- Additional app cards -->
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="marketplace-footer">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>About Marketplace</h3>
+                    <p>Discover tools and integrations built by the Crawl4AI community.</p>
+                </div>
+                <div class="footer-section">
+                    <h3>Become a Sponsor</h3>
+                    <p>Reach developers building with Crawl4AI</p>
+                    <a href="mailto:sponsors@crawl4ai.com" class="sponsor-btn">Learn More →</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>[ Crawl4AI Marketplace · Updated <span id="last-update">--</span> ]</p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="marketplace.js"></script>
+</body>
+</html>

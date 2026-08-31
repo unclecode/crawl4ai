@@ -1,0 +1,51 @@
+{
+  "name": "LinkedIn Company Search Result Card",
+  "baseSelector": "div[data-chameleon-result-urn][data-view-name=\"search-entity-result-universal-template\"]",
+  "baseFields": [
+    {
+      "name": "chameleon_result_urn",
+      "type": "attribute",
+      "attribute": "data-chameleon-result-urn"
+    },
+    {
+      "name": "view_name",
+      "type": "attribute",
+      "attribute": "data-view-name"
+    }
+  ],
+  "fields": [
+    {
+      "name": "handle",
+      "selector": "div.mb1 div.display-flex span a[data-test-app-aware-link]",
+      "type": "attribute",
+      "attribute": "href"
+    },
+    {
+      "name": "profile_image",
+      "selector": "div.ivm-image-view-model img",
+      "type": "attribute",
+      "attribute": "src"
+    },
+    {
+      "name": "name",
+      "selector": "div.mb1 div.display-flex span a[data-test-app-aware-link]",
+      "type": "text"
+    },
+    {
+      "name": "descriptor",
+      "selector": "div.mb1 > div[class*=\"t-14 t-black\"]",
+      "type": "text"
+    },
+    {
+      "name": "about",
+      "selector": "p.entity-result__summary--2-lines",
+      "type": "text"
+    },
+    {
+      "name": "followers",
+      "selector": "div.mb1 > div:nth-of-type(3)",
+      "type": "regex",
+      "pattern": "(\\d+[KM]?) followers"
+    }
+  ]
+}

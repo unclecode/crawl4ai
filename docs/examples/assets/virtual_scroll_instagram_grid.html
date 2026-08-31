@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Instagram-like Grid Virtual Scroll</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #fafafa;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #262626;
+            font-weight: 300;
+        }
+        
+        .feed-container {
+            max-width: 935px;
+            margin: 0 auto;
+            height: 800px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #dbdbdb;
+            border-radius: 3px;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 28px;
+            padding: 28px;
+        }
+        
+        .post {
+            aspect-ratio: 1;
+            background: #f0f0f0;
+            border-radius: 3px;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+        
+        .post:hover .overlay {
+            opacity: 1;
+        }
+        
+        .post img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Instagram Grid Virtual Scroll</h1>
+    <p style="text-align: center; color: #8e8e8e;">Grid layout with virtual scrolling - only visible rows are rendered</p>
+    <div class="feed-container">
+        <div class="grid" id="grid"></div>
+    </div>
+    
+    <script>
+        // Instagram-like grid virtual scroll
+        const grid = document.getElementById('grid');
+        const container = document.querySelector('.feed-container');
+        const totalPosts = 999; // Instagram style count
+        const postsPerRow = 3;
+        const rowsPerPage = 4; // 12 posts per page
+        const postsPerPage = postsPerRow * rowsPerPage;
+        let currentStartIndex = 0;
+        
+        // Generate fake Instagram post data
+        const allPosts = [];
+        for (let i = 0; i < totalPosts; i++) {
+            allPosts.push({
+                id: i,
+                likes: Math.floor(Math.random() * 10000),
+                comments: Math.floor(Math.random() * 500),
+                imageNumber: (i % 10) + 1 // Cycle through 10 placeholder images
+            });
+        }
+        
+        // Render grid - REPLACES content for performance
+        function renderGrid(startIndex) {
+            const posts = [];
+            const endIndex = Math.min(startIndex + postsPerPage, totalPosts);
+            
+            for (let i = startIndex; i < endIndex; i++) {
+                const post = allPosts[i];
+                posts.push(`
+                    <div class="post" data-post-id="${post.id}">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Crect width='400' height='400' fill='%23${Math.floor(Math.random()*16777215).toString(16)}'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' font-family='Arial' font-size='48' fill='white'%3E${post.id + 1}%3C/text%3E%3C/svg%3E" alt="Post ${post.id + 1}">
+                        <div class="overlay">
+                            <div class="stats">
+                                <span>❤️ ${post.likes.toLocaleString()}</span>
+                                <span>💬 ${post.comments}</span>
+                            </div>
+                        </div>
+                    </div>
+                `);
+            }
+            
+            // REPLACE grid content (virtual scroll)
+            grid.innerHTML = posts.join('');
+            currentStartIndex = startIndex;
+        }
+        
+        // Initial render
+        renderGrid(0);
+        
+        // Handle scroll
+        let scrollTimeout;
+        container.addEventListener('scroll', () => {
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                const scrollTop = container.scrollTop;
+                const scrollHeight = container.scrollHeight;
+                const clientHeight = container.clientHeight;
+                
+                // Calculate which "page" we should show
+                const scrollPercentage = scrollTop / (scrollHeight - clientHeight);
+                const targetIndex = Math.floor(scrollPercentage * (totalPosts - postsPerPage) / postsPerPage) * postsPerPage;
+                
+                // When scrolled to bottom, show next page
+                if (scrollTop + clientHeight >= scrollHeight - 100) {
+                    const nextIndex = currentStartIndex + postsPerPage;
+                    if (nextIndex < totalPosts) {
+                        renderGrid(nextIndex);
+                        container.scrollTop = 100; // Reset scroll for continuous experience
+                    }
+                }
+            }, 50);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crawl4AI Assistant - Chrome Extension for Visual Web Scraping</title>
+    <link rel="stylesheet" href="assistant.css">
+</head>
+<body>
+    <div class="terminal-container">
+        <div class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <img src="../../img/favicon-32x32.png" alt="Crawl4AI Logo" class="logo">
+                    <div>
+                        <h1>Crawl4AI Assistant</h1>
+                        <p class="tagline">Chrome Extension for Visual Web Scraping</p>
+                    </div>
+                </div>
+                <nav class="nav-links">
+                    <a href="../../" class="nav-link">← Back to Docs</a>
+                    <a href="../" class="nav-link">All Apps</a>
+                    <a href="https://github.com/unclecode/crawl4ai" class="nav-link" target="_blank">GitHub</a>
+                </nav>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- Video Section -->
+            <section class="video-section">
+                <div class="video-wrapper">
+                    <video autoplay loop muted playsinline class="demo-video">
+                        <source src="demo.mp4" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            </section>
+
+            <!-- Cloud Announcement Banner -->
+            <section class="cloud-banner-section">
+                <div class="cloud-banner">
+                    <div class="cloud-banner-content">
+                        <div class="cloud-banner-text">
+                            <h3>You don't need Puppeteer. You need Crawl4AI Cloud.</h3>
+                            <p>One API call. JS-rendered. No browser cluster to maintain.</p>
+                        </div>
+                        <button class="cloud-banner-btn" id="joinWaitlistBanner">
+                            Get API Key →
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Introduction -->
+            <section class="intro-section">
+                <div class="terminal-window">
+                    <div class="terminal-header">
+                        <span class="terminal-title">About Crawl4AI Assistant</span>
+                    </div>
+                    <div class="terminal-content">
+                        <p>Transform any website into structured data with just a few clicks! The Crawl4AI Assistant Chrome Extension provides three powerful tools for web scraping and data extraction.</p>
+                        
+                        <div style="background: #0fbbaa; color: #070708; padding: 12px 16px; border-radius: 8px; margin: 16px 0; font-weight: 600;">
+                            🎉 NEW: Click2Crawl extracts data INSTANTLY without any LLM! Test your schema and see JSON results immediately in the browser!
+                        </div>
+                        
+                        <div class="features-grid">
+                            <div class="feature-card">
+                                <span class="feature-icon">🎯</span>
+                                <h3>Click2Crawl</h3>
+                                <p>Visual data extraction - click elements to build schemas instantly!</p>
+                            </div>
+                            <div class="feature-card">
+                                <span class="feature-icon">🔴</span>
+                                <h3>Script Builder <span style="color: #f380f5; font-size: 0.75rem;">(Alpha)</span></h3>
+                                <p>Record browser actions to create automation scripts</p>
+                            </div>
+                            <div class="feature-card">
+                                <span class="feature-icon">📝</span>
+                                <h3>Markdown Extraction <span style="color: #0fbbaa; font-size: 0.75rem;">(New!)</span></h3>
+                                <p>Convert any webpage content to clean markdown with Visual Text Mode</p>
+                            </div>
+                            <!-- <div class="feature-card">
+                                <span class="feature-icon">🐍</span>
+                                <h3>Python Code</h3>
+                                <p>Get production-ready Crawl4AI code instantly</p>
+                            </div> -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quick Start -->
+            <section class="quickstart-section">
+                <h2>Quick Start</h2>
+                <div class="terminal-window">
+                    <div class="terminal-header">
+                        <span class="terminal-title">Installation</span>
+                    </div>
+                    <div class="terminal-content">
+                        <div class="installation-steps">
+                            <div class="step">
+                                <span class="step-number">1</span>
+                                <div class="step-content">
+                                    <h4>Download the Extension</h4>
+                                    <p>Get the latest release from GitHub or use the button below</p>
+                                    <a href="crawl4ai-assistant-v1.3.0.zip" class="download-button" download>
+                                        <span class="button-icon">↓</span>
+                                        Download Extension (v1.3.0)
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="step">
+                                <span class="step-number">2</span>
+                                <div class="step-content">
+                                    <h4>Load in Chrome</h4>
+                                    <p>Navigate to <code>chrome://extensions/</code> and enable Developer Mode</p>
+                                </div>
+                            </div>
+                            <div class="step">
+                                <span class="step-number">3</span>
+                                <div class="step-content">
+                                    <h4>Load Unpacked</h4>
+                                    <p>Click "Load unpacked" and select the extracted extension folder</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Interactive Tools Section -->
+            <section class="interactive-tools">
+                <h2>Explore Our Tools</h2>
+                
+                <div class="tools-container">
+                    <!-- Left Panel - Tool Selector -->
+                    <div class="tools-panel">
+                        <div class="tool-selector active" data-tool="click2crawl">
+                            <div class="tool-icon">🎯</div>
+                            <div class="tool-info">
+                                <h3>Click2Crawl</h3>
+                                <p>Visual data extraction</p>
+                            </div>
+                            <div class="tool-status">Available</div>
+                        </div>
+                        
+                        <div class="tool-selector" data-tool="script-builder">
+                            <div class="tool-icon">🔴</div>
+                            <div class="tool-info">
+                                <h3>Script Builder</h3>
+                                <p>Browser automation</p>
+                            </div>
+                            <div class="tool-status alpha">Alpha</div>
+                        </div>
+                        
+                        <div class="tool-selector" data-tool="markdown-extraction">
+                            <div class="tool-icon">📝</div>
+                            <div class="tool-info">
+                                <h3>Markdown Extraction</h3>
+                                <p>Content to markdown</p>
+                            </div>
+                            <div class="tool-status new">New!</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Right Panel - Tool Details -->
+                    <div class="tool-details">
+                        <!-- Click2Crawl Details -->
+                        <div class="tool-content active" id="click2crawl">
+                            <div class="tool-header">
+                                <h3>🎯 Click2Crawl</h3>
+                                <span class="tool-tagline">Click elements to build extraction schemas - No LLM needed!</span>
+                            </div>
+                            
+                            <div class="tool-steps">
+                                <div class="step-item">
+                                    <div class="step-number">1</div>
+                                    <div class="step-content">
+                                        <h4>Select Container</h4>
+                                        <p>Click on any repeating element like product cards or articles. Use up/down navigation to fine-tune selection!</p>
+                                        <div class="step-visual">
+                                            <span class="highlight-green">■</span> Container highlighted in green
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="step-item">
+                                    <div class="step-number">2</div>
+                                    <div class="step-content">
+                                        <h4>Click Fields to Extract</h4>
+                                        <p>Click on data fields inside the container - choose text, links, images, or attributes</p>
+                                        <div class="step-visual">
+                                            <span class="highlight-pink">■</span> Fields highlighted in pink
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="step-item">
+                                    <div class="step-number">3</div>
+                                    <div class="step-content">
+                                        <h4>Test & Extract Data Instantly!</h4>
+                                        <p>🎉 Click "Test Schema" to see extracted JSON immediately - no LLM or coding required!</p>
+                                        <div class="step-visual">
+                                            <span class="highlight-accent">⚡</span> See extracted JSON immediately
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="tool-features">
+                                <div class="feature-tag">🚀 Zero LLM dependency</div>
+                                <div class="feature-tag">📊 Instant JSON extraction</div>
+                                <div class="feature-tag">🎯 Visual element selection</div>
+                                <div class="feature-tag">🐍 Export Python code</div>
+                                <div class="feature-tag">✨ Live preview</div>
+                                <div class="feature-tag">📥 Download results</div>
+                                <div class="feature-tag">📝 Export to markdown</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Script Builder Details -->
+                        <div class="tool-content" id="script-builder">
+                            <div class="tool-header">
+                                <h3>🔴 Script Builder</h3>
+                                <span class="tool-tagline">Record actions, generate automation</span>
+                            </div>
+                            
+                            <div class="tool-steps">
+                                <div class="step-item">
+                                    <div class="step-number">1</div>
+                                    <div class="step-content">
+                                        <h4>Hit Record</h4>
+                                        <p>Start capturing your browser interactions</p>
+                                        <div class="step-visual">
+                                            <span class="recording-dot">●</span> Recording indicator
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="step-item">
+                                    <div class="step-number">2</div>
+                                    <div class="step-content">
+                                        <h4>Interact Naturally</h4>
+                                        <p>Click, type, scroll - everything is captured</p>
+                                        <div class="step-visual">
+                                            <span class="action-icon">🖱️</span> <span class="action-icon">⌨️</span> <span class="action-icon">📜</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="step-item">
+                                    <div class="step-number">3</div>
+                                    <div class="step-content">
+                                        <h4>Export Script</h4>
+                                        <p>Get JavaScript for Crawl4AI's js_code parameter</p>
+                                        <div class="step-visual">
+                                            <span class="highlight-accent">📝</span> Automation ready
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="tool-features">
+                                <div class="feature-tag">Smart action grouping</div>
+                                <div class="feature-tag">Wait detection</div>
+                                <div class="feature-tag">Keyboard shortcuts</div>
+                                <div class="feature-tag alpha-tag">Alpha version</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Markdown Extraction Details -->
+                        <div class="tool-content" id="markdown-extraction">
+                            <div class="tool-header">
+                                <h3>📝 Markdown Extraction</h3>
+                                <span class="tool-tagline">Convert webpage content to clean markdown "as you see"</span>
+                            </div>
+                            
+                            <div class="tool-steps">
+                                <div class="step-item">
+                                    <div class="step-number">1</div>
+                                    <div class="step-content">
+                                        <h4>Ctrl/Cmd + Click</h4>
+                                        <p>Hold Ctrl/Cmd and click multiple elements you want to extract</p>
+                                        <div class="step-visual">
+                                            <span class="highlight-green">🔢</span> Numbered selection badges
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="step-item">
+                                    <div class="step-number">2</div>
+                                    <div class="step-content">
+                                        <h4>Enable Visual Text Mode</h4>
+                                        <p>Extract content "as you see" - clean text without complex HTML structures</p>
+                                        <div class="step-visual">
+                                            <span class="highlight-accent">👁️</span> Visual Text Mode (As You See)
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="step-item">
+                                    <div class="step-number">3</div>
+                                    <div class="step-content">
+                                        <h4>Export Clean Markdown</h4>
+                                        <p>Get beautifully formatted markdown ready for documentation or LLMs</p>
+                                        <div class="step-visual">
+                                            <span class="highlight-pink">📄</span> Clean, readable output
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="tool-features">
+                                <div class="feature-tag">Multi-select with Ctrl/Cmd</div>
+                                <div class="feature-tag">Visual Text Mode (As You See)</div>
+                                <div class="feature-tag">Clean markdown output</div>
+                                <div class="feature-tag">Export to Crawl4AI Cloud (soon)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Interactive Code Examples -->
+            <section class="code-showcase">
+                <h2>See the Generated Code & Extracted Data</h2>
+                
+                <div class="code-tabs">
+                    <button class="code-tab active" data-example="schema">🎯 Click2Crawl</button>
+                    <button class="code-tab" data-example="script">🔴 Script Builder</button>
+                    <button class="code-tab" data-example="markdown">📝 Markdown Extraction</button>
+                </div>
+                
+                <div class="code-examples">
+                    <!-- Click2Crawl Code -->
+                    <div class="code-example active" id="code-schema">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <!-- Python Code -->
+                            <div class="terminal-window">
+                                <div class="terminal-header">
+                                    <span class="terminal-title">click2crawl_extraction.py</span>
+                                    <button class="copy-button" data-code="schema-python">Copy</button>
+                                </div>
+                                <div class="terminal-content">
+                                    <pre><code><span class="comment">#!/usr/bin/env python3</span>
+<span class="comment">"""
+🎉 NO LLM NEEDED! Direct extraction with CSS selectors
+Generated by Crawl4AI Chrome Extension - Click2Crawl
+"""</span>
+
+<span class="keyword">import</span> asyncio
+<span class="keyword">import</span> json
+<span class="keyword">from</span> crawl4ai <span class="keyword">import</span> AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
+<span class="keyword">from</span> crawl4ai.extraction_strategy <span class="keyword">import</span> JsonCssExtractionStrategy
+
+<span class="comment"># The EXACT schema from Click2Crawl - no guessing!</span>
+EXTRACTION_SCHEMA = {
+    <span class="string">"name"</span>: <span class="string">"Product Catalog"</span>,
+    <span class="string">"baseSelector"</span>: <span class="string">"div.product-card"</span>,  <span class="comment"># The container you selected</span>
+    <span class="string">"fields"</span>: [
+        {
+            <span class="string">"name"</span>: <span class="string">"title"</span>,
+            <span class="string">"selector"</span>: <span class="string">"h3.product-title"</span>,
+            <span class="string">"type"</span>: <span class="string">"text"</span>
+        },
+        {
+            <span class="string">"name"</span>: <span class="string">"price"</span>,
+            <span class="string">"selector"</span>: <span class="string">"span.price"</span>,
+            <span class="string">"type"</span>: <span class="string">"text"</span>
+        },
+        {
+            <span class="string">"name"</span>: <span class="string">"image"</span>,
+            <span class="string">"selector"</span>: <span class="string">"img.product-img"</span>,
+            <span class="string">"type"</span>: <span class="string">"attribute"</span>,
+            <span class="string">"attribute"</span>: <span class="string">"src"</span>
+        },
+        {
+            <span class="string">"name"</span>: <span class="string">"link"</span>,
+            <span class="string">"selector"</span>: <span class="string">"a.product-link"</span>,
+            <span class="string">"type"</span>: <span class="string">"attribute"</span>,
+            <span class="string">"attribute"</span>: <span class="string">"href"</span>
+        }
+    ]
+}
+
+<span class="keyword">async</span> <span class="keyword">def</span> <span class="function">extract_data</span>(url: str):
+    <span class="comment"># Direct extraction - no LLM API calls!</span>
+    extraction_strategy = JsonCssExtractionStrategy(schema=EXTRACTION_SCHEMA)
+    
+    <span class="keyword">async</span> <span class="keyword">with</span> AsyncWebCrawler() <span class="keyword">as</span> crawler:
+        result = <span class="keyword">await</span> crawler.arun(
+            url=url,
+            config=CrawlerRunConfig(extraction_strategy=extraction_strategy)
+        )
+        
+        <span class="keyword">if</span> result.success:
+            data = json.loads(result.extracted_content)
+            <span class="keyword">print</span>(<span class="string">f"✅ Extracted {len(data)} items instantly!"</span>)
+            
+            <span class="comment"># Save to file</span>
+            <span class="keyword">with</span> open(<span class="string">'products.json'</span>, <span class="string">'w'</span>) <span class="keyword">as</span> f:
+                json.dump(data, f, indent=2)
+            
+            <span class="keyword">return</span> data
+
+<span class="comment"># Run extraction on any similar page!</span>
+data = asyncio.run(extract_data(<span class="string">"https://example.com/products"</span>))
+
+<span class="comment"># 🎯 Result: Clean JSON data, no LLM costs, instant results!</span></code></pre>
+                                </div>
+                            </div>
+                            
+                            <!-- Extracted JSON Data -->
+                            <div class="terminal-window">
+                                <div class="terminal-header">
+                                    <span class="terminal-title">extracted_data.json</span>
+                                    <button class="copy-button" data-code="schema-json">Copy</button>
+                                </div>
+                                <div class="terminal-content">
+                                    <pre><code><span class="comment">// 🎉 Instantly extracted from the page - no coding required!</span>
+[
+  {
+    <span class="string">"title"</span>: <span class="string">"Wireless Bluetooth Headphones"</span>,
+    <span class="string">"price"</span>: <span class="string">"$79.99"</span>,
+    <span class="string">"image"</span>: <span class="string">"https://example.com/images/headphones-bt-01.jpg"</span>,
+    <span class="string">"link"</span>: <span class="string">"/products/wireless-bluetooth-headphones"</span>
+  },
+  {
+    <span class="string">"title"</span>: <span class="string">"Smart Watch Pro 2024"</span>,
+    <span class="string">"price"</span>: <span class="string">"$299.00"</span>,
+    <span class="string">"image"</span>: <span class="string">"https://example.com/images/smartwatch-pro.jpg"</span>,
+    <span class="string">"link"</span>: <span class="string">"/products/smart-watch-pro-2024"</span>
+  },
+  {
+    <span class="string">"title"</span>: <span class="string">"4K Webcam for Streaming"</span>,
+    <span class="string">"price"</span>: <span class="string">"$149.99"</span>,
+    <span class="string">"image"</span>: <span class="string">"https://example.com/images/webcam-4k.jpg"</span>,
+    <span class="string">"link"</span>: <span class="string">"/products/4k-webcam-streaming"</span>
+  },
+  {
+    <span class="string">"title"</span>: <span class="string">"Mechanical Gaming Keyboard RGB"</span>,
+    <span class="string">"price"</span>: <span class="string">"$129.99"</span>,
+    <span class="string">"image"</span>: <span class="string">"https://example.com/images/keyboard-gaming.jpg"</span>,
+    <span class="string">"link"</span>: <span class="string">"/products/mechanical-gaming-keyboard"</span>
+  },
+  {
+    <span class="string">"title"</span>: <span class="string">"USB-C Hub 7-in-1"</span>,
+    <span class="string">"price"</span>: <span class="string">"$45.99"</span>,
+    <span class="string">"image"</span>: <span class="string">"https://example.com/images/usbc-hub.jpg"</span>,
+    <span class="string">"link"</span>: <span class="string">"/products/usb-c-hub-7in1"</span>
+  }
+]</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Script Builder Code -->
+                    <div class="code-example" id="code-script">
+                        <div class="terminal-window">
+                            <div class="terminal-header">
+                                <span class="terminal-title">automation_script.py</span>
+                                <button class="copy-button" data-code="script">Copy</button>
+                            </div>
+                            <div class="terminal-content">
+                                <pre><code><span class="keyword">import</span> asyncio
+<span class="keyword">from</span> crawl4ai <span class="keyword">import</span> AsyncWebCrawler, CrawlerRunConfig
+
+<span class="comment"># JavaScript generated from your recorded actions</span>
+js_script = <span class="string">"""
+// Search for products
+document.querySelector('button.search-toggle').click();
+await new Promise(r => setTimeout(r, 500));
+
+// Type search query
+const searchInput = document.querySelector('input#search');
+searchInput.value = 'wireless headphones';
+searchInput.dispatchEvent(new Event('input', {bubbles: true}));
+
+// Submit search
+searchInput.dispatchEvent(new KeyboardEvent('keydown', {
+    key: 'Enter', keyCode: 13, bubbles: true
+}));
+
+// Wait for results
+await new Promise(r => setTimeout(r, 2000));
+
+// Click first product
+document.querySelector('.product-item:first-child').click();
+
+// Wait for product page
+await new Promise(r => setTimeout(r, 1000));
+
+// Add to cart
+document.querySelector('button.add-to-cart').click();
+"""</span>
+
+<span class="keyword">async</span> <span class="keyword">def</span> <span class="function">automate_shopping</span>():
+    config = CrawlerRunConfig(
+        js_code=js_script,
+        wait_for=<span class="string">"css:.cart-confirmation"</span>,
+        screenshot=<span class="keyword">True</span>
+    )
+    
+    <span class="keyword">async</span> <span class="keyword">with</span> AsyncWebCrawler() <span class="keyword">as</span> crawler:
+        result = <span class="keyword">await</span> crawler.arun(
+            url=<span class="string">"https://shop.example.com"</span>,
+            config=config
+        )
+        <span class="keyword">print</span>(<span class="string">f"✓ Automation complete: {result.url}"</span>)
+        <span class="keyword">return</span> result
+
+asyncio.run(automate_shopping())</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Markdown Extraction Output -->
+                    <div class="code-example" id="code-markdown">
+                        <div class="terminal-window">
+                            <div class="terminal-header">
+                                <span class="terminal-title">extracted_content.md</span>
+                                <button class="copy-button" data-code="markdown">Copy</button>
+                            </div>
+                            <div class="terminal-content">
+                                <pre><code><span class="comment"># Extracted from Hacker News with Visual Text Mode 👁️</span>
+
+<span class="string">1. **Show HN: I built a tool to find and reach out to YouTubers** (hellosimply.io)
+   84 points by erickim 2 hours ago | hide | 31 comments
+
+2. **The 24 Hour Restaurant** (logicmag.io)
+   124 points by helsinkiandrew 5 hours ago | hide | 52 comments
+
+3. **Building a Better Bloom Filter in Rust** (carlmastrangelo.com)
+   89 points by carlmastrangelo 3 hours ago | hide | 27 comments
+
+---
+
+### Article: The 24 Hour Restaurant
+
+In New York City, the 24-hour restaurant is becoming extinct. What we lose when we can no longer eat whenever we want.
+
+When I first moved to New York, I loved that I could get a full meal at 3 AM. Not just pizza or fast food, but a proper sit-down dinner with table service and a menu that ran for pages. The city that never sleeps had restaurants that matched its rhythm.
+
+Today, finding a 24-hour restaurant in Manhattan requires genuine effort. The pandemic accelerated a decline that was already underway, but the roots go deeper: rising rents, changing labor laws, and shifting cultural patterns have all contributed to the death of round-the-clock dining.
+
+---
+
+### Product Review: Framework Laptop 16
+
+**Specifications:**
+- Display: 16" 2560×1600 165Hz
+- Processor: AMD Ryzen 7 7840HS
+- Memory: 32GB DDR5-5600
+- Storage: 2TB NVMe Gen4
+- Price: Starting at $1,399
+
+**Pros:**
+- Fully modular and repairable
+- Excellent Linux support
+- Great keyboard and trackpad
+- Expansion card system
+
+**Cons:**
+- Battery life could be better
+- Slightly heavier than competitors
+- Fan noise under load</span></code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- Crawl4AI Cloud Section -->
+            <section class="cloud-section">
+                <div class="cloud-announcement">
+                    <h2>Crawl4AI Cloud</h2>
+                    <p class="cloud-tagline">Your browser cluster without the cluster.</p>
+                    
+                    <div class="cloud-features-preview">
+                        <div class="cloud-feature-item">
+                            ⚡ POST /crawl
+                        </div>
+                        <div class="cloud-feature-item">
+                            🌐 JS-rendered pages
+                        </div>
+                        <div class="cloud-feature-item">
+                            📊 Schema extraction built-in
+                        </div>
+                        <div class="cloud-feature-item">
+                            💰 $0.001/page
+                        </div>
+                    </div>
+                    
+                    <button class="cloud-cta-button" id="joinWaitlist">
+                        Get Early Access →
+                    </button>
+                    
+                    <p class="cloud-hint">See it extract your own data. Right now.</p>
+                </div>
+                
+                <!-- Hidden Signup Form -->
+                <div class="signup-overlay" id="signupOverlay">
+                    <div class="signup-container" id="signupContainer">
+                        <button class="close-signup" id="closeSignup">×</button>
+                        
+                        <div class="signup-content" id="signupForm">
+                            <h3>🚀 Join C4AI Cloud Waiting List</h3>
+                            <p>Be among the first to experience the future of web scraping</p>
+                            
+                            <form id="waitlistForm" class="waitlist-form">
+                                <div class="form-field">
+                                    <label for="userName">Your Name</label>
+                                    <input type="text" id="userName" name="name" placeholder="John Doe" required>
+                                </div>
+                                
+                                <div class="form-field">
+                                    <label for="userEmail">Email Address</label>
+                                    <input type="email" id="userEmail" name="email" placeholder="john@example.com" required>
+                                </div>
+                                
+                                <div class="form-field">
+                                    <label for="userCompany">Company (Optional)</label>
+                                    <input type="text" id="userCompany" name="company" placeholder="Acme Inc.">
+                                </div>
+                                
+                                <div class="form-field">
+                                    <label for="useCase">What will you use Crawl4AI Cloud for?</label>
+                                    <select id="useCase" name="useCase">
+                                        <option value="">Select use case...</option>
+                                        <option value="price-monitoring">Price Monitoring</option>
+                                        <option value="news-aggregation">News Aggregation</option>
+                                        <option value="market-research">Market Research</option>
+                                        <option value="ai-training">AI Training Data</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                
+                                <button type="submit" class="submit-button">
+                                    <span>🎯</span> Submit & Watch the Magic
+                                </button>
+                            </form>
+                        </div>
+                        
+                        <!-- Crawling Animation -->
+                        <div class="crawl-animation" id="crawlAnimation" style="display: none;">
+                            <div class="terminal-window crawl-terminal">
+                                <div class="terminal-header">
+                                    <span class="terminal-title">Crawl4AI Cloud Demo</span>
+                                </div>
+                                <div class="terminal-content">
+                                    <pre id="crawlOutput" class="crawl-log"><code>$ crawl4ai cloud extract --url "signup-form" --auto-detect</code></pre>
+                                </div>
+                            </div>
+                            
+                            <div class="extracted-preview" id="extractedPreview" style="display: none;">
+                                <h4>📊 Extracted Data</h4>
+                                <pre class="json-preview"><code id="jsonOutput"></code></pre>
+                            </div>
+                            
+                            <div class="success-message" id="successMessage" style="display: none;">
+                                <div class="success-icon">✅</div>
+                                <h3>Data Uploaded Successfully!</h3>
+                                <p>You're on the Crawl4AI Cloud waiting list!</p>
+                                <p>What you just witnessed:</p>
+                                <ul>
+                                    <li>⚡ Real-time extraction of your form data</li>
+                                    <li>🔄 Automatic schema detection</li>
+                                    <li>📤 Instant cloud processing</li>
+                                    <li>✨ No code required - just like that!</li>
+                                </ul>
+                                <p class="success-note">We'll notify you at <strong id="userEmailDisplay"></strong> when Crawl4AI Cloud launches!</p>
+                                <button class="continue-button" id="continueBtn">Continue Exploring</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Coming Soon Section -->
+            <section class="coming-soon-section">
+                <h2>More Features Coming Soon</h2>
+                <div class="terminal-window">
+                    <div class="terminal-header">
+                        <span class="terminal-title">Roadmap</span>
+                    </div>
+                    <div class="terminal-content">
+                        <p class="intro-text">We're continuously expanding C4AI Assistant with powerful new features:</p>
+                        
+                        <div class="coming-features">
+                            <div class="coming-feature">
+                                <div class="feature-header">
+                                    <span class="feature-badge">Direct</span>
+                                    <h3>Direct Data Download</h3>
+                                </div>
+                                <p>Skip the code generation entirely! Download extracted data directly from Click2Crawl as JSON or CSV files.</p>
+                                <div class="feature-preview">
+                                    <code>📊 One-click download • No Python needed • Multiple export formats</code>
+                                </div>
+                            </div>
+                            
+                            <div class="coming-feature">
+                                <div class="feature-header">
+                                    <span class="feature-badge">AI</span>
+                                    <h3>Smart Field Detection</h3>
+                                </div>
+                                <p>AI-powered field detection for Click2Crawl that automatically suggests the most likely data fields on any page.</p>
+                                <div class="feature-preview">
+                                    <code>🤖 Auto-detect fields • Smart naming • Pattern recognition</code>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="stay-tuned">
+                            <p>🚀 Stay tuned for updates! Follow our <a href="https://github.com/unclecode/crawl4ai" target="_blank">GitHub</a> for the latest releases.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Footer -->
+            <footer class="footer">
+                <div class="footer-content">
+                    <div class="footer-section">
+                        <h4>Resources</h4>
+                        <ul>
+                            <li><a href="https://github.com/unclecode/crawl4ai">GitHub Repository</a></li>
+                            <li><a href="../../">Documentation</a></li>
+                            <li><a href="https://discord.gg/jP8KfhDhyN">Discord Community</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-section">
+                        <h4>Connect</h4>
+                        <ul>
+                            <li><a href="https://twitter.com/unclecode">Twitter @unclecode</a></li>
+                            <li><a href="https://github.com/unclecode">GitHub @unclecode</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="footer-bottom">
+                    <p>Made with 🚀 by the Crawl4AI team</p>
+                </div>
+            </footer>
+        </div>
+    </div>
+    
+    <script>
+        // Tool Selector Interaction
+        document.querySelectorAll('.tool-selector').forEach(selector => {
+            selector.addEventListener('click', function() {
+                // Remove active class from all selectors
+                document.querySelectorAll('.tool-selector').forEach(s => s.classList.remove('active'));
+                document.querySelectorAll('.tool-content').forEach(c => c.classList.remove('active'));
+                
+                // Add active class to clicked selector
+                this.classList.add('active');
+                
+                // Show corresponding content
+                const toolId = this.getAttribute('data-tool');
+                const contentElement = document.getElementById(toolId);
+                if (contentElement) {
+                    contentElement.classList.add('active');
+                }
+            });
+        });
+        
+        // Code Tab Interaction
+        document.querySelectorAll('.code-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                // Remove active class from all tabs
+                document.querySelectorAll('.code-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.code-example').forEach(e => e.classList.remove('active'));
+                
+                // Add active class to clicked tab
+                this.classList.add('active');
+                
+                // Show corresponding code
+                const exampleId = this.getAttribute('data-example');
+                document.getElementById('code-' + exampleId).classList.add('active');
+            });
+        });
+        
+        // Copy Button Functionality
+        document.querySelectorAll('.copy-button').forEach(button => {
+            button.addEventListener('click', async function() {
+                const codeType = this.getAttribute('data-code');
+                let codeText = '';
+                
+                // Handle different code types
+                if (codeType === 'schema-python') {
+                    const codeElement = document.querySelector('#code-schema .terminal-window:first-child pre code');
+                    codeText = codeElement.textContent;
+                } else if (codeType === 'schema-json') {
+                    const codeElement = document.querySelector('#code-schema .terminal-window:last-child pre code');
+                    codeText = codeElement.textContent;
+                } else {
+                    const codeElement = document.getElementById('code-' + codeType).querySelector('pre code');
+                    codeText = codeElement.textContent;
+                }
+                
+                try {
+                    await navigator.clipboard.writeText(codeText);
+                    this.textContent = 'Copied!';
+                    this.classList.add('copied');
+                    
+                    setTimeout(() => {
+                        this.textContent = 'Copy';
+                        this.classList.remove('copied');
+                    }, 2000);
+                } catch (err) {
+                    console.error('Failed to copy code:', err);
+                }
+            });
+        });
+        
+        // Crawl4AI Cloud Interactive Demo
+        const joinWaitlistBtn = document.getElementById('joinWaitlist');
+        const signupOverlay = document.getElementById('signupOverlay');
+        const closeSignupBtn = document.getElementById('closeSignup');
+        const waitlistForm = document.getElementById('waitlistForm');
+        const signupForm = document.getElementById('signupForm');
+        const crawlAnimation = document.getElementById('crawlAnimation');
+        const crawlOutput = document.getElementById('crawlOutput');
+        const extractedPreview = document.getElementById('extractedPreview');
+        const jsonOutput = document.getElementById('jsonOutput');
+        const successMessage = document.getElementById('successMessage');
+        const continueBtn = document.getElementById('continueBtn');
+        const userEmailDisplay = document.getElementById('userEmailDisplay');
+        
+        // Open signup modal
+        joinWaitlistBtn.addEventListener('click', () => {
+            signupOverlay.classList.add('active');
+        });
+        
+        // Banner button
+        const joinWaitlistBannerBtn = document.getElementById('joinWaitlistBanner');
+        if (joinWaitlistBannerBtn) {
+            joinWaitlistBannerBtn.addEventListener('click', () => {
+                signupOverlay.classList.add('active');
+            });
+        }
+        
+        // Close signup modal
+        closeSignupBtn.addEventListener('click', () => {
+            signupOverlay.classList.remove('active');
+        });
+        
+        // Close on overlay click
+        signupOverlay.addEventListener('click', (e) => {
+            if (e.target === signupOverlay) {
+                signupOverlay.classList.remove('active');
+            }
+        });
+        
+        // Continue button
+        if (continueBtn) {
+            continueBtn.addEventListener('click', () => {
+                signupOverlay.classList.remove('active');
+                // Reset form for next time
+                waitlistForm.reset();
+                signupForm.style.display = 'block';
+                crawlAnimation.style.display = 'none';
+                extractedPreview.style.display = 'none';
+                successMessage.style.display = 'none';
+            });
+        }
+        
+        // Form submission with crawling animation
+        waitlistForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Get form data
+            const formData = {
+                name: document.getElementById('userName').value,
+                email: document.getElementById('userEmail').value,
+                company: document.getElementById('userCompany').value || 'Not specified',
+                useCase: document.getElementById('useCase').value || 'General web scraping',
+                timestamp: new Date().toISOString(),
+                source: 'Crawl4AI Assistant Landing Page'
+            };
+            
+            // Update email display
+            userEmailDisplay.textContent = formData.email;
+            
+            // Hide form and show crawling animation
+            signupForm.style.display = 'none';
+            crawlAnimation.style.display = 'block';
+            
+            // Clear previous output
+            const codeElement = crawlOutput.querySelector('code');
+            codeElement.innerHTML = '$ crawl4ai cloud extract --url "signup-form" --auto-detect\n\n';
+            
+            // Simulate crawling process with proper C4AI log format
+            const crawlSteps = [
+                { 
+                    log: '<span class="log-init">[INIT]....</span> → Crawl4AI Cloud 1.0.0',
+                    time: '0.12s'
+                },
+                { 
+                    log: '<span class="log-fetch">[FETCH]...</span> ↓ https://crawl4ai.com/waitlist-form',
+                    time: '0.45s'
+                },
+                { 
+                    log: '<span class="log-scrape">[SCRAPE]..</span> ◆ https://crawl4ai.com/waitlist-form',
+                    time: '0.28s'
+                },
+                { 
+                    log: '<span class="log-extract">[EXTRACT].</span> ■ Extracting form data with auto-detect',
+                    time: '0.55s'
+                },
+                { 
+                    log: '<span class="log-complete">[COMPLETE]</span> ● https://crawl4ai.com/waitlist-form',
+                    time: '1.40s'
+                }
+            ];
+            
+            let stepIndex = 0;
+            const typeStep = async () => {
+                if (stepIndex < crawlSteps.length) {
+                    const step = crawlSteps[stepIndex];
+                    codeElement.innerHTML += step.log + ' | <span class="log-success">✓</span> | <span class="log-time">⏱: ' + step.time + '</span>\n';
+                    stepIndex++;
+                    
+                    // Scroll to bottom
+                    const terminal = crawlOutput.parentElement;
+                    terminal.scrollTop = terminal.scrollHeight;
+                    
+                    setTimeout(typeStep, 600);
+                } else {
+                    // Show extracted data
+                    setTimeout(() => {
+                        codeElement.innerHTML += '\n<span class="log-success">[UPLOAD]..</span> ↑ Uploading to Crawl4AI Cloud...';
+                        
+                        setTimeout(() => {
+                            extractedPreview.style.display = 'block';
+                            jsonOutput.textContent = JSON.stringify(formData, null, 2);
+                            
+                            // Add syntax highlighting
+                            jsonOutput.innerHTML = jsonOutput.textContent
+                                .replace(/"([^"]+)":/g, '<span class="string">"$1"</span>:')
+                                .replace(/: "([^"]+)"/g, ': <span class="string">"$1"</span>');
+                            
+                            codeElement.innerHTML += ' | <span class="log-success">✓</span> | <span class="log-time">⏱: 0.23s</span>\n';
+                            codeElement.innerHTML += '\n<span class="log-success">[SUCCESS]</span> ✨ Data uploaded successfully!';
+                            
+                            // Show success message after a delay
+                            setTimeout(() => {
+                                successMessage.style.display = 'block';
+                                
+                                // Smooth scroll to bottom to show success message
+                                setTimeout(() => {
+                                    const container = document.getElementById('signupContainer');
+                                    container.scrollTo({
+                                        top: container.scrollHeight,
+                                        behavior: 'smooth'
+                                    });
+                                }, 100);
+                                
+                                // Actually submit to waiting list (you can implement this)
+                                console.log('Waitlist submission:', formData);
+                            }, 1500);
+                        }, 800);
+                    }, 600);
+                }
+            };
+            
+            // Start the animation
+            setTimeout(typeStep, 500);
+        });
+    </script>
+</body>
+</html>

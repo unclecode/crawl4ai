@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="35" viewBox="0 0 120 35">
+  <g>
+    <defs>
+      <pattern id="cyberdots" width="4" height="4" patternUnits="userSpaceOnUse">
+        <circle cx="2" cy="2" r="1">
+          <animate attributeName="fill" 
+                   values="#FF2EC4;#8B5CF6;#0BC5EA;#FF2EC4" 
+                   dur="6s" 
+                   repeatCount="indefinite"/>
+          <animate attributeName="opacity" 
+                   values="0.2;0.4;0.2" 
+                   dur="4s" 
+                   repeatCount="indefinite"/>
+        </circle>
+      </pattern>
+      <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="1" result="blur"/>
+        <feFlood flood-color="#FF2EC4" flood-opacity="0.2">
+          <animate attributeName="flood-color"
+                   values="#FF2EC4;#8B5CF6;#0BC5EA;#FF2EC4"
+                   dur="8s"
+                   repeatCount="indefinite"/>
+        </feFlood>
+        <feComposite in2="blur" operator="in"/>
+        <feMerge>
+          <feMergeNode/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+    </defs>
+    
+    <rect width="120" height="35" rx="5" fill="#0A0A0F"/>
+    <rect x="2" y="2" width="116" height="31" rx="4" fill="#16161E"/>
+    <rect x="2" y="2" width="116" height="31" rx="4" fill="url(#cyberdots)"/>
+    
+    <!-- Logo with animated neon -->
+    <path d="M30 17.5 a7.5 7.5 0 1 1 -15 0 a7.5 7.5 0 1 1 15 0" fill="none" stroke="#8B5CF6" stroke-width="2" filter="url(#neonGlow)">
+      <animate attributeName="stroke"
+               values="#FF2EC4;#8B5CF6;#0BC5EA;#FF2EC4"
+               dur="8s"
+               repeatCount="indefinite"/>
+    </path>
+    <path d="M18 17.5 L27 17.5" stroke="#8B5CF6" stroke-width="2" filter="url(#neonGlow)">
+      <animate attributeName="stroke"
+               values="#FF2EC4;#8B5CF6;#0BC5EA;#FF2EC4"
+               dur="8s"
+               repeatCount="indefinite"/>
+    </path>
+    <circle cx="22.5" cy="17.5" r="2" fill="#0BC5EA">
+      <animate attributeName="fill" 
+               values="#0BC5EA;#FF2EC4;#8B5CF6;#0BC5EA" 
+               dur="8s" 
+               repeatCount="indefinite"/>
+    </circle>
+    
+    <text x="40" y="23" font-family="Arial, sans-serif" font-weight="500" font-size="14" filter="url(#neonGlow)">
+      <animate attributeName="fill"
+               values="#FF2EC4;#8B5CF6;#0BC5EA;#FF2EC4"
+               dur="8s"
+               repeatCount="indefinite"/>
+      Crawl4AI
+    </text>
+  </g>
+</svg>

@@ -1,0 +1,142 @@
+name: Release Pipeline
+on:
+  push:
+    tags:
+      - 'v*'
+      - '!test-v*'  # Exclude test tags
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required for creating releases
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$TAG_VERSION" >> $GITHUB_OUTPUT
+          echo "Releasing version: $TAG_VERSION"
+      
+      - name: Install package dependencies
+        run: |
+          pip install -e .
+      
+      - name: Check version consistency
+        run: |
+          TAG_VERSION=${{ steps.get_version.outputs.VERSION }}
+          PACKAGE_VERSION=$(python -c "from crawl4ai.__version__ import __version__; print(__version__)")
+          
+          echo "Tag version: $TAG_VERSION"
+          echo "Package version: $PACKAGE_VERSION"
+          
+          if [ "$TAG_VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "❌ Version mismatch! Tag: $TAG_VERSION, Package: $PACKAGE_VERSION"
+            echo "Please update crawl4ai/__version__.py to match the tag version"
+            exit 1
+          fi
+          echo "✅ Version check passed: $TAG_VERSION"
+      
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+      
+      - name: Build package
+        run: python -m build
+      
+      - name: Check package
+        run: twine check dist/*
+      
+      - name: Upload to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          echo "📦 Uploading to PyPI..."
+          twine upload dist/*
+          echo "✅ Package uploaded to https://pypi.org/project/crawl4ai/"
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+      
+      - name: Extract major and minor versions
+        id: versions
+        run: |
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f1-2)
+          echo "MAJOR=$MAJOR" >> $GITHUB_OUTPUT
+          echo "MINOR=$MINOR" >> $GITHUB_OUTPUT
+      
+      - name: Build and push Docker images
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            unclecode/crawl4ai:${{ steps.get_version.outputs.VERSION }}
+            unclecode/crawl4ai:${{ steps.versions.outputs.MINOR }}
+            unclecode/crawl4ai:${{ steps.versions.outputs.MAJOR }}
+            unclecode/crawl4ai:latest
+          platforms: linux/amd64,linux/arm64
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.get_version.outputs.VERSION }}
+          name: Release v${{ steps.get_version.outputs.VERSION }}
+          body: |
+            ## 🎉 Crawl4AI v${{ steps.get_version.outputs.VERSION }} Released!
+            
+            ### 📦 Installation
+            
+            **PyPI:**
+            ```bash
+            pip install crawl4ai==${{ steps.get_version.outputs.VERSION }}
+            ```
+            
+            **Docker:**
+            ```bash
+            docker pull unclecode/crawl4ai:${{ steps.get_version.outputs.VERSION }}
+            docker pull unclecode/crawl4ai:latest
+            ```
+            
+            ### 📝 What's Changed
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Summary
+        run: |
+          echo "## 🚀 Release Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 PyPI Package" >> $GITHUB_STEP_SUMMARY
+          echo "- Version: ${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- URL: https://pypi.org/project/crawl4ai/" >> $GITHUB_STEP_SUMMARY
+          echo "- Install: \`pip install crawl4ai==${{ steps.get_version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🐳 Docker Images" >> $GITHUB_STEP_SUMMARY
+          echo "- \`unclecode/crawl4ai:${{ steps.get_version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`unclecode/crawl4ai:${{ steps.versions.outputs.MINOR }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`unclecode/crawl4ai:${{ steps.versions.outputs.MAJOR }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`unclecode/crawl4ai:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 GitHub Release" >> $GITHUB_STEP_SUMMARY
+          echo "https://github.com/${{ github.repository }}/releases/tag/v${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY

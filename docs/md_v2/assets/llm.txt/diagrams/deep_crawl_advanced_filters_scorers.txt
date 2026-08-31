@@ -1,0 +1,401 @@
+## Deep Crawling Filters & Scorers Architecture
+
+Visual representations of advanced URL filtering, scoring strategies, and performance optimization workflows for intelligent deep crawling.
+
+### Filter Chain Processing Pipeline
+
+```mermaid
+flowchart TD
+    A[URL Input] --> B{Domain Filter}
+    B -->|✓ Pass| C{Pattern Filter}
+    B -->|✗ Fail| X1[Reject: Invalid Domain]
+    
+    C -->|✓ Pass| D{Content Type Filter}
+    C -->|✗ Fail| X2[Reject: Pattern Mismatch]
+    
+    D -->|✓ Pass| E{SEO Filter}
+    D -->|✗ Fail| X3[Reject: Wrong Content Type]
+    
+    E -->|✓ Pass| F{Content Relevance Filter}
+    E -->|✗ Fail| X4[Reject: Low SEO Score]
+    
+    F -->|✓ Pass| G[URL Accepted]
+    F -->|✗ Fail| X5[Reject: Low Relevance]
+    
+    G --> H[Add to Crawl Queue]
+    
+    subgraph "Fast Filters"
+        B
+        C
+        D
+    end
+    
+    subgraph "Slow Filters"
+        E
+        F
+    end
+    
+    style A fill:#e3f2fd
+    style G fill:#c8e6c9
+    style H fill:#e8f5e8
+    style X1 fill:#ffcdd2
+    style X2 fill:#ffcdd2
+    style X3 fill:#ffcdd2
+    style X4 fill:#ffcdd2
+    style X5 fill:#ffcdd2
+```
+
+### URL Scoring System Architecture
+
+```mermaid
+graph TB
+    subgraph "Input URL"
+        A[https://python.org/tutorial/2024/ml-guide.html]
+    end
+    
+    subgraph "Individual Scorers"
+        B[Keyword Relevance Scorer]
+        C[Path Depth Scorer]
+        D[Content Type Scorer]
+        E[Freshness Scorer]
+        F[Domain Authority Scorer]
+    end
+    
+    subgraph "Scoring Process"
+        B --> B1[Keywords: python, tutorial, ml<br/>Score: 0.85]
+        C --> C1[Depth: 4 levels<br/>Optimal: 3<br/>Score: 0.75]
+        D --> D1[Content: HTML<br/>Score: 1.0]
+        E --> E1[Year: 2024<br/>Score: 1.0]
+        F --> F1[Domain: python.org<br/>Score: 1.0]
+    end
+    
+    subgraph "Composite Scoring"
+        G[Weighted Combination]
+        B1 --> G
+        C1 --> G
+        D1 --> G
+        E1 --> G
+        F1 --> G
+    end
+    
+    subgraph "Final Result"
+        H[Composite Score: 0.92]
+        I{Score > Threshold?}
+        J[Accept URL]
+        K[Reject URL]
+    end
+    
+    A --> B
+    A --> C
+    A --> D
+    A --> E
+    A --> F
+    
+    G --> H
+    H --> I
+    I -->|✓ 0.92 > 0.6| J
+    I -->|✗ Score too low| K
+    
+    style A fill:#e3f2fd
+    style G fill:#fff3e0
+    style H fill:#e8f5e8
+    style J fill:#c8e6c9
+    style K fill:#ffcdd2
+```
+
+### Filter vs Scorer Decision Matrix
+
+```mermaid
+flowchart TD
+    A[URL Processing Decision] --> B{Binary Decision Needed?}
+    
+    B -->|Yes - Include/Exclude| C[Use Filters]
+    B -->|No - Quality Rating| D[Use Scorers]
+    
+    C --> C1{Filter Type Needed?}
+    C1 -->|Domain Control| C2[DomainFilter]
+    C1 -->|Pattern Matching| C3[URLPatternFilter]
+    C1 -->|Content Type| C4[ContentTypeFilter]
+    C1 -->|SEO Quality| C5[SEOFilter]
+    C1 -->|Content Relevance| C6[ContentRelevanceFilter]
+    
+    D --> D1{Scoring Criteria?}
+    D1 -->|Keyword Relevance| D2[KeywordRelevanceScorer]
+    D1 -->|URL Structure| D3[PathDepthScorer]
+    D1 -->|Content Quality| D4[ContentTypeScorer]
+    D1 -->|Time Sensitivity| D5[FreshnessScorer]
+    D1 -->|Source Authority| D6[DomainAuthorityScorer]
+    
+    C2 --> E[Chain Filters]
+    C3 --> E
+    C4 --> E
+    C5 --> E
+    C6 --> E
+    
+    D2 --> F[Composite Scorer]
+    D3 --> F
+    D4 --> F
+    D5 --> F
+    D6 --> F
+    
+    E --> G[Binary Output: Pass/Fail]
+    F --> H[Numeric Score: 0.0-1.0]
+    
+    G --> I[Apply to URL Queue]
+    H --> J[Priority Ranking]
+    
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
+    style E fill:#f3e5f5
+    style F fill:#e3f2fd
+    style G fill:#c8e6c9
+    style H fill:#ffecb3
+```
+
+### Performance Optimization Strategy
+
+```mermaid
+sequenceDiagram
+    participant Queue as URL Queue
+    participant Fast as Fast Filters
+    participant Slow as Slow Filters
+    participant Score as Scorers
+    participant Output as Filtered URLs
+    
+    Note over Queue, Output: Batch Processing (1000 URLs)
+    
+    Queue->>Fast: Apply Domain Filter
+    Fast-->>Queue: 60% passed (600 URLs)
+    
+    Queue->>Fast: Apply Pattern Filter
+    Fast-->>Queue: 70% passed (420 URLs)
+    
+    Queue->>Fast: Apply Content Type Filter
+    Fast-->>Queue: 90% passed (378 URLs)
+    
+    Note over Fast: Fast filters eliminate 62% of URLs
+    
+    Queue->>Slow: Apply SEO Filter (378 URLs)
+    Slow-->>Queue: 80% passed (302 URLs)
+    
+    Queue->>Slow: Apply Relevance Filter
+    Slow-->>Queue: 75% passed (227 URLs)
+    
+    Note over Slow: Content analysis on remaining URLs
+    
+    Queue->>Score: Calculate Composite Scores
+    Score-->>Queue: Scored and ranked
+    
+    Queue->>Output: Top 100 URLs by score
+    Output-->>Queue: Processing complete
+    
+    Note over Queue, Output: Total: 90% filtered out, 10% high-quality URLs retained
+```
+
+### Custom Filter Implementation Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> Planning
+    
+    Planning --> IdentifyNeeds: Define filtering criteria
+    IdentifyNeeds --> ChooseType: Binary vs Scoring decision
+    
+    ChooseType --> FilterImpl: Binary decision needed
+    ChooseType --> ScorerImpl: Quality rating needed
+    
+    FilterImpl --> InheritURLFilter: Extend URLFilter base class
+    ScorerImpl --> InheritURLScorer: Extend URLScorer base class
+    
+    InheritURLFilter --> ImplementApply: def apply(url) -> bool
+    InheritURLScorer --> ImplementScore: def _calculate_score(url) -> float
+    
+    ImplementApply --> AddLogic: Add custom filtering logic
+    ImplementScore --> AddLogic
+    
+    AddLogic --> TestFilter: Unit testing
+    TestFilter --> OptimizePerf: Performance optimization
+    
+    OptimizePerf --> Integration: Integrate with FilterChain
+    Integration --> Production: Deploy to production
+    
+    Production --> Monitor: Monitor performance
+    Monitor --> Tune: Tune parameters
+    Tune --> Production
+    
+    note right of Planning : Consider performance impact
+    note right of AddLogic : Handle edge cases
+    note right of OptimizePerf : Cache frequently accessed data
+```
+
+### Filter Chain Optimization Patterns
+
+```mermaid
+graph TB
+    subgraph "Naive Approach - Poor Performance"
+        A1[All URLs] --> B1[Slow Filter 1]
+        B1 --> C1[Slow Filter 2]
+        C1 --> D1[Fast Filter 1]
+        D1 --> E1[Fast Filter 2]
+        E1 --> F1[Final Results]
+        
+        B1 -.->|High CPU| G1[Performance Issues]
+        C1 -.->|Network Calls| G1
+    end
+    
+    subgraph "Optimized Approach - High Performance"
+        A2[All URLs] --> B2[Fast Filter 1]
+        B2 --> C2[Fast Filter 2]
+        C2 --> D2[Batch Process]
+        D2 --> E2[Slow Filter 1]
+        E2 --> F2[Slow Filter 2]
+        F2 --> G2[Final Results]
+        
+        D2 --> H2[Concurrent Processing]
+        H2 --> I2[Semaphore Control]
+    end
+    
+    subgraph "Performance Metrics"
+        J[Processing Time]
+        K[Memory Usage]
+        L[CPU Utilization]
+        M[Network Requests]
+    end
+    
+    G1 -.-> J
+    G1 -.-> K
+    G1 -.-> L
+    G1 -.-> M
+    
+    G2 -.-> J
+    G2 -.-> K
+    G2 -.-> L
+    G2 -.-> M
+    
+    style A1 fill:#ffcdd2
+    style G1 fill:#ffcdd2
+    style A2 fill:#c8e6c9
+    style G2 fill:#c8e6c9
+    style H2 fill:#e8f5e8
+    style I2 fill:#e8f5e8
+```
+
+### Composite Scoring Weight Distribution
+
+```mermaid
+pie title Composite Scorer Weight Distribution
+    "Keyword Relevance (30%)" : 30
+    "Domain Authority (25%)" : 25
+    "Content Type (20%)" : 20
+    "Freshness (15%)" : 15
+    "Path Depth (10%)" : 10
+```
+
+### Deep Crawl Integration Architecture
+
+```mermaid
+graph TD
+    subgraph "Deep Crawl Strategy"
+        A[Start URL] --> B[Extract Links]
+        B --> C[Apply Filter Chain]
+        C --> D[Calculate Scores]
+        D --> E[Priority Queue]
+        E --> F[Crawl Next URL]
+        F --> B
+    end
+    
+    subgraph "Filter Chain Components"
+        C --> C1[Domain Filter]
+        C --> C2[Pattern Filter]
+        C --> C3[Content Filter]
+        C --> C4[SEO Filter]
+        C --> C5[Relevance Filter]
+    end
+    
+    subgraph "Scoring Components"
+        D --> D1[Keyword Scorer]
+        D --> D2[Depth Scorer]
+        D --> D3[Freshness Scorer]
+        D --> D4[Authority Scorer]
+        D --> D5[Composite Score]
+    end
+    
+    subgraph "Queue Management"
+        E --> E1{Score > Threshold?}
+        E1 -->|Yes| E2[High Priority Queue]
+        E1 -->|No| E3[Low Priority Queue]
+        E2 --> F
+        E3 --> G[Delayed Processing]
+    end
+    
+    subgraph "Control Flow"
+        H{Max Depth Reached?}
+        I{Max Pages Reached?}
+        J[Stop Crawling]
+    end
+    
+    F --> H
+    H -->|No| I
+    H -->|Yes| J
+    I -->|No| B
+    I -->|Yes| J
+    
+    style A fill:#e3f2fd
+    style E2 fill:#c8e6c9
+    style E3 fill:#fff3e0
+    style J fill:#ffcdd2
+```
+
+### Filter Performance Comparison
+
+```mermaid
+xychart-beta
+    title "Filter Performance Comparison (1000 URLs)"
+    x-axis [Domain, Pattern, ContentType, SEO, Relevance]
+    y-axis "Processing Time (ms)" 0 --> 1000
+    bar [50, 80, 45, 300, 800]
+```
+
+### Scoring Algorithm Workflow
+
+```mermaid
+flowchart TD
+    A[Input URL] --> B[Parse URL Components]
+    B --> C[Extract Features]
+    
+    C --> D[Domain Analysis]
+    C --> E[Path Analysis] 
+    C --> F[Content Type Detection]
+    C --> G[Keyword Extraction]
+    C --> H[Freshness Detection]
+    
+    D --> I[Domain Authority Score]
+    E --> J[Path Depth Score]
+    F --> K[Content Type Score]
+    G --> L[Keyword Relevance Score]
+    H --> M[Freshness Score]
+    
+    I --> N[Apply Weights]
+    J --> N
+    K --> N
+    L --> N
+    M --> N
+    
+    N --> O[Normalize Scores]
+    O --> P[Calculate Final Score]
+    P --> Q{Score >= Threshold?}
+    
+    Q -->|Yes| R[Accept for Crawling]
+    Q -->|No| S[Reject URL]
+    
+    R --> T[Add to Priority Queue]
+    S --> U[Log Rejection Reason]
+    
+    style A fill:#e3f2fd
+    style P fill:#fff3e0
+    style R fill:#c8e6c9
+    style S fill:#ffcdd2
+    style T fill:#e8f5e8
+```
+
+**📖 Learn more:** [Deep Crawling Strategy](https://docs.crawl4ai.com/core/deep-crawling/), [Performance Optimization](https://docs.crawl4ai.com/advanced/performance-tuning/), [Custom Implementations](https://docs.crawl4ai.com/advanced/custom-filters/)

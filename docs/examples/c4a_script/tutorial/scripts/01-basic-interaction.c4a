@@ -1,0 +1,18 @@
+# Basic Page Interaction
+# This script demonstrates basic C4A commands
+
+# Navigate to the playground
+GO http://127.0.0.1:8080/playground/
+
+# Wait for page to load
+WAIT `body` 2
+
+# Handle cookie banner if present
+IF (EXISTS `.cookie-banner`) THEN CLICK `.accept`
+
+# Close newsletter popup if it appears
+WAIT 3
+IF (EXISTS `.newsletter-popup`) THEN CLICK `.close`
+
+# Click the start tutorial button
+CLICK `#start-tutorial`

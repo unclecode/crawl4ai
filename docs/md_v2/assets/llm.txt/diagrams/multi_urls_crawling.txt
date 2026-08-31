@@ -1,0 +1,392 @@
+## Multi-URL Crawling Workflows and Architecture
+
+Visual representations of concurrent crawling patterns, resource management, and monitoring systems for handling multiple URLs efficiently.
+
+### Multi-URL Processing Modes
+
+```mermaid
+flowchart TD
+    A[Multi-URL Crawling Request] --> B{Processing Mode?}
+    
+    B -->|Batch Mode| C[Collect All URLs]
+    B -->|Streaming Mode| D[Process URLs Individually]
+    
+    C --> C1[Queue All URLs]
+    C1 --> C2[Execute Concurrently]
+    C2 --> C3[Wait for All Completion]
+    C3 --> C4[Return Complete Results Array]
+    
+    D --> D1[Queue URLs]
+    D1 --> D2[Start First Batch]
+    D2 --> D3[Yield Results as Available]
+    D3 --> D4{More URLs?}
+    D4 -->|Yes| D5[Start Next URLs]
+    D4 -->|No| D6[Stream Complete]
+    D5 --> D3
+    
+    C4 --> E[Process Results]
+    D6 --> E
+    
+    E --> F[Success/Failure Analysis]
+    F --> G[End]
+    
+    style C fill:#e3f2fd
+    style D fill:#f3e5f5
+    style C4 fill:#c8e6c9
+    style D6 fill:#c8e6c9
+```
+
+### Memory-Adaptive Dispatcher Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> Initializing
+    
+    Initializing --> MonitoringMemory: Start dispatcher
+    
+    MonitoringMemory --> CheckingMemory: Every check_interval
+    CheckingMemory --> MemoryOK: Memory < threshold
+    CheckingMemory --> MemoryHigh: Memory >= threshold
+    
+    MemoryOK --> DispatchingTasks: Start new crawls
+    MemoryHigh --> WaitingForMemory: Pause dispatching
+    
+    DispatchingTasks --> TaskRunning: Launch crawler
+    TaskRunning --> TaskCompleted: Crawl finished
+    TaskRunning --> TaskFailed: Crawl error
+    
+    TaskCompleted --> MonitoringMemory: Update stats
+    TaskFailed --> MonitoringMemory: Update stats
+    
+    WaitingForMemory --> CheckingMemory: Wait timeout
+    WaitingForMemory --> MonitoringMemory: Memory freed
+    
+    note right of MemoryHigh: Prevents OOM crashes
+    note right of DispatchingTasks: Respects max_session_permit
+    note right of WaitingForMemory: Configurable timeout
+```
+
+### Concurrent Crawling Architecture
+
+```mermaid
+graph TB
+    subgraph "URL Queue Management"
+        A[URL Input List] --> B[URL Queue]
+        B --> C[Priority Scheduler]
+        C --> D[Batch Assignment]
+    end
+    
+    subgraph "Dispatcher Layer"
+        E[Memory Adaptive Dispatcher]
+        F[Semaphore Dispatcher]
+        G[Rate Limiter]
+        H[Resource Monitor]
+        
+        E --> I[Memory Checker]
+        F --> J[Concurrency Controller]
+        G --> K[Delay Calculator]
+        H --> L[System Stats]
+    end
+    
+    subgraph "Crawler Pool"
+        M[Crawler Instance 1]
+        N[Crawler Instance 2]
+        O[Crawler Instance 3]
+        P[Crawler Instance N]
+        
+        M --> Q[Browser Session 1]
+        N --> R[Browser Session 2]
+        O --> S[Browser Session 3]
+        P --> T[Browser Session N]
+    end
+    
+    subgraph "Result Processing"
+        U[Result Collector]
+        V[Success Handler]
+        W[Error Handler]
+        X[Retry Queue]
+        Y[Final Results]
+    end
+    
+    D --> E
+    D --> F
+    E --> M
+    F --> N
+    G --> O
+    H --> P
+    
+    Q --> U
+    R --> U
+    S --> U
+    T --> U
+    
+    U --> V
+    U --> W
+    W --> X
+    X --> B
+    V --> Y
+    
+    style E fill:#e3f2fd
+    style F fill:#f3e5f5
+    style G fill:#e8f5e8
+    style H fill:#fff3e0
+```
+
+### Rate Limiting and Backoff Strategy
+
+```mermaid
+sequenceDiagram
+    participant C as Crawler
+    participant RL as Rate Limiter
+    participant S as Server
+    participant D as Dispatcher
+    
+    C->>RL: Request to crawl URL
+    RL->>RL: Calculate delay
+    RL->>RL: Apply base delay (1-3s)
+    RL->>C: Delay applied
+    
+    C->>S: HTTP Request
+    
+    alt Success Response
+        S-->>C: 200 OK + Content
+        C->>RL: Report success
+        RL->>RL: Reset failure count
+        C->>D: Return successful result
+    else Rate Limited
+        S-->>C: 429 Too Many Requests
+        C->>RL: Report rate limit
+        RL->>RL: Exponential backoff
+        RL->>RL: Increase delay (up to max_delay)
+        RL->>C: Apply longer delay
+        C->>S: Retry request after delay
+    else Server Error
+        S-->>C: 503 Service Unavailable
+        C->>RL: Report server error
+        RL->>RL: Moderate backoff
+        RL->>C: Retry with backoff
+    else Max Retries Exceeded
+        RL->>C: Stop retrying
+        C->>D: Return failed result
+    end
+```
+
+### Large-Scale Crawling Workflow
+
+```mermaid
+flowchart TD
+    A[Load URL List 10k+ URLs] --> B[Initialize Dispatcher]
+    
+    B --> C{Select Dispatcher Type}
+    C -->|Memory Constrained| D[Memory Adaptive]
+    C -->|Fixed Resources| E[Semaphore Based]
+    
+    D --> F[Set Memory Threshold 70%]
+    E --> G[Set Concurrency Limit]
+    
+    F --> H[Configure Monitoring]
+    G --> H
+    
+    H --> I[Start Crawling Process]
+    I --> J[Monitor System Resources]
+    
+    J --> K{Memory Usage?}
+    K -->|< Threshold| L[Continue Dispatching]
+    K -->|>= Threshold| M[Pause New Tasks]
+    
+    L --> N[Process Results Stream]
+    M --> O[Wait for Memory]
+    O --> K
+    
+    N --> P{Result Type?}
+    P -->|Success| Q[Save to Database]
+    P -->|Failure| R[Log Error]
+    
+    Q --> S[Update Progress Counter]
+    R --> S
+    
+    S --> T{More URLs?}
+    T -->|Yes| U[Get Next Batch]
+    T -->|No| V[Generate Final Report]
+    
+    U --> L
+    V --> W[Analysis Complete]
+    
+    style A fill:#e1f5fe
+    style D fill:#e8f5e8
+    style E fill:#f3e5f5
+    style V fill:#c8e6c9
+    style W fill:#a5d6a7
+```
+
+### Real-Time Monitoring Dashboard Flow
+
+```mermaid
+graph LR
+    subgraph "Data Collection"
+        A[Crawler Tasks] --> B[Performance Metrics]
+        A --> C[Memory Usage]
+        A --> D[Success/Failure Rates]
+        A --> E[Response Times]
+    end
+    
+    subgraph "Monitor Processing"
+        F[CrawlerMonitor] --> G[Aggregate Statistics]
+        F --> H[Display Formatter]
+        F --> I[Update Scheduler]
+    end
+    
+    subgraph "Display Modes"
+        J[DETAILED Mode]
+        K[AGGREGATED Mode]
+        
+        J --> L[Individual Task Status]
+        J --> M[Task-Level Metrics]
+        K --> N[Summary Statistics]
+        K --> O[Overall Progress]
+    end
+    
+    subgraph "Output Interface"
+        P[Console Display]
+        Q[Progress Bars]
+        R[Status Tables]
+        S[Real-time Updates]
+    end
+    
+    B --> F
+    C --> F
+    D --> F
+    E --> F
+    
+    G --> J
+    G --> K
+    H --> J
+    H --> K
+    I --> J
+    I --> K
+    
+    L --> P
+    M --> Q
+    N --> R
+    O --> S
+    
+    style F fill:#e3f2fd
+    style J fill:#f3e5f5
+    style K fill:#e8f5e8
+```
+
+### Error Handling and Recovery Pattern
+
+```mermaid
+stateDiagram-v2
+    [*] --> ProcessingURL
+    
+    ProcessingURL --> CrawlAttempt: Start crawl
+    
+    CrawlAttempt --> Success: HTTP 200
+    CrawlAttempt --> NetworkError: Connection failed
+    CrawlAttempt --> RateLimit: HTTP 429
+    CrawlAttempt --> ServerError: HTTP 5xx
+    CrawlAttempt --> Timeout: Request timeout
+    
+    Success --> [*]: Return result
+    
+    NetworkError --> RetryCheck: Check retry count
+    RateLimit --> BackoffWait: Apply exponential backoff
+    ServerError --> RetryCheck: Check retry count
+    Timeout --> RetryCheck: Check retry count
+    
+    BackoffWait --> RetryCheck: After delay
+    
+    RetryCheck --> CrawlAttempt: retries < max_retries
+    RetryCheck --> Failed: retries >= max_retries
+    
+    Failed --> ErrorLog: Log failure details
+    ErrorLog --> [*]: Return failed result
+    
+    note right of BackoffWait: Exponential backoff for rate limits
+    note right of RetryCheck: Configurable max_retries
+    note right of ErrorLog: Detailed error tracking
+```
+
+### Resource Management Timeline
+
+```mermaid
+gantt
+    title Multi-URL Crawling Resource Management
+    dateFormat X
+    axisFormat %s
+    
+    section Memory Usage
+    Initialize Dispatcher    :0, 1
+    Memory Monitoring       :1, 10
+    Peak Usage Period       :3, 7
+    Memory Cleanup          :7, 9
+    
+    section Task Execution
+    URL Queue Setup         :0, 2
+    Batch 1 Processing      :2, 5
+    Batch 2 Processing      :4, 7
+    Batch 3 Processing      :6, 9
+    Final Results           :9, 10
+    
+    section Rate Limiting
+    Normal Delays           :2, 4
+    Backoff Period          :4, 6
+    Recovery Period         :6, 8
+    
+    section Monitoring
+    System Health Check     :0, 10
+    Progress Updates        :1, 9
+    Performance Metrics     :2, 8
+```
+
+### Concurrent Processing Performance Matrix
+
+```mermaid
+graph TD
+    subgraph "Input Factors"
+        A[Number of URLs]
+        B[Concurrency Level]
+        C[Memory Threshold]
+        D[Rate Limiting]
+    end
+    
+    subgraph "Processing Characteristics"
+        A --> E[Low 1-100 URLs]
+        A --> F[Medium 100-1k URLs]
+        A --> G[High 1k-10k URLs]
+        A --> H[Very High 10k+ URLs]
+        
+        B --> I[Conservative 1-5]
+        B --> J[Moderate 5-15]
+        B --> K[Aggressive 15-30]
+        
+        C --> L[Strict 60-70%]
+        C --> M[Balanced 70-80%]
+        C --> N[Relaxed 80-90%]
+    end
+    
+    subgraph "Recommended Configurations"
+        E --> O[Simple Semaphore]
+        F --> P[Memory Adaptive Basic]
+        G --> Q[Memory Adaptive Advanced]
+        H --> R[Memory Adaptive + Monitoring]
+        
+        I --> O
+        J --> P
+        K --> Q
+        K --> R
+        
+        L --> Q
+        M --> P
+        N --> O
+    end
+    
+    style O fill:#c8e6c9
+    style P fill:#fff3e0
+    style Q fill:#ffecb3
+    style R fill:#ffcdd2
+```
+
+**📖 Learn more:** [Multi-URL Crawling Guide](https://docs.crawl4ai.com/advanced/multi-url-crawling/), [Dispatcher Configuration](https://docs.crawl4ai.com/advanced/crawl-dispatcher/), [Performance Optimization](https://docs.crawl4ai.com/advanced/multi-url-crawling/#performance-optimization)

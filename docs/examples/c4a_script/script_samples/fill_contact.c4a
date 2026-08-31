@@ -1,0 +1,8 @@
+GO https://company.com/contact
+WAIT `form#contact` 10
+TYPE "John Smith"
+PRESS Tab
+TYPE "john@email.com"
+PRESS Tab
+TYPE "Need help with my order"
+CLICK `button[type="submit"]`

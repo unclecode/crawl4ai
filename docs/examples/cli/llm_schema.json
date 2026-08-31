@@ -1,0 +1,26 @@
+{
+  "title": "NewsArticle",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "The title/headline of the news article"
+    },
+    "link": {
+      "type": "string",
+      "description": "The URL or link to the full article"
+    },
+    "details": {
+      "type": "string", 
+      "description": "Brief summary or details about the article content"
+    },
+    "topics": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of topics or categories associated with the article"
+    }
+  },
+  "required": ["title", "details"]
+}

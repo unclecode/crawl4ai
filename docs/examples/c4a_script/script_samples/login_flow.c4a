@@ -1,0 +1,36 @@
+# Login flow with error handling
+# Demonstrates procedures, variables, and conditional checks
+
+# Define login procedure
+PROC perform_login
+  CLICK `input#email`
+  TYPE $email
+  CLICK `input#password`
+  TYPE $password
+  CLICK `button.login-submit`
+ENDPROC
+
+# Set credentials
+SET email = "user@example.com"
+SET password = "securePassword123"
+
+# Navigate to login page
+GO https://app.example.com/login
+WAIT `.login-container` 15
+
+# Attempt login
+perform_login
+
+# Wait for page to load
+WAIT 3
+
+# Check if login was successful
+EVAL `
+  if (document.querySelector('.dashboard')) {
+    console.log('Login successful - on dashboard');
+  } else if (document.querySelector('.error-message')) {
+    console.log('Login failed:', document.querySelector('.error-message').textContent);
+  } else {
+    console.log('Unknown state after login');
+  }
+`

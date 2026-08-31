@@ -1,0 +1,37 @@
+/* docs/assets/feedback-overrides.css */
+:root {
+  /* brand */
+  --feedback-primary-color: #09b5a5;
+  --feedback-highlight-color: #fed500;          /* stars etc */
+
+  /* modal shell / text */
+  --feedback-modal-content-bg-color: var(--background-color);
+  --feedback-modal-content-text-color: var(--font-color);
+  --feedback-modal-content-border-color: var(--primary-dimmed-color);
+  --feedback-modal-content-border-radius: 4px;
+
+  /* overlay */
+  --feedback-overlay-bg-color: rgba(0,0,0,.75);
+
+  /* rating buttons */
+  --feedback-modal-rating-button-color: var(--secondary-color);
+  --feedback-modal-rating-button-selected-color: var(--primary-color);
+
+  /* inputs */
+  --feedback-modal-input-bg-color: var(--code-bg-color);
+  --feedback-modal-input-text-color: var(--font-color);
+  --feedback-modal-input-border-color: var(--primary-dimmed-color);
+  --feedback-modal-input-border-color-focused: var(--primary-color);
+
+  /* submit / secondary buttons */
+  --feedback-modal-button-submit-bg-color: var(--primary-color);
+  --feedback-modal-button-submit-bg-color-hover: var(--primary-dimmed-color);
+  --feedback-modal-button-submit-text-color: var(--invert-font-color);
+
+  --feedback-modal-button-bg-color: transparent;       /* screenshot btn */
+  --feedback-modal-button-border-color: var(--primary-color);
+  --feedback-modal-button-icon-color: var(--primary-color);
+}
+
+/* optional: keep the “Powered by” link subtle */
+.feedback-logo a{color:var(--secondary-color);}

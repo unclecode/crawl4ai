@@ -1,0 +1,41 @@
+{
+  "name": "LinkedIn People Profile Card",
+  "baseSelector": "li.org-people-profile-card__profile-card-spacing",
+  "baseFields": [],
+  "fields": [
+    {
+      "name": "profile_url",
+      "selector": "div.artdeco-entity-lockup__title a[data-test-app-aware-link]",
+      "type": "attribute",
+      "attribute": "href"
+    },
+    {
+      "name": "avatar_url",
+      "selector": "div.artdeco-entity-lockup__image img",
+      "type": "attribute",
+      "attribute": "src"
+    },
+    {
+      "name": "name",
+      "selector": "div.artdeco-entity-lockup__title a div.lt-line-clamp--single-line",
+      "type": "text"
+    },
+    {
+      "name": "headline",
+      "selector": "div.artdeco-entity-lockup__subtitle div.lt-line-clamp--multi-line",
+      "type": "text"
+    },
+    {
+      "name": "followers",
+      "selector": "span.text-align-center span.lt-line-clamp--multi-line",
+      "type": "regex",
+      "pattern": "(\\d+)"
+    },
+    {
+      "name": "connection_degree",
+      "selector": "span.artdeco-entity-lockup__degree",
+      "type": "regex",
+      "pattern": "(\\d+\\w+)"
+    }
+  ]
+}

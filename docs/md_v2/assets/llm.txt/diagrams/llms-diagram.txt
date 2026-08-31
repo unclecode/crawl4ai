@@ -1,0 +1,5912 @@
+# Crawl4AI
+
+> Open-source LLM-friendly web crawler and scraper for AI applications
+
+Crawl4AI simplifies asynchronous web crawling and data extraction, making it accessible for large language models (LLMs) and AI applications. Built with Python and Playwright for high-performance crawling with structured data extraction.
+
+**Key Features:**
+- Asynchronous crawling with high concurrency
+- Multiple extraction strategies (CSS, XPath, LLM-based)
+- Built-in markdown generation with content filtering
+- Docker deployment with REST API
+- Session management and browser automation
+- Advanced anti-detection capabilities
+
+**Quick Links:**
+- [GitHub Repository](https://github.com/unclecode/crawl4ai)
+- [Documentation](https://docs.crawl4ai.com)
+- [Examples](https://github.com/unclecode/crawl4ai/tree/main/docs/examples)
+
+---
+
+
+## Installation Workflows and Architecture
+
+Visual representations of Crawl4AI installation processes, deployment options, and system interactions.
+
+### Installation Decision Flow
+
+```mermaid
+flowchart TD
+    A[Start Installation] --> B{Environment Type?}
+    
+    B -->|Local Development| C[Basic Python Install]
+    B -->|Production| D[Docker Deployment]
+    B -->|Research/Testing| E[Google Colab]
+    B -->|CI/CD Pipeline| F[Automated Setup]
+    
+    C --> C1[pip install crawl4ai]
+    C1 --> C2[crawl4ai-setup]
+    C2 --> C3{Need Advanced Features?}
+    
+    C3 -->|No| C4[Basic Installation Complete]
+    C3 -->|Text Clustering| C5[pip install crawl4ai with torch]
+    C3 -->|Transformers| C6[pip install crawl4ai with transformer]
+    C3 -->|All Features| C7[pip install crawl4ai with all]
+    
+    C5 --> C8[crawl4ai-download-models]
+    C6 --> C8
+    C7 --> C8
+    C8 --> C9[Advanced Installation Complete]
+    
+    D --> D1{Deployment Method?}
+    D1 -->|Pre-built Image| D2[docker pull unclecode/crawl4ai]
+    D1 -->|Docker Compose| D3[Clone repo + docker compose]
+    D1 -->|Custom Build| D4[docker buildx build]
+    
+    D2 --> D5[Configure .llm.env]
+    D3 --> D5
+    D4 --> D5
+    D5 --> D6[docker run with ports]
+    D6 --> D7[Docker Deployment Complete]
+    
+    E --> E1[Colab pip install]
+    E1 --> E2[playwright install chromium]
+    E2 --> E3[Test basic crawl]
+    E3 --> E4[Colab Setup Complete]
+    
+    F --> F1[Automated pip install]
+    F1 --> F2[Automated setup scripts]
+    F2 --> F3[CI/CD Integration Complete]
+    
+    C4 --> G[Verify with crawl4ai-doctor]
+    C9 --> G
+    D7 --> H[Health check via API]
+    E4 --> I[Run test crawl]
+    F3 --> G
+    
+    G --> J[Installation Verified]
+    H --> J
+    I --> J
+    
+    style A fill:#e1f5fe
+    style J fill:#c8e6c9
+    style C4 fill:#fff3e0
+    style C9 fill:#fff3e0
+    style D7 fill:#f3e5f5
+    style E4 fill:#fce4ec
+    style F3 fill:#e8f5e8
+```
+
+### Basic Installation Sequence
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant PyPI
+    participant System
+    participant Playwright
+    participant Crawler
+    
+    User->>PyPI: pip install crawl4ai
+    PyPI-->>User: Package downloaded
+    
+    User->>System: crawl4ai-setup
+    System->>Playwright: Install browser binaries
+    Playwright-->>System: Chromium, Firefox installed
+    System-->>User: Setup complete
+    
+    User->>System: crawl4ai-doctor
+    System->>System: Check Python version
+    System->>System: Verify Playwright installation
+    System->>System: Test browser launch
+    System-->>User: Diagnostics report
+    
+    User->>Crawler: Basic crawl test
+    Crawler->>Playwright: Launch browser
+    Playwright-->>Crawler: Browser ready
+    Crawler->>Crawler: Navigate to test URL
+    Crawler-->>User: Success confirmation
+```
+
+### Docker Deployment Architecture
+
+```mermaid
+graph TB
+    subgraph "Host System"
+        A[Docker Engine] --> B[Crawl4AI Container]
+        C[.llm.env File] --> B
+        D[Port 11235] --> B
+    end
+    
+    subgraph "Container Environment"
+        B --> E[FastAPI Server]
+        B --> F[Playwright Browsers]
+        B --> G[Python Runtime]
+        
+        E --> H[/crawl Endpoint]
+        E --> I[/playground Interface]
+        E --> J[/health Monitoring]
+        E --> K[/metrics Prometheus]
+        
+        F --> L[Chromium Browser]
+        F --> M[Firefox Browser]
+        F --> N[WebKit Browser]
+    end
+    
+    subgraph "External Services"
+        O[OpenAI API] --> B
+        P[Anthropic API] --> B
+        Q[Local LLM Ollama] --> B
+    end
+    
+    subgraph "Client Applications"
+        R[Python SDK] --> H
+        S[REST API Calls] --> H
+        T[Web Browser] --> I
+        U[Monitoring Tools] --> J
+        V[Prometheus] --> K
+    end
+    
+    style B fill:#e3f2fd
+    style E fill:#f3e5f5
+    style F fill:#e8f5e8
+    style G fill:#fff3e0
+```
+
+### Advanced Features Installation Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> BasicInstall
+    
+    BasicInstall --> FeatureChoice: crawl4ai installed
+    
+    FeatureChoice --> TorchInstall: Need text clustering
+    FeatureChoice --> TransformerInstall: Need HuggingFace models
+    FeatureChoice --> AllInstall: Need everything
+    FeatureChoice --> Complete: Basic features sufficient
+    
+    TorchInstall --> TorchSetup: pip install crawl4ai with torch
+    TransformerInstall --> TransformerSetup: pip install crawl4ai with transformer  
+    AllInstall --> AllSetup: pip install crawl4ai with all
+    
+    TorchSetup --> ModelDownload: crawl4ai-setup
+    TransformerSetup --> ModelDownload: crawl4ai-setup
+    AllSetup --> ModelDownload: crawl4ai-setup
+    
+    ModelDownload --> PreDownload: crawl4ai-download-models
+    PreDownload --> Complete: All models cached
+    
+    Complete --> Verification: crawl4ai-doctor
+    Verification --> [*]: Installation verified
+    
+    note right of TorchInstall : PyTorch for semantic operations
+    note right of TransformerInstall : HuggingFace for LLM features
+    note right of AllInstall : Complete feature set
+```
+
+### Platform-Specific Installation Matrix
+
+```mermaid
+graph LR
+    subgraph "Installation Methods"
+        A[Python Package] --> A1[pip install]
+        B[Docker Image] --> B1[docker pull]
+        C[Source Build] --> C1[git clone + build]
+        D[Cloud Platform] --> D1[Colab/Kaggle]
+    end
+    
+    subgraph "Operating Systems"
+        E[Linux x86_64]
+        F[Linux ARM64] 
+        G[macOS Intel]
+        H[macOS Apple Silicon]
+        I[Windows x86_64]
+    end
+    
+    subgraph "Feature Sets"
+        J[Basic crawling]
+        K[Text clustering torch]
+        L[LLM transformers]
+        M[All features]
+    end
+    
+    A1 --> E
+    A1 --> F
+    A1 --> G
+    A1 --> H
+    A1 --> I
+    
+    B1 --> E
+    B1 --> F
+    B1 --> G
+    B1 --> H
+    
+    C1 --> E
+    C1 --> F
+    C1 --> G
+    C1 --> H
+    C1 --> I
+    
+    D1 --> E
+    D1 --> I
+    
+    E --> J
+    E --> K
+    E --> L
+    E --> M
+    
+    F --> J
+    F --> K
+    F --> L
+    F --> M
+    
+    G --> J
+    G --> K
+    G --> L
+    G --> M
+    
+    H --> J
+    H --> K
+    H --> L
+    H --> M
+    
+    I --> J
+    I --> K
+    I --> L
+    I --> M
+    
+    style A1 fill:#e3f2fd
+    style B1 fill:#f3e5f5
+    style C1 fill:#e8f5e8
+    style D1 fill:#fff3e0
+```
+
+### Docker Multi-Stage Build Process
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant Git as GitHub Repo
+    participant Docker as Docker Engine
+    participant Registry as Docker Hub
+    participant User as End User
+    
+    Dev->>Git: Push code changes
+    
+    Docker->>Git: Clone repository
+    Docker->>Docker: Stage 1 - Base Python image
+    Docker->>Docker: Stage 2 - Install dependencies
+    Docker->>Docker: Stage 3 - Install Playwright
+    Docker->>Docker: Stage 4 - Copy application code
+    Docker->>Docker: Stage 5 - Setup FastAPI server
+    
+    Note over Docker: Multi-architecture build
+    Docker->>Docker: Build for linux/amd64
+    Docker->>Docker: Build for linux/arm64
+    
+    Docker->>Registry: Push multi-arch manifest
+    Registry-->>Docker: Build complete
+    
+    User->>Registry: docker pull unclecode/crawl4ai
+    Registry-->>User: Download appropriate architecture
+    
+    User->>Docker: docker run with configuration
+    Docker->>Docker: Start container
+    Docker->>Docker: Initialize FastAPI server
+    Docker->>Docker: Setup Playwright browsers
+    Docker-->>User: Service ready on port 11235
+```
+
+### Installation Verification Workflow
+
+```mermaid
+flowchart TD
+    A[Installation Complete] --> B[Run crawl4ai-doctor]
+    
+    B --> C{Python Version Check}
+    C -->|✓ 3.10+| D{Playwright Check}
+    C -->|✗ < 3.10| C1[Upgrade Python]
+    C1 --> D
+    
+    D -->|✓ Installed| E{Browser Binaries}
+    D -->|✗ Missing| D1[Run crawl4ai-setup]
+    D1 --> E
+    
+    E -->|✓ Available| F{Test Browser Launch}
+    E -->|✗ Missing| E1[playwright install]
+    E1 --> F
+    
+    F -->|✓ Success| G[Test Basic Crawl]
+    F -->|✗ Failed| F1[Check system dependencies]
+    F1 --> F
+    
+    G --> H{Crawl Test Result}
+    H -->|✓ Success| I[Installation Verified ✓]
+    H -->|✗ Failed| H1[Check network/permissions]
+    H1 --> G
+    
+    I --> J[Ready for Production Use]
+    
+    style I fill:#c8e6c9
+    style J fill:#e8f5e8
+    style C1 fill:#ffcdd2
+    style D1 fill:#fff3e0
+    style E1 fill:#fff3e0
+    style F1 fill:#ffcdd2
+    style H1 fill:#ffcdd2
+```
+
+### Resource Requirements by Installation Type
+
+```mermaid
+graph TD
+    subgraph "Basic Installation"
+        A1[Memory: 512MB]
+        A2[Disk: 2GB]
+        A3[CPU: 1 core]
+        A4[Network: Required for setup]
+    end
+    
+    subgraph "Advanced Features torch"
+        B1[Memory: 2GB+]
+        B2[Disk: 5GB+]
+        B3[CPU: 2+ cores]
+        B4[GPU: Optional CUDA]
+    end
+    
+    subgraph "All Features"
+        C1[Memory: 4GB+]
+        C2[Disk: 10GB+]
+        C3[CPU: 4+ cores]
+        C4[GPU: Recommended]
+    end
+    
+    subgraph "Docker Deployment"
+        D1[Memory: 1GB+]
+        D2[Disk: 3GB+]
+        D3[CPU: 2+ cores]
+        D4[Ports: 11235]
+        D5[Shared Memory: 1GB]
+    end
+    
+    style A1 fill:#e8f5e8
+    style B1 fill:#fff3e0
+    style C1 fill:#ffecb3
+    style D1 fill:#e3f2fd
+```
+
+**📖 Learn more:** [Installation Guide](https://docs.crawl4ai.com/core/installation/), [Docker Deployment](https://docs.crawl4ai.com/core/docker-deployment/), [System Requirements](https://docs.crawl4ai.com/core/installation/#prerequisites)
+---
+
+
+## Simple Crawling Workflows and Data Flow
+
+Visual representations of basic web crawling operations, configuration patterns, and result processing workflows.
+
+### Basic Crawling Sequence
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Crawler as AsyncWebCrawler
+    participant Browser as Browser Instance
+    participant Page as Web Page
+    participant Processor as Content Processor
+    
+    User->>Crawler: Create with BrowserConfig
+    Crawler->>Browser: Launch browser instance
+    Browser-->>Crawler: Browser ready
+    
+    User->>Crawler: arun(url, CrawlerRunConfig)
+    Crawler->>Browser: Create new page/context
+    Browser->>Page: Navigate to URL
+    Page-->>Browser: Page loaded
+    
+    Browser->>Processor: Extract raw HTML
+    Processor->>Processor: Clean HTML
+    Processor->>Processor: Generate markdown
+    Processor->>Processor: Extract media/links
+    Processor-->>Crawler: CrawlResult created
+    
+    Crawler-->>User: Return CrawlResult
+    
+    Note over User,Processor: All processing happens asynchronously
+```
+
+### Crawling Configuration Flow
+
+```mermaid
+flowchart TD
+    A[Start Crawling] --> B{Browser Config Set?}
+    
+    B -->|No| B1[Use Default BrowserConfig]
+    B -->|Yes| B2[Custom BrowserConfig]
+    
+    B1 --> C[Launch Browser]
+    B2 --> C
+    
+    C --> D{Crawler Run Config Set?}
+    
+    D -->|No| D1[Use Default CrawlerRunConfig]
+    D -->|Yes| D2[Custom CrawlerRunConfig]
+    
+    D1 --> E[Navigate to URL]
+    D2 --> E
+    
+    E --> F{Page Load Success?}
+    F -->|No| F1[Return Error Result]
+    F -->|Yes| G[Apply Content Filters]
+    
+    G --> G1{excluded_tags set?}
+    G1 -->|Yes| G2[Remove specified tags]
+    G1 -->|No| G3[Keep all tags]
+    G2 --> G4{css_selector set?}
+    G3 --> G4
+    
+    G4 -->|Yes| G5[Extract selected elements]
+    G4 -->|No| G6[Process full page]
+    G5 --> H[Generate Markdown]
+    G6 --> H
+    
+    H --> H1{markdown_generator set?}
+    H1 -->|Yes| H2[Use custom generator]
+    H1 -->|No| H3[Use default generator]
+    H2 --> I[Extract Media and Links]
+    H3 --> I
+    
+    I --> I1{process_iframes?}
+    I1 -->|Yes| I2[Include iframe content]
+    I1 -->|No| I3[Skip iframes]
+    I2 --> J[Create CrawlResult]
+    I3 --> J
+    
+    J --> K[Return Result]
+    
+    style A fill:#e1f5fe
+    style K fill:#c8e6c9
+    style F1 fill:#ffcdd2
+```
+
+### CrawlResult Data Structure
+
+```mermaid
+graph TB
+    subgraph "CrawlResult Object"
+        A[CrawlResult] --> B[Basic Info]
+        A --> C[Content Variants]
+        A --> D[Extracted Data]
+        A --> E[Media Assets]
+        A --> F[Optional Outputs]
+        
+        B --> B1[url: Final URL]
+        B --> B2[success: Boolean]
+        B --> B3[status_code: HTTP Status]
+        B --> B4[error_message: Error Details]
+        
+        C --> C1[html: Raw HTML]
+        C --> C2[cleaned_html: Sanitized HTML]
+        C --> C3[markdown: MarkdownGenerationResult]
+        
+        C3 --> C3A[raw_markdown: Basic conversion]
+        C3 --> C3B[markdown_with_citations: With references]
+        C3 --> C3C[fit_markdown: Filtered content]
+        C3 --> C3D[references_markdown: Citation list]
+        
+        D --> D1[links: Internal/External]
+        D --> D2[media: Images/Videos/Audio]
+        D --> D3[metadata: Page info]
+        D --> D4[extracted_content: JSON data]
+        D --> D5[tables: Structured table data]
+        
+        E --> E1[screenshot: Base64 image]
+        E --> E2[pdf: PDF bytes]
+        E --> E3[mhtml: Archive file]
+        E --> E4[downloaded_files: File paths]
+        
+        F --> F1[session_id: Browser session]
+        F --> F2[ssl_certificate: Security info]
+        F --> F3[response_headers: HTTP headers]
+        F --> F4[network_requests: Traffic log]
+        F --> F5[console_messages: Browser logs]
+    end
+    
+    style A fill:#e3f2fd
+    style C3 fill:#f3e5f5
+    style D5 fill:#e8f5e8
+```
+
+### Content Processing Pipeline
+
+```mermaid
+flowchart LR
+    subgraph "Input Sources"
+        A1[Web URL]
+        A2[Raw HTML]
+        A3[Local File]
+    end
+    
+    A1 --> B[Browser Navigation]
+    A2 --> C[Direct Processing]
+    A3 --> C
+    
+    B --> D[Raw HTML Capture]
+    C --> D
+    
+    D --> E{Content Filtering}
+    
+    E --> E1[Remove Scripts/Styles]
+    E --> E2[Apply excluded_tags]
+    E --> E3[Apply css_selector]
+    E --> E4[Remove overlay elements]
+    
+    E1 --> F[Cleaned HTML]
+    E2 --> F
+    E3 --> F
+    E4 --> F
+    
+    F --> G{Markdown Generation}
+    
+    G --> G1[HTML to Markdown]
+    G --> G2[Apply Content Filter]
+    G --> G3[Generate Citations]
+    
+    G1 --> H[MarkdownGenerationResult]
+    G2 --> H
+    G3 --> H
+    
+    F --> I{Media Extraction}
+    I --> I1[Find Images]
+    I --> I2[Find Videos/Audio]
+    I --> I3[Score Relevance]
+    I1 --> J[Media Dictionary]
+    I2 --> J
+    I3 --> J
+    
+    F --> K{Link Extraction}
+    K --> K1[Internal Links]
+    K --> K2[External Links]
+    K --> K3[Apply Link Filters]
+    K1 --> L[Links Dictionary]
+    K2 --> L
+    K3 --> L
+    
+    H --> M[Final CrawlResult]
+    J --> M
+    L --> M
+    
+    style D fill:#e3f2fd
+    style F fill:#f3e5f5
+    style H fill:#e8f5e8
+    style M fill:#c8e6c9
+```
+
+### Table Extraction Workflow
+
+```mermaid
+stateDiagram-v2
+    [*] --> DetectTables
+    
+    DetectTables --> ScoreTables: Find table elements
+    
+    ScoreTables --> EvaluateThreshold: Calculate quality scores
+    EvaluateThreshold --> PassThreshold: score >= table_score_threshold
+    EvaluateThreshold --> RejectTable: score < threshold
+    
+    PassThreshold --> ExtractHeaders: Parse table structure
+    ExtractHeaders --> ExtractRows: Get header cells
+    ExtractRows --> ExtractMetadata: Get data rows
+    ExtractMetadata --> CreateTableObject: Get caption/summary
+    
+    CreateTableObject --> AddToResult: {headers, rows, caption, summary}
+    AddToResult --> [*]: Table extraction complete
+    
+    RejectTable --> [*]: Table skipped
+    
+    note right of ScoreTables : Factors: header presence, data density, structure quality
+    note right of EvaluateThreshold : Threshold 1-10, higher = stricter
+```
+
+### Error Handling Decision Tree
+
+```mermaid
+flowchart TD
+    A[Start Crawl] --> B[Navigate to URL]
+    
+    B --> C{Navigation Success?}
+    C -->|Network Error| C1[Set error_message: Network failure]
+    C -->|Timeout| C2[Set error_message: Page timeout]
+    C -->|Invalid URL| C3[Set error_message: Invalid URL format]
+    C -->|Success| D[Process Page Content]
+    
+    C1 --> E[success = False]
+    C2 --> E
+    C3 --> E
+    
+    D --> F{Content Processing OK?}
+    F -->|Parser Error| F1[Set error_message: HTML parsing failed]
+    F -->|Memory Error| F2[Set error_message: Insufficient memory]
+    F -->|Success| G[Generate Outputs]
+    
+    F1 --> E
+    F2 --> E
+    
+    G --> H{Output Generation OK?}
+    H -->|Markdown Error| H1[Partial success with warnings]
+    H -->|Extraction Error| H2[Partial success with warnings]
+    H -->|Success| I[success = True]
+    
+    H1 --> I
+    H2 --> I
+    
+    E --> J[Return Failed CrawlResult]
+    I --> K[Return Successful CrawlResult]
+    
+    J --> L[User Error Handling]
+    K --> M[User Result Processing]
+    
+    L --> L1{Check error_message}
+    L1 -->|Network| L2[Retry with different config]
+    L1 -->|Timeout| L3[Increase page_timeout]
+    L1 -->|Parser| L4[Try different scraping_strategy]
+    
+    style E fill:#ffcdd2
+    style I fill:#c8e6c9
+    style J fill:#ffcdd2
+    style K fill:#c8e6c9
+```
+
+### Configuration Impact Matrix
+
+```mermaid
+graph TB
+    subgraph "Configuration Categories"
+        A[Content Processing]
+        B[Page Interaction] 
+        C[Output Generation]
+        D[Performance]
+    end
+    
+    subgraph "Configuration Options"
+        A --> A1[word_count_threshold]
+        A --> A2[excluded_tags]
+        A --> A3[css_selector]
+        A --> A4[exclude_external_links]
+        
+        B --> B1[process_iframes]
+        B --> B2[remove_overlay_elements]
+        B --> B3[scan_full_page]
+        B --> B4[wait_for]
+        
+        C --> C1[screenshot]
+        C --> C2[pdf] 
+        C --> C3[markdown_generator]
+        C --> C4[table_score_threshold]
+        
+        D --> D1[cache_mode]
+        D --> D2[verbose]
+        D --> D3[page_timeout]
+        D --> D4[semaphore_count]
+    end
+    
+    subgraph "Result Impact"
+        A1 --> R1[Filters short text blocks]
+        A2 --> R2[Removes specified HTML tags]
+        A3 --> R3[Focuses on selected content]
+        A4 --> R4[Cleans links dictionary]
+        
+        B1 --> R5[Includes iframe content]
+        B2 --> R6[Removes popups/modals]
+        B3 --> R7[Loads dynamic content]
+        B4 --> R8[Waits for specific elements]
+        
+        C1 --> R9[Adds screenshot field]
+        C2 --> R10[Adds pdf field]
+        C3 --> R11[Custom markdown processing]
+        C4 --> R12[Filters table quality]
+        
+        D1 --> R13[Controls caching behavior]
+        D2 --> R14[Detailed logging output]
+        D3 --> R15[Prevents timeout errors]
+        D4 --> R16[Limits concurrent operations]
+    end
+    
+    style A fill:#e3f2fd
+    style B fill:#f3e5f5
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
+```
+
+### Raw HTML and Local File Processing
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Crawler
+    participant Processor
+    participant FileSystem
+    
+    Note over User,FileSystem: Raw HTML Processing
+    User->>Crawler: arun("raw://html_content")
+    Crawler->>Processor: Parse raw HTML directly
+    Processor->>Processor: Apply same content filters
+    Processor-->>Crawler: Standard CrawlResult
+    Crawler-->>User: Result with markdown
+    
+    Note over User,FileSystem: Local File Processing  
+    User->>Crawler: arun("file:///path/to/file.html")
+    Crawler->>FileSystem: Read local file
+    FileSystem-->>Crawler: File content
+    Crawler->>Processor: Process file HTML
+    Processor->>Processor: Apply content processing
+    Processor-->>Crawler: Standard CrawlResult
+    Crawler-->>User: Result with markdown
+    
+    Note over User,FileSystem: Both return identical CrawlResult structure
+```
+
+### Comprehensive Processing Example Flow
+
+```mermaid
+flowchart TD
+    A[Input: example.com] --> B[Create Configurations]
+    
+    B --> B1[BrowserConfig verbose=True]
+    B --> B2[CrawlerRunConfig with filters]
+    
+    B1 --> C[Launch AsyncWebCrawler]
+    B2 --> C
+    
+    C --> D[Navigate and Process]
+    
+    D --> E{Check Success}
+    E -->|Failed| E1[Print Error Message]
+    E -->|Success| F[Extract Content Summary]
+    
+    F --> F1[Get Page Title]
+    F --> F2[Get Content Preview]
+    F --> F3[Process Media Items]
+    F --> F4[Process Links]
+    
+    F3 --> F3A[Count Images]
+    F3 --> F3B[Show First 3 Images]
+    
+    F4 --> F4A[Count Internal Links]
+    F4 --> F4B[Show First 3 Links]
+    
+    F1 --> G[Display Results]
+    F2 --> G
+    F3A --> G
+    F3B --> G
+    F4A --> G
+    F4B --> G
+    
+    E1 --> H[End with Error]
+    G --> I[End with Success]
+    
+    style E1 fill:#ffcdd2
+    style G fill:#c8e6c9
+    style H fill:#ffcdd2
+    style I fill:#c8e6c9
+```
+
+**📖 Learn more:** [Simple Crawling Guide](https://docs.crawl4ai.com/core/simple-crawling/), [Configuration Options](https://docs.crawl4ai.com/core/browser-crawler-config/), [Result Processing](https://docs.crawl4ai.com/core/crawler-result/), [Table Extraction](https://docs.crawl4ai.com/extraction/no-llm-strategies/)
+---
+
+
+## Configuration Objects and System Architecture
+
+Visual representations of Crawl4AI's configuration system, object relationships, and data flow patterns.
+
+### Configuration Object Relationships
+
+```mermaid
+classDiagram
+    class BrowserConfig {
+        +browser_type: str
+        +headless: bool
+        +viewport_width: int
+        +viewport_height: int
+        +proxy: str
+        +user_agent: str
+        +cookies: list
+        +headers: dict
+        +clone() BrowserConfig
+        +to_dict() dict
+    }
+    
+    class CrawlerRunConfig {
+        +cache_mode: CacheMode
+        +extraction_strategy: ExtractionStrategy
+        +markdown_generator: MarkdownGenerator
+        +js_code: list
+        +wait_for: str
+        +screenshot: bool
+        +session_id: str
+        +clone() CrawlerRunConfig
+        +dump() dict
+    }
+    
+    class LLMConfig {
+        +provider: str
+        +api_token: str
+        +base_url: str
+        +temperature: float
+        +max_tokens: int
+        +clone() LLMConfig
+        +to_dict() dict
+    }
+    
+    class CrawlResult {
+        +url: str
+        +success: bool
+        +html: str
+        +cleaned_html: str
+        +markdown: MarkdownGenerationResult
+        +extracted_content: str
+        +media: dict
+        +links: dict
+        +screenshot: str
+        +pdf: bytes
+    }
+    
+    class AsyncWebCrawler {
+        +config: BrowserConfig
+        +arun() CrawlResult
+    }
+    
+    AsyncWebCrawler --> BrowserConfig : uses
+    AsyncWebCrawler --> CrawlerRunConfig : accepts
+    CrawlerRunConfig --> LLMConfig : contains
+    AsyncWebCrawler --> CrawlResult : returns
+    
+    note for BrowserConfig "Controls browser\nenvironment and behavior"
+    note for CrawlerRunConfig "Controls individual\ncrawl operations"
+    note for LLMConfig "Configures LLM\nproviders and parameters"
+    note for CrawlResult "Contains all crawl\noutputs and metadata"
+```
+
+### Configuration Decision Flow
+
+```mermaid
+flowchart TD
+    A[Start Configuration] --> B{Use Case Type?}
+    
+    B -->|Simple Web Scraping| C[Basic Config Pattern]
+    B -->|Data Extraction| D[Extraction Config Pattern]
+    B -->|Stealth Crawling| E[Stealth Config Pattern]
+    B -->|High Performance| F[Performance Config Pattern]
+    
+    C --> C1[BrowserConfig: headless=True]
+    C --> C2[CrawlerRunConfig: basic options]
+    C1 --> C3[No LLMConfig needed]
+    C2 --> C3
+    C3 --> G[Simple Crawling Ready]
+    
+    D --> D1[BrowserConfig: standard setup]
+    D --> D2[CrawlerRunConfig: with extraction_strategy]
+    D --> D3[LLMConfig: for LLM extraction]
+    D1 --> D4[Advanced Extraction Ready]
+    D2 --> D4
+    D3 --> D4
+    
+    E --> E1[BrowserConfig: proxy + user_agent]
+    E --> E2[CrawlerRunConfig: simulate_user=True]
+    E1 --> E3[Stealth Crawling Ready]
+    E2 --> E3
+    
+    F --> F1[BrowserConfig: lightweight]
+    F --> F2[CrawlerRunConfig: caching + concurrent]
+    F1 --> F3[High Performance Ready]
+    F2 --> F3
+    
+    G --> H[Execute Crawl]
+    D4 --> H
+    E3 --> H
+    F3 --> H
+    
+    H --> I[Get CrawlResult]
+    
+    style A fill:#e1f5fe
+    style I fill:#c8e6c9
+    style G fill:#fff3e0
+    style D4 fill:#f3e5f5
+    style E3 fill:#ffebee
+    style F3 fill:#e8f5e8
+```
+
+### Configuration Lifecycle Sequence
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant BrowserConfig as Browser Config
+    participant CrawlerConfig as Crawler Config
+    participant LLMConfig as LLM Config
+    participant Crawler as AsyncWebCrawler
+    participant Browser as Browser Instance
+    participant Result as CrawlResult
+    
+    User->>BrowserConfig: Create with browser settings
+    User->>CrawlerConfig: Create with crawl options
+    User->>LLMConfig: Create with LLM provider
+    
+    User->>Crawler: Initialize with BrowserConfig
+    Crawler->>Browser: Launch browser with config
+    Browser-->>Crawler: Browser ready
+    
+    User->>Crawler: arun(url, CrawlerConfig)
+    Crawler->>Crawler: Apply CrawlerConfig settings
+    
+    alt LLM Extraction Needed
+        Crawler->>LLMConfig: Get LLM settings
+        LLMConfig-->>Crawler: Provider configuration
+    end
+    
+    Crawler->>Browser: Navigate with settings
+    Browser->>Browser: Apply page interactions
+    Browser->>Browser: Execute JavaScript if specified
+    Browser->>Browser: Wait for conditions
+    
+    Browser-->>Crawler: Page content ready
+    Crawler->>Crawler: Process content per config
+    Crawler->>Result: Create CrawlResult
+    
+    Result-->>User: Return complete result
+    
+    Note over User,Result: Configuration objects control every aspect
+```
+
+### BrowserConfig Parameter Flow
+
+```mermaid
+graph TB
+    subgraph "BrowserConfig Parameters"
+        A[browser_type] --> A1[chromium/firefox/webkit]
+        B[headless] --> B1[true: invisible / false: visible]
+        C[viewport] --> C1[width x height dimensions]
+        D[proxy] --> D1[proxy server configuration]
+        E[user_agent] --> E1[browser identification string]
+        F[cookies] --> F1[session authentication]
+        G[headers] --> G1[HTTP request headers]
+        H[extra_args] --> H1[browser command line flags]
+    end
+    
+    subgraph "Browser Instance"
+        I[Playwright Browser]
+        J[Browser Context]
+        K[Page Instance]
+    end
+    
+    A1 --> I
+    B1 --> I
+    C1 --> J
+    D1 --> J
+    E1 --> J
+    F1 --> J
+    G1 --> J
+    H1 --> I
+    
+    I --> J
+    J --> K
+    
+    style I fill:#e3f2fd
+    style J fill:#f3e5f5
+    style K fill:#e8f5e8
+```
+
+### CrawlerRunConfig Category Breakdown
+
+```mermaid
+mindmap
+  root((CrawlerRunConfig))
+    Content Processing
+      word_count_threshold
+      css_selector
+      target_elements
+      excluded_tags
+      markdown_generator
+      extraction_strategy
+    Page Navigation
+      wait_until
+      page_timeout
+      wait_for
+      wait_for_images
+      delay_before_return_html
+    Page Interaction
+      js_code
+      scan_full_page
+      simulate_user
+      magic
+      remove_overlay_elements
+    Caching Session
+      cache_mode
+      session_id
+      shared_data
+    Media Output
+      screenshot
+      pdf
+      capture_mhtml
+      image_score_threshold
+    Link Filtering
+      exclude_external_links
+      exclude_domains
+      exclude_social_media_links
+```
+
+### LLM Provider Selection Flow
+
+```mermaid
+flowchart TD
+    A[Need LLM Processing?] --> B{Provider Type?}
+    
+    B -->|Cloud API| C{Which Service?}
+    B -->|Local Model| D[Local Setup]
+    B -->|Custom Endpoint| E[Custom Config]
+    
+    C -->|OpenAI| C1[OpenAI GPT Models]
+    C -->|Anthropic| C2[Claude Models]
+    C -->|Google| C3[Gemini Models]
+    C -->|Groq| C4[Fast Inference]
+    
+    D --> D1[Ollama Setup]
+    E --> E1[Custom base_url]
+    
+    C1 --> F1[LLMConfig with OpenAI settings]
+    C2 --> F2[LLMConfig with Anthropic settings]
+    C3 --> F3[LLMConfig with Google settings]
+    C4 --> F4[LLMConfig with Groq settings]
+    D1 --> F5[LLMConfig with Ollama settings]
+    E1 --> F6[LLMConfig with custom settings]
+    
+    F1 --> G[Use in Extraction Strategy]
+    F2 --> G
+    F3 --> G
+    F4 --> G
+    F5 --> G
+    F6 --> G
+    
+    style A fill:#e1f5fe
+    style G fill:#c8e6c9
+```
+
+### CrawlResult Structure and Data Flow
+
+```mermaid
+graph TB
+    subgraph "CrawlResult Output"
+        A[Basic Info]
+        B[HTML Content]
+        C[Markdown Output]
+        D[Extracted Data]
+        E[Media Files]
+        F[Metadata]
+    end
+    
+    subgraph "Basic Info Details"
+        A --> A1[url: final URL]
+        A --> A2[success: boolean]
+        A --> A3[status_code: HTTP status]
+        A --> A4[error_message: if failed]
+    end
+    
+    subgraph "HTML Content Types"
+        B --> B1[html: raw HTML]
+        B --> B2[cleaned_html: processed]
+        B --> B3[fit_html: filtered content]
+    end
+    
+    subgraph "Markdown Variants"
+        C --> C1[raw_markdown: basic conversion]
+        C --> C2[markdown_with_citations: with refs]
+        C --> C3[fit_markdown: filtered content]
+        C --> C4[references_markdown: citation list]
+    end
+    
+    subgraph "Extracted Content"
+        D --> D1[extracted_content: JSON string]
+        D --> D2[From CSS extraction]
+        D --> D3[From LLM extraction]
+        D --> D4[From XPath extraction]
+    end
+    
+    subgraph "Media and Links"
+        E --> E1[images: list with scores]
+        E --> E2[videos: media content]
+        E --> E3[internal_links: same domain]
+        E --> E4[external_links: other domains]
+    end
+    
+    subgraph "Generated Files"
+        F --> F1[screenshot: base64 PNG]
+        F --> F2[pdf: binary PDF data]
+        F --> F3[mhtml: archive format]
+        F --> F4[ssl_certificate: cert info]
+    end
+    
+    style A fill:#e3f2fd
+    style B fill:#f3e5f5
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
+    style E fill:#ffebee
+    style F fill:#f1f8e9
+```
+
+### Configuration Pattern State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> ConfigCreation
+    
+    ConfigCreation --> BasicConfig: Simple use case
+    ConfigCreation --> AdvancedConfig: Complex requirements
+    ConfigCreation --> TemplateConfig: Use predefined pattern
+    
+    BasicConfig --> Validation: Check parameters
+    AdvancedConfig --> Validation: Check parameters
+    TemplateConfig --> Validation: Check parameters
+    
+    Validation --> Invalid: Missing required fields
+    Validation --> Valid: All parameters correct
+    
+    Invalid --> ConfigCreation: Fix and retry
+    
+    Valid --> InUse: Passed to crawler
+    InUse --> Cloning: Need variation
+    InUse --> Serialization: Save configuration
+    InUse --> Complete: Crawl finished
+    
+    Cloning --> Modified: clone() with updates
+    Modified --> Valid: Validate changes
+    
+    Serialization --> Stored: dump() to dict
+    Stored --> Restoration: load() from dict
+    Restoration --> Valid: Recreate config object
+    
+    Complete --> [*]
+    
+    note right of BasicConfig : Minimal required settings
+    note right of AdvancedConfig : Full feature configuration
+    note right of TemplateConfig : Pre-built patterns
+```
+
+### Configuration Integration Architecture
+
+```mermaid
+graph TB
+    subgraph "User Layer"
+        U1[Configuration Creation]
+        U2[Parameter Selection]
+        U3[Pattern Application]
+    end
+    
+    subgraph "Configuration Layer"
+        C1[BrowserConfig]
+        C2[CrawlerRunConfig]
+        C3[LLMConfig]
+        C4[Config Validation]
+        C5[Config Cloning]
+    end
+    
+    subgraph "Crawler Engine"
+        E1[Browser Management]
+        E2[Page Navigation]
+        E3[Content Processing]
+        E4[Extraction Pipeline]
+        E5[Result Generation]
+    end
+    
+    subgraph "Output Layer"
+        O1[CrawlResult Assembly]
+        O2[Data Formatting]
+        O3[File Generation]
+        O4[Metadata Collection]
+    end
+    
+    U1 --> C1
+    U2 --> C2
+    U3 --> C3
+    
+    C1 --> C4
+    C2 --> C4
+    C3 --> C4
+    
+    C4 --> E1
+    C2 --> E2
+    C2 --> E3
+    C3 --> E4
+    
+    E1 --> E2
+    E2 --> E3
+    E3 --> E4
+    E4 --> E5
+    
+    E5 --> O1
+    O1 --> O2
+    O2 --> O3
+    O3 --> O4
+    
+    C5 -.-> C1
+    C5 -.-> C2
+    C5 -.-> C3
+    
+    style U1 fill:#e1f5fe
+    style C4 fill:#fff3e0
+    style E4 fill:#f3e5f5
+    style O4 fill:#c8e6c9
+```
+
+### Configuration Best Practices Flow
+
+```mermaid
+flowchart TD
+    A[Configuration Planning] --> B{Performance Priority?}
+    
+    B -->|Speed| C[Fast Config Pattern]
+    B -->|Quality| D[Comprehensive Config Pattern]
+    B -->|Stealth| E[Stealth Config Pattern]
+    B -->|Balanced| F[Standard Config Pattern]
+    
+    C --> C1[Enable caching]
+    C --> C2[Disable heavy features]
+    C --> C3[Use text_mode]
+    C1 --> G[Apply Configuration]
+    C2 --> G
+    C3 --> G
+    
+    D --> D1[Enable all processing]
+    D --> D2[Use content filters]
+    D --> D3[Capture everything]
+    D1 --> G
+    D2 --> G
+    D3 --> G
+    
+    E --> E1[Rotate user agents]
+    E --> E2[Use proxies]
+    E --> E3[Simulate human behavior]
+    E1 --> G
+    E2 --> G
+    E3 --> G
+    
+    F --> F1[Balanced timeouts]
+    F --> F2[Selective processing]
+    F --> F3[Smart caching]
+    F1 --> G
+    F2 --> G
+    F3 --> G
+    
+    G --> H[Test Configuration]
+    H --> I{Results Satisfactory?}
+    
+    I -->|Yes| J[Production Ready]
+    I -->|No| K[Adjust Parameters]
+    
+    K --> L[Clone and Modify]
+    L --> H
+    
+    J --> M[Deploy with Confidence]
+    
+    style A fill:#e1f5fe
+    style J fill:#c8e6c9
+    style M fill:#e8f5e8
+```
+
+## Advanced Configuration Workflows and Patterns
+
+Visual representations of advanced Crawl4AI configuration strategies, proxy management, session handling, and identity-based crawling patterns.
+
+### User Agent and Anti-Detection Strategy Flow
+
+```mermaid
+flowchart TD
+    A[Start Configuration] --> B{Detection Avoidance Needed?}
+    
+    B -->|No| C[Standard User Agent]
+    B -->|Yes| D[Anti-Detection Strategy]
+    
+    C --> C1[Static user_agent string]
+    C1 --> Z[Basic Configuration]
+    
+    D --> E{User Agent Strategy}
+    E -->|Random| F[user_agent_mode: random]
+    E -->|Static Custom| G[Custom user_agent string]
+    E -->|Platform Specific| H[Generator Config]
+    
+    F --> I[Configure Generator]
+    H --> I
+    I --> I1[Platform: windows/macos/linux]
+    I1 --> I2[Browser: chrome/firefox/safari]
+    I2 --> I3[Device: desktop/mobile/tablet]
+    
+    G --> J[Behavioral Simulation]
+    I3 --> J
+    
+    J --> K{Enable Simulation?}
+    K -->|Yes| L[simulate_user: True]
+    K -->|No| M[Standard Behavior]
+    
+    L --> N[override_navigator: True]
+    N --> O[Configure Delays]
+    O --> O1[mean_delay: 1.5]
+    O1 --> O2[max_range: 2.0]
+    O2 --> P[Magic Mode]
+    
+    M --> P
+    P --> Q{Auto-Handle Patterns?}
+    Q -->|Yes| R[magic: True]
+    Q -->|No| S[Manual Handling]
+    
+    R --> T[Complete Anti-Detection Setup]
+    S --> T
+    Z --> T
+    
+    style D fill:#ffeb3b
+    style T fill:#c8e6c9
+    style L fill:#ff9800
+    style R fill:#9c27b0
+```
+
+### Proxy Configuration and Rotation Architecture
+
+```mermaid
+graph TB
+    subgraph "Proxy Configuration Types"
+        A[Single Proxy] --> A1[ProxyConfig object]
+        B[Proxy String] --> B1[from_string method]
+        C[Environment Proxies] --> C1[from_env method]
+        D[Multiple Proxies] --> D1[ProxyRotationStrategy]
+    end
+    
+    subgraph "ProxyConfig Structure"
+        A1 --> E[server: URL]
+        A1 --> F[username: auth]
+        A1 --> G[password: auth]
+        A1 --> H[ip: extracted]
+    end
+    
+    subgraph "Rotation Strategies"
+        D1 --> I[round_robin]
+        D1 --> J[random]
+        D1 --> K[least_used]
+        D1 --> L[failure_aware]
+    end
+    
+    subgraph "Configuration Flow"
+        M[CrawlerRunConfig] --> N[proxy_config]
+        M --> O[proxy_rotation_strategy]
+        N --> P[Single Proxy Usage]
+        O --> Q[Multi-Proxy Rotation]
+    end
+    
+    subgraph "Runtime Behavior"
+        P --> R[All requests use same proxy]
+        Q --> S[Requests rotate through proxies]
+        S --> T[Health monitoring]
+        T --> U[Automatic failover]
+    end
+    
+    style A1 fill:#e3f2fd
+    style D1 fill:#f3e5f5
+    style M fill:#e8f5e8
+    style T fill:#fff3e0
+```
+
+### Content Selection Strategy Comparison
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant HTML as Raw HTML
+    participant CSS as css_selector
+    participant Target as target_elements
+    participant Processor as Content Processor
+    participant Output
+    
+    Note over Browser,Output: css_selector Strategy
+    Browser->>HTML: Load complete page
+    HTML->>CSS: Apply css_selector
+    CSS->>CSS: Extract matching elements only
+    CSS->>Processor: Process subset HTML
+    Processor->>Output: Markdown + Extraction from subset
+    
+    Note over Browser,Output: target_elements Strategy  
+    Browser->>HTML: Load complete page
+    HTML->>Processor: Process entire page
+    Processor->>Target: Focus on target_elements
+    Target->>Target: Extract from specified elements
+    Processor->>Output: Full page links/media + targeted content
+    
+    Note over CSS,Target: Key Difference
+    Note over CSS: Affects entire processing pipeline
+    Note over Target: Affects only content extraction
+```
+
+### Advanced wait_for Conditions Decision Tree
+
+```mermaid
+flowchart TD
+    A[Configure wait_for] --> B{Condition Type?}
+    
+    B -->|CSS Element| C[CSS Selector Wait]
+    B -->|JavaScript Condition| D[JS Expression Wait]
+    B -->|Complex Logic| E[Custom JS Function]
+    B -->|No Wait| F[Default domcontentloaded]
+    
+    C --> C1["wait_for: 'css:.element'"]
+    C1 --> C2[Element appears in DOM]
+    C2 --> G[Continue Processing]
+    
+    D --> D1["wait_for: 'js:() => condition'"]
+    D1 --> D2[JavaScript returns true]
+    D2 --> G
+    
+    E --> E1[Complex JS Function]
+    E1 --> E2{Multiple Conditions}
+    E2 -->|AND Logic| E3[All conditions true]
+    E2 -->|OR Logic| E4[Any condition true]
+    E2 -->|Custom Logic| E5[User-defined logic]
+    
+    E3 --> G
+    E4 --> G
+    E5 --> G
+    
+    F --> G
+    
+    G --> H{Timeout Reached?}
+    H -->|No| I[Page Ready]
+    H -->|Yes| J[Timeout Error]
+    
+    I --> K[Begin Content Extraction]
+    J --> L[Handle Error/Retry]
+    
+    style C1 fill:#e8f5e8
+    style D1 fill:#fff3e0
+    style E1 fill:#ffeb3b
+    style I fill:#c8e6c9
+    style J fill:#ffcdd2
+```
+
+### Session Management Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> SessionCreate
+    
+    SessionCreate --> SessionActive: session_id provided
+    SessionCreate --> OneTime: no session_id
+    
+    SessionActive --> BrowserLaunch: First arun() call
+    BrowserLaunch --> PageLoad: Navigate to URL
+    PageLoad --> JSExecution: Execute js_code
+    JSExecution --> ContentExtract: Extract content
+    ContentExtract --> SessionHold: Keep session alive
+    
+    SessionHold --> ReuseSession: Subsequent arun() calls
+    ReuseSession --> JSOnlyMode: js_only=True
+    ReuseSession --> NewNavigation: js_only=False
+    
+    JSOnlyMode --> JSExecution: Execute JS in existing page
+    NewNavigation --> PageLoad: Navigate to new URL
+    
+    SessionHold --> SessionKill: kill_session() called
+    SessionHold --> SessionTimeout: Timeout reached
+    SessionHold --> SessionError: Error occurred
+    
+    SessionKill --> SessionCleanup
+    SessionTimeout --> SessionCleanup
+    SessionError --> SessionCleanup
+    SessionCleanup --> [*]
+    
+    OneTime --> BrowserLaunch
+    ContentExtract --> OneTimeCleanup: No session_id
+    OneTimeCleanup --> [*]
+    
+    note right of SessionActive : Persistent browser context
+    note right of JSOnlyMode : Reuse existing page
+    note right of OneTime : Temporary browser instance
+```
+
+### Identity-Based Crawling Configuration Matrix
+
+```mermaid
+graph TD
+    subgraph "Geographic Identity"
+        A[Geolocation] --> A1[latitude/longitude]
+        A2[Timezone] --> A3[timezone_id]
+        A4[Locale] --> A5[language/region]
+    end
+    
+    subgraph "Browser Identity"
+        B[User Agent] --> B1[Platform fingerprint]
+        B2[Navigator Properties] --> B3[override_navigator]
+        B4[Headers] --> B5[Accept-Language]
+    end
+    
+    subgraph "Behavioral Identity"
+        C[Mouse Simulation] --> C1[simulate_user]
+        C2[Timing Patterns] --> C3[mean_delay/max_range]
+        C4[Interaction Patterns] --> C5[Human-like behavior]
+    end
+    
+    subgraph "Configuration Integration"
+        D[CrawlerRunConfig] --> A
+        D --> B
+        D --> C
+        
+        D --> E[Complete Identity Profile]
+        
+        E --> F[Geographic Consistency]
+        E --> G[Browser Consistency]
+        E --> H[Behavioral Consistency]
+    end
+    
+    F --> I[Paris, France Example]
+    I --> I1[locale: fr-FR]
+    I --> I2[timezone: Europe/Paris]
+    I --> I3[geolocation: 48.8566, 2.3522]
+    
+    G --> J[Windows Chrome Example]
+    J --> J1[platform: windows]
+    J --> J2[browser: chrome]
+    J --> J3[user_agent: matching pattern]
+    
+    H --> K[Human Simulation]
+    K --> K1[Random delays]
+    K --> K2[Mouse movements]
+    K --> K3[Navigation patterns]
+    
+    style E fill:#ff9800
+    style I fill:#e3f2fd
+    style J fill:#f3e5f5
+    style K fill:#e8f5e8
+```
+
+### Multi-Step Crawling Sequence Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Crawler
+    participant Session as Browser Session
+    participant Page1 as Login Page
+    participant Page2 as Dashboard
+    participant Page3 as Data Pages
+    
+    User->>Crawler: Step 1 - Login
+    Crawler->>Session: Create session_id="user_session"
+    Session->>Page1: Navigate to login
+    Page1->>Page1: Execute login JS
+    Page1->>Page1: Wait for dashboard redirect
+    Page1-->>Crawler: Login complete
+    
+    User->>Crawler: Step 2 - Navigate dashboard
+    Note over Crawler,Session: Reuse existing session
+    Crawler->>Session: js_only=True (no page reload)
+    Session->>Page2: Execute navigation JS
+    Page2->>Page2: Wait for data table
+    Page2-->>Crawler: Dashboard ready
+    
+    User->>Crawler: Step 3 - Extract data pages
+    loop For each page 1-5
+        Crawler->>Session: js_only=True
+        Session->>Page3: Click page button
+        Page3->>Page3: Wait for page active
+        Page3->>Page3: Extract content
+        Page3-->>Crawler: Page data
+    end
+    
+    User->>Crawler: Cleanup
+    Crawler->>Session: kill_session()
+    Session-->>Crawler: Session destroyed
+```
+
+### Configuration Import and Usage Patterns
+
+```mermaid
+graph LR
+    subgraph "Main Package Imports"
+        A[crawl4ai] --> A1[AsyncWebCrawler]
+        A --> A2[BrowserConfig]
+        A --> A3[CrawlerRunConfig]
+        A --> A4[LLMConfig]
+        A --> A5[CacheMode]
+        A --> A6[ProxyConfig]
+        A --> A7[GeolocationConfig]
+    end
+    
+    subgraph "Strategy Imports"
+        A --> B1[JsonCssExtractionStrategy]
+        A --> B2[LLMExtractionStrategy]
+        A --> B3[DefaultMarkdownGenerator]
+        A --> B4[PruningContentFilter]
+        A --> B5[RegexChunking]
+    end
+    
+    subgraph "Configuration Assembly"
+        C[Configuration Builder] --> A2
+        C --> A3
+        C --> A4
+        
+        A2 --> D[Browser Environment]
+        A3 --> E[Crawl Behavior]
+        A4 --> F[LLM Integration]
+        
+        E --> B1
+        E --> B2
+        E --> B3
+        E --> B4
+        E --> B5
+    end
+    
+    subgraph "Runtime Flow"
+        G[Crawler Instance] --> D
+        G --> H[Execute Crawl]
+        H --> E
+        H --> F
+        H --> I[CrawlResult]
+    end
+    
+    style A fill:#e3f2fd
+    style C fill:#fff3e0
+    style G fill:#e8f5e8
+    style I fill:#c8e6c9
+```
+
+### Advanced Configuration Decision Matrix
+
+```mermaid
+flowchart TD
+    A[Advanced Configuration Needed] --> B{Primary Use Case?}
+    
+    B -->|Bot Detection Avoidance| C[Anti-Detection Setup]
+    B -->|Geographic Simulation| D[Identity-Based Config]
+    B -->|Multi-Step Workflows| E[Session Management]
+    B -->|Network Reliability| F[Proxy Configuration]
+    B -->|Content Precision| G[Selector Strategy]
+    
+    C --> C1[Random User Agents]
+    C --> C2[Behavioral Simulation]
+    C --> C3[Navigator Override]
+    C --> C4[Magic Mode]
+    
+    D --> D1[Geolocation Setup]
+    D --> D2[Locale Configuration]
+    D --> D3[Timezone Setting]
+    D --> D4[Browser Fingerprinting]
+    
+    E --> E1[Session ID Management]
+    E --> E2[JS-Only Navigation]
+    E --> E3[Shared Data Context]
+    E --> E4[Session Cleanup]
+    
+    F --> F1[Single Proxy]
+    F --> F2[Proxy Rotation]
+    F --> F3[Failover Strategy]
+    F --> F4[Health Monitoring]
+    
+    G --> G1[css_selector for Subset]
+    G --> G2[target_elements for Focus]
+    G --> G3[excluded_selector for Removal]
+    G --> G4[Hierarchical Selection]
+    
+    C1 --> H[Production Configuration]
+    C2 --> H
+    C3 --> H
+    C4 --> H
+    D1 --> H
+    D2 --> H
+    D3 --> H
+    D4 --> H
+    E1 --> H
+    E2 --> H
+    E3 --> H
+    E4 --> H
+    F1 --> H
+    F2 --> H
+    F3 --> H
+    F4 --> H
+    G1 --> H
+    G2 --> H
+    G3 --> H
+    G4 --> H
+    
+    style H fill:#c8e6c9
+    style C fill:#ff9800
+    style D fill:#9c27b0
+    style E fill:#2196f3
+    style F fill:#4caf50
+    style G fill:#ff5722
+```
+
+## Advanced Features Workflows and Architecture
+
+Visual representations of advanced crawling capabilities, session management, hooks system, and performance optimization strategies.
+
+### File Download Workflow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Crawler
+    participant Browser
+    participant FileSystem
+    participant Page
+    
+    User->>Crawler: Configure downloads_path
+    Crawler->>Browser: Create context with download handling
+    Browser-->>Crawler: Context ready
+    
+    Crawler->>Page: Navigate to target URL
+    Page-->>Crawler: Page loaded
+    
+    Crawler->>Page: Execute download JavaScript
+    Page->>Page: Find download links (.pdf, .zip, etc.)
+    
+    loop For each download link
+        Page->>Browser: Click download link
+        Browser->>FileSystem: Save file to downloads_path
+        FileSystem-->>Browser: File saved
+        Browser-->>Page: Download complete
+    end
+    
+    Page-->>Crawler: All downloads triggered
+    Crawler->>FileSystem: Check downloaded files
+    FileSystem-->>Crawler: List of file paths
+    Crawler-->>User: CrawlResult with downloaded_files[]
+    
+    Note over User,FileSystem: Files available in downloads_path
+```
+
+### Hooks Execution Flow
+
+```mermaid
+flowchart TD
+    A[Start Crawl] --> B[on_browser_created Hook]
+    B --> C[Browser Instance Created]
+    C --> D[on_page_context_created Hook]
+    D --> E[Page & Context Setup]
+    E --> F[before_goto Hook]
+    F --> G[Navigate to URL]
+    G --> H[after_goto Hook]
+    H --> I[Page Loaded]
+    I --> J[before_retrieve_html Hook]
+    J --> K[Extract HTML Content]
+    K --> L[Return CrawlResult]
+    
+    subgraph "Hook Capabilities"
+        B1[Route Filtering]
+        B2[Authentication]
+        B3[Custom Headers]
+        B4[Viewport Setup]
+        B5[Content Manipulation]
+    end
+    
+    D --> B1
+    F --> B2
+    F --> B3
+    D --> B4
+    J --> B5
+    
+    style A fill:#e1f5fe
+    style L fill:#c8e6c9
+    style B fill:#fff3e0
+    style D fill:#f3e5f5
+    style F fill:#e8f5e8
+    style H fill:#fce4ec
+    style J fill:#fff9c4
+```
+
+### Session Management State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> SessionCreated: session_id provided
+    
+    SessionCreated --> PageLoaded: Initial arun()
+    PageLoaded --> JavaScriptExecution: js_code executed
+    JavaScriptExecution --> ContentUpdated: DOM modified
+    ContentUpdated --> NextOperation: js_only=True
+    
+    NextOperation --> JavaScriptExecution: More interactions
+    NextOperation --> SessionMaintained: Keep session alive
+    NextOperation --> SessionClosed: kill_session()
+    
+    SessionMaintained --> PageLoaded: Navigate to new URL
+    SessionMaintained --> JavaScriptExecution: Continue interactions
+    
+    SessionClosed --> [*]: Session terminated
+    
+    note right of SessionCreated
+        Browser tab created
+        Context preserved
+    end note
+    
+    note right of ContentUpdated
+        State maintained
+        Cookies preserved
+        Local storage intact
+    end note
+    
+    note right of SessionClosed
+        Clean up resources
+        Release browser tab
+    end note
+```
+
+### Lazy Loading & Dynamic Content Strategy
+
+```mermaid
+flowchart TD
+    A[Page Load] --> B{Content Type?}
+    
+    B -->|Static Content| C[Standard Extraction]
+    B -->|Lazy Loaded| D[Enable scan_full_page]
+    B -->|Infinite Scroll| E[Custom Scroll Strategy]
+    B -->|Load More Button| F[JavaScript Interaction]
+    
+    D --> D1[Automatic Scrolling]
+    D1 --> D2[Wait for Images]
+    D2 --> D3[Content Stabilization]
+    
+    E --> E1[Detect Scroll Triggers]
+    E1 --> E2[Progressive Loading]
+    E2 --> E3[Monitor Content Changes]
+    
+    F --> F1[Find Load More Button]
+    F1 --> F2[Click and Wait]
+    F2 --> F3{More Content?}
+    F3 -->|Yes| F1
+    F3 -->|No| G[Complete Extraction]
+    
+    D3 --> G
+    E3 --> G
+    C --> G
+    
+    G --> H[Return Enhanced Content]
+    
+    subgraph "Optimization Techniques"
+        I[exclude_external_images]
+        J[image_score_threshold]
+        K[wait_for selectors]
+        L[scroll_delay tuning]
+    end
+    
+    D --> I
+    E --> J
+    F --> K
+    D1 --> L
+    
+    style A fill:#e1f5fe
+    style H fill:#c8e6c9
+    style D fill:#fff3e0
+    style E fill:#f3e5f5
+    style F fill:#e8f5e8
+```
+
+### Network & Console Monitoring Architecture
+
+```mermaid
+graph TB
+    subgraph "Browser Context"
+        A[Web Page] --> B[Network Requests]
+        A --> C[Console Messages]
+        A --> D[Resource Loading]
+    end
+    
+    subgraph "Monitoring Layer"
+        B --> E[Request Interceptor]
+        C --> F[Console Listener]
+        D --> G[Resource Monitor]
+        
+        E --> H[Request Events]
+        E --> I[Response Events]
+        E --> J[Failure Events]
+        
+        F --> K[Log Messages]
+        F --> L[Error Messages]
+        F --> M[Warning Messages]
+    end
+    
+    subgraph "Data Collection"
+        H --> N[Request Details]
+        I --> O[Response Analysis]
+        J --> P[Failure Tracking]
+        
+        K --> Q[Debug Information]
+        L --> R[Error Analysis]
+        M --> S[Performance Insights]
+    end
+    
+    subgraph "Output Aggregation"
+        N --> T[network_requests Array]
+        O --> T
+        P --> T
+        
+        Q --> U[console_messages Array]
+        R --> U
+        S --> U
+    end
+    
+    T --> V[CrawlResult]
+    U --> V
+    
+    style V fill:#c8e6c9
+    style E fill:#fff3e0
+    style F fill:#f3e5f5
+    style T fill:#e8f5e8
+    style U fill:#fce4ec
+```
+
+### Multi-Step Workflow Sequence
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Crawler
+    participant Session
+    participant Page
+    participant Server
+    
+    User->>Crawler: Step 1 - Initial load
+    Crawler->>Session: Create session_id
+    Session->>Page: New browser tab
+    Page->>Server: GET /step1
+    Server-->>Page: Page content
+    Page-->>Crawler: Content ready
+    Crawler-->>User: Result 1
+    
+    User->>Crawler: Step 2 - Navigate (js_only=true)
+    Crawler->>Session: Reuse existing session
+    Session->>Page: Execute JavaScript
+    Page->>Page: Click next button
+    Page->>Server: Navigate to /step2
+    Server-->>Page: New content
+    Page-->>Crawler: Updated content
+    Crawler-->>User: Result 2
+    
+    User->>Crawler: Step 3 - Form submission
+    Crawler->>Session: Continue session
+    Session->>Page: Execute form JS
+    Page->>Page: Fill form fields
+    Page->>Server: POST form data
+    Server-->>Page: Results page
+    Page-->>Crawler: Final content
+    Crawler-->>User: Result 3
+    
+    User->>Crawler: Cleanup
+    Crawler->>Session: kill_session()
+    Session->>Page: Close tab
+    Session-->>Crawler: Session terminated
+    
+    Note over User,Server: State preserved across steps
+    Note over Session: Cookies, localStorage maintained
+```
+
+### SSL Certificate Analysis Flow
+
+```mermaid
+flowchart LR
+    A[Enable SSL Fetch] --> B[HTTPS Connection]
+    B --> C[Certificate Retrieval]
+    C --> D[Certificate Analysis]
+    
+    D --> E[Basic Info]
+    D --> F[Validity Check]
+    D --> G[Chain Verification]
+    D --> H[Security Assessment]
+    
+    E --> E1[Issuer Details]
+    E --> E2[Subject Information]
+    E --> E3[Serial Number]
+    
+    F --> F1[Not Before Date]
+    F --> F2[Not After Date]
+    F --> F3[Expiration Warning]
+    
+    G --> G1[Root CA]
+    G --> G2[Intermediate Certs]
+    G --> G3[Trust Path]
+    
+    H --> H1[Key Length]
+    H --> H2[Signature Algorithm]
+    H --> H3[Vulnerabilities]
+    
+    subgraph "Export Formats"
+        I[JSON Format]
+        J[PEM Format]
+        K[DER Format]
+    end
+    
+    E1 --> I
+    F1 --> I
+    G1 --> I
+    H1 --> I
+    
+    I --> J
+    J --> K
+    
+    style A fill:#e1f5fe
+    style D fill:#fff3e0
+    style I fill:#e8f5e8
+    style J fill:#f3e5f5
+    style K fill:#fce4ec
+```
+
+### Performance Optimization Decision Tree
+
+```mermaid
+flowchart TD
+    A[Performance Optimization] --> B{Primary Goal?}
+    
+    B -->|Speed| C[Fast Crawling Mode]
+    B -->|Resource Usage| D[Memory Optimization]
+    B -->|Scale| E[Batch Processing]
+    B -->|Quality| F[Comprehensive Extraction]
+    
+    C --> C1[text_mode=True]
+    C --> C2[exclude_all_images=True]
+    C --> C3[excluded_tags=['script','style']]
+    C --> C4[page_timeout=30000]
+    
+    D --> D1[light_mode=True]
+    D --> D2[headless=True]
+    D --> D3[semaphore_count=3]
+    D --> D4[disable monitoring]
+    
+    E --> E1[stream=True]
+    E --> E2[cache_mode=ENABLED]
+    E --> E3[arun_many()]
+    E --> E4[concurrent batches]
+    
+    F --> F1[wait_for_images=True]
+    F --> F2[process_iframes=True]
+    F --> F3[capture_network=True]
+    F --> F4[screenshot=True]
+    
+    subgraph "Trade-offs"
+        G[Speed vs Quality]
+        H[Memory vs Features]
+        I[Scale vs Detail]
+    end
+    
+    C --> G
+    D --> H
+    E --> I
+    
+    subgraph "Monitoring Metrics"
+        J[Response Time]
+        K[Memory Usage]
+        L[Success Rate]
+        M[Content Quality]
+    end
+    
+    C1 --> J
+    D1 --> K
+    E1 --> L
+    F1 --> M
+    
+    style A fill:#e1f5fe
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
+    style E fill:#f3e5f5
+    style F fill:#fce4ec
+```
+
+### Advanced Page Interaction Matrix
+
+```mermaid
+graph LR
+    subgraph "Interaction Types"
+        A[Form Filling]
+        B[Dynamic Loading]
+        C[Modal Handling]
+        D[Scroll Interactions]
+        E[Button Clicks]
+    end
+    
+    subgraph "Detection Methods"
+        F[CSS Selectors]
+        G[JavaScript Conditions]
+        H[Element Visibility]
+        I[Content Changes]
+        J[Network Activity]
+    end
+    
+    subgraph "Automation Features"
+        K[simulate_user=True]
+        L[magic=True]
+        M[remove_overlay_elements=True]
+        N[override_navigator=True]
+        O[scan_full_page=True]
+    end
+    
+    subgraph "Wait Strategies"
+        P[wait_for CSS]
+        Q[wait_for JS]
+        R[wait_for_images]
+        S[delay_before_return]
+        T[custom timeouts]
+    end
+    
+    A --> F
+    A --> K
+    A --> P
+    
+    B --> G
+    B --> O
+    B --> Q
+    
+    C --> H
+    C --> L
+    C --> M
+    
+    D --> I
+    D --> O
+    D --> S
+    
+    E --> F
+    E --> K
+    E --> T
+    
+    style A fill:#e8f5e8
+    style B fill:#fff3e0
+    style C fill:#f3e5f5
+    style D fill:#fce4ec
+    style E fill:#e1f5fe
+```
+
+### Input Source Processing Flow
+
+```mermaid
+flowchart TD
+    A[Input Source] --> B{Input Type?}
+    
+    B -->|URL| C[Web Request]
+    B -->|file://| D[Local File]
+    B -->|raw:| E[Raw HTML]
+    
+    C --> C1[HTTP/HTTPS Request]
+    C1 --> C2[Browser Navigation]
+    C2 --> C3[Page Rendering]
+    C3 --> F[Content Processing]
+    
+    D --> D1[File System Access]
+    D1 --> D2[Read HTML File]
+    D2 --> D3[Parse Content]
+    D3 --> F
+    
+    E --> E1[Parse Raw HTML]
+    E1 --> E2[Create Virtual Page]
+    E2 --> E3[Direct Processing]
+    E3 --> F
+    
+    F --> G[Common Processing Pipeline]
+    G --> H[Markdown Generation]
+    G --> I[Link Extraction]
+    G --> J[Media Processing]
+    G --> K[Data Extraction]
+    
+    H --> L[CrawlResult]
+    I --> L
+    J --> L
+    K --> L
+    
+    subgraph "Processing Features"
+        M[Same extraction strategies]
+        N[Same filtering options]
+        O[Same output formats]
+        P[Consistent results]
+    end
+    
+    F --> M
+    F --> N
+    F --> O
+    F --> P
+    
+    style A fill:#e1f5fe
+    style L fill:#c8e6c9
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
+    style E fill:#f3e5f5
+```
+
+**📖 Learn more:** [Advanced Features Guide](https://docs.crawl4ai.com/advanced/advanced-features/), [Session Management](https://docs.crawl4ai.com/advanced/session-management/), [Hooks System](https://docs.crawl4ai.com/advanced/hooks-auth/), [Performance Optimization](https://docs.crawl4ai.com/advanced/performance/)
+
+**📖 Learn more:** [Identity-Based Crawling](https://docs.crawl4ai.com/advanced/identity-based-crawling/), [Session Management](https://docs.crawl4ai.com/advanced/session-management/), [Proxy & Security](https://docs.crawl4ai.com/advanced/proxy-security/), [Content Selection](https://docs.crawl4ai.com/core/content-selection/)
+
+**📖 Learn more:** [Configuration Reference](https://docs.crawl4ai.com/api/parameters/), [Best Practices](https://docs.crawl4ai.com/core/browser-crawler-config/), [Advanced Configuration](https://docs.crawl4ai.com/advanced/advanced-features/)
+---
+
+
+## Extraction Strategy Workflows and Architecture
+
+Visual representations of Crawl4AI's data extraction approaches, strategy selection, and processing workflows.
+
+### Extraction Strategy Decision Tree
+
+```mermaid
+flowchart TD
+    A[Content to Extract] --> B{Content Type?}
+    
+    B -->|Simple Patterns| C[Common Data Types]
+    B -->|Structured HTML| D[Predictable Structure]
+    B -->|Complex Content| E[Requires Reasoning]
+    B -->|Mixed Content| F[Multiple Data Types]
+    
+    C --> C1{Pattern Type?}
+    C1 -->|Email, Phone, URLs| C2[Built-in Regex Patterns]
+    C1 -->|Custom Patterns| C3[Custom Regex Strategy]
+    C1 -->|LLM-Generated| C4[One-time Pattern Generation]
+    
+    D --> D1{Selector Type?}
+    D1 -->|CSS Selectors| D2[JsonCssExtractionStrategy]
+    D1 -->|XPath Expressions| D3[JsonXPathExtractionStrategy]
+    D1 -->|Need Schema?| D4[Auto-generate Schema with LLM]
+    
+    E --> E1{LLM Provider?}
+    E1 -->|OpenAI/Anthropic| E2[Cloud LLM Strategy]
+    E1 -->|Local Ollama| E3[Local LLM Strategy]
+    E1 -->|Cost-sensitive| E4[Hybrid: Generate Schema Once]
+    
+    F --> F1[Multi-Strategy Approach]
+    F1 --> F2[1. Regex for Patterns]
+    F1 --> F3[2. CSS for Structure]
+    F1 --> F4[3. LLM for Complex Analysis]
+    
+    C2 --> G[Fast Extraction ⚡]
+    C3 --> G
+    C4 --> H[Cached Pattern Reuse]
+    
+    D2 --> I[Schema-based Extraction 🏗️]
+    D3 --> I
+    D4 --> J[Generated Schema Cache]
+    
+    E2 --> K[Intelligent Parsing 🧠]
+    E3 --> K
+    E4 --> L[Hybrid Cost-Effective]
+    
+    F2 --> M[Comprehensive Results 📊]
+    F3 --> M
+    F4 --> M
+    
+    style G fill:#c8e6c9
+    style I fill:#e3f2fd
+    style K fill:#fff3e0
+    style M fill:#f3e5f5
+    style H fill:#e8f5e8
+    style J fill:#e8f5e8
+    style L fill:#ffecb3
+```
+
+### LLM Extraction Strategy Workflow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Crawler
+    participant LLMStrategy
+    participant Chunker
+    participant LLMProvider
+    participant Parser
+    
+    User->>Crawler: Configure LLMExtractionStrategy
+    User->>Crawler: arun(url, config)
+    
+    Crawler->>Crawler: Navigate to URL
+    Crawler->>Crawler: Extract content (HTML/Markdown)
+    Crawler->>LLMStrategy: Process content
+    
+    LLMStrategy->>LLMStrategy: Check content size
+    
+    alt Content > chunk_threshold
+        LLMStrategy->>Chunker: Split into chunks with overlap
+        Chunker-->>LLMStrategy: Return chunks[]
+        
+        loop For each chunk
+            LLMStrategy->>LLMProvider: Send chunk + schema + instruction
+            LLMProvider-->>LLMStrategy: Return structured JSON
+        end
+        
+        LLMStrategy->>LLMStrategy: Merge chunk results
+    else Content <= threshold
+        LLMStrategy->>LLMProvider: Send full content + schema
+        LLMProvider-->>LLMStrategy: Return structured JSON
+    end
+    
+    LLMStrategy->>Parser: Validate JSON schema
+    Parser-->>LLMStrategy: Validated data
+    
+    LLMStrategy->>LLMStrategy: Track token usage
+    LLMStrategy-->>Crawler: Return extracted_content
+    
+    Crawler-->>User: CrawlResult with JSON data
+    
+    User->>LLMStrategy: show_usage()
+    LLMStrategy-->>User: Token count & estimated cost
+```
+
+### Schema-Based Extraction Architecture
+
+```mermaid
+graph TB
+    subgraph "Schema Definition"
+        A[JSON Schema] --> A1[baseSelector]
+        A --> A2[fields[]]
+        A --> A3[nested structures]
+        
+        A2 --> A4[CSS/XPath selectors]
+        A2 --> A5[Data types: text, html, attribute]
+        A2 --> A6[Default values]
+        
+        A3 --> A7[nested objects]
+        A3 --> A8[nested_list arrays]
+        A3 --> A9[simple lists]
+    end
+    
+    subgraph "Extraction Engine"
+        B[HTML Content] --> C[Selector Engine]
+        C --> C1[CSS Selector Parser]
+        C --> C2[XPath Evaluator]
+        
+        C1 --> D[Element Matcher]
+        C2 --> D
+        
+        D --> E[Type Converter]
+        E --> E1[Text Extraction]
+        E --> E2[HTML Preservation]
+        E --> E3[Attribute Extraction]
+        E --> E4[Nested Processing]
+    end
+    
+    subgraph "Result Processing"
+        F[Raw Extracted Data] --> G[Structure Builder]
+        G --> G1[Object Construction]
+        G --> G2[Array Assembly]
+        G --> G3[Type Validation]
+        
+        G1 --> H[JSON Output]
+        G2 --> H
+        G3 --> H
+    end
+    
+    A --> C
+    E --> F
+    H --> I[extracted_content]
+    
+    style A fill:#e3f2fd
+    style C fill:#f3e5f5
+    style G fill:#e8f5e8
+    style H fill:#c8e6c9
+```
+
+### Automatic Schema Generation Process
+
+```mermaid
+stateDiagram-v2
+    [*] --> CheckCache
+    
+    CheckCache --> CacheHit: Schema exists
+    CheckCache --> SamplePage: Schema missing
+    
+    CacheHit --> LoadSchema
+    LoadSchema --> FastExtraction
+    
+    SamplePage --> ExtractHTML: Crawl sample URL
+    ExtractHTML --> LLMAnalysis: Send HTML to LLM
+    LLMAnalysis --> GenerateSchema: Create CSS/XPath selectors
+    GenerateSchema --> ValidateSchema: Test generated schema
+    
+    ValidateSchema --> SchemaWorks: Valid selectors
+    ValidateSchema --> RefineSchema: Invalid selectors
+    
+    RefineSchema --> LLMAnalysis: Iterate with feedback
+    
+    SchemaWorks --> CacheSchema: Save for reuse
+    CacheSchema --> FastExtraction: Use cached schema
+    
+    FastExtraction --> [*]: No more LLM calls needed
+    
+    note right of CheckCache : One-time LLM cost
+    note right of FastExtraction : Unlimited fast reuse
+    note right of CacheSchema : JSON file storage
+```
+
+### Multi-Strategy Extraction Pipeline
+
+```mermaid
+flowchart LR
+    A[Web Page Content] --> B[Strategy Pipeline]
+    
+    subgraph B["Extraction Pipeline"]
+        B1[Stage 1: Regex Patterns]
+        B2[Stage 2: Schema-based CSS]
+        B3[Stage 3: LLM Analysis]
+        
+        B1 --> B1a[Email addresses]
+        B1 --> B1b[Phone numbers]
+        B1 --> B1c[URLs and links]
+        B1 --> B1d[Currency amounts]
+        
+        B2 --> B2a[Structured products]
+        B2 --> B2b[Article metadata]
+        B2 --> B2c[User reviews]
+        B2 --> B2d[Navigation links]
+        
+        B3 --> B3a[Sentiment analysis]
+        B3 --> B3b[Key topics]
+        B3 --> B3c[Entity recognition]
+        B3 --> B3d[Content summary]
+    end
+    
+    B1a --> C[Result Merger]
+    B1b --> C
+    B1c --> C
+    B1d --> C
+    
+    B2a --> C
+    B2b --> C
+    B2c --> C
+    B2d --> C
+    
+    B3a --> C
+    B3b --> C
+    B3c --> C
+    B3d --> C
+    
+    C --> D[Combined JSON Output]
+    D --> E[Final CrawlResult]
+    
+    style B1 fill:#c8e6c9
+    style B2 fill:#e3f2fd
+    style B3 fill:#fff3e0
+    style C fill:#f3e5f5
+```
+
+### Performance Comparison Matrix
+
+```mermaid
+graph TD
+    subgraph "Strategy Performance"
+        A[Extraction Strategy Comparison]
+        
+        subgraph "Speed ⚡"
+            S1[Regex: ~10ms]
+            S2[CSS Schema: ~50ms]
+            S3[XPath: ~100ms]
+            S4[LLM: ~2-10s]
+        end
+        
+        subgraph "Accuracy 🎯"
+            A1[Regex: Pattern-dependent]
+            A2[CSS: High for structured]
+            A3[XPath: Very high]
+            A4[LLM: Excellent for complex]
+        end
+        
+        subgraph "Cost 💰"
+            C1[Regex: Free]
+            C2[CSS: Free]
+            C3[XPath: Free]
+            C4[LLM: $0.001-0.01 per page]
+        end
+        
+        subgraph "Complexity 🔧"
+            X1[Regex: Simple patterns only]
+            X2[CSS: Structured HTML]
+            X3[XPath: Complex selectors]
+            X4[LLM: Any content type]
+        end
+    end
+    
+    style S1 fill:#c8e6c9
+    style S2 fill:#e8f5e8
+    style S3 fill:#fff3e0
+    style S4 fill:#ffcdd2
+    
+    style A2 fill:#e8f5e8
+    style A3 fill:#c8e6c9
+    style A4 fill:#c8e6c9
+    
+    style C1 fill:#c8e6c9
+    style C2 fill:#c8e6c9
+    style C3 fill:#c8e6c9
+    style C4 fill:#fff3e0
+    
+    style X1 fill:#ffcdd2
+    style X2 fill:#e8f5e8
+    style X3 fill:#c8e6c9
+    style X4 fill:#c8e6c9
+```
+
+### Regex Pattern Strategy Flow
+
+```mermaid
+flowchart TD
+    A[Regex Extraction] --> B{Pattern Source?}
+    
+    B -->|Built-in| C[Use Predefined Patterns]
+    B -->|Custom| D[Define Custom Regex]
+    B -->|LLM-Generated| E[Generate with AI]
+    
+    C --> C1[Email Pattern]
+    C --> C2[Phone Pattern]
+    C --> C3[URL Pattern]
+    C --> C4[Currency Pattern]
+    C --> C5[Date Pattern]
+    
+    D --> D1[Write Custom Regex]
+    D --> D2[Test Pattern]
+    D --> D3{Pattern Works?}
+    D3 -->|No| D1
+    D3 -->|Yes| D4[Use Pattern]
+    
+    E --> E1[Provide Sample Content]
+    E --> E2[LLM Analyzes Content]
+    E --> E3[Generate Optimized Regex]
+    E --> E4[Cache Pattern for Reuse]
+    
+    C1 --> F[Pattern Matching]
+    C2 --> F
+    C3 --> F
+    C4 --> F
+    C5 --> F
+    D4 --> F
+    E4 --> F
+    
+    F --> G[Extract Matches]
+    G --> H[Group by Pattern Type]
+    H --> I[JSON Output with Labels]
+    
+    style C fill:#e8f5e8
+    style D fill:#e3f2fd
+    style E fill:#fff3e0
+    style F fill:#f3e5f5
+```
+
+### Complex Schema Structure Visualization
+
+```mermaid
+graph TB
+    subgraph "E-commerce Schema Example"
+        A[Category baseSelector] --> B[Category Fields]
+        A --> C[Products nested_list]
+        
+        B --> B1[category_name]
+        B --> B2[category_id attribute]
+        B --> B3[category_url attribute]
+        
+        C --> C1[Product baseSelector]
+        C1 --> C2[name text]
+        C1 --> C3[price text]
+        C1 --> C4[Details nested object]
+        C1 --> C5[Features list]
+        C1 --> C6[Reviews nested_list]
+        
+        C4 --> C4a[brand text]
+        C4 --> C4b[model text]
+        C4 --> C4c[specs html]
+        
+        C5 --> C5a[feature text array]
+        
+        C6 --> C6a[reviewer text]
+        C6 --> C6b[rating attribute]
+        C6 --> C6c[comment text]
+        C6 --> C6d[date attribute]
+    end
+    
+    subgraph "JSON Output Structure"
+        D[categories array] --> D1[category object]
+        D1 --> D2[category_name]
+        D1 --> D3[category_id]
+        D1 --> D4[products array]
+        
+        D4 --> D5[product object]
+        D5 --> D6[name, price]
+        D5 --> D7[details object]
+        D5 --> D8[features array]
+        D5 --> D9[reviews array]
+        
+        D7 --> D7a[brand, model, specs]
+        D8 --> D8a[feature strings]
+        D9 --> D9a[review objects]
+    end
+    
+    A -.-> D
+    B1 -.-> D2
+    C2 -.-> D6
+    C4 -.-> D7
+    C5 -.-> D8
+    C6 -.-> D9
+    
+    style A fill:#e3f2fd
+    style C fill:#f3e5f5
+    style C4 fill:#e8f5e8
+    style D fill:#fff3e0
+```
+
+### Error Handling and Fallback Strategy
+
+```mermaid
+stateDiagram-v2
+    [*] --> PrimaryStrategy
+    
+    PrimaryStrategy --> Success: Extraction successful
+    PrimaryStrategy --> ValidationFailed: Invalid data
+    PrimaryStrategy --> ExtractionFailed: No matches found
+    PrimaryStrategy --> TimeoutError: LLM timeout
+    
+    ValidationFailed --> FallbackStrategy: Try alternative
+    ExtractionFailed --> FallbackStrategy: Try alternative
+    TimeoutError --> FallbackStrategy: Try alternative
+    
+    FallbackStrategy --> FallbackSuccess: Fallback works
+    FallbackStrategy --> FallbackFailed: All strategies failed
+    
+    FallbackSuccess --> Success: Return results
+    FallbackFailed --> ErrorReport: Log failure details
+    
+    Success --> [*]: Complete
+    ErrorReport --> [*]: Return empty results
+    
+    note right of PrimaryStrategy : Try fastest/most accurate first
+    note right of FallbackStrategy : Use simpler but reliable method
+    note left of ErrorReport : Provide debugging information
+```
+
+### Token Usage and Cost Optimization
+
+```mermaid
+flowchart TD
+    A[LLM Extraction Request] --> B{Content Size Check}
+    
+    B -->|Small < 1200 tokens| C[Single LLM Call]
+    B -->|Large > 1200 tokens| D[Chunking Strategy]
+    
+    C --> C1[Send full content]
+    C1 --> C2[Parse JSON response]
+    C2 --> C3[Track token usage]
+    
+    D --> D1[Split into chunks]
+    D1 --> D2[Add overlap between chunks]
+    D2 --> D3[Process chunks in parallel]
+    
+    D3 --> D4[Chunk 1 → LLM]
+    D3 --> D5[Chunk 2 → LLM]
+    D3 --> D6[Chunk N → LLM]
+    
+    D4 --> D7[Merge results]
+    D5 --> D7
+    D6 --> D7
+    
+    D7 --> D8[Deduplicate data]
+    D8 --> D9[Aggregate token usage]
+    
+    C3 --> E[Cost Calculation]
+    D9 --> E
+    
+    E --> F[Usage Report]
+    F --> F1[Prompt tokens: X]
+    F --> F2[Completion tokens: Y]
+    F --> F3[Total cost: $Z]
+    
+    style C fill:#c8e6c9
+    style D fill:#fff3e0
+    style E fill:#e3f2fd
+    style F fill:#f3e5f5
+```
+
+**📖 Learn more:** [LLM Strategies](https://docs.crawl4ai.com/extraction/llm-strategies/), [Schema-Based Extraction](https://docs.crawl4ai.com/extraction/no-llm-strategies/), [Pattern Matching](https://docs.crawl4ai.com/extraction/no-llm-strategies/#regexextractionstrategy), [Performance Optimization](https://docs.crawl4ai.com/advanced/multi-url-crawling/)
+---
+
+
+## Multi-URL Crawling Workflows and Architecture
+
+Visual representations of concurrent crawling patterns, resource management, and monitoring systems for handling multiple URLs efficiently.
+
+### Multi-URL Processing Modes
+
+```mermaid
+flowchart TD
+    A[Multi-URL Crawling Request] --> B{Processing Mode?}
+    
+    B -->|Batch Mode| C[Collect All URLs]
+    B -->|Streaming Mode| D[Process URLs Individually]
+    
+    C --> C1[Queue All URLs]
+    C1 --> C2[Execute Concurrently]
+    C2 --> C3[Wait for All Completion]
+    C3 --> C4[Return Complete Results Array]
+    
+    D --> D1[Queue URLs]
+    D1 --> D2[Start First Batch]
+    D2 --> D3[Yield Results as Available]
+    D3 --> D4{More URLs?}
+    D4 -->|Yes| D5[Start Next URLs]
+    D4 -->|No| D6[Stream Complete]
+    D5 --> D3
+    
+    C4 --> E[Process Results]
+    D6 --> E
+    
+    E --> F[Success/Failure Analysis]
+    F --> G[End]
+    
+    style C fill:#e3f2fd
+    style D fill:#f3e5f5
+    style C4 fill:#c8e6c9
+    style D6 fill:#c8e6c9
+```
+
+### Memory-Adaptive Dispatcher Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> Initializing
+    
+    Initializing --> MonitoringMemory: Start dispatcher
+    
+    MonitoringMemory --> CheckingMemory: Every check_interval
+    CheckingMemory --> MemoryOK: Memory < threshold
+    CheckingMemory --> MemoryHigh: Memory >= threshold
+    
+    MemoryOK --> DispatchingTasks: Start new crawls
+    MemoryHigh --> WaitingForMemory: Pause dispatching
+    
+    DispatchingTasks --> TaskRunning: Launch crawler
+    TaskRunning --> TaskCompleted: Crawl finished
+    TaskRunning --> TaskFailed: Crawl error
+    
+    TaskCompleted --> MonitoringMemory: Update stats
+    TaskFailed --> MonitoringMemory: Update stats
+    
+    WaitingForMemory --> CheckingMemory: Wait timeout
+    WaitingForMemory --> MonitoringMemory: Memory freed
+    
+    note right of MemoryHigh: Prevents OOM crashes
+    note right of DispatchingTasks: Respects max_session_permit
+    note right of WaitingForMemory: Configurable timeout
+```
+
+### Concurrent Crawling Architecture
+
+```mermaid
+graph TB
+    subgraph "URL Queue Management"
+        A[URL Input List] --> B[URL Queue]
+        B --> C[Priority Scheduler]
+        C --> D[Batch Assignment]
+    end
+    
+    subgraph "Dispatcher Layer"
+        E[Memory Adaptive Dispatcher]
+        F[Semaphore Dispatcher]
+        G[Rate Limiter]
+        H[Resource Monitor]
+        
+        E --> I[Memory Checker]
+        F --> J[Concurrency Controller]
+        G --> K[Delay Calculator]
+        H --> L[System Stats]
+    end
+    
+    subgraph "Crawler Pool"
+        M[Crawler Instance 1]
+        N[Crawler Instance 2]
+        O[Crawler Instance 3]
+        P[Crawler Instance N]
+        
+        M --> Q[Browser Session 1]
+        N --> R[Browser Session 2]
+        O --> S[Browser Session 3]
+        P --> T[Browser Session N]
+    end
+    
+    subgraph "Result Processing"
+        U[Result Collector]
+        V[Success Handler]
+        W[Error Handler]
+        X[Retry Queue]
+        Y[Final Results]
+    end
+    
+    D --> E
+    D --> F
+    E --> M
+    F --> N
+    G --> O
+    H --> P
+    
+    Q --> U
+    R --> U
+    S --> U
+    T --> U
+    
+    U --> V
+    U --> W
+    W --> X
+    X --> B
+    V --> Y
+    
+    style E fill:#e3f2fd
+    style F fill:#f3e5f5
+    style G fill:#e8f5e8
+    style H fill:#fff3e0
+```
+
+### Rate Limiting and Backoff Strategy
+
+```mermaid
+sequenceDiagram
+    participant C as Crawler
+    participant RL as Rate Limiter
+    participant S as Server
+    participant D as Dispatcher
+    
+    C->>RL: Request to crawl URL
+    RL->>RL: Calculate delay
+    RL->>RL: Apply base delay (1-3s)
+    RL->>C: Delay applied
+    
+    C->>S: HTTP Request
+    
+    alt Success Response
+        S-->>C: 200 OK + Content
+        C->>RL: Report success
+        RL->>RL: Reset failure count
+        C->>D: Return successful result
+    else Rate Limited
+        S-->>C: 429 Too Many Requests
+        C->>RL: Report rate limit
+        RL->>RL: Exponential backoff
+        RL->>RL: Increase delay (up to max_delay)
+        RL->>C: Apply longer delay
+        C->>S: Retry request after delay
+    else Server Error
+        S-->>C: 503 Service Unavailable
+        C->>RL: Report server error
+        RL->>RL: Moderate backoff
+        RL->>C: Retry with backoff
+    else Max Retries Exceeded
+        RL->>C: Stop retrying
+        C->>D: Return failed result
+    end
+```
+
+### Large-Scale Crawling Workflow
+
+```mermaid
+flowchart TD
+    A[Load URL List 10k+ URLs] --> B[Initialize Dispatcher]
+    
+    B --> C{Select Dispatcher Type}
+    C -->|Memory Constrained| D[Memory Adaptive]
+    C -->|Fixed Resources| E[Semaphore Based]
+    
+    D --> F[Set Memory Threshold 70%]
+    E --> G[Set Concurrency Limit]
+    
+    F --> H[Configure Monitoring]
+    G --> H
+    
+    H --> I[Start Crawling Process]
+    I --> J[Monitor System Resources]
+    
+    J --> K{Memory Usage?}
+    K -->|< Threshold| L[Continue Dispatching]
+    K -->|>= Threshold| M[Pause New Tasks]
+    
+    L --> N[Process Results Stream]
+    M --> O[Wait for Memory]
+    O --> K
+    
+    N --> P{Result Type?}
+    P -->|Success| Q[Save to Database]
+    P -->|Failure| R[Log Error]
+    
+    Q --> S[Update Progress Counter]
+    R --> S
+    
+    S --> T{More URLs?}
+    T -->|Yes| U[Get Next Batch]
+    T -->|No| V[Generate Final Report]
+    
+    U --> L
+    V --> W[Analysis Complete]
+    
+    style A fill:#e1f5fe
+    style D fill:#e8f5e8
+    style E fill:#f3e5f5
+    style V fill:#c8e6c9
+    style W fill:#a5d6a7
+```
+
+### Real-Time Monitoring Dashboard Flow
+
+```mermaid
+graph LR
+    subgraph "Data Collection"
+        A[Crawler Tasks] --> B[Performance Metrics]
+        A --> C[Memory Usage]
+        A --> D[Success/Failure Rates]
+        A --> E[Response Times]
+    end
+    
+    subgraph "Monitor Processing"
+        F[CrawlerMonitor] --> G[Aggregate Statistics]
+        F --> H[Display Formatter]
+        F --> I[Update Scheduler]
+    end
+    
+    subgraph "Display Modes"
+        J[DETAILED Mode]
+        K[AGGREGATED Mode]
+        
+        J --> L[Individual Task Status]
+        J --> M[Task-Level Metrics]
+        K --> N[Summary Statistics]
+        K --> O[Overall Progress]
+    end
+    
+    subgraph "Output Interface"
+        P[Console Display]
+        Q[Progress Bars]
+        R[Status Tables]
+        S[Real-time Updates]
+    end
+    
+    B --> F
+    C --> F
+    D --> F
+    E --> F
+    
+    G --> J
+    G --> K
+    H --> J
+    H --> K
+    I --> J
+    I --> K
+    
+    L --> P
+    M --> Q
+    N --> R
+    O --> S
+    
+    style F fill:#e3f2fd
+    style J fill:#f3e5f5
+    style K fill:#e8f5e8
+```
+
+### Error Handling and Recovery Pattern
+
+```mermaid
+stateDiagram-v2
+    [*] --> ProcessingURL
+    
+    ProcessingURL --> CrawlAttempt: Start crawl
+    
+    CrawlAttempt --> Success: HTTP 200
+    CrawlAttempt --> NetworkError: Connection failed
+    CrawlAttempt --> RateLimit: HTTP 429
+    CrawlAttempt --> ServerError: HTTP 5xx
+    CrawlAttempt --> Timeout: Request timeout
+    
+    Success --> [*]: Return result
+    
+    NetworkError --> RetryCheck: Check retry count
+    RateLimit --> BackoffWait: Apply exponential backoff
+    ServerError --> RetryCheck: Check retry count
+    Timeout --> RetryCheck: Check retry count
+    
+    BackoffWait --> RetryCheck: After delay
+    
+    RetryCheck --> CrawlAttempt: retries < max_retries
+    RetryCheck --> Failed: retries >= max_retries
+    
+    Failed --> ErrorLog: Log failure details
+    ErrorLog --> [*]: Return failed result
+    
+    note right of BackoffWait: Exponential backoff for rate limits
+    note right of RetryCheck: Configurable max_retries
+    note right of ErrorLog: Detailed error tracking
+```
+
+### Resource Management Timeline
+
+```mermaid
+gantt
+    title Multi-URL Crawling Resource Management
+    dateFormat X
+    axisFormat %s
+    
+    section Memory Usage
+    Initialize Dispatcher    :0, 1
+    Memory Monitoring       :1, 10
+    Peak Usage Period       :3, 7
+    Memory Cleanup          :7, 9
+    
+    section Task Execution
+    URL Queue Setup         :0, 2
+    Batch 1 Processing      :2, 5
+    Batch 2 Processing      :4, 7
+    Batch 3 Processing      :6, 9
+    Final Results           :9, 10
+    
+    section Rate Limiting
+    Normal Delays           :2, 4
+    Backoff Period          :4, 6
+    Recovery Period         :6, 8
+    
+    section Monitoring
+    System Health Check     :0, 10
+    Progress Updates        :1, 9
+    Performance Metrics     :2, 8
+```
+
+### Concurrent Processing Performance Matrix
+
+```mermaid
+graph TD
+    subgraph "Input Factors"
+        A[Number of URLs]
+        B[Concurrency Level]
+        C[Memory Threshold]
+        D[Rate Limiting]
+    end
+    
+    subgraph "Processing Characteristics"
+        A --> E[Low 1-100 URLs]
+        A --> F[Medium 100-1k URLs]
+        A --> G[High 1k-10k URLs]
+        A --> H[Very High 10k+ URLs]
+        
+        B --> I[Conservative 1-5]
+        B --> J[Moderate 5-15]
+        B --> K[Aggressive 15-30]
+        
+        C --> L[Strict 60-70%]
+        C --> M[Balanced 70-80%]
+        C --> N[Relaxed 80-90%]
+    end
+    
+    subgraph "Recommended Configurations"
+        E --> O[Simple Semaphore]
+        F --> P[Memory Adaptive Basic]
+        G --> Q[Memory Adaptive Advanced]
+        H --> R[Memory Adaptive + Monitoring]
+        
+        I --> O
+        J --> P
+        K --> Q
+        K --> R
+        
+        L --> Q
+        M --> P
+        N --> O
+    end
+    
+    style O fill:#c8e6c9
+    style P fill:#fff3e0
+    style Q fill:#ffecb3
+    style R fill:#ffcdd2
+```
+
+**📖 Learn more:** [Multi-URL Crawling Guide](https://docs.crawl4ai.com/advanced/multi-url-crawling/), [Dispatcher Configuration](https://docs.crawl4ai.com/advanced/crawl-dispatcher/), [Performance Optimization](https://docs.crawl4ai.com/advanced/multi-url-crawling/#performance-optimization)
+---
+
+
+## Deep Crawling Workflows and Architecture
+
+Visual representations of multi-level website exploration, filtering strategies, and intelligent crawling patterns.
+
+### Deep Crawl Strategy Overview
+
+```mermaid
+flowchart TD
+    A[Start Deep Crawl] --> B{Strategy Selection}
+    
+    B -->|Explore All Levels| C[BFS Strategy]
+    B -->|Dive Deep Fast| D[DFS Strategy] 
+    B -->|Smart Prioritization| E[Best-First Strategy]
+    
+    C --> C1[Breadth-First Search]
+    C1 --> C2[Process all depth 0 links]
+    C2 --> C3[Process all depth 1 links]
+    C3 --> C4[Continue by depth level]
+    
+    D --> D1[Depth-First Search]
+    D1 --> D2[Follow first link deeply]
+    D2 --> D3[Backtrack when max depth reached]
+    D3 --> D4[Continue with next branch]
+    
+    E --> E1[Best-First Search]
+    E1 --> E2[Score all discovered URLs]
+    E2 --> E3[Process highest scoring URLs first]
+    E3 --> E4[Continuously re-prioritize queue]
+    
+    C4 --> F[Apply Filters]
+    D4 --> F
+    E4 --> F
+    
+    F --> G{Filter Chain Processing}
+    G -->|Domain Filter| G1[Check allowed/blocked domains]
+    G -->|URL Pattern Filter| G2[Match URL patterns]
+    G -->|Content Type Filter| G3[Verify content types]
+    G -->|SEO Filter| G4[Evaluate SEO quality]
+    G -->|Content Relevance| G5[Score content relevance]
+    
+    G1 --> H{Passed All Filters?}
+    G2 --> H
+    G3 --> H
+    G4 --> H
+    G5 --> H
+    
+    H -->|Yes| I[Add to Crawl Queue]
+    H -->|No| J[Discard URL]
+    
+    I --> K{Processing Mode}
+    K -->|Streaming| L[Process Immediately]
+    K -->|Batch| M[Collect All Results]
+    
+    L --> N[Stream Result to User]
+    M --> O[Return Complete Result Set]
+    
+    J --> P{More URLs in Queue?}
+    N --> P
+    O --> P
+    
+    P -->|Yes| Q{Within Limits?}
+    P -->|No| R[Deep Crawl Complete]
+    
+    Q -->|Max Depth OK| S{Max Pages OK}
+    Q -->|Max Depth Exceeded| T[Skip Deeper URLs]
+    
+    S -->|Under Limit| U[Continue Crawling]
+    S -->|Limit Reached| R
+    
+    T --> P
+    U --> F
+    
+    style A fill:#e1f5fe
+    style R fill:#c8e6c9
+    style C fill:#fff3e0
+    style D fill:#f3e5f5
+    style E fill:#e8f5e8
+```
+
+### Deep Crawl Strategy Comparison
+
+```mermaid
+graph TB
+    subgraph "BFS - Breadth-First Search"
+        BFS1[Level 0: Start URL]
+        BFS2[Level 1: All direct links]
+        BFS3[Level 2: All second-level links]
+        BFS4[Level 3: All third-level links]
+        
+        BFS1 --> BFS2
+        BFS2 --> BFS3
+        BFS3 --> BFS4
+        
+        BFS_NOTE[Complete each depth before going deeper<br/>Good for site mapping<br/>Memory intensive for wide sites]
+    end
+    
+    subgraph "DFS - Depth-First Search"
+        DFS1[Start URL]
+        DFS2[First Link → Deep]
+        DFS3[Follow until max depth]
+        DFS4[Backtrack and try next]
+        
+        DFS1 --> DFS2
+        DFS2 --> DFS3
+        DFS3 --> DFS4
+        DFS4 --> DFS2
+        
+        DFS_NOTE[Go deep on first path<br/>Memory efficient<br/>May miss important pages]
+    end
+    
+    subgraph "Best-First - Priority Queue"
+        BF1[Start URL]
+        BF2[Score all discovered links]
+        BF3[Process highest scoring first]
+        BF4[Continuously re-prioritize]
+        
+        BF1 --> BF2
+        BF2 --> BF3
+        BF3 --> BF4
+        BF4 --> BF2
+        
+        BF_NOTE[Intelligent prioritization<br/>Finds relevant content fast<br/>Recommended for most use cases]
+    end
+    
+    style BFS1 fill:#e3f2fd
+    style DFS1 fill:#f3e5f5
+    style BF1 fill:#e8f5e8
+    style BFS_NOTE fill:#fff3e0
+    style DFS_NOTE fill:#fff3e0
+    style BF_NOTE fill:#fff3e0
+```
+
+### Filter Chain Processing Sequence
+
+```mermaid
+sequenceDiagram
+    participant URL as Discovered URL
+    participant Chain as Filter Chain
+    participant Domain as Domain Filter
+    participant Pattern as URL Pattern Filter
+    participant Content as Content Type Filter
+    participant SEO as SEO Filter
+    participant Relevance as Content Relevance Filter
+    participant Queue as Crawl Queue
+    
+    URL->>Chain: Process URL
+    Chain->>Domain: Check domain rules
+    
+    alt Domain Allowed
+        Domain-->>Chain: ✓ Pass
+        Chain->>Pattern: Check URL patterns
+        
+        alt Pattern Matches
+            Pattern-->>Chain: ✓ Pass
+            Chain->>Content: Check content type
+            
+            alt Content Type Valid
+                Content-->>Chain: ✓ Pass
+                Chain->>SEO: Evaluate SEO quality
+                
+                alt SEO Score Above Threshold
+                    SEO-->>Chain: ✓ Pass
+                    Chain->>Relevance: Score content relevance
+                    
+                    alt Relevance Score High
+                        Relevance-->>Chain: ✓ Pass
+                        Chain->>Queue: Add to crawl queue
+                        Queue-->>URL: Queued for crawling
+                    else Relevance Score Low
+                        Relevance-->>Chain: ✗ Reject
+                        Chain-->>URL: Filtered out - Low relevance
+                    end
+                else SEO Score Low
+                    SEO-->>Chain: ✗ Reject
+                    Chain-->>URL: Filtered out - Poor SEO
+                end
+            else Invalid Content Type
+                Content-->>Chain: ✗ Reject
+                Chain-->>URL: Filtered out - Wrong content type
+            end
+        else Pattern Mismatch
+            Pattern-->>Chain: ✗ Reject
+            Chain-->>URL: Filtered out - Pattern mismatch
+        end
+    else Domain Blocked
+        Domain-->>Chain: ✗ Reject
+        Chain-->>URL: Filtered out - Blocked domain
+    end
+```
+
+### URL Lifecycle State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> Discovered: Found on page
+    
+    Discovered --> FilterPending: Enter filter chain
+    
+    FilterPending --> DomainCheck: Apply domain filter
+    DomainCheck --> PatternCheck: Domain allowed
+    DomainCheck --> Rejected: Domain blocked
+    
+    PatternCheck --> ContentCheck: Pattern matches
+    PatternCheck --> Rejected: Pattern mismatch
+    
+    ContentCheck --> SEOCheck: Content type valid
+    ContentCheck --> Rejected: Invalid content
+    
+    SEOCheck --> RelevanceCheck: SEO score sufficient
+    SEOCheck --> Rejected: Poor SEO score
+    
+    RelevanceCheck --> Scored: Relevance score calculated
+    RelevanceCheck --> Rejected: Low relevance
+    
+    Scored --> Queued: Added to priority queue
+    
+    Queued --> Crawling: Selected for processing
+    Crawling --> Success: Page crawled successfully
+    Crawling --> Failed: Crawl failed
+    
+    Success --> LinkExtraction: Extract new links
+    LinkExtraction --> [*]: Process complete
+    
+    Failed --> [*]: Record failure
+    Rejected --> [*]: Log rejection reason
+    
+    note right of Scored : Score determines priority<br/>in Best-First strategy
+    
+    note right of Failed : Errors logged with<br/>depth and reason
+```
+
+### Streaming vs Batch Processing Architecture
+
+```mermaid
+graph TB
+    subgraph "Input"
+        A[Start URL] --> B[Deep Crawl Strategy]
+    end
+    
+    subgraph "Crawl Engine"
+        B --> C[URL Discovery]
+        C --> D[Filter Chain]
+        D --> E[Priority Queue]
+        E --> F[Page Processor]
+    end
+    
+    subgraph "Streaming Mode stream=True"
+        F --> G1[Process Page]
+        G1 --> H1[Extract Content]
+        H1 --> I1[Yield Result Immediately]
+        I1 --> J1[async for result]
+        J1 --> K1[Real-time Processing]
+        
+        G1 --> L1[Extract Links]
+        L1 --> M1[Add to Queue]
+        M1 --> F
+    end
+    
+    subgraph "Batch Mode stream=False"
+        F --> G2[Process Page]
+        G2 --> H2[Extract Content]
+        H2 --> I2[Store Result]
+        I2 --> N2[Result Collection]
+        
+        G2 --> L2[Extract Links]
+        L2 --> M2[Add to Queue]
+        M2 --> O2{More URLs?}
+        O2 -->|Yes| F
+        O2 -->|No| P2[Return All Results]
+        P2 --> Q2[Batch Processing]
+    end
+    
+    style I1 fill:#e8f5e8
+    style K1 fill:#e8f5e8
+    style P2 fill:#e3f2fd
+    style Q2 fill:#e3f2fd
+```
+
+### Advanced Scoring and Prioritization System
+
+```mermaid
+flowchart LR
+    subgraph "URL Discovery"
+        A[Page Links] --> B[Extract URLs]
+        B --> C[Normalize URLs]
+    end
+    
+    subgraph "Scoring System"
+        C --> D[Keyword Relevance Scorer]
+        D --> D1[URL Text Analysis]
+        D --> D2[Keyword Matching]
+        D --> D3[Calculate Base Score]
+        
+        D3 --> E[Additional Scoring Factors]
+        E --> E1[URL Structure weight: 0.2]
+        E --> E2[Link Context weight: 0.3]
+        E --> E3[Page Depth Penalty weight: 0.1]
+        E --> E4[Domain Authority weight: 0.4]
+        
+        D1 --> F[Combined Score]
+        D2 --> F
+        D3 --> F
+        E1 --> F
+        E2 --> F
+        E3 --> F
+        E4 --> F
+    end
+    
+    subgraph "Prioritization"
+        F --> G{Score Threshold}
+        G -->|Above Threshold| H[Priority Queue]
+        G -->|Below Threshold| I[Discard URL]
+        
+        H --> J[Best-First Selection]
+        J --> K[Highest Score First]
+        K --> L[Process Page]
+        
+        L --> M[Update Scores]
+        M --> N[Re-prioritize Queue]
+        N --> J
+    end
+    
+    style F fill:#fff3e0
+    style H fill:#e8f5e8
+    style L fill:#e3f2fd
+```
+
+### Deep Crawl Performance and Limits
+
+```mermaid
+graph TD
+    subgraph "Crawl Constraints"
+        A[Max Depth: 2] --> A1[Prevents infinite crawling]
+        B[Max Pages: 50] --> B1[Controls resource usage]
+        C[Score Threshold: 0.3] --> C1[Quality filtering]
+        D[Domain Limits] --> D1[Scope control]
+    end
+    
+    subgraph "Performance Monitoring"
+        E[Pages Crawled] --> F[Depth Distribution]
+        E --> G[Success Rate]
+        E --> H[Average Score]
+        E --> I[Processing Time]
+        
+        F --> J[Performance Report]
+        G --> J
+        H --> J
+        I --> J
+    end
+    
+    subgraph "Resource Management"
+        K[Memory Usage] --> L{Memory Threshold}
+        L -->|Under Limit| M[Continue Crawling]
+        L -->|Over Limit| N[Reduce Concurrency]
+        
+        O[CPU Usage] --> P{CPU Threshold}
+        P -->|Normal| M
+        P -->|High| Q[Add Delays]
+        
+        R[Network Load] --> S{Rate Limits}
+        S -->|OK| M
+        S -->|Exceeded| T[Throttle Requests]
+    end
+    
+    M --> U[Optimal Performance]
+    N --> V[Reduced Performance]
+    Q --> V
+    T --> V
+    
+    style U fill:#c8e6c9
+    style V fill:#fff3e0
+    style J fill:#e3f2fd
+```
+
+### Error Handling and Recovery Flow
+
+```mermaid
+sequenceDiagram
+    participant Strategy as Deep Crawl Strategy
+    participant Queue as Priority Queue
+    participant Crawler as Page Crawler
+    participant Error as Error Handler
+    participant Result as Result Collector
+    
+    Strategy->>Queue: Get next URL
+    Queue-->>Strategy: Return highest priority URL
+    
+    Strategy->>Crawler: Crawl page
+    
+    alt Successful Crawl
+        Crawler-->>Strategy: Return page content
+        Strategy->>Result: Store successful result
+        Strategy->>Strategy: Extract new links
+        Strategy->>Queue: Add new URLs to queue
+    else Network Error
+        Crawler-->>Error: Network timeout/failure
+        Error->>Error: Log error with details
+        Error->>Queue: Mark URL as failed
+        Error-->>Strategy: Skip to next URL
+    else Parse Error
+        Crawler-->>Error: HTML parsing failed
+        Error->>Error: Log parse error
+        Error->>Result: Store failed result
+        Error-->>Strategy: Continue with next URL
+    else Rate Limit Hit
+        Crawler-->>Error: Rate limit exceeded
+        Error->>Error: Apply backoff strategy
+        Error->>Queue: Re-queue URL with delay
+        Error-->>Strategy: Wait before retry
+    else Depth Limit
+        Strategy->>Strategy: Check depth constraint
+        Strategy-->>Queue: Skip URL - too deep
+    else Page Limit
+        Strategy->>Strategy: Check page count
+        Strategy-->>Result: Stop crawling - limit reached
+    end
+    
+    Strategy->>Queue: Request next URL
+    Queue-->>Strategy: More URLs available?
+    
+    alt Queue Empty
+        Queue-->>Result: Crawl complete
+    else Queue Has URLs
+        Queue-->>Strategy: Continue crawling
+    end
+```
+
+**📖 Learn more:** [Deep Crawling Strategies](https://docs.crawl4ai.com/core/deep-crawling/), [Content Filtering](https://docs.crawl4ai.com/core/content-selection/), [Advanced Crawling Patterns](https://docs.crawl4ai.com/advanced/advanced-features/)
+---
+
+
+## Docker Deployment Architecture and Workflows
+
+Visual representations of Crawl4AI Docker deployment, API architecture, configuration management, and service interactions.
+
+### Docker Deployment Decision Flow
+
+```mermaid
+flowchart TD
+    A[Start Docker Deployment] --> B{Deployment Type?}
+    
+    B -->|Quick Start| C[Pre-built Image]
+    B -->|Development| D[Docker Compose]
+    B -->|Custom Build| E[Manual Build]
+    B -->|Production| F[Production Setup]
+    
+    C --> C1[docker pull unclecode/crawl4ai]
+    C1 --> C2{Need LLM Support?}
+    C2 -->|Yes| C3[Setup .llm.env]
+    C2 -->|No| C4[Basic run]
+    C3 --> C5[docker run with --env-file]
+    C4 --> C6[docker run basic]
+    
+    D --> D1[git clone repository]
+    D1 --> D2[cp .llm.env.example .llm.env]
+    D2 --> D3{Build Type?}
+    D3 -->|Pre-built| D4[IMAGE=latest docker compose up]
+    D3 -->|Local Build| D5[docker compose up --build]
+    D3 -->|All Features| D6[INSTALL_TYPE=all docker compose up]
+    
+    E --> E1[docker buildx build]
+    E1 --> E2{Architecture?}
+    E2 -->|Single| E3[--platform linux/amd64]
+    E2 -->|Multi| E4[--platform linux/amd64,linux/arm64]
+    E3 --> E5[Build complete]
+    E4 --> E5
+    
+    F --> F1[Production configuration]
+    F1 --> F2[Custom config.yml]
+    F2 --> F3[Resource limits]
+    F3 --> F4[Health monitoring]
+    F4 --> F5[Production ready]
+    
+    C5 --> G[Service running on :11235]
+    C6 --> G
+    D4 --> G
+    D5 --> G
+    D6 --> G
+    E5 --> H[docker run custom image]
+    H --> G
+    F5 --> I[Production deployment]
+    
+    G --> J[Access playground at /playground]
+    G --> K[Health check at /health]
+    I --> L[Production monitoring]
+    
+    style A fill:#e1f5fe
+    style G fill:#c8e6c9
+    style I fill:#c8e6c9
+    style J fill:#fff3e0
+    style K fill:#fff3e0
+    style L fill:#e8f5e8
+```
+
+### Docker Container Architecture
+
+```mermaid
+graph TB
+    subgraph "Host Environment"
+        A[Docker Engine] --> B[Crawl4AI Container]
+        C[.llm.env] --> B
+        D[Custom config.yml] --> B
+        E[Port 11235] --> B
+        F[Shared Memory 1GB+] --> B
+    end
+    
+    subgraph "Container Services"
+        B --> G[FastAPI Server :8020]
+        B --> H[Gunicorn WSGI]
+        B --> I[Supervisord Process Manager]
+        B --> J[Redis Cache :6379]
+        
+        G --> K[REST API Endpoints]
+        G --> L[WebSocket Connections]
+        G --> M[MCP Protocol]
+        
+        H --> N[Worker Processes]
+        I --> O[Service Monitoring]
+        J --> P[Request Caching]
+    end
+    
+    subgraph "Browser Management"
+        B --> Q[Playwright Framework]
+        Q --> R[Chromium Browser]
+        Q --> S[Firefox Browser]
+        Q --> T[WebKit Browser]
+        
+        R --> U[Browser Pool]
+        S --> U
+        T --> U
+        
+        U --> V[Page Sessions]
+        U --> W[Context Management]
+    end
+    
+    subgraph "External Services"
+        X[OpenAI API] -.-> K
+        Y[Anthropic Claude] -.-> K
+        Z[Local Ollama] -.-> K
+        AA[Groq API] -.-> K
+        BB[Google Gemini] -.-> K
+    end
+    
+    subgraph "Client Interactions"
+        CC[Python SDK] --> K
+        DD[REST API Calls] --> K
+        EE[MCP Clients] --> M
+        FF[Web Browser] --> G
+        GG[Monitoring Tools] --> K
+    end
+    
+    style B fill:#e3f2fd
+    style G fill:#f3e5f5
+    style Q fill:#e8f5e8
+    style K fill:#fff3e0
+```
+
+### API Endpoints Architecture
+
+```mermaid
+graph LR
+    subgraph "Core Endpoints"
+        A[/crawl] --> A1[Single URL crawl]
+        A2[/crawl/stream] --> A3[Streaming multi-URL]
+        A4[/crawl/job] --> A5[Async job submission]
+        A6[/crawl/job/{id}] --> A7[Job status check]
+    end
+    
+    subgraph "Specialized Endpoints"
+        B[/html] --> B1[Preprocessed HTML]
+        B2[/screenshot] --> B3[PNG capture]
+        B4[/pdf] --> B5[PDF generation]
+        B6[/execute_js] --> B7[JavaScript execution]
+        B8[/md] --> B9[Markdown extraction]
+    end
+    
+    subgraph "Utility Endpoints"
+        C[/health] --> C1[Service status]
+        C2[/metrics] --> C3[Prometheus metrics]
+        C4[/schema] --> C5[API documentation]
+        C6[/playground] --> C7[Interactive testing]
+    end
+    
+    subgraph "LLM Integration"
+        D[/llm/{url}] --> D1[Q&A over URL]
+        D2[/ask] --> D3[Library context search]
+        D4[/config/dump] --> D5[Config validation]
+    end
+    
+    subgraph "MCP Protocol"
+        E[/mcp/sse] --> E1[Server-Sent Events]
+        E2[/mcp/ws] --> E3[WebSocket connection]
+        E4[/mcp/schema] --> E5[MCP tool definitions]
+    end
+    
+    style A fill:#e3f2fd
+    style B fill:#f3e5f5
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
+    style E fill:#fce4ec
+```
+
+### Request Processing Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant FastAPI
+    participant RequestValidator
+    participant BrowserPool
+    participant Playwright
+    participant ExtractionEngine
+    participant LLMProvider
+    
+    Client->>FastAPI: POST /crawl with config
+    FastAPI->>RequestValidator: Validate JSON structure
+    
+    alt Valid Request
+        RequestValidator-->>FastAPI: ✓ Validated
+        FastAPI->>BrowserPool: Request browser instance
+        BrowserPool->>Playwright: Launch browser/reuse session
+        Playwright-->>BrowserPool: Browser ready
+        BrowserPool-->>FastAPI: Browser allocated
+        
+        FastAPI->>Playwright: Navigate to URL
+        Playwright->>Playwright: Execute JS, wait conditions
+        Playwright-->>FastAPI: Page content ready
+        
+        FastAPI->>ExtractionEngine: Process content
+        
+        alt LLM Extraction
+            ExtractionEngine->>LLMProvider: Send content + schema
+            LLMProvider-->>ExtractionEngine: Structured data
+        else CSS Extraction
+            ExtractionEngine->>ExtractionEngine: Apply CSS selectors
+        end
+        
+        ExtractionEngine-->>FastAPI: Extraction complete
+        FastAPI->>BrowserPool: Release browser
+        FastAPI-->>Client: CrawlResult response
+        
+    else Invalid Request
+        RequestValidator-->>FastAPI: ✗ Validation error
+        FastAPI-->>Client: 400 Bad Request
+    end
+```
+
+### Configuration Management Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> ConfigLoading
+    
+    ConfigLoading --> DefaultConfig: Load default config.yml
+    ConfigLoading --> CustomConfig: Custom config mounted
+    ConfigLoading --> EnvOverrides: Environment variables
+    
+    DefaultConfig --> ConfigMerging
+    CustomConfig --> ConfigMerging
+    EnvOverrides --> ConfigMerging
+    
+    ConfigMerging --> ConfigValidation
+    
+    ConfigValidation --> Valid: Schema validation passes
+    ConfigValidation --> Invalid: Validation errors
+    
+    Invalid --> ConfigError: Log errors and exit
+    ConfigError --> [*]
+    
+    Valid --> ServiceInitialization
+    ServiceInitialization --> FastAPISetup
+    ServiceInitialization --> BrowserPoolInit
+    ServiceInitialization --> CacheSetup
+    
+    FastAPISetup --> Running
+    BrowserPoolInit --> Running
+    CacheSetup --> Running
+    
+    Running --> ConfigReload: Config change detected
+    ConfigReload --> ConfigValidation
+    
+    Running --> [*]: Service shutdown
+    
+    note right of ConfigMerging : Priority: ENV > Custom > Default
+    note right of ServiceInitialization : All services must initialize successfully
+```
+
+### Multi-Architecture Build Process
+
+```mermaid
+flowchart TD
+    A[Developer Push] --> B[GitHub Repository]
+    
+    B --> C[Docker Buildx]
+    C --> D{Build Strategy}
+    
+    D -->|Multi-arch| E[Parallel Builds]
+    D -->|Single-arch| F[Platform-specific Build]
+    
+    E --> G[AMD64 Build]
+    E --> H[ARM64 Build]
+    
+    F --> I[Target Platform Build]
+    
+    subgraph "AMD64 Build Process"
+        G --> G1[Ubuntu base image]
+        G1 --> G2[Python 3.11 install]
+        G2 --> G3[System dependencies]
+        G3 --> G4[Crawl4AI installation]
+        G4 --> G5[Playwright setup]
+        G5 --> G6[FastAPI configuration]
+        G6 --> G7[AMD64 image ready]
+    end
+    
+    subgraph "ARM64 Build Process"
+        H --> H1[Ubuntu ARM64 base]
+        H1 --> H2[Python 3.11 install]
+        H2 --> H3[ARM-specific deps]
+        H3 --> H4[Crawl4AI installation]
+        H4 --> H5[Playwright setup]
+        H5 --> H6[FastAPI configuration]
+        H6 --> H7[ARM64 image ready]
+    end
+    
+    subgraph "Single Architecture"
+        I --> I1[Base image selection]
+        I1 --> I2[Platform dependencies]
+        I2 --> I3[Application setup]
+        I3 --> I4[Platform image ready]
+    end
+    
+    G7 --> J[Multi-arch Manifest]
+    H7 --> J
+    I4 --> K[Platform Image]
+    
+    J --> L[Docker Hub Registry]
+    K --> L
+    
+    L --> M[Pull Request Auto-selects Architecture]
+    
+    style A fill:#e1f5fe
+    style J fill:#c8e6c9
+    style K fill:#c8e6c9
+    style L fill:#f3e5f5
+    style M fill:#e8f5e8
+```
+
+### MCP Integration Architecture
+
+```mermaid
+graph TB
+    subgraph "MCP Client Applications"
+        A[Claude Code] --> B[MCP Protocol]
+        C[Cursor IDE] --> B
+        D[Windsurf] --> B
+        E[Custom MCP Client] --> B
+    end
+    
+    subgraph "Crawl4AI MCP Server"
+        B --> F[MCP Endpoint Router]
+        F --> G[SSE Transport /mcp/sse]
+        F --> H[WebSocket Transport /mcp/ws]
+        F --> I[Schema Endpoint /mcp/schema]
+        
+        G --> J[MCP Tool Handler]
+        H --> J
+        
+        J --> K[Tool: md]
+        J --> L[Tool: html]
+        J --> M[Tool: screenshot]
+        J --> N[Tool: pdf]
+        J --> O[Tool: execute_js]
+        J --> P[Tool: crawl]
+        J --> Q[Tool: ask]
+    end
+    
+    subgraph "Crawl4AI Core Services"
+        K --> R[Markdown Generator]
+        L --> S[HTML Preprocessor]
+        M --> T[Screenshot Service]
+        N --> U[PDF Generator]
+        O --> V[JavaScript Executor]
+        P --> W[Batch Crawler]
+        Q --> X[Context Search]
+        
+        R --> Y[Browser Pool]
+        S --> Y
+        T --> Y
+        U --> Y
+        V --> Y
+        W --> Y
+        X --> Z[Knowledge Base]
+    end
+    
+    subgraph "External Resources"
+        Y --> AA[Playwright Browsers]
+        Z --> BB[Library Documentation]
+        Z --> CC[Code Examples]
+        AA --> DD[Web Pages]
+    end
+    
+    style B fill:#e3f2fd
+    style J fill:#f3e5f5
+    style Y fill:#e8f5e8
+    style Z fill:#fff3e0
+```
+
+### API Request/Response Flow Patterns
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant LoadBalancer
+    participant FastAPI
+    participant ConfigValidator
+    participant BrowserManager
+    participant CrawlEngine
+    participant ResponseBuilder
+    
+    Note over Client,ResponseBuilder: Basic Crawl Request
+    
+    Client->>LoadBalancer: POST /crawl
+    LoadBalancer->>FastAPI: Route request
+    
+    FastAPI->>ConfigValidator: Validate browser_config
+    ConfigValidator-->>FastAPI: ✓ Valid BrowserConfig
+    
+    FastAPI->>ConfigValidator: Validate crawler_config
+    ConfigValidator-->>FastAPI: ✓ Valid CrawlerRunConfig
+    
+    FastAPI->>BrowserManager: Allocate browser
+    BrowserManager-->>FastAPI: Browser instance
+    
+    FastAPI->>CrawlEngine: Execute crawl
+    
+    Note over CrawlEngine: Page processing
+    CrawlEngine->>CrawlEngine: Navigate & wait
+    CrawlEngine->>CrawlEngine: Extract content
+    CrawlEngine->>CrawlEngine: Apply strategies
+    
+    CrawlEngine-->>FastAPI: CrawlResult
+    
+    FastAPI->>ResponseBuilder: Format response
+    ResponseBuilder-->>FastAPI: JSON response
+    
+    FastAPI->>BrowserManager: Release browser
+    FastAPI-->>LoadBalancer: Response ready
+    LoadBalancer-->>Client: 200 OK + CrawlResult
+    
+    Note over Client,ResponseBuilder: Streaming Request
+    
+    Client->>FastAPI: POST /crawl/stream
+    FastAPI-->>Client: 200 OK (stream start)
+    
+    loop For each URL
+        FastAPI->>CrawlEngine: Process URL
+        CrawlEngine-->>FastAPI: Result ready
+        FastAPI-->>Client: NDJSON line
+    end
+    
+    FastAPI-->>Client: Stream completed
+```
+
+### Configuration Validation Workflow
+
+```mermaid
+flowchart TD
+    A[Client Request] --> B[JSON Payload]
+    B --> C{Pre-validation}
+    
+    C -->|✓ Valid JSON| D[Extract Configurations]
+    C -->|✗ Invalid JSON| E[Return 400 Bad Request]
+    
+    D --> F[BrowserConfig Validation]
+    D --> G[CrawlerRunConfig Validation]
+    
+    F --> H{BrowserConfig Valid?}
+    G --> I{CrawlerRunConfig Valid?}
+    
+    H -->|✓ Valid| J[Browser Setup]
+    H -->|✗ Invalid| K[Log Browser Config Errors]
+    
+    I -->|✓ Valid| L[Crawler Setup]
+    I -->|✗ Invalid| M[Log Crawler Config Errors]
+    
+    K --> N[Collect All Errors]
+    M --> N
+    N --> O[Return 422 Validation Error]
+    
+    J --> P{Both Configs Valid?}
+    L --> P
+    
+    P -->|✓ Yes| Q[Proceed to Crawling]
+    P -->|✗ No| O
+    
+    Q --> R[Execute Crawl Pipeline]
+    R --> S[Return CrawlResult]
+    
+    E --> T[Client Error Response]
+    O --> T
+    S --> U[Client Success Response]
+    
+    style A fill:#e1f5fe
+    style Q fill:#c8e6c9
+    style S fill:#c8e6c9
+    style U fill:#c8e6c9
+    style E fill:#ffcdd2
+    style O fill:#ffcdd2
+    style T fill:#ffcdd2
+```
+
+### Production Deployment Architecture
+
+```mermaid
+graph TB
+    subgraph "Load Balancer Layer"
+        A[NGINX/HAProxy] --> B[Health Check]
+        A --> C[Request Routing]
+        A --> D[SSL Termination]
+    end
+    
+    subgraph "Application Layer"
+        C --> E[Crawl4AI Instance 1]
+        C --> F[Crawl4AI Instance 2]
+        C --> G[Crawl4AI Instance N]
+        
+        E --> H[FastAPI Server]
+        F --> I[FastAPI Server]
+        G --> J[FastAPI Server]
+        
+        H --> K[Browser Pool 1]
+        I --> L[Browser Pool 2]
+        J --> M[Browser Pool N]
+    end
+    
+    subgraph "Shared Services"
+        N[Redis Cluster] --> E
+        N --> F
+        N --> G
+        
+        O[Monitoring Stack] --> P[Prometheus]
+        O --> Q[Grafana]
+        O --> R[AlertManager]
+        
+        P --> E
+        P --> F
+        P --> G
+    end
+    
+    subgraph "External Dependencies"
+        S[OpenAI API] -.-> H
+        T[Anthropic API] -.-> I
+        U[Local LLM Cluster] -.-> J
+    end
+    
+    subgraph "Persistent Storage"
+        V[Configuration Volume] --> E
+        V --> F
+        V --> G
+        
+        W[Cache Volume] --> N
+        X[Logs Volume] --> O
+    end
+    
+    style A fill:#e3f2fd
+    style E fill:#f3e5f5
+    style F fill:#f3e5f5
+    style G fill:#f3e5f5
+    style N fill:#e8f5e8
+    style O fill:#fff3e0
+```
+
+### Docker Resource Management
+
+```mermaid
+graph TD
+    subgraph "Resource Allocation"
+        A[Host Resources] --> B[CPU Cores]
+        A --> C[Memory GB]
+        A --> D[Disk Space]
+        A --> E[Network Bandwidth]
+        
+        B --> F[Container Limits]
+        C --> F
+        D --> F
+        E --> F
+    end
+    
+    subgraph "Container Configuration"
+        F --> G[--cpus=4]
+        F --> H[--memory=8g]
+        F --> I[--shm-size=2g]
+        F --> J[Volume Mounts]
+        
+        G --> K[Browser Processes]
+        H --> L[Browser Memory]
+        I --> M[Shared Memory for Browsers]
+        J --> N[Config & Cache Storage]
+    end
+    
+    subgraph "Monitoring & Scaling"
+        O[Resource Monitor] --> P[CPU Usage %]
+        O --> Q[Memory Usage %]
+        O --> R[Request Queue Length]
+        
+        P --> S{CPU > 80%?}
+        Q --> T{Memory > 90%?}
+        R --> U{Queue > 100?}
+        
+        S -->|Yes| V[Scale Up]
+        T -->|Yes| V
+        U -->|Yes| V
+        
+        V --> W[Add Container Instance]
+        W --> X[Update Load Balancer]
+    end
+    
+    subgraph "Performance Optimization"
+        Y[Browser Pool Tuning] --> Z[Max Pages: 40]
+        Y --> AA[Idle TTL: 30min]
+        Y --> BB[Concurrency Limits]
+        
+        Z --> CC[Memory Efficiency]
+        AA --> DD[Resource Cleanup]
+        BB --> EE[Throughput Control]
+    end
+    
+    style A fill:#e1f5fe
+    style F fill:#f3e5f5
+    style O fill:#e8f5e8
+    style Y fill:#fff3e0
+```
+
+**📖 Learn more:** [Docker Deployment Guide](https://docs.crawl4ai.com/core/docker-deployment/), [API Reference](https://docs.crawl4ai.com/api/), [MCP Integration](https://docs.crawl4ai.com/core/docker-deployment/#mcp-model-context-protocol-support), [Production Configuration](https://docs.crawl4ai.com/core/docker-deployment/#production-deployment)
+---
+
+
+## CLI Workflows and Profile Management
+
+Visual representations of command-line interface operations, browser profile management, and identity-based crawling workflows.
+
+### CLI Command Flow Architecture
+
+```mermaid
+flowchart TD
+    A[crwl command] --> B{Command Type?}
+    
+    B -->|URL Crawling| C[Parse URL & Options]
+    B -->|Profile Management| D[profiles subcommand]
+    B -->|CDP Browser| E[cdp subcommand]
+    B -->|Browser Control| F[browser subcommand]
+    B -->|Configuration| G[config subcommand]
+    
+    C --> C1{Output Format?}
+    C1 -->|Default| C2[HTML/Markdown]
+    C1 -->|JSON| C3[Structured Data]
+    C1 -->|markdown| C4[Clean Markdown]
+    C1 -->|markdown-fit| C5[Filtered Content]
+    
+    C --> C6{Authentication?}
+    C6 -->|Profile Specified| C7[Load Browser Profile]
+    C6 -->|No Profile| C8[Anonymous Session]
+    
+    C7 --> C9[Launch with User Data]
+    C8 --> C10[Launch Clean Browser]
+    
+    C9 --> C11[Execute Crawl]
+    C10 --> C11
+    
+    C11 --> C12{Success?}
+    C12 -->|Yes| C13[Return Results]
+    C12 -->|No| C14[Error Handling]
+    
+    D --> D1[Interactive Profile Menu]
+    D1 --> D2{Menu Choice?}
+    D2 -->|Create| D3[Open Browser for Setup]
+    D2 -->|List| D4[Show Existing Profiles]
+    D2 -->|Delete| D5[Remove Profile]
+    D2 -->|Use| D6[Crawl with Profile]
+    
+    E --> E1[Launch CDP Browser]
+    E1 --> E2[Remote Debugging Active]
+    
+    F --> F1{Browser Action?}
+    F1 -->|start| F2[Start Builtin Browser]
+    F1 -->|stop| F3[Stop Builtin Browser]
+    F1 -->|status| F4[Check Browser Status]
+    F1 -->|view| F5[Open Browser Window]
+    
+    G --> G1{Config Action?}
+    G1 -->|list| G2[Show All Settings]
+    G1 -->|set| G3[Update Setting]
+    G1 -->|get| G4[Read Setting]
+    
+    style A fill:#e1f5fe
+    style C13 fill:#c8e6c9
+    style C14 fill:#ffcdd2
+    style D3 fill:#fff3e0
+    style E2 fill:#f3e5f5
+```
+
+### Profile Management Workflow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI
+    participant ProfileManager
+    participant Browser
+    participant FileSystem
+    
+    User->>CLI: crwl profiles
+    CLI->>ProfileManager: Initialize profile manager
+    ProfileManager->>FileSystem: Scan for existing profiles
+    FileSystem-->>ProfileManager: Profile list
+    ProfileManager-->>CLI: Show interactive menu
+    CLI-->>User: Display options
+    
+    Note over User: User selects "Create new profile"
+    
+    User->>CLI: Create profile "linkedin-auth"
+    CLI->>ProfileManager: create_profile("linkedin-auth")
+    ProfileManager->>FileSystem: Create profile directory
+    ProfileManager->>Browser: Launch with new user data dir
+    Browser-->>User: Opens browser window
+    
+    Note over User: User manually logs in to LinkedIn
+    
+    User->>Browser: Navigate and authenticate
+    Browser->>FileSystem: Save cookies, session data
+    User->>CLI: Press 'q' to save profile
+    CLI->>ProfileManager: finalize_profile()
+    ProfileManager->>FileSystem: Lock profile settings
+    ProfileManager-->>CLI: Profile saved
+    CLI-->>User: Profile "linkedin-auth" created
+    
+    Note over User: Later usage
+    
+    User->>CLI: crwl https://linkedin.com/feed -p linkedin-auth
+    CLI->>ProfileManager: load_profile("linkedin-auth")
+    ProfileManager->>FileSystem: Read profile data
+    FileSystem-->>ProfileManager: User data directory
+    ProfileManager-->>CLI: Profile configuration
+    CLI->>Browser: Launch with existing profile
+    Browser-->>CLI: Authenticated session ready
+    CLI->>Browser: Navigate to target URL
+    Browser-->>CLI: Crawl results with auth context
+    CLI-->>User: Authenticated content
+```
+
+### Browser Management State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> Stopped: Initial state
+    
+    Stopped --> Starting: crwl browser start
+    Starting --> Running: Browser launched
+    Running --> Viewing: crwl browser view
+    Viewing --> Running: Close window
+    Running --> Stopping: crwl browser stop
+    Stopping --> Stopped: Cleanup complete
+    
+    Running --> Restarting: crwl browser restart
+    Restarting --> Running: New browser instance
+    
+    Stopped --> CDP_Mode: crwl cdp
+    CDP_Mode --> CDP_Running: Remote debugging active
+    CDP_Running --> CDP_Mode: Manual close
+    CDP_Mode --> Stopped: Exit CDP
+    
+    Running --> StatusCheck: crwl browser status
+    StatusCheck --> Running: Return status
+    
+    note right of Running : Port 9222 active\nBuiltin browser available
+    note right of CDP_Running : Remote debugging\nManual control enabled
+    note right of Viewing : Visual browser window\nDirect interaction
+```
+
+### Authentication Workflow for Protected Sites
+
+```mermaid
+flowchart TD
+    A[Protected Site Access Needed] --> B[Create Profile Strategy]
+    
+    B --> C{Existing Profile?}
+    C -->|Yes| D[Test Profile Validity]
+    C -->|No| E[Create New Profile]
+    
+    D --> D1{Profile Valid?}
+    D1 -->|Yes| F[Use Existing Profile]
+    D1 -->|No| E
+    
+    E --> E1[crwl profiles]
+    E1 --> E2[Select Create New Profile]
+    E2 --> E3[Enter Profile Name]
+    E3 --> E4[Browser Opens for Auth]
+    
+    E4 --> E5{Authentication Method?}
+    E5 -->|Login Form| E6[Fill Username/Password]
+    E5 -->|OAuth| E7[OAuth Flow]
+    E5 -->|2FA| E8[Handle 2FA]
+    E5 -->|Session Cookie| E9[Import Cookies]
+    
+    E6 --> E10[Manual Login Process]
+    E7 --> E10
+    E8 --> E10
+    E9 --> E10
+    
+    E10 --> E11[Verify Authentication]
+    E11 --> E12{Auth Successful?}
+    E12 -->|Yes| E13[Save Profile - Press q]
+    E12 -->|No| E10
+    
+    E13 --> F
+    F --> G[Execute Authenticated Crawl]
+    
+    G --> H[crwl URL -p profile-name]
+    H --> I[Load Profile Data]
+    I --> J[Launch Browser with Auth]
+    J --> K[Navigate to Protected Content]
+    K --> L[Extract Authenticated Data]
+    L --> M[Return Results]
+    
+    style E4 fill:#fff3e0
+    style E10 fill:#e3f2fd
+    style F fill:#e8f5e8
+    style M fill:#c8e6c9
+```
+
+### CDP Browser Architecture
+
+```mermaid
+graph TB
+    subgraph "CLI Layer"
+        A[crwl cdp command] --> B[CDP Manager]
+        B --> C[Port Configuration]
+        B --> D[Profile Selection]
+    end
+    
+    subgraph "Browser Process"
+        E[Chromium/Firefox] --> F[Remote Debugging]
+        F --> G[WebSocket Endpoint]
+        G --> H[ws://localhost:9222]
+    end
+    
+    subgraph "Client Connections"
+        I[Manual Browser Control] --> H
+        J[DevTools Interface] --> H
+        K[External Automation] --> H
+        L[Crawl4AI Crawler] --> H
+    end
+    
+    subgraph "Profile Data"
+        M[User Data Directory] --> E
+        N[Cookies & Sessions] --> M
+        O[Extensions] --> M
+        P[Browser State] --> M
+    end
+    
+    A --> E
+    C --> H
+    D --> M
+    
+    style H fill:#e3f2fd
+    style E fill:#f3e5f5
+    style M fill:#e8f5e8
+```
+
+### Configuration Management Hierarchy
+
+```mermaid
+graph TD
+    subgraph "Global Configuration"
+        A[~/.crawl4ai/config.yml] --> B[Default Settings]
+        B --> C[LLM Providers]
+        B --> D[Browser Defaults]
+        B --> E[Output Preferences]
+    end
+    
+    subgraph "Profile Configuration"
+        F[Profile Directory] --> G[Browser State]
+        F --> H[Authentication Data]
+        F --> I[Site-Specific Settings]
+    end
+    
+    subgraph "Command-Line Overrides"
+        J[-b browser_config] --> K[Runtime Browser Settings]
+        L[-c crawler_config] --> M[Runtime Crawler Settings]
+        N[-o output_format] --> O[Runtime Output Format]
+    end
+    
+    subgraph "Configuration Files"
+        P[browser.yml] --> Q[Browser Config Template]
+        R[crawler.yml] --> S[Crawler Config Template]
+        T[extract.yml] --> U[Extraction Config]
+    end
+    
+    subgraph "Resolution Order"
+        V[Command Line Args] --> W[Config Files]
+        W --> X[Profile Settings]
+        X --> Y[Global Defaults]
+    end
+    
+    J --> V
+    L --> V
+    N --> V
+    P --> W
+    R --> W
+    T --> W
+    F --> X
+    A --> Y
+    
+    style V fill:#ffcdd2
+    style W fill:#fff3e0
+    style X fill:#e3f2fd
+    style Y fill:#e8f5e8
+```
+
+### Identity-Based Crawling Decision Tree
+
+```mermaid
+flowchart TD
+    A[Target Website Assessment] --> B{Authentication Required?}
+    
+    B -->|No| C[Standard Anonymous Crawl]
+    B -->|Yes| D{Authentication Type?}
+    
+    D -->|Login Form| E[Create Login Profile]
+    D -->|OAuth/SSO| F[Create OAuth Profile] 
+    D -->|API Key/Token| G[Use Headers/Config]
+    D -->|Session Cookies| H[Import Cookie Profile]
+    
+    E --> E1[crwl profiles → Manual login]
+    F --> F1[crwl profiles → OAuth flow]
+    G --> G1[Configure headers in crawler config]
+    H --> H1[Import cookies to profile]
+    
+    E1 --> I[Test Authentication]
+    F1 --> I
+    G1 --> I
+    H1 --> I
+    
+    I --> J{Auth Test Success?}
+    J -->|Yes| K[Production Crawl Setup]
+    J -->|No| L[Debug Authentication]
+    
+    L --> L1{Common Issues?}
+    L1 -->|Rate Limiting| L2[Add delays/user simulation]
+    L1 -->|Bot Detection| L3[Enable stealth mode]
+    L1 -->|Session Expired| L4[Refresh authentication]
+    L1 -->|CAPTCHA| L5[Manual intervention needed]
+    
+    L2 --> M[Retry with Adjustments]
+    L3 --> M
+    L4 --> E1
+    L5 --> N[Semi-automated approach]
+    
+    M --> I
+    N --> O[Manual auth + automated crawl]
+    
+    K --> P[Automated Authenticated Crawling]
+    O --> P
+    C --> P
+    
+    P --> Q[Monitor & Maintain Profiles]
+    
+    style I fill:#fff3e0
+    style K fill:#e8f5e8
+    style P fill:#c8e6c9
+    style L fill:#ffcdd2
+    style N fill:#f3e5f5
+```
+
+### CLI Usage Patterns and Best Practices
+
+```mermaid
+timeline
+    title CLI Workflow Evolution
+    
+    section Setup Phase
+        Installation : pip install crawl4ai
+                    : crawl4ai-setup
+        Basic Test   : crwl https://example.com
+        Config Setup : crwl config set defaults
+    
+    section Profile Creation
+        Site Analysis    : Identify auth requirements
+        Profile Creation : crwl profiles
+        Manual Login     : Authenticate in browser
+        Profile Save     : Press 'q' to save
+    
+    section Development Phase
+        Test Crawls      : crwl URL -p profile -v
+        Config Tuning    : Adjust browser/crawler settings
+        Output Testing   : Try different output formats
+        Error Handling   : Debug authentication issues
+    
+    section Production Phase
+        Automated Crawls : crwl URL -p profile -o json
+        Batch Processing : Multiple URLs with same profile
+        Monitoring       : Check profile validity
+        Maintenance      : Update profiles as needed
+```
+
+### Multi-Profile Management Strategy
+
+```mermaid
+graph LR
+    subgraph "Profile Categories"
+        A[Social Media Profiles]
+        B[Work/Enterprise Profiles]
+        C[E-commerce Profiles]
+        D[Research Profiles]
+    end
+    
+    subgraph "Social Media"
+        A --> A1[linkedin-personal]
+        A --> A2[twitter-monitor]
+        A --> A3[facebook-research]
+        A --> A4[instagram-brand]
+    end
+    
+    subgraph "Enterprise"
+        B --> B1[company-intranet]
+        B --> B2[github-enterprise]
+        B --> B3[confluence-docs]
+        B --> B4[jira-tickets]
+    end
+    
+    subgraph "E-commerce"
+        C --> C1[amazon-seller]
+        C --> C2[shopify-admin]
+        C --> C3[ebay-monitor]
+        C --> C4[marketplace-competitor]
+    end
+    
+    subgraph "Research"
+        D --> D1[academic-journals]
+        D --> D2[data-platforms]
+        D --> D3[survey-tools]
+        D --> D4[government-portals]
+    end
+    
+    subgraph "Usage Patterns"
+        E[Daily Monitoring] --> A2
+        E --> B1
+        F[Weekly Reports] --> C3
+        F --> D2
+        G[On-Demand Research] --> D1
+        G --> D4
+        H[Competitive Analysis] --> C4
+        H --> A4
+    end
+    
+    style A1 fill:#e3f2fd
+    style B1 fill:#f3e5f5
+    style C1 fill:#e8f5e8
+    style D1 fill:#fff3e0
+```
+
+**📖 Learn more:** [CLI Reference](https://docs.crawl4ai.com/core/cli/), [Identity-Based Crawling](https://docs.crawl4ai.com/advanced/identity-based-crawling/), [Profile Management](https://docs.crawl4ai.com/advanced/session-management/), [Authentication Strategies](https://docs.crawl4ai.com/advanced/hooks-auth/)
+---
+
+
+## HTTP Crawler Strategy Workflows
+
+Visual representations of HTTP-based crawling architecture, request flows, and performance characteristics compared to browser-based strategies.
+
+### HTTP vs Browser Strategy Decision Tree
+
+```mermaid
+flowchart TD
+    A[Content Crawling Need] --> B{Content Type Analysis}
+    
+    B -->|Static HTML| C{JavaScript Required?}
+    B -->|Dynamic SPA| D[Browser Strategy Required]
+    B -->|API Endpoints| E[HTTP Strategy Optimal]
+    B -->|Mixed Content| F{Primary Content Source?}
+    
+    C -->|No JS Needed| G[HTTP Strategy Recommended]
+    C -->|JS Required| H[Browser Strategy Required]
+    C -->|Unknown| I{Performance Priority?}
+    
+    I -->|Speed Critical| J[Try HTTP First]
+    I -->|Accuracy Critical| K[Use Browser Strategy]
+    
+    F -->|Mostly Static| G
+    F -->|Mostly Dynamic| D
+    
+    G --> L{Resource Constraints?}
+    L -->|Memory Limited| M[HTTP Strategy - Lightweight]
+    L -->|CPU Limited| N[HTTP Strategy - No Browser]
+    L -->|Network Limited| O[HTTP Strategy - Efficient]
+    L -->|No Constraints| P[Either Strategy Works]
+    
+    J --> Q[Test HTTP Results]
+    Q --> R{Content Complete?}
+    R -->|Yes| S[Continue with HTTP]
+    R -->|No| T[Switch to Browser Strategy]
+    
+    D --> U[Browser Strategy Features]
+    H --> U
+    K --> U
+    T --> U
+    
+    U --> V[JavaScript Execution]
+    U --> W[Screenshots/PDFs]
+    U --> X[Complex Interactions]
+    U --> Y[Session Management]
+    
+    M --> Z[HTTP Strategy Benefits]
+    N --> Z
+    O --> Z
+    S --> Z
+    
+    Z --> AA[10x Faster Processing]
+    Z --> BB[Lower Memory Usage]
+    Z --> CC[Higher Concurrency]
+    Z --> DD[Simpler Deployment]
+    
+    style G fill:#c8e6c9
+    style M fill:#c8e6c9
+    style N fill:#c8e6c9
+    style O fill:#c8e6c9
+    style S fill:#c8e6c9
+    style D fill:#e3f2fd
+    style H fill:#e3f2fd
+    style K fill:#e3f2fd
+    style T fill:#e3f2fd
+    style U fill:#e3f2fd
+```
+
+### HTTP Request Lifecycle Sequence
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant HTTPStrategy as HTTP Strategy
+    participant Session as HTTP Session
+    participant Server as Target Server
+    participant Processor as Content Processor
+    
+    Client->>HTTPStrategy: crawl(url, config)
+    HTTPStrategy->>HTTPStrategy: validate_url()
+    
+    alt URL Type Check
+        HTTPStrategy->>HTTPStrategy: handle_file_url()
+        Note over HTTPStrategy: file:// URLs
+    else
+        HTTPStrategy->>HTTPStrategy: handle_raw_content()
+        Note over HTTPStrategy: raw:// content
+    else
+        HTTPStrategy->>Session: prepare_request()
+        Session->>Session: apply_config()
+        Session->>Session: set_headers()
+        Session->>Session: setup_auth()
+        
+        Session->>Server: HTTP Request
+        Note over Session,Server: GET/POST/PUT with headers
+        
+        alt Success Response
+            Server-->>Session: HTTP 200 + Content
+            Session-->>HTTPStrategy: response_data
+        else Redirect Response
+            Server-->>Session: HTTP 3xx + Location
+            Session->>Server: Follow redirect
+            Server-->>Session: HTTP 200 + Content
+            Session-->>HTTPStrategy: final_response
+        else Error Response
+            Server-->>Session: HTTP 4xx/5xx
+            Session-->>HTTPStrategy: error_response
+        end
+    end
+    
+    HTTPStrategy->>Processor: process_content()
+    Processor->>Processor: clean_html()
+    Processor->>Processor: extract_metadata()
+    Processor->>Processor: generate_markdown()
+    Processor-->>HTTPStrategy: processed_result
+    
+    HTTPStrategy-->>Client: CrawlResult
+    
+    Note over Client,Processor: Fast, lightweight processing
+    Note over HTTPStrategy: No browser overhead
+```
+
+### HTTP Strategy Architecture
+
+```mermaid
+graph TB
+    subgraph "HTTP Crawler Strategy"
+        A[AsyncHTTPCrawlerStrategy] --> B[Session Manager]
+        A --> C[Request Builder]
+        A --> D[Response Handler]
+        A --> E[Error Manager]
+        
+        B --> B1[Connection Pool]
+        B --> B2[DNS Cache]
+        B --> B3[SSL Context]
+        
+        C --> C1[Headers Builder]
+        C --> C2[Auth Handler]
+        C --> C3[Payload Encoder]
+        
+        D --> D1[Content Decoder]
+        D --> D2[Redirect Handler]
+        D --> D3[Status Validator]
+        
+        E --> E1[Retry Logic]
+        E --> E2[Timeout Handler]
+        E --> E3[Exception Mapper]
+    end
+    
+    subgraph "Content Processing"
+        F[Raw HTML] --> G[HTML Cleaner]
+        G --> H[Markdown Generator]
+        H --> I[Link Extractor]
+        I --> J[Media Extractor]
+        J --> K[Metadata Parser]
+    end
+    
+    subgraph "External Resources"
+        L[Target Websites]
+        M[Local Files]
+        N[Raw Content]
+    end
+    
+    subgraph "Output"
+        O[CrawlResult]
+        O --> O1[HTML Content]
+        O --> O2[Markdown Text]
+        O --> O3[Extracted Links]
+        O --> O4[Media References]
+        O --> O5[Status Information]
+    end
+    
+    A --> F
+    L --> A
+    M --> A
+    N --> A
+    K --> O
+    
+    style A fill:#e3f2fd
+    style B fill:#f3e5f5
+    style F fill:#e8f5e8
+    style O fill:#fff3e0
+```
+
+### Performance Comparison Flow
+
+```mermaid
+graph LR
+    subgraph "HTTP Strategy Performance"
+        A1[Request Start] --> A2[DNS Lookup: 50ms]
+        A2 --> A3[TCP Connect: 100ms]
+        A3 --> A4[HTTP Request: 200ms]
+        A4 --> A5[Content Download: 300ms]
+        A5 --> A6[Processing: 50ms]
+        A6 --> A7[Total: ~700ms]
+    end
+    
+    subgraph "Browser Strategy Performance"
+        B1[Request Start] --> B2[Browser Launch: 2000ms]
+        B2 --> B3[Page Navigation: 1000ms]
+        B3 --> B4[JS Execution: 500ms]
+        B4 --> B5[Content Rendering: 300ms]
+        B5 --> B6[Processing: 100ms]
+        B6 --> B7[Total: ~3900ms]
+    end
+    
+    subgraph "Resource Usage"
+        C1[HTTP Memory: ~50MB]
+        C2[Browser Memory: ~500MB]
+        C3[HTTP CPU: Low]
+        C4[Browser CPU: High]
+        C5[HTTP Concurrency: 100+]
+        C6[Browser Concurrency: 10-20]
+    end
+    
+    A7 --> D[5.5x Faster]
+    B7 --> D
+    C1 --> E[10x Less Memory]
+    C2 --> E
+    C5 --> F[5x More Concurrent]
+    C6 --> F
+    
+    style A7 fill:#c8e6c9
+    style B7 fill:#ffcdd2
+    style C1 fill:#c8e6c9
+    style C2 fill:#ffcdd2
+    style C5 fill:#c8e6c9
+    style C6 fill:#ffcdd2
+```
+
+### HTTP Request Types and Configuration
+
+```mermaid
+stateDiagram-v2
+    [*] --> HTTPConfigSetup
+    
+    HTTPConfigSetup --> MethodSelection
+    
+    MethodSelection --> GET: Simple data retrieval
+    MethodSelection --> POST: Form submission
+    MethodSelection --> PUT: Data upload
+    MethodSelection --> DELETE: Resource removal
+    
+    GET --> HeaderSetup: Set Accept headers
+    POST --> PayloadSetup: JSON or form data
+    PUT --> PayloadSetup: File or data upload
+    DELETE --> AuthSetup: Authentication required
+    
+    PayloadSetup --> JSONPayload: application/json
+    PayloadSetup --> FormPayload: form-data
+    PayloadSetup --> RawPayload: custom content
+    
+    JSONPayload --> HeaderSetup
+    FormPayload --> HeaderSetup
+    RawPayload --> HeaderSetup
+    
+    HeaderSetup --> AuthSetup
+    AuthSetup --> SSLSetup
+    SSLSetup --> RedirectSetup
+    RedirectSetup --> RequestExecution
+    
+    RequestExecution --> [*]: Request complete
+    
+    note right of GET : Default method for most crawling
+    note right of POST : API interactions, form submissions
+    note right of JSONPayload : Structured data transmission
+    note right of HeaderSetup : User-Agent, Accept, Custom headers
+```
+
+### Error Handling and Retry Workflow
+
+```mermaid
+flowchart TD
+    A[HTTP Request] --> B{Response Received?}
+    
+    B -->|No| C[Connection Error]
+    B -->|Yes| D{Status Code Check}
+    
+    C --> C1{Timeout Error?}
+    C1 -->|Yes| C2[ConnectionTimeoutError]
+    C1 -->|No| C3[Network Error]
+    
+    D -->|2xx| E[Success Response]
+    D -->|3xx| F[Redirect Response]
+    D -->|4xx| G[Client Error]
+    D -->|5xx| H[Server Error]
+    
+    F --> F1{Follow Redirects?}
+    F1 -->|Yes| F2[Follow Redirect]
+    F1 -->|No| F3[Return Redirect Response]
+    F2 --> A
+    
+    G --> G1{Retry on 4xx?}
+    G1 -->|No| G2[HTTPStatusError]
+    G1 -->|Yes| I[Check Retry Count]
+    
+    H --> H1{Retry on 5xx?}
+    H1 -->|Yes| I
+    H1 -->|No| H2[HTTPStatusError]
+    
+    C2 --> I
+    C3 --> I
+    
+    I --> J{Retries < Max?}
+    J -->|No| K[Final Error]
+    J -->|Yes| L[Calculate Backoff]
+    
+    L --> M[Wait Backoff Time]
+    M --> N[Increment Retry Count]
+    N --> A
+    
+    E --> O[Process Content]
+    F3 --> O
+    O --> P[Return CrawlResult]
+    
+    G2 --> Q[Error CrawlResult]
+    H2 --> Q
+    K --> Q
+    
+    style E fill:#c8e6c9
+    style P fill:#c8e6c9
+    style G2 fill:#ffcdd2
+    style H2 fill:#ffcdd2
+    style K fill:#ffcdd2
+    style Q fill:#ffcdd2
+```
+
+### Batch Processing Architecture
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant BatchManager as Batch Manager
+    participant HTTPPool as Connection Pool
+    participant Workers as HTTP Workers
+    participant Targets as Target Servers
+    
+    Client->>BatchManager: batch_crawl(urls)
+    BatchManager->>BatchManager: create_semaphore(max_concurrent)
+    
+    loop For each URL batch
+        BatchManager->>HTTPPool: acquire_connection()
+        HTTPPool->>Workers: assign_worker()
+        
+        par Concurrent Processing
+            Workers->>Targets: HTTP Request 1
+            Workers->>Targets: HTTP Request 2
+            Workers->>Targets: HTTP Request N
+        end
+        
+        par Response Handling
+            Targets-->>Workers: Response 1
+            Targets-->>Workers: Response 2
+            Targets-->>Workers: Response N
+        end
+        
+        Workers->>HTTPPool: return_connection()
+        HTTPPool->>BatchManager: batch_results()
+    end
+    
+    BatchManager->>BatchManager: aggregate_results()
+    BatchManager-->>Client: final_results()
+    
+    Note over Workers,Targets: 20-100 concurrent connections
+    Note over BatchManager: Memory-efficient processing
+    Note over HTTPPool: Connection reuse optimization
+```
+
+### Content Type Processing Pipeline
+
+```mermaid
+graph TD
+    A[HTTP Response] --> B{Content-Type Detection}
+    
+    B -->|text/html| C[HTML Processing]
+    B -->|application/json| D[JSON Processing]
+    B -->|text/plain| E[Text Processing]
+    B -->|application/xml| F[XML Processing]
+    B -->|Other| G[Binary Processing]
+    
+    C --> C1[Parse HTML Structure]
+    C1 --> C2[Extract Text Content]
+    C2 --> C3[Generate Markdown]
+    C3 --> C4[Extract Links/Media]
+    
+    D --> D1[Parse JSON Structure]
+    D1 --> D2[Extract Data Fields]
+    D2 --> D3[Format as Readable Text]
+    
+    E --> E1[Clean Text Content]
+    E1 --> E2[Basic Formatting]
+    
+    F --> F1[Parse XML Structure]
+    F1 --> F2[Extract Text Nodes]
+    F2 --> F3[Convert to Markdown]
+    
+    G --> G1[Save Binary Content]
+    G1 --> G2[Generate Metadata]
+    
+    C4 --> H[Content Analysis]
+    D3 --> H
+    E2 --> H
+    F3 --> H
+    G2 --> H
+    
+    H --> I[Link Extraction]
+    H --> J[Media Detection]
+    H --> K[Metadata Parsing]
+    
+    I --> L[CrawlResult Assembly]
+    J --> L
+    K --> L
+    
+    L --> M[Final Output]
+    
+    style C fill:#e8f5e8
+    style H fill:#fff3e0
+    style L fill:#e3f2fd
+    style M fill:#c8e6c9
+```
+
+### Integration with Processing Strategies
+
+```mermaid
+graph LR
+    subgraph "HTTP Strategy Core"
+        A[HTTP Request] --> B[Raw Content]
+        B --> C[Content Decoder]
+    end
+    
+    subgraph "Processing Pipeline"
+        C --> D[HTML Cleaner]
+        D --> E[Markdown Generator]
+        E --> F{Content Filter?}
+        
+        F -->|Yes| G[Pruning Filter]
+        F -->|Yes| H[BM25 Filter]
+        F -->|No| I[Raw Markdown]
+        
+        G --> J[Fit Markdown]
+        H --> J
+    end
+    
+    subgraph "Extraction Strategies"
+        I --> K[CSS Extraction]
+        J --> K
+        I --> L[XPath Extraction]
+        J --> L
+        I --> M[LLM Extraction]
+        J --> M
+    end
+    
+    subgraph "Output Generation"
+        K --> N[Structured JSON]
+        L --> N
+        M --> N
+        
+        I --> O[Clean Markdown]
+        J --> P[Filtered Content]
+        
+        N --> Q[Final CrawlResult]
+        O --> Q
+        P --> Q
+    end
+    
+    style A fill:#e3f2fd
+    style C fill:#f3e5f5
+    style E fill:#e8f5e8
+    style Q fill:#c8e6c9
+```
+
+**📖 Learn more:** [HTTP vs Browser Strategies](https://docs.crawl4ai.com/core/browser-crawler-config/), [Performance Optimization](https://docs.crawl4ai.com/advanced/multi-url-crawling/), [Error Handling](https://docs.crawl4ai.com/api/async-webcrawler/)
+---
+
+
+## URL Seeding Workflows and Architecture
+
+Visual representations of URL discovery strategies, filtering pipelines, and smart crawling workflows.
+
+### URL Seeding vs Deep Crawling Strategy Comparison
+
+```mermaid
+graph TB
+    subgraph "Deep Crawling Approach"
+        A1[Start URL] --> A2[Load Page]
+        A2 --> A3[Extract Links]
+        A3 --> A4{More Links?}
+        A4 -->|Yes| A5[Queue Next Page]
+        A5 --> A2
+        A4 -->|No| A6[Complete]
+        
+        A7[⏱️ Real-time Discovery]
+        A8[🐌 Sequential Processing]
+        A9[🔍 Limited by Page Structure]
+        A10[💾 High Memory Usage]
+    end
+    
+    subgraph "URL Seeding Approach"
+        B1[Domain Input] --> B2[Query Sitemap]
+        B1 --> B3[Query Common Crawl]
+        B2 --> B4[Merge Results]
+        B3 --> B4
+        B4 --> B5[Apply Filters]
+        B5 --> B6[Score Relevance]
+        B6 --> B7[Rank Results]
+        B7 --> B8[Select Top URLs]
+        
+        B9[⚡ Instant Discovery]
+        B10[🚀 Parallel Processing]
+        B11[🎯 Pattern-based Filtering]
+        B12[💡 Smart Relevance Scoring]
+    end
+    
+    style A1 fill:#ffecb3
+    style B1 fill:#e8f5e8
+    style A6 fill:#ffcdd2
+    style B8 fill:#c8e6c9
+```
+
+### URL Discovery Data Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Seeder as AsyncUrlSeeder
+    participant SM as Sitemap
+    participant CC as Common Crawl
+    participant Filter as URL Filter
+    participant Scorer as BM25 Scorer
+    
+    User->>Seeder: urls("example.com", config)
+    
+    par Parallel Data Sources
+        Seeder->>SM: Fetch sitemap.xml
+        SM-->>Seeder: 500 URLs
+    and
+        Seeder->>CC: Query Common Crawl
+        CC-->>Seeder: 2000 URLs
+    end
+    
+    Seeder->>Seeder: Merge and deduplicate
+    Note over Seeder: 2200 unique URLs
+    
+    Seeder->>Filter: Apply pattern filter
+    Filter-->>Seeder: 800 matching URLs
+    
+    alt extract_head=True
+        loop For each URL
+            Seeder->>Seeder: Extract <head> metadata
+        end
+        Note over Seeder: Title, description, keywords
+    end
+    
+    alt query provided
+        Seeder->>Scorer: Calculate relevance scores
+        Scorer-->>Seeder: Scored URLs
+        Seeder->>Seeder: Filter by score_threshold
+        Note over Seeder: 200 relevant URLs
+    end
+    
+    Seeder->>Seeder: Sort by relevance
+    Seeder->>Seeder: Apply max_urls limit
+    Seeder-->>User: Top 100 URLs ready for crawling
+```
+
+### SeedingConfig Decision Tree
+
+```mermaid
+flowchart TD
+    A[SeedingConfig Setup] --> B{Data Source Strategy?}
+    
+    B -->|Fast & Official| C[source="sitemap"]
+    B -->|Comprehensive| D[source="cc"]  
+    B -->|Maximum Coverage| E[source="sitemap+cc"]
+    
+    C --> F{Need Filtering?}
+    D --> F
+    E --> F
+    
+    F -->|Yes| G[Set URL Pattern]
+    F -->|No| H[pattern="*"]
+    
+    G --> I{Pattern Examples}
+    I --> I1[pattern="*/blog/*"]
+    I --> I2[pattern="*/docs/api/*"]
+    I --> I3[pattern="*.pdf"]
+    I --> I4[pattern="*/product/*"]
+    
+    H --> J{Need Metadata?}
+    I1 --> J
+    I2 --> J
+    I3 --> J
+    I4 --> J
+    
+    J -->|Yes| K[extract_head=True]
+    J -->|No| L[extract_head=False]
+    
+    K --> M{Need Validation?}
+    L --> M
+    
+    M -->|Yes| N[live_check=True]
+    M -->|No| O[live_check=False]
+    
+    N --> P{Need Relevance Scoring?}
+    O --> P
+    
+    P -->|Yes| Q[Set Query + BM25]
+    P -->|No| R[Skip Scoring]
+    
+    Q --> S[query="search terms"]
+    S --> T[scoring_method="bm25"]
+    T --> U[score_threshold=0.3]
+    
+    R --> V[Performance Tuning]
+    U --> V
+    
+    V --> W[Set max_urls]
+    W --> X[Set concurrency]
+    X --> Y[Set hits_per_sec]
+    Y --> Z[Configuration Complete]
+    
+    style A fill:#e3f2fd
+    style Z fill:#c8e6c9
+    style K fill:#fff3e0
+    style N fill:#fff3e0
+    style Q fill:#f3e5f5
+```
+
+### BM25 Relevance Scoring Pipeline
+
+```mermaid
+graph TB
+    subgraph "Text Corpus Preparation"
+        A1[URL Collection] --> A2[Extract Metadata]
+        A2 --> A3[Title + Description + Keywords]
+        A3 --> A4[Tokenize Text]
+        A4 --> A5[Remove Stop Words]
+        A5 --> A6[Create Document Corpus]
+    end
+    
+    subgraph "BM25 Algorithm"
+        B1[Query Terms] --> B2[Term Frequency Calculation]
+        A6 --> B2
+        B2 --> B3[Inverse Document Frequency]
+        B3 --> B4[BM25 Score Calculation]
+        B4 --> B5[Score = Σ(IDF × TF × K1+1)/(TF + K1×(1-b+b×|d|/avgdl))]
+    end
+    
+    subgraph "Scoring Results"
+        B5 --> C1[URL Relevance Scores]
+        C1 --> C2{Score ≥ Threshold?}
+        C2 -->|Yes| C3[Include in Results]
+        C2 -->|No| C4[Filter Out]
+        C3 --> C5[Sort by Score DESC]
+        C5 --> C6[Return Top URLs]
+    end
+    
+    subgraph "Example Scores"
+        D1["python async tutorial" → 0.85]
+        D2["python documentation" → 0.72]
+        D3["javascript guide" → 0.23]
+        D4["contact us page" → 0.05]
+    end
+    
+    style B5 fill:#e3f2fd
+    style C6 fill:#c8e6c9
+    style D1 fill:#c8e6c9
+    style D2 fill:#c8e6c9
+    style D3 fill:#ffecb3
+    style D4 fill:#ffcdd2
+```
+
+### Multi-Domain Discovery Architecture
+
+```mermaid
+graph TB
+    subgraph "Input Layer"
+        A1[Domain List]
+        A2[SeedingConfig]
+        A3[Query Terms]
+    end
+    
+    subgraph "Discovery Engine"
+        B1[AsyncUrlSeeder]
+        B2[Parallel Workers]
+        B3[Rate Limiter]
+        B4[Memory Manager]
+    end
+    
+    subgraph "Data Sources"
+        C1[Sitemap Fetcher]
+        C2[Common Crawl API]
+        C3[Live URL Checker]
+        C4[Metadata Extractor]
+    end
+    
+    subgraph "Processing Pipeline"
+        D1[URL Deduplication]
+        D2[Pattern Filtering]
+        D3[Relevance Scoring]
+        D4[Quality Assessment]
+    end
+    
+    subgraph "Output Layer"
+        E1[Scored URL Lists]
+        E2[Domain Statistics]
+        E3[Performance Metrics]
+        E4[Cache Storage]
+    end
+    
+    A1 --> B1
+    A2 --> B1
+    A3 --> B1
+    
+    B1 --> B2
+    B2 --> B3
+    B3 --> B4
+    
+    B2 --> C1
+    B2 --> C2
+    B2 --> C3
+    B2 --> C4
+    
+    C1 --> D1
+    C2 --> D1
+    C3 --> D2
+    C4 --> D3
+    
+    D1 --> D2
+    D2 --> D3
+    D3 --> D4
+    
+    D4 --> E1
+    B4 --> E2
+    B3 --> E3
+    D1 --> E4
+    
+    style B1 fill:#e3f2fd
+    style D3 fill:#f3e5f5
+    style E1 fill:#c8e6c9
+```
+
+### Complete Discovery-to-Crawl Pipeline
+
+```mermaid
+stateDiagram-v2
+    [*] --> Discovery
+    
+    Discovery --> SourceSelection: Configure data sources
+    SourceSelection --> Sitemap: source="sitemap"
+    SourceSelection --> CommonCrawl: source="cc"
+    SourceSelection --> Both: source="sitemap+cc"
+    
+    Sitemap --> URLCollection
+    CommonCrawl --> URLCollection
+    Both --> URLCollection
+    
+    URLCollection --> Filtering: Apply patterns
+    Filtering --> MetadataExtraction: extract_head=True
+    Filtering --> LiveValidation: extract_head=False
+    
+    MetadataExtraction --> LiveValidation: live_check=True
+    MetadataExtraction --> RelevanceScoring: live_check=False
+    LiveValidation --> RelevanceScoring
+    
+    RelevanceScoring --> ResultRanking: query provided
+    RelevanceScoring --> ResultLimiting: no query
+    
+    ResultRanking --> ResultLimiting: apply score_threshold
+    ResultLimiting --> URLSelection: apply max_urls
+    
+    URLSelection --> CrawlPreparation: URLs ready
+    CrawlPreparation --> CrawlExecution: AsyncWebCrawler
+    
+    CrawlExecution --> StreamProcessing: stream=True
+    CrawlExecution --> BatchProcessing: stream=False
+    
+    StreamProcessing --> [*]
+    BatchProcessing --> [*]
+    
+    note right of Discovery : 🔍 Smart URL Discovery
+    note right of URLCollection : 📚 Merge & Deduplicate
+    note right of RelevanceScoring : 🎯 BM25 Algorithm
+    note right of CrawlExecution : 🕷️ High-Performance Crawling
+```
+
+### Performance Optimization Strategies
+
+```mermaid
+graph LR
+    subgraph "Input Optimization"
+        A1[Smart Source Selection] --> A2[Sitemap First]
+        A2 --> A3[Add CC if Needed]
+        A3 --> A4[Pattern Filtering Early]
+    end
+    
+    subgraph "Processing Optimization"
+        B1[Parallel Workers] --> B2[Bounded Queues]
+        B2 --> B3[Rate Limiting]
+        B3 --> B4[Memory Management]
+        B4 --> B5[Lazy Evaluation]
+    end
+    
+    subgraph "Output Optimization"
+        C1[Relevance Threshold] --> C2[Max URL Limits]
+        C2 --> C3[Caching Strategy]
+        C3 --> C4[Streaming Results]
+    end
+    
+    subgraph "Performance Metrics"
+        D1[URLs/Second: 100-1000]
+        D2[Memory Usage: Bounded]
+        D3[Network Efficiency: 95%+]
+        D4[Cache Hit Rate: 80%+]
+    end
+    
+    A4 --> B1
+    B5 --> C1
+    C4 --> D1
+    
+    style A2 fill:#e8f5e8
+    style B2 fill:#e3f2fd
+    style C3 fill:#f3e5f5
+    style D3 fill:#c8e6c9
+```
+
+### URL Discovery vs Traditional Crawling Comparison
+
+```mermaid
+graph TB
+    subgraph "Traditional Approach"
+        T1[Start URL] --> T2[Crawl Page]
+        T2 --> T3[Extract Links]
+        T3 --> T4[Queue New URLs]
+        T4 --> T2
+        T5[❌ Time: Hours/Days]
+        T6[❌ Resource Heavy]
+        T7[❌ Depth Limited]
+        T8[❌ Discovery Bias]
+    end
+    
+    subgraph "URL Seeding Approach"
+        S1[Domain Input] --> S2[Query All Sources]
+        S2 --> S3[Pattern Filter]
+        S3 --> S4[Relevance Score]
+        S4 --> S5[Select Best URLs]
+        S5 --> S6[Ready to Crawl]
+        
+        S7[✅ Time: Seconds/Minutes]
+        S8[✅ Resource Efficient]
+        S9[✅ Complete Coverage]
+        S10[✅ Quality Focused]
+    end
+    
+    subgraph "Use Case Decision Matrix"
+        U1[Small Sites < 1000 pages] --> U2[Use Deep Crawling]
+        U3[Large Sites > 10000 pages] --> U4[Use URL Seeding]
+        U5[Unknown Structure] --> U6[Start with Seeding]
+        U7[Real-time Discovery] --> U8[Use Deep Crawling]
+        U9[Quality over Quantity] --> U10[Use URL Seeding]
+    end
+    
+    style S6 fill:#c8e6c9
+    style S7 fill:#c8e6c9
+    style S8 fill:#c8e6c9
+    style S9 fill:#c8e6c9
+    style S10 fill:#c8e6c9
+    style T5 fill:#ffcdd2
+    style T6 fill:#ffcdd2
+    style T7 fill:#ffcdd2
+    style T8 fill:#ffcdd2
+```
+
+### Data Source Characteristics and Selection
+
+```mermaid
+graph TB
+    subgraph "Sitemap Source"
+        SM1[📋 Official URL List]
+        SM2[⚡ Fast Response]
+        SM3[📅 Recently Updated]
+        SM4[🎯 High Quality URLs]
+        SM5[❌ May Miss Some Pages]
+    end
+    
+    subgraph "Common Crawl Source"
+        CC1[🌐 Comprehensive Coverage]
+        CC2[📚 Historical Data]
+        CC3[🔍 Deep Discovery]
+        CC4[⏳ Slower Response]
+        CC5[🧹 May Include Noise]
+    end
+    
+    subgraph "Combined Strategy"
+        CB1[🚀 Best of Both]
+        CB2[📊 Maximum Coverage]
+        CB3[✨ Automatic Deduplication]
+        CB4[⚖️ Balanced Performance]
+    end
+    
+    subgraph "Selection Guidelines"
+        G1[Speed Critical → Sitemap Only]
+        G2[Coverage Critical → Common Crawl]
+        G3[Best Quality → Combined]
+        G4[Unknown Domain → Combined]
+    end
+    
+    style SM2 fill:#c8e6c9
+    style SM4 fill:#c8e6c9
+    style CC1 fill:#e3f2fd
+    style CC3 fill:#e3f2fd
+    style CB1 fill:#f3e5f5
+    style CB3 fill:#f3e5f5
+```
+
+**📖 Learn more:** [URL Seeding Guide](https://docs.crawl4ai.com/core/url-seeding/), [Performance Optimization](https://docs.crawl4ai.com/advanced/optimization/), [Multi-URL Crawling](https://docs.crawl4ai.com/advanced/multi-url-crawling/)
+---
+
+
+## Deep Crawling Filters & Scorers Architecture
+
+Visual representations of advanced URL filtering, scoring strategies, and performance optimization workflows for intelligent deep crawling.
+
+### Filter Chain Processing Pipeline
+
+```mermaid
+flowchart TD
+    A[URL Input] --> B{Domain Filter}
+    B -->|✓ Pass| C{Pattern Filter}
+    B -->|✗ Fail| X1[Reject: Invalid Domain]
+    
+    C -->|✓ Pass| D{Content Type Filter}
+    C -->|✗ Fail| X2[Reject: Pattern Mismatch]
+    
+    D -->|✓ Pass| E{SEO Filter}
+    D -->|✗ Fail| X3[Reject: Wrong Content Type]
+    
+    E -->|✓ Pass| F{Content Relevance Filter}
+    E -->|✗ Fail| X4[Reject: Low SEO Score]
+    
+    F -->|✓ Pass| G[URL Accepted]
+    F -->|✗ Fail| X5[Reject: Low Relevance]
+    
+    G --> H[Add to Crawl Queue]
+    
+    subgraph "Fast Filters"
+        B
+        C
+        D
+    end
+    
+    subgraph "Slow Filters"
+        E
+        F
+    end
+    
+    style A fill:#e3f2fd
+    style G fill:#c8e6c9
+    style H fill:#e8f5e8
+    style X1 fill:#ffcdd2
+    style X2 fill:#ffcdd2
+    style X3 fill:#ffcdd2
+    style X4 fill:#ffcdd2
+    style X5 fill:#ffcdd2
+```
+
+### URL Scoring System Architecture
+
+```mermaid
+graph TB
+    subgraph "Input URL"
+        A[https://python.org/tutorial/2024/ml-guide.html]
+    end
+    
+    subgraph "Individual Scorers"
+        B[Keyword Relevance Scorer]
+        C[Path Depth Scorer]
+        D[Content Type Scorer]
+        E[Freshness Scorer]
+        F[Domain Authority Scorer]
+    end
+    
+    subgraph "Scoring Process"
+        B --> B1[Keywords: python, tutorial, ml<br/>Score: 0.85]
+        C --> C1[Depth: 4 levels<br/>Optimal: 3<br/>Score: 0.75]
+        D --> D1[Content: HTML<br/>Score: 1.0]
+        E --> E1[Year: 2024<br/>Score: 1.0]
+        F --> F1[Domain: python.org<br/>Score: 1.0]
+    end
+    
+    subgraph "Composite Scoring"
+        G[Weighted Combination]
+        B1 --> G
+        C1 --> G
+        D1 --> G
+        E1 --> G
+        F1 --> G
+    end
+    
+    subgraph "Final Result"
+        H[Composite Score: 0.92]
+        I{Score > Threshold?}
+        J[Accept URL]
+        K[Reject URL]
+    end
+    
+    A --> B
+    A --> C
+    A --> D
+    A --> E
+    A --> F
+    
+    G --> H
+    H --> I
+    I -->|✓ 0.92 > 0.6| J
+    I -->|✗ Score too low| K
+    
+    style A fill:#e3f2fd
+    style G fill:#fff3e0
+    style H fill:#e8f5e8
+    style J fill:#c8e6c9
+    style K fill:#ffcdd2
+```
+
+### Filter vs Scorer Decision Matrix
+
+```mermaid
+flowchart TD
+    A[URL Processing Decision] --> B{Binary Decision Needed?}
+    
+    B -->|Yes - Include/Exclude| C[Use Filters]
+    B -->|No - Quality Rating| D[Use Scorers]
+    
+    C --> C1{Filter Type Needed?}
+    C1 -->|Domain Control| C2[DomainFilter]
+    C1 -->|Pattern Matching| C3[URLPatternFilter]
+    C1 -->|Content Type| C4[ContentTypeFilter]
+    C1 -->|SEO Quality| C5[SEOFilter]
+    C1 -->|Content Relevance| C6[ContentRelevanceFilter]
+    
+    D --> D1{Scoring Criteria?}
+    D1 -->|Keyword Relevance| D2[KeywordRelevanceScorer]
+    D1 -->|URL Structure| D3[PathDepthScorer]
+    D1 -->|Content Quality| D4[ContentTypeScorer]
+    D1 -->|Time Sensitivity| D5[FreshnessScorer]
+    D1 -->|Source Authority| D6[DomainAuthorityScorer]
+    
+    C2 --> E[Chain Filters]
+    C3 --> E
+    C4 --> E
+    C5 --> E
+    C6 --> E
+    
+    D2 --> F[Composite Scorer]
+    D3 --> F
+    D4 --> F
+    D5 --> F
+    D6 --> F
+    
+    E --> G[Binary Output: Pass/Fail]
+    F --> H[Numeric Score: 0.0-1.0]
+    
+    G --> I[Apply to URL Queue]
+    H --> J[Priority Ranking]
+    
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
+    style E fill:#f3e5f5
+    style F fill:#e3f2fd
+    style G fill:#c8e6c9
+    style H fill:#ffecb3
+```
+
+### Performance Optimization Strategy
+
+```mermaid
+sequenceDiagram
+    participant Queue as URL Queue
+    participant Fast as Fast Filters
+    participant Slow as Slow Filters
+    participant Score as Scorers
+    participant Output as Filtered URLs
+    
+    Note over Queue, Output: Batch Processing (1000 URLs)
+    
+    Queue->>Fast: Apply Domain Filter
+    Fast-->>Queue: 60% passed (600 URLs)
+    
+    Queue->>Fast: Apply Pattern Filter
+    Fast-->>Queue: 70% passed (420 URLs)
+    
+    Queue->>Fast: Apply Content Type Filter
+    Fast-->>Queue: 90% passed (378 URLs)
+    
+    Note over Fast: Fast filters eliminate 62% of URLs
+    
+    Queue->>Slow: Apply SEO Filter (378 URLs)
+    Slow-->>Queue: 80% passed (302 URLs)
+    
+    Queue->>Slow: Apply Relevance Filter
+    Slow-->>Queue: 75% passed (227 URLs)
+    
+    Note over Slow: Content analysis on remaining URLs
+    
+    Queue->>Score: Calculate Composite Scores
+    Score-->>Queue: Scored and ranked
+    
+    Queue->>Output: Top 100 URLs by score
+    Output-->>Queue: Processing complete
+    
+    Note over Queue, Output: Total: 90% filtered out, 10% high-quality URLs retained
+```
+
+### Custom Filter Implementation Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> Planning
+    
+    Planning --> IdentifyNeeds: Define filtering criteria
+    IdentifyNeeds --> ChooseType: Binary vs Scoring decision
+    
+    ChooseType --> FilterImpl: Binary decision needed
+    ChooseType --> ScorerImpl: Quality rating needed
+    
+    FilterImpl --> InheritURLFilter: Extend URLFilter base class
+    ScorerImpl --> InheritURLScorer: Extend URLScorer base class
+    
+    InheritURLFilter --> ImplementApply: def apply(url) -> bool
+    InheritURLScorer --> ImplementScore: def _calculate_score(url) -> float
+    
+    ImplementApply --> AddLogic: Add custom filtering logic
+    ImplementScore --> AddLogic
+    
+    AddLogic --> TestFilter: Unit testing
+    TestFilter --> OptimizePerf: Performance optimization
+    
+    OptimizePerf --> Integration: Integrate with FilterChain
+    Integration --> Production: Deploy to production
+    
+    Production --> Monitor: Monitor performance
+    Monitor --> Tune: Tune parameters
+    Tune --> Production
+    
+    note right of Planning : Consider performance impact
+    note right of AddLogic : Handle edge cases
+    note right of OptimizePerf : Cache frequently accessed data
+```
+
+### Filter Chain Optimization Patterns
+
+```mermaid
+graph TB
+    subgraph "Naive Approach - Poor Performance"
+        A1[All URLs] --> B1[Slow Filter 1]
+        B1 --> C1[Slow Filter 2]
+        C1 --> D1[Fast Filter 1]
+        D1 --> E1[Fast Filter 2]
+        E1 --> F1[Final Results]
+        
+        B1 -.->|High CPU| G1[Performance Issues]
+        C1 -.->|Network Calls| G1
+    end
+    
+    subgraph "Optimized Approach - High Performance"
+        A2[All URLs] --> B2[Fast Filter 1]
+        B2 --> C2[Fast Filter 2]
+        C2 --> D2[Batch Process]
+        D2 --> E2[Slow Filter 1]
+        E2 --> F2[Slow Filter 2]
+        F2 --> G2[Final Results]
+        
+        D2 --> H2[Concurrent Processing]
+        H2 --> I2[Semaphore Control]
+    end
+    
+    subgraph "Performance Metrics"
+        J[Processing Time]
+        K[Memory Usage]
+        L[CPU Utilization]
+        M[Network Requests]
+    end
+    
+    G1 -.-> J
+    G1 -.-> K
+    G1 -.-> L
+    G1 -.-> M
+    
+    G2 -.-> J
+    G2 -.-> K
+    G2 -.-> L
+    G2 -.-> M
+    
+    style A1 fill:#ffcdd2
+    style G1 fill:#ffcdd2
+    style A2 fill:#c8e6c9
+    style G2 fill:#c8e6c9
+    style H2 fill:#e8f5e8
+    style I2 fill:#e8f5e8
+```
+
+### Composite Scoring Weight Distribution
+
+```mermaid
+pie title Composite Scorer Weight Distribution
+    "Keyword Relevance (30%)" : 30
+    "Domain Authority (25%)" : 25
+    "Content Type (20%)" : 20
+    "Freshness (15%)" : 15
+    "Path Depth (10%)" : 10
+```
+
+### Deep Crawl Integration Architecture
+
+```mermaid
+graph TD
+    subgraph "Deep Crawl Strategy"
+        A[Start URL] --> B[Extract Links]
+        B --> C[Apply Filter Chain]
+        C --> D[Calculate Scores]
+        D --> E[Priority Queue]
+        E --> F[Crawl Next URL]
+        F --> B
+    end
+    
+    subgraph "Filter Chain Components"
+        C --> C1[Domain Filter]
+        C --> C2[Pattern Filter]
+        C --> C3[Content Filter]
+        C --> C4[SEO Filter]
+        C --> C5[Relevance Filter]
+    end
+    
+    subgraph "Scoring Components"
+        D --> D1[Keyword Scorer]
+        D --> D2[Depth Scorer]
+        D --> D3[Freshness Scorer]
+        D --> D4[Authority Scorer]
+        D --> D5[Composite Score]
+    end
+    
+    subgraph "Queue Management"
+        E --> E1{Score > Threshold?}
+        E1 -->|Yes| E2[High Priority Queue]
+        E1 -->|No| E3[Low Priority Queue]
+        E2 --> F
+        E3 --> G[Delayed Processing]
+    end
+    
+    subgraph "Control Flow"
+        H{Max Depth Reached?}
+        I{Max Pages Reached?}
+        J[Stop Crawling]
+    end
+    
+    F --> H
+    H -->|No| I
+    H -->|Yes| J
+    I -->|No| B
+    I -->|Yes| J
+    
+    style A fill:#e3f2fd
+    style E2 fill:#c8e6c9
+    style E3 fill:#fff3e0
+    style J fill:#ffcdd2
+```
+
+### Filter Performance Comparison
+
+```mermaid
+xychart-beta
+    title "Filter Performance Comparison (1000 URLs)"
+    x-axis [Domain, Pattern, ContentType, SEO, Relevance]
+    y-axis "Processing Time (ms)" 0 --> 1000
+    bar [50, 80, 45, 300, 800]
+```
+
+### Scoring Algorithm Workflow
+
+```mermaid
+flowchart TD
+    A[Input URL] --> B[Parse URL Components]
+    B --> C[Extract Features]
+    
+    C --> D[Domain Analysis]
+    C --> E[Path Analysis] 
+    C --> F[Content Type Detection]
+    C --> G[Keyword Extraction]
+    C --> H[Freshness Detection]
+    
+    D --> I[Domain Authority Score]
+    E --> J[Path Depth Score]
+    F --> K[Content Type Score]
+    G --> L[Keyword Relevance Score]
+    H --> M[Freshness Score]
+    
+    I --> N[Apply Weights]
+    J --> N
+    K --> N
+    L --> N
+    M --> N
+    
+    N --> O[Normalize Scores]
+    O --> P[Calculate Final Score]
+    P --> Q{Score >= Threshold?}
+    
+    Q -->|Yes| R[Accept for Crawling]
+    Q -->|No| S[Reject URL]
+    
+    R --> T[Add to Priority Queue]
+    S --> U[Log Rejection Reason]
+    
+    style A fill:#e3f2fd
+    style P fill:#fff3e0
+    style R fill:#c8e6c9
+    style S fill:#ffcdd2
+    style T fill:#e8f5e8
+```
+
+**📖 Learn more:** [Deep Crawling Strategy](https://docs.crawl4ai.com/core/deep-crawling/), [Performance Optimization](https://docs.crawl4ai.com/advanced/performance-tuning/), [Custom Implementations](https://docs.crawl4ai.com/advanced/custom-filters/)
+---
+
+
+## Summary
+
+Crawl4AI provides a comprehensive solution for web crawling and data extraction optimized for AI applications. From simple page crawling to complex multi-URL operations with advanced filtering, the library offers the flexibility and performance needed for modern data extraction workflows.
+
+**Key Takeaways:**
+- Start with basic installation and simple crawling patterns
+- Use configuration objects for consistent, maintainable code
+- Choose appropriate extraction strategies based on your data structure
+- Leverage Docker for production deployments
+- Implement advanced features like deep crawling and custom filters as needed
+
+**Next Steps:**
+- Explore the [GitHub repository](https://github.com/unclecode/crawl4ai) for latest updates
+- Join the [Discord community](https://discord.gg/jP8KfhDhyN) for support
+- Check out [example projects](https://github.com/unclecode/crawl4ai/tree/main/docs/examples) for inspiration
+
+Happy crawling! 🕷️

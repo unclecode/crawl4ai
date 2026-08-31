@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web2API Example</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <img src="/assets/crawl4ai_logo.jpg" alt="Crawl4AI Logo" class="logo-image">
+                <span>Web2API Example</span>
+            </div>
+            <nav class="nav-links">
+                <a href="#" class="nav-link active" data-page="scrape">Scrape</a>
+                <a href="#" class="nav-link" data-page="models">Models</a>
+                <a href="#" class="nav-link" data-page="requests">API Requests</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Scrape Page -->
+        <div id="scrape-page" class="page active">
+            <div class="hero-section">
+                <h1 class="hero-title">Turn Any Website Into An API</h1>
+                <p class="hero-subtitle">This example shows how to turn any website into an API using Crawl4AI.</p>
+            </div>
+
+            <!-- Workflow Demonstration -->
+            <div class="workflow-demo">
+                <div class="workflow-step">
+                    <h3 class="step-title">1. Your Request</h3>
+                    <div class="request-box">
+                        <div class="input-group">
+                            <label>URL:</label>
+                            <input type="url" id="url" name="url" placeholder="https://example-bookstore.com/new-releases" required>
+                        </div>
+                        <div class="input-group">
+                            <label>QUERY:</label>
+                            <textarea id="query" name="query" placeholder="Extract all the book titles, their authors, and the biography of the author" required></textarea>
+                        </div>
+                        <div class="form-options">
+                            <div class="option-group">
+                                <label for="scraping-approach">Approach:</label>
+                                <select id="scraping-approach" name="scraping_approach">
+                                    <option value="llm">LLM-based (More Flexible)</option>
+                                    <option value="schema">Schema-based (Uses LLM once!)</option>
+                                </select>
+                            </div>
+                            <div class="option-group">
+                                <label for="model-select">Model:</label>
+                                <select id="model-select" name="model_name" required>
+                                    <option value="">Select a Model</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" id="extract-btn" class="extract-btn">
+                            <i class="fas fa-magic"></i>
+                            Extract Data
+                        </button>
+                    </div>
+                </div>
+
+                <div class="workflow-arrow">→</div>
+
+                <div class="workflow-step">
+                    <h3 class="step-title">2. Your Instant API & Data</h3>
+                    <div class="response-container">
+                        <div class="api-request-box">
+                            <label>API Request (cURL):</label>
+                            <pre id="curl-example">curl -X POST http://localhost:8000/scrape -H "Content-Type: application/json" -d '{"url": "...", "query": "..."}'
+
+# Or for LLM-based approach:
+curl -X POST http://localhost:8000/scrape-with-llm -H "Content-Type: application/json" -d '{"url": "...", "query": "..."}'</pre>
+                        </div>
+                        <div class="json-response-box">
+                            <label>JSON Response:</label>
+                            <pre id="json-output">{
+  "success": true,
+  "extracted_data": [
+    {
+      "title": "Example Book",
+      "author": "John Doe",
+      "description": "A great book..."
+    }
+  ]
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div id="results-section" class="results-section" style="display: none;">
+                <div class="results-header">
+                    <h2>Extracted Data</h2>
+                    <button id="copy-json" class="copy-btn">
+                        <i class="fas fa-copy"></i>
+                        Copy JSON
+                    </button>
+                </div>
+                <div class="results-content">
+                    <div class="result-info">
+                        <div class="info-item">
+                            <span class="label">URL:</span>
+                            <span id="result-url" class="value"></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Query:</span>
+                            <span id="result-query" class="value"></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Model Used:</span>
+                            <span id="result-model" class="value"></span>
+                        </div>
+                    </div>
+                    <div class="json-display">
+                        <pre id="actual-json-output"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>AI is analyzing the website and extracting data...</p>
+            </div>
+        </div>
+
+        <!-- Models Page -->
+        <div id="models-page" class="page">
+            <div class="models-header">
+                <h1>Model Configuration</h1>
+                <p>Configure and manage your AI model configurations</p>
+            </div>
+
+            <div class="models-container">
+                <!-- Add New Model Form -->
+                <div class="model-form-section">
+                    <h3>Add New Model</h3>
+                    <form id="model-form" class="model-form">
+                        <div class="form-row">
+                            <div class="input-group">
+                                <label for="model-name">Model Name:</label>
+                                <input type="text" id="model-name" name="model_name" placeholder="my-gemini" required>
+                            </div>
+                            <div class="input-group">
+                                <label for="provider">Provider:</label>
+                                <input type="text" id="provider" name="provider" placeholder="gemini/gemini-2.5-flash" required>
+                            </div>
+                        </div>
+                        
+                        <div class="input-group">
+                            <label for="api-token">API Token:</label>
+                            <input type="password" id="api-token" name="api_token" placeholder="Enter your API token" required>
+                        </div>
+
+                        <button type="submit" class="save-btn">
+                            <i class="fas fa-save"></i>
+                            Save Model
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Saved Models List -->
+                <div class="saved-models-section">
+                    <h3>Saved Models</h3>
+                    <div id="models-list" class="models-list">
+                        <!-- Models will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Requests Page -->
+        <div id="requests-page" class="page">
+            <div class="requests-header">
+                <h1>Saved API Requests</h1>
+                <p>View and manage your previous API requests</p>
+            </div>
+
+            <div class="requests-container">
+                <div class="requests-list" id="requests-list">
+                    <!-- Saved requests will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html> 

@@ -1,0 +1,54 @@
+{
+  "manifest_version": 3,
+  "name": "Crawl4AI Assistant",
+  "version": "1.3.0",
+  "description": "Visual schema and script builder for Crawl4AI - Build extraction schemas and automation scripts by clicking and recording actions",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "downloads"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": [
+        "libs/marked.min.js",
+        "content/shared/utils.js",
+        "content/markdownPreviewModal.js",
+        "content/click2crawl.js",
+        "content/scriptBuilder.js",
+        "content/contentAnalyzer.js",
+        "content/markdownConverter.js",
+        "content/markdownExtraction.js",
+        "content/content.js"
+      ],
+      "css": ["content/overlay.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*", "assets/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
