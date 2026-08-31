@@ -226,7 +226,7 @@ def merge_chunks(
 
 class VersionManager:
     def __init__(self):
-        self.home_dir = Path.home() / ".crawl4ai"
+        self.home_dir = Path(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home())) / ".crawl4ai"
         self.version_file = self.home_dir / "version.txt"
 
     def get_installed_version(self):
@@ -1697,7 +1697,7 @@ def extract_xml_data_legacy(tags, string):
     data = {}
 
     for tag in tags:
-        pattern = f"<{tag}>(.*?)</{tag}>"
+        pattern = f"<{tag}>((?:(?!<{tag}>).)*)</{tag}>"
         match = re.search(pattern, string, re.DOTALL)
         if match:
             data[tag] = match.group(1).strip()
@@ -1726,7 +1726,7 @@ def extract_xml_data(tags, string):
     data = {}
 
     for tag in tags:
-        pattern = f"<{tag}>(.*?)</{tag}>"
+        pattern = f"<{tag}>((?:(?!<{tag}>).)*)</{tag}>"
         matches = re.findall(pattern, string, re.DOTALL)
         
         if matches:
@@ -1748,6 +1748,7 @@ def perform_completion_with_backoff(
     base_delay=2,
     max_attempts=3,
     exponential_factor=2,
+    messages=None,
     **kwargs,
 ):
     """
@@ -1789,7 +1790,7 @@ def perform_completion_with_backoff(
         try:
             response = completion(
                 model=provider,
-                messages=[{"role": "user", "content": prompt_with_variables}],
+                messages=messages if messages is not None else [{"role": "user", "content": prompt_with_variables}],
                 **extra_args,
             )
             return response  # Return the successful response
@@ -1839,6 +1840,7 @@ async def aperform_completion_with_backoff(
     base_delay=2,
     max_attempts=3,
     exponential_factor=2,
+    messages=None,
     **kwargs,
 ):
     """
@@ -1881,7 +1883,7 @@ async def aperform_completion_with_backoff(
         try:
             response = await acompletion(
                 model=provider,
-                messages=[{"role": "user", "content": prompt_with_variables}],
+                messages=messages if messages is not None else [{"role": "user", "content": prompt_with_variables}],
                 **extra_args,
             )
             return response  # Return the successful response
@@ -2210,25 +2212,6 @@ def fast_format_html(html_string):
     return "\n".join(formatted)
 
 
-def normalize_url(href, base_url):
-    """Normalize URLs to ensure consistent format"""
-    from urllib.parse import urljoin, urlparse
-
-    # Parse base URL to get components
-    parsed_base = urlparse(base_url)
-    if not parsed_base.scheme or not parsed_base.netloc:
-        raise ValueError(f"Invalid base URL format: {base_url}")
-    
-    if  parsed_base.scheme.lower() not in ["http", "https"]:
-        # Handle special protocols
-        raise ValueError(f"Invalid base URL format: {base_url}")
-    cleaned_href = href.strip()
-
-    # Use urljoin to handle all cases
-    return urljoin(base_url, cleaned_href)
-
-
-
 
 def normalize_url(
     href: str,
@@ -2292,14 +2275,14 @@ def normalize_url(
     # IMPORTANT: Don't use quote(unquote()) as it mangles + signs in URLs
     # The path from urlparse is already properly encoded
     path = parsed.path
-    if path.endswith('/') and path != '/':
-        path = path.rstrip('/')
+    # Preserve trailing slashes -- they are semantically significant per RFC 3986
+    # e.g. /page/9123/ and /page/9123 may return different responses
 
     # ── query ──
     query = parsed.query
     if query:
         # explode, mutate, then rebuild
-        params = [(k.lower(), v) for k, v in parse_qsl(query, keep_blank_values=True)]
+        params = [(k, v) for k, v in parse_qsl(query, keep_blank_values=True)]
 
         if drop_query_tracking:
             default_tracking = {
@@ -2308,7 +2291,7 @@ def normalize_url(
             }
             if extra_drop_params:
                 default_tracking |= {p.lower() for p in extra_drop_params}
-            params = [(k, v) for k, v in params if k not in default_tracking]
+            params = [(k, v) for k, v in params if k.lower() not in default_tracking]
 
         if sort_query:
             params.sort(key=lambda kv: kv[0])
@@ -2381,7 +2364,7 @@ def normalize_url_for_deep_crawl(href, base_url, preserve_https=False, original_
     normalized = urlunparse((
         parsed.scheme,
         netloc,
-        parsed.path.rstrip('/'),  # Normalize trailing slash
+        parsed.path or '/',  # Preserve trailing slash
         parsed.params,
         query,
         fragment
@@ -2420,7 +2403,7 @@ def efficient_normalize_url_for_deep_crawl(href, base_url, preserve_https=False,
     normalized = urlunparse((
         parsed.scheme,
         parsed.netloc.lower(),
-        parsed.path.rstrip('/'),
+        parsed.path or '/',  # Preserve trailing slash
         parsed.params,
         parsed.query,
         ''  # Remove fragment
@@ -2428,41 +2411,6 @@ def efficient_normalize_url_for_deep_crawl(href, base_url, preserve_https=False,
     
     return normalized
 
-
-def normalize_url_tmp(href, base_url):
-    """Normalize URLs to ensure consistent format"""
-    # Extract protocol and domain from base URL
-    try:
-        base_parts = base_url.split("/")
-        protocol = base_parts[0]
-        domain = base_parts[2]
-    except IndexError:
-        raise ValueError(f"Invalid base URL format: {base_url}")
-
-    # Handle special protocols
-    special_protocols = {"mailto:", "tel:", "ftp:", "file:", "data:", "javascript:"}
-    if any(href.lower().startswith(proto) for proto in special_protocols):
-        return href.strip()
-
-    # Handle anchor links
-    if href.startswith("#"):
-        return f"{base_url}{href}"
-
-    # Handle protocol-relative URLs
-    if href.startswith("//"):
-        return f"{protocol}{href}"
-
-    # Handle root-relative URLs
-    if href.startswith("/"):
-        return f"{protocol}//{domain}{href}"
-
-    # Handle relative URLs
-    if not href.startswith(("http://", "https://")):
-        # Remove leading './' if present
-        href = href.lstrip("./")
-        return f"{protocol}//{domain}/{href}"
-
-    return href.strip()
 
 
 def quick_extract_links(html: str, base_url: str) -> Dict[str, List[Dict[str, str]]]:
@@ -2484,7 +2432,23 @@ def quick_extract_links(html: str, base_url: str) -> Dict[str, List[Dict[str, st
     except Exception:
         return {"internal": [], "external": []}
 
+    # base_domain stays anchored to the real page origin so internal/external
+    # classification is correct even when a <base> tag points elsewhere.
     base_domain = get_base_domain(base_url)
+
+    # Honor <head><base href> for relative-URL resolution (#752). The full LXML
+    # scraping path does this; the prefetch quick path (used by scan/site) must
+    # too — otherwise relative links resolve against the page URL and the base
+    # tag is ignored. urljoin handles a relative <base href> against the page.
+    try:
+        base_el = doc.xpath("//head/base[@href]")
+        if base_el:
+            base_href = (base_el[0].get("href") or "").strip()
+            if base_href:
+                base_url = urljoin(base_url, base_href)
+    except Exception:
+        pass
+
     internal: List[Dict[str, str]] = []
     external: List[Dict[str, str]] = []
     seen: Set[str] = set()
@@ -2588,9 +2552,9 @@ def is_external_url(url: str, base_domain: str) -> bool:
         if not parsed.netloc:  # Relative URL
             return False
 
-        # Strip 'www.' from both domains for comparison
-        url_domain = parsed.netloc.lower().replace("www.", "")
-        base = base_domain.lower().replace("www.", "")
+        # Strip port and 'www.' from both domains for comparison
+        url_domain = parsed.netloc.lower().split(":")[0].replace("www.", "")
+        base = base_domain.lower().split(":")[0].replace("www.", "")
 
         # Check if URL domain ends with base domain
         return not url_domain.endswith(base)

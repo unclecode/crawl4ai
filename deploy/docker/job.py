@@ -4,7 +4,7 @@ Relies on the existing Redis task helpers in api.py
 """
 
 from typing import Dict, Optional, Callable
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, HttpUrl
 
 from api import (
@@ -12,6 +12,7 @@ from api import (
     handle_crawl_job,
     handle_task_status,
 )
+from auth import get_principal
 from schemas import WebhookConfig
 
 # ------------- dependency placeholders -------------
@@ -21,6 +22,19 @@ _token_dep: Callable = lambda: None  # dummy until injected
 
 # public router
 router = APIRouter()
+
+
+def _principal_dep(request: Request) -> Optional[Dict]:
+    """The principal the AuthGateMiddleware already validated for this request."""
+    return get_principal(request)
+
+
+def _owner_of(principal: Optional[Dict]) -> Optional[str]:
+    return principal.get("sub") if principal else None
+
+
+def _is_admin(principal: Optional[Dict]) -> bool:
+    return bool(principal) and principal.get("scope") == "admin"
 
 
 # === init hook called by server.py =========================================
@@ -40,7 +54,7 @@ class LlmJobPayload(BaseModel):
     provider: Optional[str] = None
     webhook_config: Optional[WebhookConfig] = None
     temperature: Optional[float] = None
-    base_url: Optional[str] = None
+    # base_url removed: server-derived LLM endpoint only (key-exfil vector).
 
 
 class CrawlJobPayload(BaseModel):
@@ -56,10 +70,15 @@ async def llm_job_enqueue(
         payload: LlmJobPayload,
         background_tasks: BackgroundTasks,
         request: Request,
-        _td: Dict = Depends(lambda: _token_dep()),   # late-bound dep
+        _td: Optional[Dict] = Depends(_principal_dep),
 ):
     webhook_config = None
     if payload.webhook_config:
+        from utils import validate_webhook_url
+        try:
+            validate_webhook_url(str(payload.webhook_config.webhook_url))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         webhook_config = payload.webhook_config.model_dump(mode='json')
 
     return await handle_llm_request(
@@ -74,7 +93,8 @@ async def llm_job_enqueue(
         provider=payload.provider,
         webhook_config=webhook_config,
         temperature=payload.temperature,
-        api_base_url=payload.base_url,
+        requester=_owner_of(_td),
+        is_admin=_is_admin(_td),
     )
 
 
@@ -82,9 +102,12 @@ async def llm_job_enqueue(
 async def llm_job_status(
     request: Request,
     task_id: str,
-    _td: Dict = Depends(lambda: _token_dep())
+    _td: Optional[Dict] = Depends(_principal_dep),
 ):
-    return await handle_task_status(_redis, task_id, base_url=str(request.base_url))
+    return await handle_task_status(
+        _redis, task_id, base_url=str(request.base_url),
+        requester=_owner_of(_td), is_admin=_is_admin(_td),
+    )
 
 
 # ---------- CRAWL job -------------------------------------------------------
@@ -92,10 +115,15 @@ async def llm_job_status(
 async def crawl_job_enqueue(
         payload: CrawlJobPayload,
         background_tasks: BackgroundTasks,
-        _td: Dict = Depends(lambda: _token_dep()),
+        _td: Optional[Dict] = Depends(_principal_dep),
 ):
     webhook_config = None
     if payload.webhook_config:
+        from utils import validate_webhook_url
+        try:
+            validate_webhook_url(str(payload.webhook_config.webhook_url))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         webhook_config = payload.webhook_config.model_dump(mode='json')
 
     return await handle_crawl_job(
@@ -106,6 +134,7 @@ async def crawl_job_enqueue(
         payload.crawler_config,
         config=_config,
         webhook_config=webhook_config,
+        owner=_owner_of(_td),
     )
 
 
@@ -113,6 +142,9 @@ async def crawl_job_enqueue(
 async def crawl_job_status(
     request: Request,
     task_id: str,
-    _td: Dict = Depends(lambda: _token_dep())
+    _td: Optional[Dict] = Depends(_principal_dep),
 ):
-    return await handle_task_status(_redis, task_id, base_url=str(request.base_url))
+    return await handle_task_status(
+        _redis, task_id, base_url=str(request.base_url),
+        requester=_owner_of(_td), is_admin=_is_admin(_td),
+    )

@@ -103,7 +103,7 @@ async def arun(
     url: str,
     config: Optional[CrawlerRunConfig] = None,
     # Legacy parameters for backward compatibility...
-) -> CrawlResult:
+) -> RunManyReturn:
     ...
 ```
 
@@ -143,7 +143,7 @@ async def arun_many(
     urls: List[str],
     config: Optional[CrawlerRunConfig] = None,
     # Legacy parameters maintained for backwards compatibility...
-) -> List[CrawlResult]:
+) -> RunManyReturn:
     """
     Process multiple URLs with intelligent rate limiting and resource monitoring.
     """
@@ -200,7 +200,7 @@ Each `arun()` returns a **`CrawlResult`** containing:
 - `url`: Final URL (if redirected).
 - `html`: Original HTML.
 - `cleaned_html`: Sanitized HTML.
-- `markdown_v2`: Deprecated. Instead just use regular `markdown`
+- `markdown_v2`: Removed in v0.5. Accessing it raises `AttributeError`; use `markdown`.
 - `extracted_content`: If an extraction strategy was used (JSON for CSS/LLM strategies).
 - `screenshot`, `pdf`: If screenshots/PDF requested.
 - `media`, `links`: Information about discovered images/links.

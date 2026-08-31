@@ -1167,3 +1167,7 @@ config = SeedingConfig(
 7. **Automatic Cache Recovery**: Corrupted or incomplete caches are automatically refreshed
 
 Now go forth and seed intelligently!
+
+## Need More Coverage?
+
+If you need to discover URLs across an entire domain — including subdomains, hidden services, and pages not listed in any sitemap — check out [Domain Mapping](domain-mapping.md). It combines 8 discovery sources (including Certificate Transparency, Wayback Machine, path probing, and soft-404 detection) to find everything under a domain.

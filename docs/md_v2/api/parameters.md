@@ -10,7 +10,7 @@ browser_cfg = BrowserConfig(
     headless=True,
     viewport_width=1280,
     viewport_height=720,
-    proxy="http://user:pass@proxy:8080",
+    proxy_config="http://user:pass@proxy:8080",
     user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36",
 )
 ```
@@ -29,6 +29,7 @@ browser_cfg = BrowserConfig(
 | **`viewport_width`**  | `int` (default: `1080`)                | Initial page width (in px). Useful for testing responsive layouts.                                                                    |
 | **`viewport_height`** | `int` (default: `600`)                 | Initial page height (in px).                                                                                                          |
 | **`viewport`**        | `dict` (default: `None`)               | Viewport dimensions dict. If set, overrides `viewport_width` and `viewport_height`.                                                   |
+| **`device_scale_factor`** | `float` (default: `1.0`)           | Device pixel ratio for rendering. Use `2.0` for Retina-quality screenshots. Higher values produce larger images and use more memory.  |
 | **`proxy`**           | `str` (deprecated)                      | Deprecated. Use `proxy_config` instead. If set, it will be auto-converted internally. |
 | **`proxy_config`**    | `ProxyConfig or dict` (default: `None`)| For advanced or multi-proxy needs, specify `ProxyConfig` object or dict like `{"server": "...", "username": "...", "password": "..."}`.  |
 | **`use_persistent_context`** | `bool` (default: `False`)       | If `True`, uses a **persistent** browser context (keep cookies, sessions across runs). Also sets `use_managed_browser=True`.          |
@@ -48,6 +49,8 @@ browser_cfg = BrowserConfig(
 | **`user_agent_generator_config`** | `dict` (default: `{}`)     | Configuration dict for user agent generation when `user_agent_mode="random"`.                                                         |
 | **`text_mode`**       | `bool` (default: `False`)              | If `True`, tries to disable images/other heavy content for speed.                                                                     |
 | **`light_mode`**      | `bool` (default: `False`)              | Disables some background features for performance gains.                                                                              |
+| **`avoid_ads`**       | `bool` (default: `False`)              | If `True`, blocks requests to common ad/tracker domains (Google Analytics, DoubleClick, Facebook, Hotjar, etc.) at the browser context level. |
+| **`avoid_css`**       | `bool` (default: `False`)              | If `True`, blocks loading of CSS files (`.css`, `.less`, `.scss`, `.sass`) for faster, leaner crawls when only text content is needed. |
 | **`extra_args`**      | `list` (default: `[]`)                 | Additional flags for the underlying browser process, e.g. `["--disable-extensions"]`.                                                |
 | **`enable_stealth`**  | `bool` (default: `False`)              | Enable playwright-stealth mode to bypass bot detection. Cannot be used with `browser_mode="builtin"`.                                |
 
@@ -108,8 +111,10 @@ We group them by category.
 | **`timezone_id`**      | `str or None` (None)      | Browser's timezone (e.g., "America/New_York", "Europe/Paris").                                         |
 | **`geolocation`**      | `GeolocationConfig or None` (None) | GPS coordinates configuration. Use `GeolocationConfig(latitude=..., longitude=..., accuracy=...)`. |
 | **`fetch_ssl_certificate`** | `bool` (False)       | If `True`, fetches and includes SSL certificate information in the result.                             |
-| **`proxy_config`**           | `ProxyConfig or dict or None` (None) | Proxy configuration for this specific crawl. Can override browser-level proxy settings.          |
+| **`proxy_config`**           | `ProxyConfig`, `list[ProxyConfig]`, or `None` (None) | Proxy configuration for this specific crawl. Pass a single proxy or an ordered list of proxies to try. See [Anti-Bot & Fallback](../advanced/anti-bot-and-fallback.md). |
 | **`proxy_rotation_strategy`** | `ProxyRotationStrategy` (None)      | Strategy for rotating proxies during crawl operations.                                           |
+| **`max_retries`**            | `int` (0)                            | Number of retry rounds when anti-bot blocking is detected. Each round tries all proxies in `proxy_config`. |
+| **`fallback_fetch_function`**| `async (str) -> str or None` (None)  | Async function called as last resort after all retries are exhausted. Takes URL, returns raw HTML. See [Anti-Bot & Fallback](../advanced/anti-bot-and-fallback.md). |
 
 ---
 
@@ -149,15 +154,18 @@ Use these for controlling whether you read or write from a local content cache. 
 
 | **Parameter**              | **Type / Default**            | **What It Does**                                                                                                                       |
 |----------------------------|--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
-| **`js_code`**              | `str or list[str]` (None)      | JavaScript to run after load. E.g. `"document.querySelector('button')?.click();"`.                                                     |
+| **`js_code`**              | `str or list[str]` (None)      | JavaScript to run **after** `wait_for` and `delay_before_return_html`, on the fully-loaded page. E.g. `"document.querySelector('button')?.click();"`. |
+| **`js_code_before_wait`**  | `str or list[str]` (None)      | JavaScript to run **before** `wait_for`. Use for triggering loading that `wait_for` then checks (e.g. clicking a tab, then waiting for its content). |
 | **`c4a_script`**           | `str or list[str]` (None)      | C4A script that compiles to JavaScript. Alternative to writing raw JS.                                                                 |
 | **`js_only`**              | `bool` (False)                 | If `True`, indicates we're reusing an existing session and only applying JS. No full reload.                                           |
 | **`ignore_body_visibility`** | `bool` (True)                | Skip checking if `<body>` is visible. Usually best to keep `True`.                                                                     |
 | **`scan_full_page`**       | `bool` (False)                 | If `True`, auto-scroll the page to load dynamic content (infinite scroll).                                                              |
-| **`scroll_delay`**         | `float` (0.2)                  | Delay between scroll steps if `scan_full_page=True`.                                                                                   |
+| **`scroll_delay`**         | `float` (0.2)                  | Delay between scroll steps when scanning the full page (`scan_full_page=True`) or capturing full-page screenshots. |
 | **`max_scroll_steps`**     | `int or None` (None)           | Maximum number of scroll steps during full page scan. If None, scrolls until entire page is loaded.                                     |
 | **`process_iframes`**      | `bool` (False)                 | Inlines iframe content for single-page extraction.                                                                                     |
+| **`flatten_shadow_dom`**   | `bool` (False)                 | Flattens Shadow DOM content into the light DOM before HTML capture. Resolves slots, strips shadow-scoped styles, and force-opens closed shadow roots. Essential for sites built with Web Components (Stencil, Lit, Shoelace, etc.). |
 | **`remove_overlay_elements`** | `bool` (False)              | Removes potential modals/popups blocking the main content.                                                                              |
+| **`remove_consent_popups`** | `bool` (False)               | Removes GDPR/cookie consent popups from known CMP providers (OneTrust, Cookiebot, TrustArc, Quantcast, Didomi, Sourcepoint, FundingChoices, etc.). Tries clicking "Accept All" first, then falls back to DOM removal. |
 | **`simulate_user`**        | `bool` (False)                 | Simulate user interactions (mouse movements) to avoid bot detection.                                                                    |
 | **`override_navigator`**   | `bool` (False)                 | Override `navigator` properties in JS for stealth.                                                                                      |
 | **`magic`**                | `bool` (False)                 | Automatic handling of popups/consent banners. Experimental.                                                                             |
@@ -174,6 +182,7 @@ If your page is a single-page app with repeated JS updates, set `js_only=True` i
 | **`screenshot`**                           | `bool` (False)      | Capture a screenshot (base64) in `result.screenshot`.                                                     |
 | **`screenshot_wait_for`**                  | `float or None`     | Extra wait time before the screenshot.                                                                    |
 | **`screenshot_height_threshold`**          | `int` (~20000)      | If the page is taller than this, alternate screenshot strategies are used.                                |
+| **`force_viewport_screenshot`**            | `bool` (False)      | If `True`, always captures a viewport-only screenshot regardless of page height. Faster and smaller than full-page screenshots. |
 | **`pdf`**                                  | `bool` (False)      | If `True`, returns a PDF in `result.pdf`.                                                                 |
 | **`capture_mhtml`**                        | `bool` (False)      | If `True`, captures an MHTML snapshot of the page in `result.mhtml`. MHTML includes all page resources (CSS, images, etc.) in a single file. |
 | **`image_description_min_word_threshold`** | `int` (~50)         | Minimum words for an image's alt text or description to be considered valid.                              |
@@ -367,6 +376,55 @@ no_cache_config = base_config.clone(
 
 The `clone()` method is particularly useful when you need slightly different configurations for different use cases, without modifying the original config.
 
+### Class-Level Defaults (`set_defaults` / `get_defaults` / `reset_defaults`)
+
+Both config classes support class-level default overrides. When deploying in a server or cloud context, this eliminates the need to pass the same parameters at every call site.
+
+**Resolution order:** explicit arg > class-level default > hardcoded default
+
+```python
+from crawl4ai import BrowserConfig, CrawlerRunConfig
+
+# Set once at application startup
+BrowserConfig.set_defaults(
+    cache_cdp_connection=True,
+    cdp_close_delay=0,
+    create_isolated_context=True,
+)
+CrawlerRunConfig.set_defaults(verbose=False)
+
+# All new instances inherit the class defaults
+cfg1 = BrowserConfig(cdp_url="ws://localhost:9222")
+# → cache_cdp_connection=True, cdp_close_delay=0
+
+cfg2 = BrowserConfig(cdp_url="ws://localhost:9222", cache_cdp_connection=False)
+# → cache_cdp_connection=False (explicit value wins)
+
+# Inspect current defaults
+BrowserConfig.get_defaults()
+# → {"cache_cdp_connection": True, "cdp_close_delay": 0, "create_isolated_context": True}
+
+# Remove a single default
+BrowserConfig.reset_defaults("cdp_close_delay")
+
+# Remove all defaults
+BrowserConfig.reset_defaults()
+```
+
+**API Reference:**
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `set_defaults` | `set_defaults(**kwargs)` | Set class-level defaults for new instances. Raises `ValueError` if any key is not a valid `__init__` parameter. |
+| `get_defaults` | `get_defaults() → dict` | Return a deep copy of the current class-level defaults. |
+| `reset_defaults` | `reset_defaults(*names)` | With no args, clears all defaults. With args, removes only the named defaults. |
+
+**Notes:**
+- Defaults are independent per class — `BrowserConfig.set_defaults()` has no effect on `CrawlerRunConfig`.
+- Mutable values (lists, dicts) are deep-copied on storage and on each instance creation, so instances do not share objects.
+- `clone()`, `dump()`/`load()`, and `from_kwargs()` all work correctly with class defaults — serialized data is self-contained and independent of the current class defaults.
+- Defaults are stored in memory for the lifetime of the process. They are not persisted to disk.
+
 ## 2.3 Example Usage
 
 ```python
@@ -379,7 +437,7 @@ async def main():
         headless=False,
         viewport_width=1280,
         viewport_height=720,
-        proxy="http://user:pass@myproxy:8080",
+        proxy_config="http://user:pass@myproxy:8080",
         text_mode=True
     )
 
@@ -432,6 +490,8 @@ LLMConfig is useful to pass LLM provider config to strategies and functions that
 2. LLMContentFilter
 3. JsonCssExtractionStrategy.generate_schema
 4. JsonXPathExtractionStrategy.generate_schema
+5. AdaptiveConfig.embedding_llm_config (embedding model for adaptive crawling)
+6. AdaptiveConfig.query_llm_config (chat completion model for query expansion in adaptive crawling)
 
 ## 3.1 Parameters
 | **Parameter**         | **Type / Default**                     | **What It Does**                                                                                                                     |
@@ -459,7 +519,7 @@ llm_config = LLMConfig(
 - **Use** `BrowserConfig` for **global** browser settings: engine, headless, proxy, user agent.  
 - **Use** `CrawlerRunConfig` for each crawl’s **context**: how to filter content, handle caching, wait for dynamic elements, or run JS.  
 - **Pass** both configs to `AsyncWebCrawler` (the `BrowserConfig`) and then to `arun()` (the `CrawlerRunConfig`).  
-- **Use** `LLMConfig` for LLM provider configurations that can be used across all extraction, filtering, schema generation tasks. Can be used in - `LLMExtractionStrategy`, `LLMContentFilter`, `JsonCssExtractionStrategy.generate_schema` & `JsonXPathExtractionStrategy.generate_schema`
+- **Use** `LLMConfig` for LLM provider configurations that can be used across all extraction, filtering, schema generation, and adaptive crawling tasks. Can be used in - `LLMExtractionStrategy`, `LLMContentFilter`, `JsonCssExtractionStrategy.generate_schema`, `JsonXPathExtractionStrategy.generate_schema`, and `AdaptiveConfig` (`embedding_llm_config` / `query_llm_config`)
 
 ```python
 # Create a modified copy with the clone() method
@@ -467,4 +527,8 @@ stream_cfg = run_cfg.clone(
     stream=True,
     cache_mode=CacheMode.BYPASS
 )
+
+# Or set project-wide defaults once at startup
+BrowserConfig.set_defaults(headless=True, text_mode=True)
+CrawlerRunConfig.set_defaults(cache_mode=CacheMode.BYPASS)
 ```

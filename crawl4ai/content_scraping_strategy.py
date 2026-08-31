@@ -562,6 +562,14 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             ):
                 parent = el.getparent()
                 if parent is not None:
+                    # Preserve .tail text before removing the element
+                    tail = el.tail
+                    if tail:
+                        prev = el.getprevious()
+                        if prev is not None:
+                            prev.tail = (prev.tail or "") + tail
+                        else:
+                            parent.text = (parent.text or "") + tail
                     parent.remove(el)
 
         return root
@@ -695,24 +703,117 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 meta = {}
 
             content_element = None
+            if css_selector:
+                try:
+                    selected = body.cssselect(css_selector)
+                    if selected:
+                        content_element = lhtml.Element("div")
+                        content_element.extend(copy.deepcopy(selected))
+                    else:
+                        content_element = body
+                except Exception as e:
+                    self._log("error", f"Error with css_selector: {str(e)}", "SCRAPE")
+                    content_element = body
+
             if target_elements:
                 try:
+                    source = content_element if content_element is not None else body
                     for_content_targeted_element = []
                     for target_element in target_elements:
-                        for_content_targeted_element.extend(body.cssselect(target_element))
+                        for_content_targeted_element.extend(source.cssselect(target_element))
                     content_element = lhtml.Element("div")
                     content_element.extend(copy.deepcopy(for_content_targeted_element))
                 except Exception as e:
                     self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
                     return None
-            else:
+            elif content_element is None:
                 content_element = body
 
+            # Replace mermaid SVGs with text before they get stripped
+            for svg in body.xpath('.//svg[starts-with(@id, "mermaid-")]'):
+                try:
+                    diagram_type = svg.get("aria-roledescription", "diagram")
+                    labels = []
+                    seen = set()
+
+                    # Primary: foreignObject-based labels (flowchart, class, state…)
+                    for el in svg.cssselect(".nodeLabel, .label span, .edgeLabel span"):
+                        text = el.text_content().strip()
+                        if text and text not in seen:
+                            seen.add(text)
+                            labels.append(text)
+
+                    # Fallback: native SVG text/tspan elements (sequence, gantt, git…)
+                    if not labels:
+                        for el in svg.xpath(
+                            './/*[local-name()="text"] | .//*[local-name()="tspan"]'
+                        ):
+                            text = (el.text or "").strip()
+                            if text and text not in seen:
+                                seen.add(text)
+                                labels.append(text)
+
+                    if not labels:
+                        continue
+
+                    # Check whether the SVG already lives inside a <pre> block.
+                    # If so, avoid creating a nested fence; just let the outer
+                    # <pre> preserve the text that lxml has already flattened.
+                    ancestor = svg.getparent()
+                    inside_pre = False
+                    while ancestor is not None:
+                        if ancestor.tag == "pre":
+                            inside_pre = True
+                            break
+                        ancestor = ancestor.getparent()
+
+                    if inside_pre:
+                        # The outer <pre> will format the text as a code block.
+                        # Replace the SVG with a plain span so lxml preserves
+                        # the label text without the SVG markup noise.
+                        placeholder = lhtml.Element("span")
+                        placeholder.text = "\n".join(labels)
+                        parent = svg.getparent()
+                        if parent is not None:
+                            parent.replace(svg, placeholder)
+                    else:
+                        # Build a fenced code block that survives markdown conversion
+                        placeholder = lhtml.Element("pre")
+                        placeholder.set("data-language", "mermaid")
+                        code = etree.SubElement(placeholder, "code")
+                        code.set("class", "language-mermaid")
+                        code.text = f"%% {diagram_type} diagram\n" + "\n".join(labels)
+                        parent = svg.getparent()
+                        if parent is not None:
+                            parent.replace(svg, placeholder)
+                except Exception:
+                    pass
+
             # Remove script and style tags
-            for tag in ["script", "style", "link", "meta", "noscript"]:
+            for tag in ["style", "link", "meta", "noscript"]:
                 for element in body.xpath(f".//{tag}"):
                     if element.getparent() is not None:
                         element.getparent().remove(element)
+                        
+            # Handle script separately
+            for element in body.xpath(f".//script"):
+                parent = element.getparent()
+                if parent is not None:
+                    tail = element.tail  # Get the tail text
+                    if tail:
+                        prev = element.getprevious()  # Get the previous sibling node
+                        if prev is not None:
+                            if prev.tail:
+                                prev.tail += tail 
+                            else:
+                                prev.tail = tail
+                        else:
+                            if parent.text:
+                                parent.text += tail
+                            else:
+                                parent.text = tail
+                    parent.remove(element)  # Delete the element
+
 
             # Handle social media and domain exclusions
             kwargs["exclude_domains"] = set(kwargs.get("exclude_domains", []))

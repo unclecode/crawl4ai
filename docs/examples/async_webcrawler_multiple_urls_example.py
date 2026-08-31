@@ -30,7 +30,7 @@ async def main():
         results = await crawler.arun_many(
             urls=urls,
             word_count_threshold=word_count_threshold,
-            bypass_cache=True,
+            cache_mode=CacheMode.BYPASS,
             verbose=True,
         )
 

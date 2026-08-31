@@ -233,7 +233,7 @@ async def test_knowledge_export_import():
         crawler2 = AdaptiveCrawler(crawler=crawler, config=config)
         
         console.print("\n[cyan]Importing knowledge base...[/cyan]")
-        crawler2.import_knowledge_base(export_path)
+        await crawler2.import_knowledge_base(export_path)
         
         # Continue with new query - should be faster
         console.print("\n[cyan]Extending with new query...[/cyan]")

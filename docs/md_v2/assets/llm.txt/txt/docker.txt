@@ -484,7 +484,7 @@ browser_config = BrowserConfig(
     headless=True,
     viewport_width=1280,
     viewport_height=720,
-    proxy="http://user:pass@proxy:8080"
+    proxy_config="http://user:pass@proxy:8080"
 )
 
 # Get JSON structure

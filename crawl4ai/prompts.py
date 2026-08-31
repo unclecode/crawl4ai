@@ -9,67 +9,6 @@ And here is the cleaned HTML content of that webpage:
 Your task is to break down this HTML content into semantically relevant blocks, and for each block, generate a JSON object with the following keys:
 
 - index: an integer representing the index of the block in the content
-- tags: a list of semantic tags that are relevant to the content of the block
-- content: a list of strings containing the text content of the block
-- questions: a list of 3 questions that a user may ask about the content in this block
-
-To generate the JSON objects:
-
-1. Carefully read through the HTML content and identify logical breaks or shifts in the content that would warrant splitting it into separate blocks.
-
-2. For each block:
-   a. Assign it an index based on its order in the content.
-   b. Analyze the content and generate a list of relevant semantic tags that describe what the block is about.
-   c. Extract the text content, clean it up if needed, and store it as a list of strings in the "content" field.
-   d. Come up with 3 questions that a user might ask about this specific block of content, based on the tags and content. The questions should be relevant and answerable by the content in the block.
-
-3. Ensure that the order of the JSON objects matches the order of the blocks as they appear in the original HTML content.
-
-4. Double-check that each JSON object includes all required keys (index, tags, content, questions) and that the values are in the expected format (integer, list of strings, etc.).
-
-5. Make sure the generated JSON is complete and parsable, with no errors or omissions.
-
-6. Make sure to escape any special characters in the HTML content, and also single or double quote to avoid JSON parsing issues.
-
-Please provide your output within <blocks> tags, like this:
-
-<blocks>
-[{
-  "index": 0,
-  "tags": ["introduction", "overview"],
-  "content": ["This is the first paragraph of the article, which provides an introduction and overview of the main topic."],
-  "questions": [
-    "What is the main topic of this article?",
-    "What can I expect to learn from reading this article?",
-    "Is this article suitable for beginners or experts in the field?"
-  ]
-},
-{
-  "index": 1,
-  "tags": ["history", "background"],
-  "content": ["This is the second paragraph, which delves into the history and background of the topic.",
-              "It provides context and sets the stage for the rest of the article."],
-  "questions": [
-    "What historical events led to the development of this topic?",
-    "How has the understanding of this topic evolved over time?",
-    "What are some key milestones in the history of this topic?"
-  ]
-}]
-</blocks>
-
-Remember, the output should be a complete, parsable JSON wrapped in <blocks> tags, with no omissions or errors. The JSON objects should semantically break down the content into relevant blocks, maintaining the original order."""
-
-PROMPT_EXTRACT_BLOCKS = """Here is the URL of the webpage:
-<url>{URL}</url>
-
-And here is the cleaned HTML content of that webpage:
-<html>
-{HTML}
-</html>
-
-Your task is to break down this HTML content into semantically relevant blocks, and for each block, generate a JSON object with the following keys:
-
-- index: an integer representing the index of the block in the content
 - content: a list of strings containing the text content of the block
 
 To generate the JSON objects:
@@ -359,6 +298,7 @@ Your output must always be a JSON object with this structure:
       "attribute": "attribute_name",  // Optional
       "transform": "transformation_type",  // Optional
       "pattern": "regex_pattern",  // Optional
+      "source": "+ sibling_selector",  // Optional — navigate to sibling element first
       "fields": []  // For nested/list types
     }
   ]
@@ -372,6 +312,27 @@ Available field types:
 - nested: Object containing other fields
 - list: Array of similar items
 - regex: Pattern-based extraction
+
+Optional field keys:
+- source: Navigate to a sibling element before running the selector.
+  Syntax: "+ <css_selector>" — finds the next sibling matching the selector.
+  Example: "source": "+ tr" finds the next sibling <tr> of the base element.
+  Example: "source": "+ tr.subtext" finds the next sibling <tr> with class "subtext".
+  The field's selector then runs inside the resolved sibling element.
+  Use this when a logical item's data is split across sibling elements (e.g. table rows).
+
+CRITICAL - How selectors work at each level:
+- baseSelector runs against the FULL document and returns all matching elements.
+- Field selectors run INSIDE each base element (descendants only, not siblings).
+- This means a field selector will NEVER match sibling elements of the base element.
+- To reach sibling data, use the "source" key to navigate to the sibling first.
+- Therefore: NEVER use the same (or equivalent) selector as baseSelector in a field.
+  It would search for the element inside itself, which returns nothing for flat/sibling layouts.
+
+When repeating items are siblings (e.g. table rows, flat divs):
+- CORRECT: Use baseSelector to match each item, then use flat fields (text/attribute) to extract data directly from within each item.
+- WRONG: Using baseSelector as a "list" field selector inside itself — this produces empty arrays.
+- For data in sibling elements: Use "source" to navigate to the sibling, then extract from there.
 </type_definitions>
 
 <behavior_rules>
@@ -387,8 +348,9 @@ Available field types:
    - Include prices, dates, titles, and other common data types
 
 3. Always:
-   - Use reliable CSS selectors
-   - Handle dynamic class names appropriately
+   - Use reliable CSS selectors that will survive page rebuilds
+   - NEVER use auto-generated or hashed class names (e.g. `.styles_card__xK9r2`, `.css-1a2b3c`, `.sc-bdnxRM`). These are generated by CSS-in-JS tools and change on every build — your schema will break on the next crawl.
+   - PREFER: `data-*` attributes (`[data-testid="review"]`), semantic tags (`article`, `section`, `nav`), ARIA attributes (`[role="listitem"]`), and stable class names that reflect meaning (`.product-card`, `.review`).
    - Create descriptive field names
    - Follow consistent naming conventions
 </behavior_rules>
@@ -667,6 +629,71 @@ Generated Schema:
     }
   ]
 }
+
+7. Sibling Rows Example (e.g. table rows, flat lists):
+<html>
+<table>
+  <tr class="item"><td class="title"><a href="/1">First</a></td></tr>
+  <tr class="item"><td class="title"><a href="/2">Second</a></td></tr>
+</table>
+</html>
+
+WRONG Schema (baseSelector reused as list field — produces empty results):
+{
+  "name": "Items",
+  "baseSelector": ".item",
+  "fields": [
+    {
+      "name": "entries",
+      "type": "list",
+      "selector": ".item",
+      "fields": [
+        {"name": "title", "selector": ".title a", "type": "text"}
+      ]
+    }
+  ]
+}
+
+CORRECT Schema (flat fields directly on base element):
+{
+  "name": "Items",
+  "baseSelector": ".item",
+  "fields": [
+    {"name": "title", "selector": ".title a", "type": "text"},
+    {"name": "link", "selector": ".title a", "type": "attribute", "attribute": "href"}
+  ]
+}
+
+8. Sibling Data Example (data split across sibling elements):
+<html>
+<table>
+  <tr class="athing submission">
+    <td class="title"><span class="rank">1.</span></td>
+    <td><span class="titleline"><a href="https://example.com">Example Title</a></span></td>
+  </tr>
+  <tr>
+    <td colspan="2"></td>
+    <td class="subtext">
+      <span class="score">100 points</span>
+      <a class="hnuser">johndoe</a>
+      <a>50 comments</a>
+    </td>
+  </tr>
+</table>
+</html>
+
+Generated Schema (using "source" to reach sibling row):
+{
+  "name": "HN Submissions",
+  "baseSelector": "tr.athing.submission",
+  "fields": [
+    {"name": "rank", "selector": "span.rank", "type": "text"},
+    {"name": "title", "selector": "span.titleline a", "type": "text"},
+    {"name": "url", "selector": "span.titleline a", "type": "attribute", "attribute": "href"},
+    {"name": "score", "selector": "span.score", "type": "text", "source": "+ tr"},
+    {"name": "author", "selector": "a.hnuser", "type": "text", "source": "+ tr"}
+  ]
+}
 </examples>
 
 
@@ -735,6 +762,7 @@ Your output must always be a JSON object with this structure:
      "attribute": "attribute_name",  // Optional
      "transform": "transformation_type",  // Optional
      "pattern": "regex_pattern",  // Optional
+     "source": "+ sibling_selector",  // Optional — navigate to sibling element first
      "fields": []  // For nested/list types
    }
  ]
@@ -748,6 +776,27 @@ Available field types:
 - nested: Object containing other fields
 - list: Array of similar items
 - regex: Pattern-based extraction
+
+Optional field keys:
+- source: Navigate to a sibling element before running the selector.
+  Syntax: "+ <selector>" — finds the next sibling matching the selector.
+  Example: "source": "+ tr" finds the next sibling <tr> of the base element.
+  Example: "source": "+ tr.subtext" finds the next sibling <tr> with class "subtext".
+  The field's selector then runs inside the resolved sibling element.
+  Use this when a logical item's data is split across sibling elements (e.g. table rows).
+
+CRITICAL - How selectors work at each level:
+- baseSelector runs against the FULL document and returns all matching elements.
+- Field selectors run INSIDE each base element (descendants only, not siblings).
+- This means a field selector will NEVER match sibling elements of the base element.
+- To reach sibling data, use the "source" key to navigate to the sibling first.
+- Therefore: NEVER use the same (or equivalent) selector as baseSelector in a field.
+  It would search for the element inside itself, which returns nothing for flat/sibling layouts.
+
+When repeating items are siblings (e.g. table rows, flat divs):
+- CORRECT: Use baseSelector to match each item, then use flat fields (text/attribute) to extract data directly from within each item.
+- WRONG: Using baseSelector as a "list" field selector inside itself — this produces empty arrays.
+- For data in sibling elements: Use "source" to navigate to the sibling, then extract from there.
 </type_definitions>
 
 <behavior_rules>
@@ -763,8 +812,9 @@ Available field types:
   - Include prices, dates, titles, and other common data types
 
 3. Always:
-  - Use reliable XPath selectors
-  - Handle dynamic element IDs appropriately
+  - Use reliable XPath selectors that will survive page rebuilds
+  - NEVER use auto-generated or hashed class names (e.g. `styles_card__xK9r2`, `css-1a2b3c`, `sc-bdnxRM`). These are generated by CSS-in-JS tools and change on every build — your schema will break on the next crawl.
+  - PREFER: `data-*` attributes (`@data-testid='review'`), semantic tags (`article`, `section`, `nav`), ARIA attributes (`@role='listitem'`), and stable class names that reflect meaning (`product-card`, `review`).
   - Create descriptive field names
   - Follow consistent naming conventions
 </behavior_rules>
@@ -1042,6 +1092,71 @@ Generated Schema:
      "attribute": "href"
    }
  ]
+}
+
+7. Sibling Rows Example (e.g. table rows, flat lists):
+<html>
+<table>
+  <tr class="item"><td class="title"><a href="/1">First</a></td></tr>
+  <tr class="item"><td class="title"><a href="/2">Second</a></td></tr>
+</table>
+</html>
+
+WRONG Schema (baseSelector reused as list field — produces empty results):
+{
+  "name": "Items",
+  "baseSelector": ".//tr[@class='item']",
+  "fields": [
+    {
+      "name": "entries",
+      "type": "list",
+      "selector": ".//tr[@class='item']",
+      "fields": [
+        {"name": "title", "selector": ".//td[@class='title']/a", "type": "text"}
+      ]
+    }
+  ]
+}
+
+CORRECT Schema (flat fields directly on base element):
+{
+  "name": "Items",
+  "baseSelector": ".//tr[@class='item']",
+  "fields": [
+    {"name": "title", "selector": ".//td[@class='title']/a", "type": "text"},
+    {"name": "link", "selector": ".//td[@class='title']/a", "type": "attribute", "attribute": "href"}
+  ]
+}
+
+8. Sibling Data Example (data split across sibling elements):
+<html>
+<table>
+  <tr class="athing submission">
+    <td class="title"><span class="rank">1.</span></td>
+    <td><span class="titleline"><a href="https://example.com">Example Title</a></span></td>
+  </tr>
+  <tr>
+    <td colspan="2"></td>
+    <td class="subtext">
+      <span class="score">100 points</span>
+      <a class="hnuser">johndoe</a>
+      <a>50 comments</a>
+    </td>
+  </tr>
+</table>
+</html>
+
+Generated Schema (using "source" to reach sibling row):
+{
+  "name": "HN Submissions",
+  "baseSelector": "//tr[contains(@class, 'athing') and contains(@class, 'submission')]",
+  "fields": [
+    {"name": "rank", "selector": ".//span[@class='rank']", "type": "text"},
+    {"name": "title", "selector": ".//span[@class='titleline']/a", "type": "text"},
+    {"name": "url", "selector": ".//span[@class='titleline']/a", "type": "attribute", "attribute": "href"},
+    {"name": "score", "selector": ".//span[@class='score']", "type": "text", "source": "+ tr"},
+    {"name": "author", "selector": ".//a[@class='hnuser']", "type": "text", "source": "+ tr"}
+  ]
 }
 </examples>
 

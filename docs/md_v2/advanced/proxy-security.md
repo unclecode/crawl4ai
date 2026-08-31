@@ -264,7 +264,7 @@ run_config = CrawlerRunConfig(proxy_config="socks5://proxy.example.com:1080")
 ```python
 # Old (deprecated) approach
 # from crawl4ai import BrowserConfig
-# browser_config = BrowserConfig(proxy="http://proxy.example.com:8080")
+# browser_config = BrowserConfig(proxy_config="http://proxy.example.com:8080")
 
 # New (preferred) approach
 from crawl4ai import CrawlerRunConfig
@@ -302,3 +302,7 @@ def safe_proxy_repr(proxy: ProxyConfig):
     - Ensure `ProxyConfig.from_env()` actually loaded entries (`len(proxies) > 0`).
     - Attach `proxy_rotation_strategy` to `CrawlerRunConfig`.
     - Validate the proxy definitions you pass into the strategy.
+
+## See Also
+
+- [Anti-Bot Detection & Fallback](anti-bot-and-fallback.md) — Automatic retry with proxy escalation and fallback functions when anti-bot blocking is detected

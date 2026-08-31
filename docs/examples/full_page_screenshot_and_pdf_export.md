@@ -56,5 +56,53 @@ if __name__ == "__main__":
 - If `screenshot=True`, and a PDF is already available, it directly converts the first page of that PDF to an image for you—no repeated loading or scrolling.
 - Finally, you get your PDF and/or screenshot ready to use.
 
+**Controlling scroll speed for full-page screenshots:**  
+When a page is taller than `screenshot_height_threshold` (default ~20,000px) and no PDF is available, Crawl4AI scrolls through the page to capture a stitched full-page screenshot. Use `scroll_delay` to control the pause between scroll steps:
+
+```python
+config = CrawlerRunConfig(
+    screenshot=True,
+    scroll_delay=0.5,  # Wait 0.5s between scroll steps (default: 0.2)
+)
+```
+
+This is particularly useful for pages with lazy-loaded images or animations that need time to render during scrolling.
+
+---
+
+## Viewport-Only Screenshots
+
+If you only need a screenshot of the visible viewport (not the entire page), use the `force_viewport_screenshot` option. This is significantly faster and produces smaller images, especially for long pages.
+
+```python
+import os
+import asyncio
+from base64 import b64decode
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+
+async def main():
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(
+            url='https://en.wikipedia.org/wiki/List_of_common_misconceptions',
+            config=CrawlerRunConfig(
+                screenshot=True,
+                force_viewport_screenshot=True  # Only capture the visible viewport
+            )
+        )
+
+        if result.success and result.screenshot:
+            with open("viewport_screenshot.png", "wb") as f:
+                f.write(b64decode(result.screenshot))
+            print("Viewport screenshot saved!")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+**When to use viewport-only screenshots:**
+- You only need what's visible above the fold
+- You want faster screenshot capture on long pages
+- You need smaller image sizes for thumbnails or previews
+
 **Conclusion:**
 With this feature, Crawl4AI becomes even more robust and versatile for large-scale content extraction. Whether you need a PDF snapshot or a quick screenshot, you now have a reliable solution for even the most extensive webpages.

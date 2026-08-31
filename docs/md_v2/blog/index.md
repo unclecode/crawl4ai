@@ -20,6 +20,39 @@ Ever wondered why your AI coding assistant struggles with your library despite c
 
 ## Latest Release
 
+### [Crawl4AI v0.9.2 – Maintenance Bug Fixes](../blog/release-v0.9.2.md)
+*July 2026*
+
+Crawl4AI v0.9.2 is a maintenance patch release with bug fixes across the dispatcher, Docker, and GPU builds.
+
+Key highlights:
+- **🧹 Dispatcher Cleanup**: `MemoryAdaptiveDispatcher` no longer leaks crawl tasks and browser pages when a streaming crawl is closed
+- **🐳 Docker Fixes**: Playground "Advanced Config" 400, Monitor WebSocket auth 500, and Playwright headless-shell packaging
+- **🖥️ GPU Builds**: `ENABLE_GPU=true` Docker builds fixed (CUDA toolkit `non-free` apt source)
+
+[Read full release notes →](../blog/release-v0.9.2.md)
+
+## Recent Releases
+
+### [Crawl4AI v0.9.1 – Bug Fixes & PruningContentFilter Whitelist](../blog/release-v0.9.1.md)
+*July 2026*
+
+Crawl4AI v0.9.1 is a patch release with 12 bug fixes and a new `preserve_classes`/`preserve_tags` whitelist for PruningContentFilter.
+
+Key highlights:
+- **🏷️ PruningContentFilter Whitelist**: Protect specific CSS classes or HTML tags from density-based pruning
+- **🐛 12 Bug Fixes**: Docker auth gate UI, Windows browser crash, HTTP timeout unit mismatch, and more
+- **📦 Dependency**: lxml ceiling widened to allow 6.x
+
+[Read full release notes →](../blog/release-v0.9.1.md)
+
+### [Crawl4AI v0.8.5 – Anti-Bot Detection, Shadow DOM & 60+ Bug Fixes](../blog/release-v0.8.5.md)
+*March 2026*
+
+Crawl4AI v0.8.5 is the biggest release since v0.8.0, bringing automatic anti-bot detection with proxy escalation, Shadow DOM flattening, deep crawl cancellation, and over 60 bug fixes.
+
+[Read full release notes →](../blog/release-v0.8.5.md)
+
 ### [Crawl4AI v0.8.0 – Crash Recovery & Prefetch Mode](../blog/release-v0.8.0.md)
 *January 2026*
 
@@ -31,8 +64,6 @@ Key highlights:
 - **🔒 Security Fixes**: Hooks disabled by default, `file://` URLs blocked on Docker API, `__import__` removed from sandbox
 
 [Read full release notes →](../blog/release-v0.8.0.md)
-
-## Recent Releases
 
 ### [Crawl4AI v0.7.8 – Stability & Bug Fix Release](../blog/release-v0.7.8.md)
 *December 2025*
@@ -46,37 +77,14 @@ Key highlights:
 
 [Read full release notes →](../blog/release-v0.7.8.md)
 
-### [Crawl4AI v0.7.7 – The Self-Hosting & Monitoring Update](../blog/release-v0.7.7.md)
-*November 14, 2025*
-
-Crawl4AI v0.7.7 transforms Docker into a complete self-hosting platform with enterprise-grade real-time monitoring, comprehensive observability, and full operational control.
-
-Key highlights:
-- **📊 Real-time Monitoring Dashboard**: Interactive web UI with live system metrics
-- **🔌 Comprehensive Monitor API**: Complete REST API for programmatic access
-- **⚡ WebSocket Streaming**: Real-time updates every 2 seconds
-- **🔥 Smart Browser Pool**: 3-tier architecture with automatic promotion and cleanup
-
-[Read full release notes →](../blog/release-v0.7.7.md)
-
-### [Crawl4AI v0.7.6 – The Webhook Infrastructure Update](../blog/release-v0.7.6.md)
-*October 22, 2025*
-
-Crawl4AI v0.7.6 introduces comprehensive webhook support for the Docker job queue API, bringing real-time notifications to both crawling and LLM extraction workflows.
-
-Key highlights:
-- **🪝 Complete Webhook Support**: Real-time notifications for both `/crawl/job` and `/llm/job` endpoints
-- **🔄 Reliable Delivery**: Exponential backoff retry mechanism
-- **🔐 Custom Authentication**: Add custom headers for webhook authentication
-
-[Read full release notes →](../blog/release-v0.7.6.md)
-
 ---
 
 ## Older Releases
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| [v0.7.7](../blog/release-v0.7.7.md) | November 2025 | Self-hosting platform, real-time monitoring, smart browser pool |
+| [v0.7.6](../blog/release-v0.7.6.md) | October 2025 | Webhook infrastructure, reliable delivery, custom auth |
 | [v0.7.5](../blog/release-v0.7.5.md) | September 2025 | Docker Hooks System, enhanced LLM integration, HTTPS preservation |
 | [v0.7.4](../blog/release-v0.7.4.md) | August 2025 | LLM-powered table extraction, performance improvements |
 | [v0.7.3](../blog/release-v0.7.3.md) | July 2025 | Undetected browser, multi-URL config, memory monitoring |

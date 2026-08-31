@@ -153,35 +153,27 @@ class StealthAdapter(BrowserAdapter):
 
     def __init__(self):
         self._console_script_injected = {}
+        self._stealth = None
         self._stealth_available = self._check_stealth_availability()
 
     def _check_stealth_availability(self) -> bool:
-        """Check if playwright_stealth is available and get the correct function"""
+        """Check if playwright_stealth is importable and instantiate the Stealth helper."""
         try:
-            from playwright_stealth import stealth_async
-            self._stealth_function = stealth_async
-            return True
+            from playwright_stealth import Stealth
         except ImportError:
-            try:
-                from playwright_stealth import stealth_sync
-                self._stealth_function = stealth_sync
-                return True
-            except ImportError:
-                self._stealth_function = None
-                return False
+            return False
+        self._stealth = Stealth()
+        return True
 
     async def apply_stealth(self, page: Page):
         """Apply stealth to a page if available"""
-        if self._stealth_available and self._stealth_function:
-            try:
-                if hasattr(self._stealth_function, '__call__'):
-                    if 'async' in getattr(self._stealth_function, '__name__', ''):
-                        await self._stealth_function(page)
-                    else:
-                        self._stealth_function(page)
-            except Exception as e:
-                # Fail silently or log error depending on requirements
-                pass
+        if not (self._stealth_available and self._stealth):
+            return
+        try:
+            await self._stealth.apply_stealth_async(page)
+        except Exception:
+            # Fail silently or log error depending on requirements
+            pass
 
     async def evaluate(self, page: Page, expression: str, arg: Any = None) -> Any:
         """Standard Playwright evaluate with stealth applied"""

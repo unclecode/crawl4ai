@@ -60,24 +60,34 @@ class TerminalUI:
     
     def _ui_loop(self):
         """Main UI rendering loop."""
+        import os
+        import sys
+
+        if os.name == 'nt':
+            self._ui_loop_windows()
+        else:
+            self._ui_loop_unix()
+
+    def _ui_loop_unix(self):
+        """UI loop for Unix/macOS using termios."""
         import sys
         import select
         import termios
         import tty
-        
+
         # Setup terminal for non-blocking input
         old_settings = termios.tcgetattr(sys.stdin)
         try:
             tty.setcbreak(sys.stdin.fileno())
-            
+
             # Use Live display to render the UI
             with Live(self.layout, refresh_per_second=1/self.refresh_rate, screen=True) as live:
                 self.live = live  # Store the live display for updates
-                
+
                 # Main UI loop
                 while not self.stop_event.is_set():
                     self._update_display()
-                    
+
                     # Check for key press (non-blocking)
                     if select.select([sys.stdin], [], [], 0)[0]:
                         key = sys.stdin.read(1)
@@ -88,15 +98,37 @@ class TerminalUI:
                             self.stop_event.set()
                             self.monitor.is_running = False
                             break
-                    
+
                     time.sleep(self.refresh_rate)
-                    
+
                     # Just check if the monitor was stopped
                     if not self.monitor.is_running:
                         break
         finally:
             # Restore terminal settings
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+
+    def _ui_loop_windows(self):
+        """UI loop for Windows using msvcrt."""
+        import msvcrt
+
+        with Live(self.layout, refresh_per_second=1/self.refresh_rate, screen=True) as live:
+            self.live = live
+
+            while not self.stop_event.is_set():
+                self._update_display()
+
+                if msvcrt.kbhit():
+                    key = msvcrt.getch().decode("utf-8", errors="ignore")
+                    if key == 'q':
+                        self.stop_event.set()
+                        self.monitor.is_running = False
+                        break
+
+                time.sleep(self.refresh_rate)
+
+                if not self.monitor.is_running:
+                    break
     
     def _update_display(self):
         """Update the terminal display with current statistics."""

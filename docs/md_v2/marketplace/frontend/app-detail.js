@@ -164,21 +164,22 @@ proxy_config = {
     "password": "your_password"
 }
 
-async with AsyncWebCrawler(proxy=proxy_config) as crawler:
+async with AsyncWebCrawler() as crawler:
     result = await crawler.arun(
         url="https://example.com",
-        bypass_cache=True
+        cache_mode=CacheMode.BYPASS
     )
     print(result.status_code)`;
         } else if (this.appData.category === 'LLM Integration') {
-            usageCode.textContent = `from crawl4ai import AsyncWebCrawler
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+            usageCode.textContent = `from crawl4ai import AsyncWebCrawler, CacheMode
+from crawl4ai.extraction_strategy import LLMExtractionStrategy, LLMConfig
 
 # Configure LLM extraction
 strategy = LLMExtractionStrategy(
-    provider="${this.appData.name.toLowerCase().includes('gpt') ? 'openai' : 'anthropic'}",
-    api_key="your-api-key",
-    model="${this.appData.name.toLowerCase().includes('gpt') ? 'gpt-4' : 'claude-3'}",
+    llm_config=LLMConfig(
+        provider="${this.appData.name.toLowerCase().includes('gpt') ? 'openai/gpt-4o' : 'anthropic/claude-3-5-sonnet-20240620'}",
+        api_token="your-api-key",
+    ),
     instruction="Extract structured data"
 )
 
@@ -228,7 +229,7 @@ async def crawl_with_${this.appData.slug.replace(/-/g, '_')}():
         result = await crawler.arun(
             url="https://example.com/products",
             extraction_strategy=JsonCssExtractionStrategy(schema),
-            cache_mode="bypass",
+            cache_mode=CacheMode.BYPASS,
             wait_for="css:.product",
             screenshot=True
         )

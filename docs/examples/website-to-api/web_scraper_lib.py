@@ -170,7 +170,7 @@ class WebScraperAgent:
                     delay_before_return_html=5,
                 )
             )
-            html = result.fit_html
+            html = result.markdown.fit_html
         
         # Step 2: Generate schema using AI with custom model if specified
         print("AI is analyzing the page structure...")

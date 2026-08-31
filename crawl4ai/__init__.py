@@ -3,13 +3,14 @@ import warnings
 
 from .async_webcrawler import AsyncWebCrawler, CacheMode
 # MODIFIED: Add SeedingConfig and VirtualScrollConfig here
-from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig, SeedingConfig, VirtualScrollConfig, LinkPreviewConfig, MatchMode
+from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig, SeedingConfig, VirtualScrollConfig, LinkPreviewConfig, MatchMode, DomainMapperConfig
 
 from .content_scraping_strategy import (
     ContentScrapingStrategy,
     LXMLWebScrapingStrategy,
     WebScrapingStrategy,  # Backward compatibility alias
 )
+from .processors.pdf import PDFContentScrapingStrategy
 from .async_logger import (
     AsyncLoggerBase,
     AsyncLogger,
@@ -77,6 +78,7 @@ from .deep_crawling import (
 )
 # NEW: Import AsyncUrlSeeder
 from .async_url_seeder import AsyncUrlSeeder
+from .domain_mapper import DomainMapper
 # Adaptive Crawler
 from .adaptive_crawler import (
     AdaptiveCrawler,
@@ -121,6 +123,9 @@ __all__ = [
     "VirtualScrollConfig",
     # NEW: Add AsyncUrlSeeder
     "AsyncUrlSeeder",
+    # DomainMapper
+    "DomainMapper",
+    "DomainMapperConfig",
     # Adaptive Crawler
     "AdaptiveCrawler",
     "AdaptiveConfig", 
@@ -168,6 +173,7 @@ __all__ = [
     "TableExtractionStrategy",
     "DefaultTableExtraction",
     "NoTableExtraction",
+    "LLMTableExtraction",
     "RelevantContentFilter",
     "PruningContentFilter",
     "BM25ContentFilter",

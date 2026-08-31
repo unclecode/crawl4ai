@@ -12,6 +12,7 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import hashlib
+import random
 import uuid
 from .js_snippet import load_js_script
 from .models import AsyncCrawlResponse
@@ -19,7 +20,7 @@ from .config import SCREENSHOT_HEIGHT_TRESHOLD
 from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig
 from .async_logger import AsyncLogger
 from .ssl_certificate import SSLCertificate
-from .user_agent_generator import ValidUAGenerator
+from .user_agent_generator import ValidUAGenerator, UAGen
 from .browser_manager import BrowserManager
 from .browser_adapter import BrowserAdapter, PlaywrightAdapter, UndetectedAdapter
 
@@ -87,7 +88,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         # Initialize browser config, either from provided object or kwargs
         self.browser_config = browser_config or BrowserConfig.from_kwargs(kwargs)
-        self.logger = logger
+        # Initialize with default logger if none provided to prevent NoneType errors
+        self.logger = logger if logger is not None else AsyncLogger(verbose=False)
         
         # Initialize browser adapter
         self.adapter = browser_adapter or PlaywrightAdapter()
@@ -138,8 +140,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Close the browser and clean up resources.
         """
         await self.browser_manager.close()
-        # Explicitly reset the static Playwright instance
-        BrowserManager._playwright_instance = None
+        # Explicitly reset the static Playwright instance (skip if using cached CDP)
+        if not self.browser_manager._using_cached_cdp:
+            BrowserManager._playwright_instance = None
 
     async def kill_session(self, session_id: str):
         """
@@ -380,7 +383,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         () => {{
                             const iframe = document.getElementById('iframe-{i}');
                             const div = document.createElement('div');
-                            div.innerHTML = `{_iframe}`;
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(`{_iframe}`, 'text/html');
+                            while (doc.body.firstChild) {{
+                                div.appendChild(doc.body.firstChild);
+                            }}
                             div.className = '{class_name}';
                             iframe.replaceWith(div);
                         }}
@@ -463,6 +470,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 config.wait_for or
                 config.scan_full_page or
                 config.remove_overlay_elements or
+                config.remove_consent_popups or
                 config.simulate_user or
                 config.magic or
                 config.process_iframes or
@@ -495,6 +503,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 pdf_data=None,
                 mhtml_data=None,
                 get_delayed_content=None,
+                # For raw:/file:// URLs, use base_url if provided; don't fall back to the raw content
+                redirected_url=config.base_url,
             )
         else:
             raise ValueError(
@@ -519,7 +529,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         response_headers = {}
         execution_result = None
         status_code = None
-        redirected_url = url 
+        redirected_url = url
+        redirected_status_code = None
 
         # Reset downloaded files list for new crawl
         self._downloaded_files = []
@@ -528,126 +539,173 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         captured_requests = []
         captured_console = []
 
-        # Handle user agent with magic mode
-        user_agent_to_override = config.user_agent
-        if user_agent_to_override:
-            self.browser_config.user_agent = user_agent_to_override
-        elif config.magic or config.user_agent_mode == "random":
-            self.browser_config.user_agent = ValidUAGenerator().generate(
-                **(config.user_agent_generator_config or {})
+        # Handle user agent with magic mode.
+        # For persistent contexts the UA is locked at browser launch time
+        # (launch_persistent_context bakes it into the protocol layer), so
+        # changing it here would only desync browser_config from reality.
+        # Users should set user_agent or user_agent_mode on BrowserConfig.
+        ua_changed = False
+        if not self.browser_config.use_persistent_context:
+            user_agent_to_override = config.user_agent
+            if user_agent_to_override:
+                self.browser_config.user_agent = user_agent_to_override
+                ua_changed = True
+            elif config.magic or config.user_agent_mode == "random":
+                self.browser_config.user_agent = ValidUAGenerator().generate(
+                    **(config.user_agent_generator_config or {})
+                )
+                ua_changed = True
+
+        # Keep sec-ch-ua in sync whenever the UA changed
+        if ua_changed:
+            self.browser_config.browser_hint = UAGen.generate_client_hints(
+                self.browser_config.user_agent
             )
+            self.browser_config.headers["sec-ch-ua"] = self.browser_config.browser_hint
 
         # Get page for session
         page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
 
-        # await page.goto(URL)
-
-        # Add default cookie
-        # await context.add_cookies(
-        #     [{"name": "cookiesEnabled", "value": "true", "url": url}]
-        # )
-
-        # Handle navigator overrides
-        if config.override_navigator or config.simulate_user or config.magic:
-            await context.add_init_script(load_js_script("navigator_overrider"))
-
-        # Call hook after page creation
-        await self.execute_hook("on_page_context_created", page, context=context, config=config)
-
-        # Network Request Capturing
-        if config.capture_network_requests:
-            async def handle_request_capture(request):
-                try:
-                    post_data_str = None
-                    try:
-                        # Be cautious with large post data
-                        post_data = request.post_data_buffer
-                        if post_data:
-                             # Attempt to decode, fallback to base64 or size indication
-                             try:
-                                 post_data_str = post_data.decode('utf-8', errors='replace')
-                             except UnicodeDecodeError:
-                                 post_data_str = f"[Binary data: {len(post_data)} bytes]"
-                    except Exception:
-                        post_data_str = "[Error retrieving post data]"
-
-                    captured_requests.append({
-                        "event_type": "request",
-                        "url": request.url,
-                        "method": request.method,
-                        "headers": dict(request.headers), # Convert Header dict
-                        "post_data": post_data_str,
-                        "resource_type": request.resource_type,
-                        "is_navigation_request": request.is_navigation_request(),
-                        "timestamp": time.time()
-                    })
-                except Exception as e:
-                    if self.logger:
-                        self.logger.warning(f"Error capturing request details for {request.url}: {e}", tag="CAPTURE")
-                    captured_requests.append({"event_type": "request_capture_error", "url": request.url, "error": str(e), "timestamp": time.time()})
-
-            async def handle_response_capture(response):
-                try:
-                    try:
-                        # body = await response.body()
-                        # json_body = await response.json()
-                        text_body = await response.text()
-                    except Exception as e:
-                        body = None
-                        # json_body = None
-                        # text_body = None
-                    captured_requests.append({
-                        "event_type": "response",
-                        "url": response.url,
-                        "status": response.status,
-                        "status_text": response.status_text,
-                        "headers": dict(response.headers), # Convert Header dict
-                        "from_service_worker": response.from_service_worker,
-                        "request_timing": response.request.timing, # Detailed timing info
-                        "timestamp": time.time(),
-                        "body" : {
-                            # "raw": body,
-                            # "json": json_body,
-                            "text": text_body
-                        }
-                    })
-                except Exception as e:
-                    if self.logger:
-                        self.logger.warning(f"Error capturing response details for {response.url}: {e}", tag="CAPTURE")
-                    captured_requests.append({"event_type": "response_capture_error", "url": response.url, "error": str(e), "timestamp": time.time()})
-
-            async def handle_request_failed_capture(request):
-                 try:
-                    captured_requests.append({
-                        "event_type": "request_failed",
-                        "url": request.url,
-                        "method": request.method,
-                        "resource_type": request.resource_type,
-                        "failure_text": str(request.failure) if request.failure else "Unknown failure",
-                        "timestamp": time.time()
-                    })
-                 except Exception as e:
-                    if self.logger:
-                        self.logger.warning(f"Error capturing request failed details for {request.url}: {e}", tag="CAPTURE")
-                    captured_requests.append({"event_type": "request_failed_capture_error", "url": request.url, "error": str(e), "timestamp": time.time()})
-
-            page.on("request", handle_request_capture)
-            page.on("response", handle_response_capture)
-            page.on("requestfailed", handle_request_failed_capture)
-
-        # Console Message Capturing
-        handle_console = None
-        handle_error = None
-        if config.capture_console_messages:
-            # Set up console capture using adapter
-            handle_console = await self.adapter.setup_console_capture(page, captured_console)
-            handle_error = await self.adapter.setup_error_capture(page, captured_console)
-
-        # Set up console logging if requested
-        # Note: For undetected browsers, console logging won't work directly
-        # but captured messages can still be logged after retrieval
+        # When reusing a session page, abort any pending loads from the
+        # previous navigation to prevent timeouts on the next goto().
+        if config.session_id:
+            try:
+                await page.evaluate("window.stop()")
+            except Exception:
+                pass
 
         try:
+            # Push updated UA + sec-ch-ua to the page so the server sees them
+            if ua_changed:
+                combined_headers = {
+                    "User-Agent": self.browser_config.user_agent,
+                    "sec-ch-ua": self.browser_config.browser_hint,
+                }
+                combined_headers.update(self.browser_config.headers)
+                await page.set_extra_http_headers(combined_headers)
+
+            # await page.goto(URL)
+
+            # Add default cookie
+            # await context.add_cookies(
+            #     [{"name": "cookiesEnabled", "value": "true", "url": url}]
+            # )
+
+            # Handle navigator overrides — only inject if not already done
+            # at context level by setup_context(). This fallback covers
+            # managed-browser / persistent / CDP paths where setup_context()
+            # is called without a crawlerRunConfig.
+            if config.override_navigator or config.simulate_user or config.magic:
+                if not getattr(context, '_crawl4ai_nav_overrider_injected', False):
+                    await context.add_init_script(load_js_script("navigator_overrider"))
+                    context._crawl4ai_nav_overrider_injected = True
+
+            # Force-open closed shadow roots — same guard against duplication
+            if config.flatten_shadow_dom:
+                if not getattr(context, '_crawl4ai_shadow_dom_injected', False):
+                    await context.add_init_script("""
+                        const _origAttachShadow = Element.prototype.attachShadow;
+                        Element.prototype.attachShadow = function(init) {
+                            return _origAttachShadow.call(this, {...init, mode: 'open'});
+                        };
+                    """)
+                    context._crawl4ai_shadow_dom_injected = True
+
+            # Call hook after page creation
+            await self.execute_hook("on_page_context_created", page, context=context, config=config)
+
+            # Network Request Capturing
+            if config.capture_network_requests:
+                async def handle_request_capture(request):
+                    try:
+                        post_data_str = None
+                        try:
+                            # Be cautious with large post data
+                            post_data = request.post_data_buffer
+                            if post_data:
+                                 # Attempt to decode, fallback to base64 or size indication
+                                 try:
+                                     post_data_str = post_data.decode('utf-8', errors='replace')
+                                 except UnicodeDecodeError:
+                                     post_data_str = f"[Binary data: {len(post_data)} bytes]"
+                        except Exception:
+                            post_data_str = "[Error retrieving post data]"
+
+                        captured_requests.append({
+                            "event_type": "request",
+                            "url": request.url,
+                            "method": request.method,
+                            "headers": dict(request.headers), # Convert Header dict
+                            "post_data": post_data_str,
+                            "resource_type": request.resource_type,
+                            "is_navigation_request": request.is_navigation_request(),
+                            "timestamp": time.time()
+                        })
+                    except Exception as e:
+                        if self.logger:
+                            self.logger.warning(f"Error capturing request details for {request.url}: {e}", tag="CAPTURE")
+                        captured_requests.append({"event_type": "request_capture_error", "url": request.url, "error": str(e), "timestamp": time.time()})
+
+                async def handle_response_capture(response):
+                    try:
+                        try:
+                            # body = await response.body()
+                            # json_body = await response.json()
+                            text_body = await response.text()
+                        except Exception as e:
+                            body = None
+                            # json_body = None
+                            # text_body = None
+                        captured_requests.append({
+                            "event_type": "response",
+                            "url": response.url,
+                            "status": response.status,
+                            "status_text": response.status_text,
+                            "headers": dict(response.headers), # Convert Header dict
+                            "from_service_worker": response.from_service_worker,
+                            "request_timing": response.request.timing, # Detailed timing info
+                            "timestamp": time.time(),
+                            "body" : {
+                                # "raw": body,
+                                # "json": json_body,
+                                "text": text_body
+                            }
+                        })
+                    except Exception as e:
+                        if self.logger:
+                            self.logger.warning(f"Error capturing response details for {response.url}: {e}", tag="CAPTURE")
+                        captured_requests.append({"event_type": "response_capture_error", "url": response.url, "error": str(e), "timestamp": time.time()})
+
+                async def handle_request_failed_capture(request):
+                     try:
+                        captured_requests.append({
+                            "event_type": "request_failed",
+                            "url": request.url,
+                            "method": request.method,
+                            "resource_type": request.resource_type,
+                            "failure_text": str(request.failure) if request.failure else "Unknown failure",
+                            "timestamp": time.time()
+                        })
+                     except Exception as e:
+                        if self.logger:
+                            self.logger.warning(f"Error capturing request failed details for {request.url}: {e}", tag="CAPTURE")
+                        captured_requests.append({"event_type": "request_failed_capture_error", "url": request.url, "error": str(e), "timestamp": time.time()})
+
+                page.on("request", handle_request_capture)
+                page.on("response", handle_response_capture)
+                page.on("requestfailed", handle_request_failed_capture)
+
+            # Console Message Capturing
+            handle_console = None
+            handle_error = None
+            if config.capture_console_messages:
+                # Set up console capture using adapter
+                handle_console = await self.adapter.setup_console_capture(page, captured_console)
+                handle_error = await self.adapter.setup_error_capture(page, captured_console)
+
+            # Set up console logging if requested
+            # Note: For undetected browsers, console logging won't work directly
+            # but captured messages can still be logged after retrieval
             # Get SSL certificate information if requested and URL is HTTPS
             ssl_cert = None
             if config.fetch_ssl_certificate:
@@ -683,7 +741,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
                     await page.set_content(html_content, wait_until=config.wait_until)
                     response = None
-                    redirected_url = config.base_url or url
+                    # For raw: URLs, only use base_url if provided; don't fall back to the raw HTML string
+                    redirected_url = config.base_url
                     status_code = 200
                     response_headers = {}
                 else:
@@ -704,6 +763,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                             url, wait_until=config.wait_until, timeout=config.page_timeout
                         )
                         redirected_url = page.url
+                        redirected_status_code = response.status if response else None
                     except Error as e:
                         # Allow navigation to be aborted when downloading files
                         # This is expected behavior for downloads in some browser engines
@@ -876,6 +936,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                             "scale": scale,
                         },
                     )
+                    await cdp.detach()
                 except Exception as e:
                     self.logger.warning(
                         message="Failed to adjust viewport to content: {error}",
@@ -885,23 +946,65 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             # Handle full page scanning
             if config.scan_full_page:
-                # await self._handle_full_page_scan(page, config.scroll_delay)
-                await self._handle_full_page_scan(page, config.scroll_delay, config.max_scroll_steps)
+                scan_timeout = (config.page_timeout or 30000) / 1000  # ms to seconds
+                try:
+                    await asyncio.wait_for(
+                        self._handle_full_page_scan(page, config.scroll_delay, config.max_scroll_steps),
+                        timeout=scan_timeout,
+                    )
+                except asyncio.TimeoutError:
+                    self.logger.warning(
+                        message="Full page scan timed out after {timeout}s, continuing with partial scroll",
+                        tag="PAGE_SCAN",
+                        params={"timeout": scan_timeout},
+                    )
 
-            # Handle virtual scroll if configured
+            # --- Phase 1: Pre-wait JS and interaction ---
+
+            # Execute js_code_before_wait (for triggering loading that wait_for checks)
+            if config.js_code_before_wait:
+                bw_result = await self.robust_execute_user_script(
+                    page, config.js_code_before_wait
+                )
+                if not bw_result["success"]:
+                    self.logger.warning(
+                        message="js_code_before_wait had issues: {error}",
+                        tag="JS_EXEC",
+                        params={"error": bw_result.get("error")},
+                    )
+
+            # Handle user simulation — generate mouse movement and scroll
+            # signals that anti-bot systems look for, without firing keyboard
+            # events (ArrowDown triggers JS framework navigation) or clicking
+            # at fixed positions (may hit buttons/links and navigate away).
+            if config.simulate_user or config.magic:
+                await page.mouse.move(random.randint(100, 300), random.randint(150, 300))
+                await page.mouse.move(random.randint(300, 600), random.randint(200, 400))
+                await page.mouse.wheel(0, random.randint(200, 400))
+
+            # --- Phase 2: Wait for page readiness ---
+
+            if config.wait_for:
+                try:
+                    timeout = config.wait_for_timeout if config.wait_for_timeout is not None else config.page_timeout
+                    await self.smart_wait(
+                        page, config.wait_for, timeout=timeout
+                    )
+                except Exception as e:
+                    raise RuntimeError(f"Wait condition failed: {str(e)}")
+
+            # Handle virtual scroll if configured (after wait_for so container exists)
             if config.virtual_scroll_config:
                 await self._handle_virtual_scroll(page, config.virtual_scroll_config)
 
-            # Execute JavaScript if provided
-            # if config.js_code:
-            #     if isinstance(config.js_code, str):
-            #         await page.evaluate(config.js_code)
-            #     elif isinstance(config.js_code, list):
-            #         for js in config.js_code:
-            #             await page.evaluate(js)
+            # Pre-content retrieval hooks and delay
+            await self.execute_hook("before_retrieve_html", page, context=context, config=config)
+            if config.delay_before_return_html:
+                await asyncio.sleep(config.delay_before_return_html)
+
+            # --- Phase 3: Post-wait JS (runs on fully-loaded page) ---
 
             if config.js_code:
-                # execution_result = await self.execute_user_script(page, config.js_code)
                 execution_result = await self.robust_execute_user_script(
                     page, config.js_code
                 )
@@ -916,28 +1019,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await self.execute_hook("on_execution_started", page, context=context, config=config)
                 await self.execute_hook("on_execution_ended", page, context=context, config=config, result=execution_result)
 
-            # Handle user simulation
-            if config.simulate_user or config.magic:
-                await page.mouse.move(100, 100)
-                await page.mouse.down()
-                await page.mouse.up()
-                await page.keyboard.press("ArrowDown")
-
-            # Handle wait_for condition
-            # Todo: Decide how to handle this
-            if not config.wait_for and config.css_selector and False:
-            # if not config.wait_for and config.css_selector:
-                config.wait_for = f"css:{config.css_selector}"
-
-            if config.wait_for:
-                try:
-                    # Use wait_for_timeout if specified, otherwise fall back to page_timeout
-                    timeout = config.wait_for_timeout if config.wait_for_timeout is not None else config.page_timeout
-                    await self.smart_wait(
-                        page, config.wait_for, timeout=timeout
-                    )
-                except Exception as e:
-                    raise RuntimeError(f"Wait condition failed: {str(e)}")
+            # --- Phase 4: DOM processing before HTML capture ---
 
             # Update image dimensions if needed
             if not self.browser_config.text_mode:
@@ -959,21 +1041,32 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if config.process_iframes:
                 page = await self.process_iframes(page)
 
-            # Pre-content retrieval hooks and delay
-            await self.execute_hook("before_retrieve_html", page, context=context, config=config)
-            if config.delay_before_return_html:
-                await asyncio.sleep(config.delay_before_return_html)
+            # Handle CMP/consent popup removal (before generic overlay removal)
+            if config.remove_consent_popups:
+                await self.remove_consent_popups(page)
 
             # Handle overlay removal
             if config.remove_overlay_elements:
                 await self.remove_overlay_elements(page)
 
-            if config.css_selector:
+            # --- Phase 5: HTML capture ---
+
+            if config.flatten_shadow_dom:
+                # Use JS to serialize the full DOM including shadow roots
+                flatten_js = load_js_script("flatten_shadow_dom")
+                html = await self.adapter.evaluate(page, flatten_js)
+                if not html or not isinstance(html, str):
+                    # Fallback to normal capture if JS returned nothing
+                    self.logger.warning(
+                        message="Shadow DOM flattening returned no content, falling back to page.content()",
+                        tag="SCRAPE",
+                    )
+                    html = await page.content()
+            elif config.css_selector:
                 try:
-                    # Handle comma-separated selectors by splitting them
                     selectors = [s.strip() for s in config.css_selector.split(',')]
                     html_parts = []
-                    
+
                     for selector in selectors:
                         try:
                             content = await self.adapter.evaluate(page,
@@ -984,16 +1077,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                             html_parts.append(content)
                         except Error as e:
                             print(f"Warning: Could not get content for selector '{selector}': {str(e)}")
-                    
-                    # Wrap in a div to create a valid HTML structure
-                    html = f"<div class='crawl4ai-result'>\n" + "\n".join(html_parts) + "\n</div>"                    
+
+                    html = f"<div class='crawl4ai-result'>\n" + "\n".join(html_parts) + "\n</div>"
                 except Error as e:
                     raise RuntimeError(f"Failed to extract HTML content: {str(e)}")
             else:
                 html = await page.content()
-            
-            # # Get final HTML content
-            # html = await page.content()
+
             await self.execute_hook(
                 "before_return_html", page=page, html=html, context=context, config=config
             )
@@ -1014,7 +1104,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 if config.screenshot_wait_for:
                     await asyncio.sleep(config.screenshot_wait_for)
                 screenshot_data = await self.take_screenshot(
-                    page, screenshot_height_threshold=config.screenshot_height_threshold
+                    page,
+                    screenshot_height_threshold=config.screenshot_height_threshold,
+                    force_viewport_screenshot=config.force_viewport_screenshot,
+                    scan_full_page=config.scan_full_page,
+                    scroll_delay=config.scroll_delay
                 )
 
             if screenshot_data or pdf_data or mhtml_data:
@@ -1040,10 +1134,14 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 captured_console.extend(final_messages)
 
             ###
-            # This ensures we capture the current page URL at the time we return the response, 
+            # This ensures we capture the current page URL at the time we return the response,
             # which correctly reflects any JavaScript navigation that occurred.
+            # For raw:/file:// URLs, preserve the earlier redirected_url (config.base_url or None)
+            # instead of using page.url which would be "about:blank".
             ###
-            redirected_url = page.url  # Use current page URL to capture JS redirects
+            is_local_content = url.startswith("file://") or url.startswith("raw://") or url.startswith("raw:")
+            if not is_local_content:
+                redirected_url = page.url  # Use current page URL to capture JS redirects
             
             # Return complete response
             return AsyncCrawlResponse(
@@ -1060,6 +1158,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     self._downloaded_files if self._downloaded_files else None
                 ),
                 redirected_url=redirected_url,
+                redirected_status_code=redirected_status_code,
                 # Include captured data if enabled
                 network_requests=captured_requests if config.capture_network_requests else None,
                 console_messages=captured_console if config.capture_console_messages else None,
@@ -1069,30 +1168,37 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             raise e
 
         finally:
-            # If no session_id is given we should close the page
-            all_contexts = page.context.browser.contexts
-            total_pages = sum(len(context.pages) for context in all_contexts)                
-            if config.session_id:
-                pass
-            elif total_pages <= 1 and (self.browser_config.use_managed_browser or self.browser_config.headless):
-                pass
-            else:
-                # Detach listeners before closing to prevent potential errors during close
+            # Always clean up event listeners to prevent accumulation
+            # across reuses (even for session pages).
+            try:
                 if config.capture_network_requests:
                     page.remove_listener("request", handle_request_capture)
                     page.remove_listener("response", handle_response_capture)
                     page.remove_listener("requestfailed", handle_request_failed_capture)
                 if config.capture_console_messages:
-                    # Retrieve any final console messages for undetected browsers
                     if hasattr(self.adapter, 'retrieve_console_messages'):
                         final_messages = await self.adapter.retrieve_console_messages(page)
                         captured_console.extend(final_messages)
-                    
-                    # Clean up console capture
                     await self.adapter.cleanup_console_capture(page, handle_console, handle_error)
-                
-                # Close the page
-                await page.close()
+            except Exception:
+                pass
+
+            if not config.session_id:
+                # ALWAYS decrement refcount first — must succeed even if
+                # the browser crashed or the page is in a bad state.
+                try:
+                    await self.browser_manager.release_page_with_context(page)
+                except Exception:
+                    pass
+
+                # Close the page unless it's the last one in a headless/managed browser
+                try:
+                    all_contexts = page.context.browser.contexts
+                    total_pages = sum(len(context.pages) for context in all_contexts)
+                    if not (total_pages <= 1 and (self.browser_config.use_managed_browser or self.browser_config.headless)):
+                        await page.close()
+                except Exception:
+                    pass
 
     # async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1):
     async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1, max_scroll_steps: Optional[int] = None):
@@ -1110,9 +1216,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Args:
             page (Page): The Playwright page object
             scroll_delay (float): The delay between page scrolls
-            max_scroll_steps (Optional[int]): Maximum number of scroll steps to perform. If None, scrolls until end.
+            max_scroll_steps (Optional[int]): Maximum number of scroll steps to perform. Defaults to 10 to prevent infinite scroll hangs.
 
         """
+        # Default to 10 steps to prevent infinite scroll on dynamic pages
+        if max_scroll_steps is None:
+            max_scroll_steps = 10
+
         try:
             viewport_size = page.viewport_size
             if viewport_size is None:
@@ -1364,7 +1474,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         try:
             suggested_filename = download.suggested_filename
-            download_path = os.path.join(self.browser_config.downloads_path, suggested_filename)
+            download_path = _safe_download_filepath(self.browser_config.downloads_path, suggested_filename)
+            # Playwright's save_as performs the write itself (no O_NOFOLLOW
+            # hook), so reject a symlink planted at the target before writing.
+            if os.path.islink(download_path):
+                raise ValueError(f"Refusing to write download through symlink: {download_path}")
 
             self.logger.info(
                 message="Downloading {filename} to {path}",
@@ -1424,6 +1538,50 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         except Exception as e:
             self.logger.warning(
                 message="Failed to remove overlay elements: {error}",
+                tag="SCRAPE",
+                params={"error": str(e)},
+            )
+
+    async def remove_consent_popups(self, page: Page) -> None:
+        """
+        Removes GDPR/cookie consent popups from known CMP providers (OneTrust, Cookiebot,
+        TrustArc, Quantcast, Didomi, Usercentrics, Sourcepoint, Klaro, Osano, Iubenda,
+        Complianz, CookieYes, ConsentManager, LiveRamp/Fides, etc.).
+
+        Strategy:
+        1. Try clicking "Accept All" buttons (cleanest dismissal, sets cookies)
+        2. Try IAB TCF / CMP JavaScript APIs
+        3. Remove known CMP containers by selector
+        4. Handle iframe-based CMPs
+        5. Restore body scroll
+
+        Args:
+            page (Page): The Playwright page instance
+        """
+        remove_consent_js = load_js_script("remove_consent_popups")
+
+        try:
+            await self.adapter.evaluate(page,
+                f"""
+                (async () => {{
+                    try {{
+                        const removeConsent = {remove_consent_js};
+                        await removeConsent();
+                        return {{ success: true }};
+                    }} catch (error) {{
+                        return {{
+                            success: false,
+                            error: error.toString(),
+                            stack: error.stack
+                        }};
+                    }}
+                }})()
+            """
+            )
+            await page.wait_for_timeout(500)  # Wait for any animations to complete
+        except Exception as e:
+            self.logger.warning(
+                message="Failed to remove consent popups: {error}",
                 tag="SCRAPE",
                 params={"error": str(e)},
             )
@@ -1582,7 +1740,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     await asyncio.sleep(config.screenshot_wait_for)
                 screenshot_height_threshold = getattr(config, 'screenshot_height_threshold', None)
                 screenshot_data = await self.take_screenshot(
-                    page, screenshot_height_threshold=screenshot_height_threshold
+                    page,
+                    screenshot_height_threshold=screenshot_height_threshold,
+                    scan_full_page=getattr(config, 'scan_full_page', True),
+                    scroll_delay=config.scroll_delay if config else 0.2
                 )
 
             return screenshot_data, pdf_data, mhtml_data
@@ -1608,6 +1769,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Clean up the page
             if page:
                 try:
+                    await self.browser_manager.release_page_with_context(page)
                     await page.close()
                 except Exception:
                     pass
@@ -1623,6 +1785,14 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Returns:
             str: The base64-encoded screenshot data
         """
+        # Check if viewport-only screenshot is forced
+        force_viewport = kwargs.get('force_viewport_screenshot', False)
+        scan_full_page = kwargs.get('scan_full_page', True)
+
+        if force_viewport or not scan_full_page:
+            # Use viewport-only screenshot
+            return await self.take_screenshot_naive(page)
+
         need_scroll = await self.page_need_scroll(page)
 
         if not need_scroll:
@@ -1684,12 +1854,26 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             str: The base64-encoded screenshot data
         """
         try:
+            # Save original viewport so we can restore it after capture
+            original_viewport = page.viewport_size
+
             # Get page height
             dimensions = await self.get_page_dimensions(page)
             page_width = dimensions["width"]
             page_height = dimensions["height"]
-            # page_height = await page.evaluate("document.documentElement.scrollHeight")
-            # page_width = await page.evaluate("document.documentElement.scrollWidth")
+
+            # Freeze element dimensions before viewport change to prevent
+            # responsive CSS from rescaling images (fixes Elementor distortion)
+            await page.evaluate("""
+                document.querySelectorAll('img, video, picture, svg, canvas').forEach(el => {
+                    const rect = el.getBoundingClientRect();
+                    if (rect.width > 0 && rect.height > 0) {
+                        el.style.setProperty('width', rect.width + 'px', 'important');
+                        el.style.setProperty('height', rect.height + 'px', 'important');
+                        el.dataset.crawl4aiFrozen = '1';
+                    }
+                });
+            """)
 
             # Set a large viewport
             large_viewport_height = min(
@@ -1701,6 +1885,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             )
 
             # Page still too long, segment approach
+            scroll_delay = kwargs.get("scroll_delay", 0.2)
             segments = []
             viewport_size = page.viewport_size
             viewport_height = viewport_size["height"]
@@ -1711,28 +1896,33 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 # Special handling for the last segment
                 if i == num_segments - 1:
                     last_part_height = page_height % viewport_height
-                    
+
                     # If page_height is an exact multiple of viewport_height,
                     # we don't need an extra segment
                     if last_part_height == 0:
                         # Skip last segment if page height is exact multiple of viewport
                         break
-                    
+
                     # Adjust viewport to exactly match the remaining content height
                     await page.set_viewport_size({"width": page_width, "height": last_part_height})
-                
+
                 await page.evaluate(f"window.scrollTo(0, {y_offset})")
-                await asyncio.sleep(0.01)  # wait for render
-                
+                await asyncio.sleep(scroll_delay)  # wait for render (respects scroll_delay config)
+
                 # Capture the current segment
-                # Note: Using compression options (format, quality) would go here
                 seg_shot = await page.screenshot(full_page=False, type="jpeg", quality=85)
-                # seg_shot = await page.screenshot(full_page=False)
                 img = Image.open(BytesIO(seg_shot)).convert("RGB")
                 segments.append(img)
 
-            # Reset viewport to original size after capturing segments
-            await page.set_viewport_size({"width": page_width, "height": viewport_height})
+            # Unfreeze element dimensions and restore original viewport
+            await page.evaluate("""
+                document.querySelectorAll('[data-crawl4ai-frozen]').forEach(el => {
+                    el.style.removeProperty('width');
+                    el.style.removeProperty('height');
+                    delete el.dataset.crawl4aiFrozen;
+                });
+            """)
+            await page.set_viewport_size(original_viewport)
 
             total_height = sum(img.height for img in segments)
             stitched = Image.new("RGB", (segments[0].width, total_height))
@@ -1744,7 +1934,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             buffered = BytesIO()
             stitched = stitched.convert("RGB")
-            stitched.save(buffered, format="BMP", quality=85)
+            stitched.save(buffered, format="PNG")
             encoded = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
             return encoded
@@ -2227,6 +2417,35 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 # HTTP Crawler Strategy
 ####################################################################################################
 
+def _safe_download_filepath(downloads_path: str, filename: str) -> str:
+    """Resolve a download destination confined to ``downloads_path``.
+
+    The filename is derived from attacker-influenced input (a remote
+    Content-Disposition header, or the browser's suggested filename), so it is
+    reduced to a bare basename (dropping absolute paths and ``..`` traversal)
+    and the resolved path is re-checked to live inside the downloads root,
+    rejecting any pre-existing symlink that points outside. Raises ValueError
+    on any escape. The final write must still use ``_nofollow_opener`` (or an
+    equivalent ``O_NOFOLLOW`` / pre-write symlink check) to close the TOCTOU
+    window between this check and the open.
+    """
+    safe_name = os.path.basename(filename or "")
+    if not safe_name or safe_name in (".", ".."):
+        safe_name = f"download_{hashlib.md5((filename or '').encode()).hexdigest()[:10]}"
+    real_root = os.path.realpath(downloads_path)
+    real_path = os.path.realpath(os.path.join(real_root, safe_name))
+    if os.path.commonpath([real_root, real_path]) != real_root:
+        raise ValueError(f"Unsafe download filename rejected: {filename!r}")
+    return real_path
+
+
+def _nofollow_opener(path, flags):
+    """Opener for ``open``/``aiofiles.open`` that refuses to follow a symlink at
+    the final path component, closing the TOCTOU symlink-swap race after a path
+    has been confined by ``_safe_download_filepath``."""
+    return os.open(path, flags | os.O_NOFOLLOW)
+
+
 class HTTPCrawlerError(Exception):
     """Base error class for HTTP crawler specific exceptions"""
     pass
@@ -2372,11 +2591,13 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
             status_code=200
         )
 
-    async def _handle_raw(self, content: str) -> AsyncCrawlResponse:
+    async def _handle_raw(self, content: str, base_url: str = None) -> AsyncCrawlResponse:
         return AsyncCrawlResponse(
             html=content,
             response_headers={},
-            status_code=200
+            status_code=200,
+            # For raw: URLs, use base_url if provided; don't fall back to the raw content
+            redirected_url=base_url
         )
 
 
@@ -2399,14 +2620,72 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
 
         return server
 
+    # Content types treated as text (decoded into html field)
+    _TEXT_CONTENT_TYPES: Final = frozenset({
+        'text/csv', 'text/plain', 'text/tab-separated-values', 'text/xml',
+        'application/json', 'application/xml', 'application/xhtml+xml',
+        'application/rss+xml', 'application/atom+xml', 'application/ld+json',
+        'application/x-ndjson', 'text/calendar', 'text/vcard',
+    })
+
+    def _is_file_download(self, content_type: str, content_disposition: str) -> bool:
+        """Detect if the HTTP response is a file download rather than an HTML page."""
+        if 'attachment' in content_disposition:
+            return True
+        if not content_type or content_type == 'text/html':
+            return False
+        # Anything that isn't text/html is a file download
+        return True
+
+    def _is_text_content(self, content_type: str) -> bool:
+        """Check if content type is text-based (safe to decode and put in html field)."""
+        if content_type in self._TEXT_CONTENT_TYPES:
+            return True
+        # Catch-all for text/* subtypes not in the explicit set
+        return content_type.startswith('text/')
+
+    def _extract_filename(self, content_disposition: str, url: str, content_type: str) -> str:
+        """Extract filename from Content-Disposition header or URL path."""
+        # Try Content-Disposition first
+        if content_disposition:
+            import re
+            # filename*=UTF-8''encoded_name (RFC 5987)
+            match = re.search(r"filename\*=(?:UTF-8''|utf-8'')(.+?)(?:;|$)", content_disposition)
+            if match:
+                from urllib.parse import unquote
+                return unquote(match.group(1).strip())
+            # filename="name" or filename=name
+            match = re.search(r'filename="?([^";]+)"?', content_disposition)
+            if match:
+                return match.group(1).strip()
+
+        # Fall back to URL path
+        path = urlparse(url).path
+        if path and '/' in path:
+            basename = path.rsplit('/', 1)[-1]
+            if '.' in basename and len(basename) <= 255:
+                return basename
+
+        # Last resort: hash-based name with extension from content type
+        ext_map = {
+            'text/csv': '.csv', 'application/pdf': '.pdf',
+            'application/zip': '.zip', 'image/png': '.png',
+            'image/jpeg': '.jpg', 'application/json': '.json',
+            'text/plain': '.txt', 'application/xml': '.xml',
+        }
+        ext = ext_map.get(content_type, '')
+        return f"download_{hashlib.md5(url.encode()).hexdigest()[:10]}{ext}"
+
     async def _handle_http(
         self,
         url: str,
         config: CrawlerRunConfig
     ) -> AsyncCrawlResponse:
         async with self._session_context() as session:
+            # page_timeout is in ms (Playwright convention), but aiohttp expects seconds
+            timeout_sec = (config.page_timeout / 1000) if config.page_timeout else self.DEFAULT_TIMEOUT
             timeout = ClientTimeout(
-                total=config.page_timeout or self.DEFAULT_TIMEOUT,
+                total=timeout_sec,
                 connect=10,
                 sock_read=30
             )
@@ -2438,25 +2717,61 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
 
             try:
                 async with session.request(self.browser_config.method, url, **request_kwargs) as response:
-                    content = memoryview(await response.read())
-                    
+                    raw_bytes = await response.read()
+                    content = memoryview(raw_bytes)
+
                     if not (200 <= response.status < 300):
                         raise HTTPStatusError(
                             response.status,
                             f"Unexpected status code for {url}"
                         )
-                    
-                    encoding = response.charset
-                    if not encoding:
-                        encoding = chardet.detect(content.tobytes())['encoding'] or 'utf-8'                    
-                    
+
+                    response_headers = dict(response.headers)
+                    content_type = response.content_type or 'text/html'
+                    content_type = content_type.split(';')[0].strip().lower()
+                    content_disposition = response_headers.get('Content-Disposition', '')
+
+                    downloaded_files = None
+                    html = ""
+
+                    if self._is_file_download(content_type, content_disposition):
+                        # Save file to disk
+                        downloads_path = self.browser_config.downloads_path or os.path.join(
+                            os.path.expanduser("~"), ".crawl4ai", "downloads"
+                        )
+                        os.makedirs(downloads_path, exist_ok=True)
+
+                        filename = self._extract_filename(content_disposition, url, content_type)
+                        filepath = _safe_download_filepath(downloads_path, filename)
+
+                        async with aiofiles.open(filepath, 'wb', opener=_nofollow_opener) as f:
+                            await f.write(raw_bytes)
+
+                        downloaded_files = [filepath]
+
+                        # For text-based files, also decode into html (backward compatible)
+                        if self._is_text_content(content_type):
+                            encoding = response.charset
+                            if not encoding:
+                                detection_result = await asyncio.to_thread(chardet.detect, raw_bytes)
+                                encoding = detection_result['encoding'] or 'utf-8'
+                            html = raw_bytes.decode(encoding, errors='replace')
+                    else:
+                        # Standard HTML response — existing behavior
+                        encoding = response.charset
+                        if not encoding:
+                            detection_result = await asyncio.to_thread(chardet.detect, content.tobytes())
+                            encoding = detection_result['encoding'] or 'utf-8'
+                        html = content.tobytes().decode(encoding, errors='replace')
+
                     result = AsyncCrawlResponse(
-                        html=content.tobytes().decode(encoding, errors='replace'),
-                        response_headers=dict(response.headers),
+                        html=html,
+                        response_headers=response_headers,
                         status_code=response.status,
-                        redirected_url=str(response.url)
+                        redirected_url=str(response.url),
+                        downloaded_files=downloaded_files,
                     )
-                    
+
                     await self.hooks['after_request'](result)
                     return result
 
@@ -2501,7 +2816,7 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
                 # Don't use parsed.path - urlparse truncates at '#' which is common in CSS
                 # Strip prefix directly: "raw://" (6 chars) or "raw:" (4 chars)
                 raw_content = url[6:] if url.startswith("raw://") else url[4:]
-                return await self._handle_raw(raw_content)
+                return await self._handle_raw(raw_content, base_url=config.base_url)
             else:  # http or https
                 return await self._handle_http(url, config)
                 

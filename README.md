@@ -41,13 +41,17 @@ Limited slots._
 
 Crawl4AI turns the web into clean, LLM ready Markdown for RAG, agents, and data pipelines. Fast, controllable, battle tested by a 50k+ star community.
 
-[✨ Check out latest update v0.8.0](#-recent-updates)
+[✨ Check out latest update v0.9.2](#-recent-updates)
 
-✨ **New in v0.8.0**: Crash Recovery & Prefetch Mode! Deep crawl crash recovery with `resume_state` and `on_state_change` callbacks for long-running crawls. New `prefetch=True` mode for 5-10x faster URL discovery. Critical security fixes for Docker API (hooks disabled by default, file:// URLs blocked). [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.0.md)
+✨ **New in v0.9.2**: Maintenance patch release. Fixes a `MemoryAdaptiveDispatcher` task/page leak when a streaming crawl is closed, Docker Playground "Advanced Config" and Monitor WebSocket auth, Playwright headless-shell packaging, and GPU (`ENABLE_GPU=true`) Docker builds. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.2.md)
 
-✨ Recent v0.7.8: Stability & Bug Fix Release! 11 bug fixes addressing Docker API issues, LLM extraction improvements, URL handling fixes, and dependency updates. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.8.md)
+✨ Recent v0.9.0: Major secure-by-default release of the Docker API server. Auth is on by default, the server binds loopback unless given a token, and the request body is now an untrusted trust boundary. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.0.md)
 
-✨ Previous v0.7.7: Complete Self-Hosting Platform with Real-time Monitoring! Enterprise-grade monitoring dashboard, comprehensive REST API, WebSocket streaming, and smart browser pool management. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.7.md)
+✨ Recent v0.8.7: Security-hardening release. Fixes critical Docker API vulnerabilities (RCE, SSRF, auth bypass, file write, XSS, hardcoded JWT secret), adds DomainMapper, and ships scraping, deep-crawl, and LLM fixes. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.7.md)
+
+✨ Previous v0.8.0: Crash Recovery & Prefetch Mode! Deep crawl crash recovery with `resume_state` and `on_state_change` callbacks for long-running crawls. New `prefetch=True` mode for 5-10x faster URL discovery. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.0.md)
+
+✨ Previous v0.7.8: Stability & Bug Fix Release! 11 bug fixes addressing Docker API issues, LLM extraction improvements, URL handling fixes, and dependency updates. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.8.md)
 
 <details>
   <summary>🤓 <strong>My Personal Story</strong></summary>
@@ -562,11 +566,118 @@ async def test_news_crawl():
 
 ---
 
-> **💡 Tip:** Some websites may use **CAPTCHA** based verification mechanisms to prevent automated access. If your workflow encounters such challenges, you may optionally integrate a third-party CAPTCHA-handling service such as <strong>[CapSolver](https://www.capsolver.com/blog/Partners/crawl4ai-capsolver/?utm_source=crawl4ai&utm_medium=github_pr&utm_campaign=crawl4ai_integration)</strong>. They support reCAPTCHA v2/v3, Cloudflare Turnstile, Challenge, AWS WAF, and more. Please ensure that your usage complies with the target website’s terms of service and applicable laws.
-
 ## ✨ Recent Updates
 
 <details open>
+<summary><strong>Version 0.9.2 Release Highlights - Maintenance Bug Fixes</strong></summary>
+
+A maintenance patch release with bug fixes across the dispatcher, Docker, and GPU builds. `MemoryAdaptiveDispatcher` no longer leaks crawl tasks and browser pages when a streaming crawl is closed. Docker fixes cover the Playground "Advanced Config" 400, the Monitor WebSocket 500 under JWT auth, and Playwright headless-shell packaging. `ENABLE_GPU=true` Docker builds no longer fail on the CUDA toolkit.
+
+No new features, no breaking changes.
+
+```bash
+pip install -U crawl4ai
+```
+
+[Full v0.9.2 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.2.md)
+
+</details>
+
+<details>
+<summary><strong>Version 0.9.1 Release Highlights - Bug Fixes & PruningContentFilter Whitelist</strong></summary>
+
+A patch release with 12 bug fixes and one new feature. The new `preserve_classes` / `preserve_tags` parameters for `PruningContentFilter` let you whitelist CSS classes or HTML tags that should never be pruned — useful for protecting short metadata elements like author names and timestamps.
+
+Bug fixes span Docker (auth gate UI, supervisord/redis dirs, FastAPI compatibility, redis auth), browser (Windows channel crash, context snapshot leak), core (HTTP timeout unit mismatch, best-first ordering), and extraction (html2text table attributes).
+
+```bash
+pip install -U crawl4ai
+```
+
+[Full v0.9.1 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.1.md)
+
+</details>
+
+<details>
+<summary><strong>Version 0.9.0 Release Highlights - Secure-by-Default Docker Server</strong></summary>
+
+A major, secure-by-default release of the Docker API server. The out-of-the-box deployment is hardened with defense in depth: authentication is on by default, the server binds loopback unless you give it a token, and the network request body is treated as an untrusted trust boundary.
+
+```bash
+pip install -U crawl4ai
+```
+
+[Migration Guide →](https://github.com/unclecode/crawl4ai/blob/main/deploy/docker/MIGRATION.md) · [Full v0.9.0 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.0.md)
+
+</details>
+
+<details>
+<summary><strong>Version 0.8.7 Release Highlights - Security Hardening, DomainMapper & Community Fixes</strong></summary>
+
+A security-hardening release. Fixes critical Docker API vulnerabilities (AST sandbox escape RCE, hook sandbox RCE, hardcoded JWT secret, SSRF on webhook and crawl endpoints, arbitrary file write, monitor auth bypass, stored XSS, and unauthenticated JS execution), adds the DomainMapper feature, and ships a batch of scraping, deep-crawl, and LLM fixes. If you self-host the Docker API, upgrade immediately.
+
+```bash
+pip install -U crawl4ai
+```
+
+[Full v0.8.7 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.7.md)
+
+</details>
+
+<details>
+<summary><strong>Version 0.8.6 - Security Hotfix: litellm Supply Chain Fix</strong></summary>
+
+Replaced `litellm` dependency with `unclecode-litellm` due to a PyPI supply chain compromise affecting the original package. If you're on v0.8.5 or earlier, upgrade immediately.
+
+```bash
+pip install -U crawl4ai
+```
+
+</details>
+
+<details>
+<summary><strong>Version 0.8.5 Release Highlights - Anti-Bot Detection, Shadow DOM & 60+ Bug Fixes</strong></summary>
+
+Our biggest release since v0.8.0. Anti-bot detection with proxy escalation, Shadow DOM flattening, deep crawl cancellation, and over 60 bug fixes.
+
+- **🛡️ Anti-Bot Detection & Proxy Escalation**:
+  - 3-tier detection: known vendors, generic block indicators, structural integrity checks
+  - Automatic retry with proxy chain and fallback fetch function
+  ```python
+  from crawl4ai import CrawlerRunConfig
+  from crawl4ai.async_configs import ProxyConfig
+
+  config = CrawlerRunConfig(
+      proxy_config=[ProxyConfig.DIRECT, ProxyConfig(server="http://my-proxy:8080")],
+      max_retries=2,
+      fallback_fetch_function=my_web_unlocker,
+  )
+  ```
+
+- **🌑 Shadow DOM Flattening**:
+  - Extract content hidden inside shadow DOM components
+  ```python
+  config = CrawlerRunConfig(flatten_shadow_dom=True)
+  ```
+
+- **🛑 Deep Crawl Cancellation**:
+  - Stop long crawls gracefully with `cancel()` or `should_cancel` callback
+  - Works with BFS, DFS, and BestFirst strategies
+
+- **⚙️ Config Defaults API**:
+  - `set_defaults()` / `get_defaults()` / `reset_defaults()` on BrowserConfig and CrawlerRunConfig
+
+- **🔒 Critical Security Fixes**:
+  - RCE via deserialization in Docker `/crawl` endpoint — removed `eval()`, added allowlist
+  - Redis CVE-2025-49844 (CVSS 10.0) — upgraded to 7.2.7
+
+- **60+ Bug Fixes** across browser management, proxy, deep crawling, extraction, CLI, and Docker
+
+[Full v0.8.5 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.5.md)
+
+</details>
+
+<details>
 <summary><strong>Version 0.8.0 Release Highlights - Crash Recovery & Prefetch Mode</strong></summary>
 
 This release introduces crash recovery for deep crawls, a new prefetch mode for fast URL discovery, and critical security fixes for Docker deployments.
@@ -809,21 +920,21 @@ This release focuses on stability with 11 bug fixes addressing issues reported b
   ```
 
 - **🎨 Multi-URL Configuration**: Different strategies for different URL patterns in one batch:
-  ```python
-  from crawl4ai import CrawlerRunConfig, MatchMode
+```python
+from crawl4ai import CrawlerRunConfig, MatchMode, CacheMode
   
   configs = [
       # Documentation sites - aggressive caching
       CrawlerRunConfig(
           url_matcher=["*docs*", "*documentation*"],
-          cache_mode="write",
+          cache_mode=CacheMode.WRITE_ONLY,
           markdown_generator_options={"include_links": True}
       ),
       
       # News/blog sites - fresh content
       CrawlerRunConfig(
           url_matcher=lambda url: 'blog' in url or 'news' in url,
-          cache_mode="bypass"
+          cache_mode=CacheMode.BYPASS
       ),
       
       # Fallback for everything else
@@ -1130,19 +1241,33 @@ For more details, see our [full mission statement](./MISSION.md).
 
 ## 🌟 Current Sponsors
 
-### 🏢 Enterprise Sponsors & Partners
+### 🤝 Strategic Partners
 
-Our enterprise sponsors and technology partners help scale Crawl4AI to power production-grade data pipelines.
+These companies provide core infrastructure and technology that power Crawl4AI’s capabilities — from web access and proxy networks to AI tooling and data pipelines.
+
+| Company | About |
+|------|------|
+| <a href="https://www.joinmassive.com/" target="_blank"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/sponsors/massive_light.svg"><source media="(prefers-color-scheme: light)" srcset="docs/assets/sponsors/massive.svg"><img alt="Massive" src="docs/assets/sponsors/massive.svg" height="40"/></picture></a> | Massive is a web access API backed by millions of volunteer devices in 195+ countries. AI agents, models, and data pipelines use it to reach any site on the internet, reliably, in real time, and at scale. |
+
+### 🏢 Enterprise Sponsors
+
+Our enterprise sponsors support Crawl4AI and help scale it to power production-grade data pipelines.
 
 | Company | About | Sponsorship Tier |
 |------|------|----------------------------|
-| <a href="https://www.thordata.com/?ls=github&lk=crawl4ai" target="_blank"><img src="https://gist.github.com/aravindkarnam/dfc598a67be5036494475acece7e54cf/raw/thor_data.svg" alt="Thor Data" width="120"/></a>  | Leveraging Thordata ensures seamless compatibility with any AI/ML workflows and data infrastructure, massively accessing web data with 99.9% uptime, backed by one-on-one customer support. | 🥈 Silver |
-| <a href="https://app.nstproxy.com/register?i=ecOqW9" target="_blank"><picture><source width="250" media="(prefers-color-scheme: dark)" srcset="https://gist.github.com/aravindkarnam/62f82bd4818d3079d9dd3c31df432cf8/raw/nst-light.svg"><source width="250" media="(prefers-color-scheme: light)" srcset="https://www.nstproxy.com/logo.svg"><img alt="nstproxy" src="ttps://www.nstproxy.com/logo.svg"></picture></a>  | NstProxy is a trusted proxy provider with over 110M+ real residential IPs, city-level targeting, 99.99% uptime, and low pricing at $0.1/GB, it delivers unmatched stability, scale, and cost-efficiency. | 🥈 Silver |
-| <a href="https://app.scrapeless.com/passport/register?utm_source=official&utm_term=crawl4ai" target="_blank"><picture><source width="250" media="(prefers-color-scheme: dark)" srcset="https://gist.githubusercontent.com/aravindkarnam/0d275b942705604263e5c32d2db27bc1/raw/Scrapeless-light-logo.svg"><source width="250" media="(prefers-color-scheme: light)" srcset="https://gist.githubusercontent.com/aravindkarnam/22d0525cc0f3021bf19ebf6e11a69ccd/raw/Scrapeless-dark-logo.svg"><img alt="Scrapeless" src="https://gist.githubusercontent.com/aravindkarnam/22d0525cc0f3021bf19ebf6e11a69ccd/raw/Scrapeless-dark-logo.svg"></picture></a>  | Scrapeless provides production-grade infrastructure for Crawling, Automation, and AI Agents, offering Scraping Browser, 4 Proxy Types and Universal Scraping API. | 🥈 Silver |
-| <a href="https://dashboard.capsolver.com/passport/register?inviteCode=ESVSECTX5Q23" target="_blank"><picture><source width="120" media="(prefers-color-scheme: dark)" srcset="https://docs.crawl4ai.com/uploads/sponsors/20251013045338_72a71fa4ee4d2f40.png"><source width="120" media="(prefers-color-scheme: light)" srcset="https://www.capsolver.com/assets/images/logo-text.png"><img alt="Capsolver" src="https://www.capsolver.com/assets/images/logo-text.png"></picture></a> | AI-powered Captcha solving service. Supports all major Captcha types, including reCAPTCHA, Cloudflare, and more | 🥉 Bronze |
-| <a href="https://kipo.ai" target="_blank"><img src="https://docs.crawl4ai.com/uploads/sponsors/20251013045751_2d54f57f117c651e.png" alt="DataSync" width="120"/></a> | Helps engineers and buyers find, compare, and source electronic & industrial parts in seconds, with specs, pricing, lead times & alternatives.| 🥇 Gold |
-| <a href="https://www.kidocode.com/" target="_blank"><img src="https://docs.crawl4ai.com/uploads/sponsors/20251013045045_bb8dace3f0440d65.svg" alt="Kidocode" width="120"/><p align="center">KidoCode</p></a> | Kidocode is a hybrid technology and entrepreneurship school for kids aged 5–18, offering both online and on-campus education. | 🥇 Gold |
-| <a href="https://www.alephnull.sg/" target="_blank"><img src="https://docs.crawl4ai.com/uploads/sponsors/20251013050323_a9e8e8c4c3650421.svg" alt="Aleph null" width="120"/></a> | Singapore-based  Aleph Null is Asia’s leading edtech hub, dedicated to student-centric, AI-driven education—empowering learners with the tools to thrive in a fast-changing world. | 🥇 Gold |
+| <a href="https://kipo.ai" target="_blank"><img src="https://docs.crawl4ai.com/uploads/sponsors/20251013045751_2d54f57f117c651e.png" alt="DataSync" height="40"/></a> | Helps engineers and buyers find, compare, and source electronic & industrial parts in seconds, with specs, pricing, lead times & alternatives.| 🥇 Gold |
+| <a href="https://www.kidocode.com/" target="_blank"><img src="https://docs.crawl4ai.com/uploads/sponsors/20251013045045_bb8dace3f0440d65.svg" alt="Kidocode" height="40"/></a> | Kidocode is a hybrid technology and entrepreneurship school for kids aged 5–18, offering both online and on-campus education. | 🥇 Gold |
+| <a href="https://www.alephnull.sg/" target="_blank"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/sponsors/aleph_null_light.svg"><source media="(prefers-color-scheme: light)" srcset="docs/assets/sponsors/aleph_null.svg"><img alt="Aleph null" src="docs/assets/sponsors/aleph_null.svg" height="40"/></picture></a> | Singapore-based  Aleph Null is Asia’s leading edtech hub, dedicated to student-centric, AI-driven education—empowering learners with the tools to thrive in a fast-changing world. | 🥇 Gold |
+
+---
+
+### 💼 Become a Strategic Partner or Sponsor
+
+Interested in partnering with Crawl4AI?
+
+Whether you’re a proxy provider, AI infrastructure company, cloud platform, or an organization looking to support the Crawl4AI ecosystem, we’d love to hear from you.
+
+📩 Contact: hello@crawl4ai.com
 
 
 
@@ -1165,4 +1290,10 @@ A heartfelt thanks to our individual supporters! Every contribution helps us kee
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=unclecode/crawl4ai&type=Date)](https://star-history.com/#unclecode/crawl4ai&Date)
+<a href="https://www.star-history.com/?type=date&repos=unclecode%2Fcrawl4ai">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=unclecode/crawl4ai&type=date&theme=dark&legend=top-left&sealed_token=KuajrA7ScH8VT4KagC7nm1xbazTVaNs6rdok4At2dV6tDl91YR_dxmHhmsffjhFiWdLYlzdACxZ-cWLwp8tZHCYxSDMjITf3Vnu4mPns7YdLetyQBPHMQ2f_KakXdbvbVP6PofI82GNqGCVEXtPnZWHC8WM6CzZe6s6cJb6_ga_kn-jh-BeHdyuRRdVR" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=unclecode/crawl4ai&type=date&legend=top-left&sealed_token=KuajrA7ScH8VT4KagC7nm1xbazTVaNs6rdok4At2dV6tDl91YR_dxmHhmsffjhFiWdLYlzdACxZ-cWLwp8tZHCYxSDMjITf3Vnu4mPns7YdLetyQBPHMQ2f_KakXdbvbVP6PofI82GNqGCVEXtPnZWHC8WM6CzZe6s6cJb6_ga_kn-jh-BeHdyuRRdVR" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=unclecode/crawl4ai&type=date&legend=top-left&sealed_token=KuajrA7ScH8VT4KagC7nm1xbazTVaNs6rdok4At2dV6tDl91YR_dxmHhmsffjhFiWdLYlzdACxZ-cWLwp8tZHCYxSDMjITf3Vnu4mPns7YdLetyQBPHMQ2f_KakXdbvbVP6PofI82GNqGCVEXtPnZWHC8WM6CzZe6s6cJb6_ga_kn-jh-BeHdyuRRdVR" />
+ </picture>
+</a>

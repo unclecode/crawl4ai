@@ -179,6 +179,7 @@ class AdaptiveConfig:
     # Embedding strategy parameters
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     embedding_llm_config: Optional[Union[LLMConfig, Dict]] = None  # Separate config for embeddings
+    query_llm_config: Optional[Union[LLMConfig, Dict]] = None  # Config for query expansion (chat completion)
     n_query_variations: int = 10
     coverage_threshold: float = 0.85
     alpha_shape_alpha: float = 0.5
@@ -206,6 +207,9 @@ class AdaptiveConfig:
     # Example: Links with >0.85 similarity to existing KB get penalized to avoid redundancy
     # Lower = more aggressive deduplication, Higher = allow more similar content
     
+    # Link preview timeout (seconds)
+    link_preview_timeout: float = 5.0
+
     # Embedding stopping criteria parameters
     embedding_min_relative_improvement: float = 0.1  # Minimum relative improvement to continue
     # Example: If confidence is 0.6, need improvement > 0.06 per batch to continue crawling
@@ -256,24 +260,18 @@ class AdaptiveConfig:
         """Convert LLMConfig to dict format for backward compatibility."""
         if self.embedding_llm_config is None:
             return None
-        
         if isinstance(self.embedding_llm_config, dict):
-            # Already a dict - return as-is for backward compatibility
             return self.embedding_llm_config
-        
-        # Convert LLMConfig object to dict format
-        return {
-            'provider': self.embedding_llm_config.provider,
-            'api_token': self.embedding_llm_config.api_token,
-            'base_url': getattr(self.embedding_llm_config, 'base_url', None),
-            'temperature': getattr(self.embedding_llm_config, 'temperature', None),
-            'max_tokens': getattr(self.embedding_llm_config, 'max_tokens', None),
-            'top_p': getattr(self.embedding_llm_config, 'top_p', None),
-            'frequency_penalty': getattr(self.embedding_llm_config, 'frequency_penalty', None),
-            'presence_penalty': getattr(self.embedding_llm_config, 'presence_penalty', None),
-            'stop': getattr(self.embedding_llm_config, 'stop', None),
-            'n': getattr(self.embedding_llm_config, 'n', None),
-        }
+        return self.embedding_llm_config.to_dict()
+
+    @property
+    def _query_llm_config_dict(self) -> Optional[Dict]:
+        """Convert query LLM config to dict format."""
+        if self.query_llm_config is None:
+            return None
+        if isinstance(self.query_llm_config, dict):
+            return self.query_llm_config
+        return self.query_llm_config.to_dict()
 
 
 class CrawlStrategy(ABC):
@@ -617,9 +615,10 @@ class StatisticalStrategy(CrawlStrategy):
 class EmbeddingStrategy(CrawlStrategy):
     """Embedding-based adaptive crawling using semantic space coverage"""
     
-    def __init__(self, embedding_model: str = None, llm_config: Union[LLMConfig, Dict] = None):
+    def __init__(self, embedding_model: str = None, llm_config: Union[LLMConfig, Dict] = None, query_llm_config: Union[LLMConfig, Dict] = None):
         self.embedding_model = embedding_model or "sentence-transformers/all-MiniLM-L6-v2"
         self.llm_config = llm_config
+        self.query_llm_config = query_llm_config
         self._embedding_cache = {}
         self._link_embedding_cache = {}  # Cache for link embeddings
         self._validation_passed = False  # Track if validation passed
@@ -630,19 +629,46 @@ class EmbeddingStrategy(CrawlStrategy):
         self._validation_embeddings_cache = None  # Cache validation query embeddings
         self._kb_similarity_threshold = 0.95  # Threshold for deduplication
     
-    def _get_embedding_llm_config_dict(self) -> Dict:
-        """Get embedding LLM config as dict with fallback to default."""
+    def _get_embedding_llm_config_dict(self) -> Optional[Dict]:
+        """Get embedding LLM config as dict, or None for local embeddings."""
         if hasattr(self, 'config') and self.config:
             config_dict = self.config._embedding_llm_config_dict
             if config_dict:
                 return config_dict
-        
-        # Fallback to default if no config provided
-        return {
-            'provider': 'openai/text-embedding-3-small',
-            'api_token': os.getenv('OPENAI_API_KEY')
-        }
-        
+
+        # Return None to use local sentence-transformers embeddings
+        return None
+
+    def _get_query_llm_config_dict(self) -> Optional[Dict]:
+        """Get query LLM config as dict for chat completion calls.
+
+        Fallback chain:
+        1. self.query_llm_config (explicit query config on strategy)
+        2. self.config._query_llm_config_dict (from AdaptiveConfig)
+        3. self.llm_config (legacy: single config for both)
+        4. None (caller uses hardcoded defaults)
+        """
+        # 1. Explicit query config on strategy instance
+        if self.query_llm_config is not None:
+            if isinstance(self.query_llm_config, dict):
+                return self.query_llm_config
+            return self.query_llm_config.to_dict()
+
+        # 2. From AdaptiveConfig
+        if hasattr(self, 'config') and self.config:
+            config_dict = self.config._query_llm_config_dict
+            if config_dict:
+                return config_dict
+
+        # 3. Legacy fallback: use embedding/shared llm_config for backward compat
+        if self.llm_config is not None:
+            if isinstance(self.llm_config, dict):
+                return self.llm_config
+            return self.llm_config.to_dict()
+
+        # 4. None — caller applies hardcoded defaults
+        return None
+
     async def _get_embeddings(self, texts: List[str]) -> Any:
         """Get embeddings using configured method"""
         from .utils import get_text_embeddings
@@ -712,27 +738,22 @@ class EmbeddingStrategy(CrawlStrategy):
         
         Return as a JSON array of strings."""
         
-        # Use the LLM for query generation
-        # Convert LLMConfig to dict if needed
-        llm_config_dict = None
-        if self.llm_config:
-            if isinstance(self.llm_config, dict):
-                llm_config_dict = self.llm_config
-            else:
-                # Convert LLMConfig object to dict
-                llm_config_dict = {
-                    'provider': self.llm_config.provider,
-                    'api_token': self.llm_config.api_token
-                }
-        
+        # Use a chat completion model for query generation
+        llm_config_dict = self._get_query_llm_config_dict()
+
         provider = llm_config_dict.get('provider', 'openai/gpt-4o-mini') if llm_config_dict else 'openai/gpt-4o-mini'
         api_token = llm_config_dict.get('api_token') if llm_config_dict else None
-        
+        base_url = llm_config_dict.get('base_url') if llm_config_dict else None
+
         response = perform_completion_with_backoff(
             provider=provider,
             prompt_with_variables=prompt,
             api_token=api_token,
-            json_response=True
+            json_response=True,
+            base_url=base_url,
+            base_delay=llm_config_dict.get('backoff_base_delay', 2) if llm_config_dict else 2,
+            max_attempts=llm_config_dict.get('backoff_max_attempts', 3) if llm_config_dict else 3,
+            exponential_factor=llm_config_dict.get('backoff_exponential_factor', 2) if llm_config_dict else 2,
         )
         
         variations = json.loads(response.choices[0].message.content)
@@ -1298,7 +1319,8 @@ class AdaptiveCrawler:
         elif strategy_name == "embedding":
             strategy = EmbeddingStrategy(
                 embedding_model=self.config.embedding_model,
-                llm_config=self.config.embedding_llm_config
+                llm_config=self.config.embedding_llm_config,
+                query_llm_config=self.config.query_llm_config,
             )
             strategy.config = self.config  # Pass config to strategy
             return strategy
@@ -1353,11 +1375,10 @@ class AdaptiveCrawler:
                         if isinstance(result.links, dict):
                             # Extract internal and external links from dict
                             internal_links = [Link(**link) for link in result.links.get('internal', [])]
-                            external_links = [Link(**link) for link in result.links.get('external', [])]
-                            self.state.pending_links.extend(internal_links + external_links)
+                            self.state.pending_links.extend(internal_links)
                         else:
                             # Handle Links object
-                            self.state.pending_links.extend(result.links.internal + result.links.external)
+                            self.state.pending_links.extend(result.links.internal)
                     
                     # Update state
                     await self.strategy.update_state(self.state, [result])
@@ -1407,11 +1428,10 @@ class AdaptiveCrawler:
                                 if isinstance(result.links, dict):
                                     # Extract internal and external links from dict
                                     internal_links = [Link(**link_data) for link_data in result.links.get('internal', [])]
-                                    external_links = [Link(**link_data) for link_data in result.links.get('external', [])]
-                                    new_links = internal_links + external_links
+                                    new_links = internal_links
                                 else:
                                     # Handle Links object
-                                    new_links = result.links.internal + result.links.external
+                                    new_links = result.links.internal
                                 
                                 # Add new links to pending
                                 for new_link in new_links:
@@ -1459,7 +1479,7 @@ class AdaptiveCrawler:
                 include_external=False,
                 query=query,  # For BM25 scoring
                 concurrency=5,
-                timeout=5,
+                timeout=self.config.link_preview_timeout,
                 max_links=50,  # Reasonable limit
                 verbose=False
             ),
@@ -1822,7 +1842,7 @@ class AdaptiveCrawler:
         
         return export_dict
     
-    def import_knowledge_base(self, filepath: Union[str, Path], format: str = "jsonl") -> None:
+    async def import_knowledge_base(self, filepath: Union[str, Path], format: str = "jsonl") -> None:
         """Import a knowledge base from a file
         
         Args:
@@ -1851,7 +1871,7 @@ class AdaptiveCrawler:
             self.state.knowledge_base.extend(imported_results)
             
             # Update state with imported data
-            asyncio.run(self.strategy.update_state(self.state, imported_results))
+            await self.strategy.update_state(self.state, imported_results)
             
             print(f"Imported {len(imported_results)} documents from {filepath}")
         else:

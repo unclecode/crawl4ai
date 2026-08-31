@@ -286,6 +286,7 @@ docs/apps/linkdin/samples/insights/*
 
 scripts/
 !scripts/gen-sbom.sh
+!scripts/update_stats.py
 
 
 # Databse files
@@ -298,3 +299,15 @@ scripts/
 *.rdb
 *.ldb
 MEMORY.md
+
+# Handoff files
+HANDOFF-*.md
+
+# Security advisory payloads - kept private, published via GitHub Security Advisories only
+.security/
+
+# Local pipeline/run output
+out/
+
+# entrypoint.sh is a required deployment artifact (Dockerfile COPYs it)
+!deploy/docker/entrypoint.sh

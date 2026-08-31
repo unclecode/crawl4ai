@@ -145,6 +145,7 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
             
             # Create temp file with .pdf extension
             temp_file = tempfile.NamedTemporaryFile(suffix='.pdf', delete=False)
+            temp_file.close()  # Close handle immediately; file persists due to delete=False
             self._temp_files.append(temp_file.name)
             
             try:

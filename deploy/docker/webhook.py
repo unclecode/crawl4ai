@@ -4,12 +4,79 @@ Webhook delivery service for Crawl4AI.
 This module provides webhook notification functionality with exponential backoff retry logic.
 """
 import asyncio
-import httpx
 import logging
-from typing import Dict, Optional
+import re
+import socket
+from typing import Dict, List, Optional
 from datetime import datetime, timezone
 
+import aiohttp
+from aiohttp.abc import AbstractResolver
+
 logger = logging.getLogger(__name__)
+
+_MAX_WEBHOOK_REDIRECTS = 5
+
+
+class _WebhookBlocked(Exception):
+    """Webhook target (or a redirect hop) resolved to a non-global address."""
+
+
+class _PinnedResolver(AbstractResolver):
+    """aiohttp resolver that returns a single pre-pinned IP for the target host.
+
+    aiohttp connects to this IP but still performs TLS SNI / certificate
+    verification against the original hostname, so this pins the connection
+    (closing DNS rebinding) without weakening TLS or doing a MITM.
+    """
+
+    def __init__(self, host: str, ip: str):
+        self._host = host
+        self._ip = ip
+
+    async def resolve(self, host, port=0, family=socket.AF_INET):
+        return [{
+            "hostname": host,
+            "host": self._ip,
+            "port": port,
+            "family": family,
+            "proto": 0,
+            "flags": 0,
+        }]
+
+    async def close(self):
+        pass
+
+# Webhook request-header policy: user-controlled outbound headers could inject
+# hop-by-hop / smuggling headers or CRLF. Allow only well-formed names, reject
+# control chars in values, and deny sensitive/hop-by-hop names.
+_WEBHOOK_HEADER_NAME = re.compile(r"^[A-Za-z0-9-]{1,64}$")
+_WEBHOOK_DENY_HEADERS = {
+    "host", "content-length", "transfer-encoding", "connection",
+    "content-type", "proxy-authorization", "authorization", "cookie",
+    "expect", "upgrade", "te", "trailer",
+}
+_MAX_WEBHOOK_HEADERS = 20
+_MAX_WEBHOOK_HEADER_VALUE = 2048
+
+
+def sanitize_webhook_headers(headers: Optional[Dict[str, str]]) -> Dict[str, str]:
+    """Validate user-supplied webhook headers; raise ValueError on any bad one."""
+    if not headers:
+        return {}
+    if len(headers) > _MAX_WEBHOOK_HEADERS:
+        raise ValueError("too many webhook headers")
+    clean: Dict[str, str] = {}
+    for name, value in headers.items():
+        if not isinstance(name, str) or not _WEBHOOK_HEADER_NAME.match(name):
+            raise ValueError(f"invalid webhook header name: {name!r}")
+        if name.lower() in _WEBHOOK_DENY_HEADERS:
+            raise ValueError(f"webhook header not allowed: {name}")
+        sval = str(value)
+        if len(sval) > _MAX_WEBHOOK_HEADER_VALUE or any(c in sval for c in "\r\n\x00"):
+            raise ValueError(f"invalid value for webhook header {name}")
+        clean[name] = sval
+    return clean
 
 
 class WebhookDeliveryService:
@@ -46,50 +113,72 @@ class WebhookDeliveryService:
             bool: True if delivered successfully, False otherwise
         """
         default_headers = self.config.get("headers", {})
-        merged_headers = {**default_headers, **(headers or {})}
+        try:
+            safe_custom = sanitize_webhook_headers(headers)
+        except ValueError as e:
+            # Defense in depth (the schema validator rejects these at request
+            # time); never send a forged/unsafe header.
+            logger.warning(f"Dropping unsafe webhook headers: {e}")
+            safe_custom = {}
+        merged_headers = {**default_headers, **safe_custom}
         merged_headers["Content-Type"] = "application/json"
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            for attempt in range(self.max_attempts):
-                try:
-                    logger.info(
-                        f"Sending webhook (attempt {attempt + 1}/{self.max_attempts}) to {webhook_url}"
-                    )
+        for attempt in range(self.max_attempts):
+            try:
+                status = await self._deliver(webhook_url, payload, merged_headers)
+                if 200 <= status < 300:
+                    logger.info("Webhook delivered successfully")
+                    return True
+                if status < 500:
+                    logger.warning(f"Webhook rejected with status {status}")
+                    return False  # client error - don't retry
+                logger.warning(f"Webhook failed with status {status}, will retry")
+            except _WebhookBlocked as exc:
+                # SSRF: target (or a redirect hop) resolved non-global. Do not
+                # retry - it will not become safe.
+                logger.warning(f"Webhook blocked (SSRF protection): {exc}")
+                return False
+            except Exception as exc:
+                logger.error(f"Webhook delivery error (attempt {attempt + 1}): {exc}")
 
-                    response = await client.post(
-                        webhook_url,
-                        json=payload,
-                        headers=merged_headers
-                    )
+            if attempt < self.max_attempts - 1:
+                delay = min(self.initial_delay * (2 ** attempt), self.max_delay)
+                await asyncio.sleep(delay)
+        return False
 
-                    # Success or client error (don't retry client errors)
-                    if response.status_code < 500:
-                        if 200 <= response.status_code < 300:
-                            logger.info(f"Webhook delivered successfully to {webhook_url}")
-                            return True
-                        else:
-                            logger.warning(
-                                f"Webhook rejected with status {response.status_code}: {response.text[:200]}"
-                            )
-                            return False  # Client error - don't retry
+    async def _deliver(self, url: str, payload: Dict, headers: Dict[str, str]) -> int:
+        """POST with the connection pinned to the validated IP, following (and
+        re-validating) redirects manually. Returns the final status code."""
+        from egress_broker import resolve_and_pin, check_redirect, EgressBlocked, ALLOW_INSECURE_TLS
 
-                    # Server error - retry with backoff
-                    logger.warning(
-                        f"Webhook failed with status {response.status_code}, will retry"
-                    )
+        current = url
+        for _hop in range(_MAX_WEBHOOK_REDIRECTS + 1):
+            try:
+                pin = resolve_and_pin(current)
+            except EgressBlocked as e:
+                raise _WebhookBlocked(str(e))
 
-                except httpx.TimeoutException as exc:
-                    logger.error(f"Webhook timeout (attempt {attempt + 1}): {exc}")
-                except httpx.RequestError as exc:
-                    logger.error(f"Webhook request error (attempt {attempt + 1}): {exc}")
-                except Exception as exc:
-                    logger.error(f"Webhook delivery error (attempt {attempt + 1}): {exc}")
-
-                # Calculate exponential backoff delay
-                if attempt < self.max_attempts - 1:
-                    delay = min(self.initial_delay * (2 ** attempt), self.max_delay)
-                    logger.info(f"Retrying in {delay}s...")
-                    await asyncio.sleep(delay)
+            connector = aiohttp.TCPConnector(resolver=_PinnedResolver(pin.host, pin.ip))
+            ssl = None if not ALLOW_INSECURE_TLS else False
+            timeout = aiohttp.ClientTimeout(total=self.timeout)
+            async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
+                async with session.post(
+                    current, json=payload, headers=headers,
+                    allow_redirects=False, ssl=ssl,
+                ) as resp:
+                    if resp.status in (301, 302, 303, 307, 308):
+                        loc = resp.headers.get("Location")
+                        if not loc:
+                            return resp.status
+                        # Re-validate every redirect hop before following it.
+                        try:
+                            check_redirect(loc)
+                        except EgressBlocked as e:
+                            raise _WebhookBlocked(f"redirect to blocked target: {e}")
+                        current = loc
+                        continue
+                    return resp.status
+        raise _WebhookBlocked("too many webhook redirects")
 
         logger.error(
             f"Webhook delivery failed after {self.max_attempts} attempts to {webhook_url}"

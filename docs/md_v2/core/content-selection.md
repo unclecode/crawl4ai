@@ -153,8 +153,10 @@ Some sites embed content in `<iframe>` tags. If you want that inline:
 ```python
 config = CrawlerRunConfig(
     # Merge iframe content into the final output
-    process_iframes=True,    
-    remove_overlay_elements=True
+    process_iframes=True,
+    remove_overlay_elements=True,
+    # Remove GDPR/cookie consent popups (OneTrust, Cookiebot, etc.)
+    remove_consent_popups=True
 )
 ```
 
@@ -178,6 +180,55 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+---
+
+## 3.1 Flattening Shadow DOM
+
+Sites built with **Web Components** (Stencil, Lit, Shoelace, Angular Elements, etc.) render content inside [Shadow DOM](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_shadow_DOM) — an encapsulated sub-tree that is invisible to normal page serialization. The browser renders it on screen, but `page.content()` never includes it.
+
+Set `flatten_shadow_dom=True` to walk all shadow trees, resolve `<slot>` projections, and produce a single flat HTML document:
+
+```python
+config = CrawlerRunConfig(
+    # Flatten shadow DOM into the main document
+    flatten_shadow_dom=True,
+    # Give web components time to hydrate
+    wait_until="load",
+    delay_before_return_html=3.0,
+)
+```
+
+**Full example** — crawling a product page where specs live inside shadow roots:
+
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+
+async def main():
+    config = CrawlerRunConfig(
+        flatten_shadow_dom=True,
+        wait_until="load",
+        delay_before_return_html=3.0,
+    )
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(
+            url="https://store.boschrexroth.com/en/us/p/hydraulic-cylinder-r900999011",
+            config=config,
+        )
+        # Without flatten_shadow_dom: ~1 KB of markdown (breadcrumbs only)
+        # With flatten_shadow_dom:   ~33 KB (full product specs, downloads, etc.)
+        print(len(result.markdown.raw_markdown))
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+When `flatten_shadow_dom=True` is set, Crawl4AI also injects an init script that force-opens **closed** shadow roots (by patching `Element.prototype.attachShadow`), so even components that use `mode: 'closed'` become accessible.
+
+> **Tip**: Web components need JavaScript to run before they render content (a process called *hydration*). Use `wait_until="load"` and a `delay_before_return_html` of 2–5 seconds to ensure components are fully hydrated before flattening.
+
+For a complete runnable example, see [`shadow_dom_crawling.py`](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/shadow_dom_crawling.py).
 
 ---
 

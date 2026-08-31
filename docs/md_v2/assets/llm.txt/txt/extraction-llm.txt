@@ -614,7 +614,7 @@ async def batch_llm_extraction():
             if result.success:
                 contents.append({
                     "url": url,
-                    "content": result.fit_markdown[:2000]  # Limit content
+                    "content": result.markdown.fit_markdown[:2000]  # Limit content
                 })
     
     # Process in batches (reduce LLM calls)

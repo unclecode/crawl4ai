@@ -24,6 +24,7 @@ class CrawlResult(BaseModel):
     session_id: Optional[str] = None
     response_headers: Optional[dict] = None
     status_code: Optional[int] = None
+    redirected_status_code: Optional[int] = None
     ssl_certificate: Optional[SSLCertificate] = None
     dispatch_result: Optional[DispatchResult] = None
     ...
@@ -50,15 +51,23 @@ if not result.success:
     print(f"Crawl failed: {result.error_message}")
 ```
 
-### 1.3 **`status_code`** *(Optional[int])*  
-**What**: The page's HTTP status code (e.g., 200, 404).  
+### 1.3 **`status_code`** *(Optional[int])*
+**What**: The page's HTTP status code (e.g., 200, 404). When the page was reached via redirect, this is the status code of the **first** response in the redirect chain (e.g., 301 or 302).
 **Usage**:
 ```python
 if result.status_code == 404:
     print("Page not found!")
 ```
 
-### 1.4 **`error_message`** *(Optional[str])*  
+### 1.4 **`redirected_status_code`** *(Optional[int])*
+**What**: The HTTP status code of the **final** redirect destination. For a 302→200 redirect, `status_code` is 302 and `redirected_status_code` is 200. `None` for non-HTTP requests (raw HTML, local files).
+**Usage**:
+```python
+if result.status_code in (301, 302) and result.redirected_status_code == 200:
+    print(f"Redirected to {result.redirected_url} (OK)")
+```
+
+### 1.5 **`error_message`** *(Optional[str])*  
 **What**: If `success=False`, a textual description of the failure.  
 **Usage**:
 ```python
@@ -401,8 +410,8 @@ async def handle_result(result: CrawlResult):
 ## 9. Key Points & Future
 
 1. **Deprecated legacy properties of CrawlResult**  
-   - `markdown_v2` - Deprecated in v0.5. Just use `markdown`. It holds the `MarkdownGenerationResult` now!
-   - `fit_markdown` and `fit_html` - Deprecated in v0.5. They can now be accessed via `MarkdownGenerationResult` in `result.markdown`. eg: `result.markdown.fit_markdown` and `result.markdown.fit_html`
+   - `markdown_v2` - Removed in v0.5 and now raises `AttributeError`. Use `result.markdown` instead.
+   - `fit_markdown` and `fit_html` - No longer top-level properties in v0.5. Use `result.markdown.fit_markdown` and `result.markdown.fit_html`.
 
 2. **Fit Content**  
    - **`fit_markdown`** and **`fit_html`** appear in MarkdownGenerationResult, only if you used a content filter (like **PruningContentFilter** or **BM25ContentFilter**) inside your **MarkdownGenerationStrategy** or set them directly.  

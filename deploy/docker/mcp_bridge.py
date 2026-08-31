@@ -8,9 +8,8 @@ import httpx
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import JSONResponse
-from fastapi import Request
-from sse_starlette.sse import EventSourceResponse
 from pydantic import BaseModel
+from starlette.routing import Route, Mount
 from mcp.server.sse import SseServerTransport
 
 import mcp.types as t
@@ -37,7 +36,23 @@ def mcp_tool(name: str | None = None):
     return deco
 
 # ── HTTP‑proxy helper for FastAPI endpoints ─────────────────────
-def _make_http_proxy(base_url: str, route):
+def _service_auth_headers() -> dict:
+    """Authenticate the internal loopback call to our own gated endpoints.
+
+    The MCP transport is now behind the AuthGateMiddleware, so by the time a
+    tool is invoked the MCP client is already authenticated. The loopback HTTP
+    call this proxy makes must therefore carry a credential too, or the gate
+    would 401 it. We mint a short-lived, data-scope service token: MCP exposes
+    only data-plane tools (no admin/monitor actions), so this grants no
+    privilege escalation. (Requires a shared SECRET_KEY across workers, which
+    the auth startup check already mandates for any real deployment.)
+    """
+    from auth import create_access_token
+    token = create_access_token({"sub": "mcp-service"}, scope="data")
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _make_http_proxy(base_url: str, route, *, timeout: float | None = None):
     method = list(route.methods - {"HEAD", "OPTIONS"})[0]
     async def proxy(**kwargs):
         # replace `/items/{id}` style params first
@@ -49,18 +64,21 @@ def _make_http_proxy(base_url: str, route):
                 kwargs.pop(k)
         url = base_url.rstrip("/") + path
 
-        async with httpx.AsyncClient() as client:
+        headers = _service_auth_headers()
+        async with httpx.AsyncClient(timeout=timeout) as client:
             try:
                 r = (
-                    await client.get(url, params=kwargs)
+                    await client.get(url, params=kwargs, headers=headers)
                     if method == "GET"
-                    else await client.request(method, url, json=kwargs)
+                    else await client.request(method, url, json=kwargs, headers=headers)
                 )
                 r.raise_for_status()
                 return r.text if method == "GET" else r.json()
             except httpx.HTTPStatusError as e:
                 # surface FastAPI error details instead of plain 500
                 raise HTTPException(e.response.status_code, e.response.text)
+            except httpx.TimeoutException:
+                raise HTTPException(504, "upstream request timed out")
     return proxy
 
 # ── main entry point ────────────────────────────────────────────
@@ -70,6 +88,7 @@ def attach_mcp(
     base: str = "/mcp",
     name: str | None = None,
     base_url: str,              # eg. "http://127.0.0.1:8020"
+    timeout: float | None = None,  # httpx timeout in seconds; None = no limit
 ) -> None:
     """Call once after all routes are declared to expose WS+SSE MCP endpoints."""
     server_name = name or app.title or "FastAPI-MCP"
@@ -92,7 +111,7 @@ def attach_mcp(
         # if kind == "tool":
         #     tools[key] = _make_http_proxy(base_url, route)
         if kind == "tool":
-            proxy = _make_http_proxy(base_url, route)
+            proxy = _make_http_proxy(base_url, route, timeout=timeout)
             tools[key] = (proxy, fn)
             continue
         if kind == "resource":
@@ -135,8 +154,8 @@ def attach_mcp(
         except HTTPException as exc:
             # map server‑side errors into MCP "text/error" payloads
             err = {"error": exc.status_code, "detail": exc.detail}
-            return [t.TextContent(type = "text", text=json.dumps(err))]
-        return [t.TextContent(type = "text", text=json.dumps(res, default=str))]
+            return [t.TextContent(type = "text", text=json.dumps(err, ensure_ascii=False))]
+        return [t.TextContent(type = "text", text=json.dumps(res, default=str, ensure_ascii=False))]
 
     @mcp.list_resources()
     async def _list_resources() -> List[t.Resource]:
@@ -150,7 +169,7 @@ def attach_mcp(
         if name not in resources:
             raise HTTPException(404, "resource not found")
         res = resources[name]()
-        return [t.TextContent(type = "text", text=json.dumps(res, default=str))]
+        return [t.TextContent(type = "text", text=json.dumps(res, default=str, ensure_ascii=False))]
 
     @mcp.list_resource_templates()
     async def _list_templates() -> List[t.ResourceTemplate]:
@@ -218,18 +237,20 @@ def attach_mcp(
             tg.start_soon(ws_to_srv)
             tg.start_soon(srv_to_ws)
 
-    # ── SSE transport (official) ─────────────────────────────
+    # ── SSE transport (raw ASGI — avoids Starlette middleware conflict) ──
     sse = SseServerTransport(f"{base}/messages/")
 
-    @app.get(f"{base}/sse")
-    async def _mcp_sse(request: Request):
-        async with sse.connect_sse(
-            request.scope, request.receive, request._send  # starlette ASGI primitives
-        ) as (read_stream, write_stream):
-            await mcp.run(read_stream, write_stream, init_opts)
+    # Starlette's Route wraps plain async functions in request_response(),
+    # which calls handler(request) instead of handler(scope, receive, send).
+    # Using a callable class bypasses this — Route passes classes through
+    # as raw ASGI apps.  See #1594, #1850.
+    class _MCPSseApp:
+        async def __call__(self, scope, receive, send):
+            async with sse.connect_sse(scope, receive, send) as (read_stream, write_stream):
+                await mcp.run(read_stream, write_stream, init_opts)
 
-    # client → server frames are POSTed here
-    app.mount(f"{base}/messages", app=sse.handle_post_message)
+    app.routes.append(Route(f"{base}/sse", endpoint=_MCPSseApp()))
+    app.routes.append(Mount(f"{base}/messages", app=sse.handle_post_message))
 
     # ── schema endpoint ───────────────────────────────────────
     @app.get(f"{base}/schema")

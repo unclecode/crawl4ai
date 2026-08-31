@@ -507,6 +507,37 @@ class TestBestFirstResume:
         # So -0.9 should be crawled first
         assert crawl_order[0] == "https://example.com/high-priority"
 
+    @pytest.mark.asyncio
+    async def test_stream_results_follow_priority_order_with_out_of_order_batch(self):
+        saved_state = {
+            "strategy_type": "best_first",
+            "visited": ["https://example.com"],
+            "queue_items": [
+                {"score": -0.9, "depth": 1, "url": "https://example.com/high", "parent_url": "https://example.com"},
+                {"score": -0.1, "depth": 1, "url": "https://example.com/low", "parent_url": "https://example.com"},
+            ],
+            "depths": {"https://example.com": 0},
+            "pages_crawled": 1,
+        }
+
+        async def mock_arun_many(urls, config):
+            async def gen():
+                for url in reversed(urls):
+                    result = MagicMock(url=url, success=True, metadata={})
+                    result.links = {"internal": [], "external": []}
+                    yield result
+            return gen()
+
+        strategy = BestFirstCrawlingStrategy(max_depth=2, max_pages=10, resume_state=saved_state)
+        mock_crawler = MagicMock(arun_many=mock_arun_many)
+        results = [
+            result.url
+            async for result in strategy._arun_stream("https://example.com", mock_crawler, create_mock_config(stream=True))
+        ]
+
+        assert results[:2] == ["https://example.com/high", "https://example.com/low"]
+
+
 
 class TestCrossStrategyResume:
     """Tests that apply to all strategies."""
@@ -745,6 +776,41 @@ class TestBestFirstRegressions:
         )
 
         assert strategy.url_scorer is scorer
+
+
+class TestMaxPagesBoundaryYielded:
+    """best_first must YIELD exactly max_pages results (boundary page kept).
+
+    Regression for #859: best_first used to break BEFORE yielding the page that
+    hit the limit, so it returned max_pages-1 results while BFS already returned
+    max_pages. The downstream scan count (discovered_urls) is derived from the
+    yielded results, so the off-by-one surfaced as "11 requested -> 10 found".
+    BFS is included as the working reference. (DFS batch mode has a separate,
+    unrelated overshoot quirk and is intentionally not asserted here.)
+    """
+
+    @pytest.mark.parametrize(
+        "strategy_class",
+        [BFSDeepCrawlStrategy, BestFirstCrawlingStrategy],
+    )
+    @pytest.mark.asyncio
+    async def test_yields_exactly_max_pages(self, strategy_class):
+        max_pages = 11
+        strategy = strategy_class(max_depth=10, max_pages=max_pages)
+
+        mock_crawler = create_mock_crawler_unlimited_links()
+        # _arun_batch is the path the scan worker takes (crawler.arun with the
+        # default stream=False). best_first's _arun_batch re-clones with
+        # stream=True internally, so clone must honour the requested flag.
+        mock_config = create_mock_config()
+        mock_config.clone = lambda **kw: create_mock_config(stream=kw.get("stream", False))
+
+        results = await strategy._arun_batch("https://example.com", mock_crawler, mock_config)
+
+        assert len(results) == max_pages, (
+            f"{strategy_class.__name__} yielded {len(results)} results, "
+            f"expected exactly max_pages={max_pages}"
+        )
 
 
 class TestAPICompatibility:
