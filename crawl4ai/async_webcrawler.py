@@ -1108,13 +1108,18 @@ class AsyncWebCrawler:
 
         if stream:
             async def result_transformer():
+                inner = dispatcher.run_urls_stream(
+                    crawler=self, urls=urls, config=config
+                )
                 try:
-                    async for task_result in dispatcher.run_urls_stream(
-                        crawler=self, urls=urls, config=config
-                    ):
+                    async for task_result in inner:
                         yield transform_result(task_result)
                 finally:
-                    # Auto-release session after streaming completes
+                    # Ensure the inner dispatcher stream is fully closed
+                    # before releasing the session — otherwise cleanup of
+                    # active crawl tasks may overlap with session teardown.
+                    # (See #2083: arun_many stream closure leaks tasks.)
+                    await inner.aclose()
                     await maybe_release_session()
 
             return result_transformer()
