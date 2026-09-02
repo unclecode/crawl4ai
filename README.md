@@ -500,6 +500,7 @@ async def main():
         extraction_strategy=LLMExtractionStrategy(
             # Here you can use any provider that Litellm library supports, for instance: ollama/qwen2
             # provider="ollama/qwen2", api_token="no-token", 
+            # OrcaRouter (OpenAI-compatible gateway): provider="orcarouter/auto", api_token=os.getenv('ORCAROUTER_API_KEY')
             llm_config = LLMConfig(provider="openai/gpt-4o", api_token=os.getenv('OPENAI_API_KEY')), 
             schema=OpenAIModelFee.schema(),
             extraction_type="schema",
