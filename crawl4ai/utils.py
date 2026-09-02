@@ -55,21 +55,43 @@ from urllib.robotparser import RuleLine
 import re
 
 original_applies_to = RuleLine.applies_to
+original_ruleline_init = RuleLine.__init__
+
+
+def _has_query_marker(value: str) -> bool:
+    """True if a quoted or raw robots path/URL still carries a '?' query marker."""
+    if not value:
+        return False
+    return "?" in value or "%3F" in value.upper()
+
+
+def patched_ruleline_init(self, path, allowance):
+    # urlparse/urlunparse drops an empty query, so '/*?' collapses to '/*'.
+    # Preserve a trailing '?' so query-only rules keep their meaning (#2225).
+    keep_query_marker = isinstance(path, str) and path.endswith("?")
+    original_ruleline_init(self, path, allowance)
+    if keep_query_marker and not _has_query_marker(self.path):
+        self.path += "%3F"
+
 
 def patched_applies_to(self, filename):
-   # Handle wildcards in paths
-   if '*' in self.path or '%2A' in self.path or self.path in ("*", "%2A"):
-       pattern = self.path.replace('%2A', '*')
-       pattern = re.escape(pattern).replace('\\*', '.*')
-       pattern = '^' + pattern
-       if pattern.endswith('\\$'):
-           pattern = pattern[:-2] + '$'
-       try:
-           return bool(re.match(pattern, filename))
-       except re.error:
-           return original_applies_to(self, filename)
-   return original_applies_to(self, filename)
+    # Disallow: /*? (and similar) must only match URLs that actually carry a query.
+    if _has_query_marker(self.path) and not _has_query_marker(filename):
+        return False
+    # Handle wildcards in paths
+    if '*' in self.path or '%2A' in self.path or self.path in ("*", "%2A"):
+        pattern = self.path.replace('%2A', '*')
+        pattern = re.escape(pattern).replace('\\*', '.*')
+        pattern = '^' + pattern
+        if pattern.endswith('\\$'):
+            pattern = pattern[:-2] + '$'
+        try:
+            return bool(re.match(pattern, filename))
+        except re.error:
+            return original_applies_to(self, filename)
+    return original_applies_to(self, filename)
 
+RuleLine.__init__ = patched_ruleline_init
 RuleLine.applies_to = patched_applies_to
 # Monkey patch ends
 
@@ -361,7 +383,13 @@ class RobotsParser:
         # If parser can't read rules, allow access
         if not parser.mtime():
             return True
-            
+
+        # urllib.robotparser drops an empty query component, so a URL like
+        # https://host/page? is normalized to /page. Keep a query marker so
+        # rules such as Disallow: /*? still see that the URL carries '?'.
+        if "?" in url and not parsed.query:
+            url = f"{url}="
+
         return parser.can_fetch(user_agent, url)
 
     def clear_cache(self):

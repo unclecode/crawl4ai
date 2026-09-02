@@ -1,11 +1,18 @@
 from crawl4ai.utils import RobotsParser
-            
+from urllib.robotparser import RobotFileParser
+
 import asyncio
 import aiohttp
 from aiohttp import web
 import tempfile
 import shutil
 import os, sys, time, json
+
+
+# Ecommerce-style rule: block URLs that carry a query string, not the whole site.
+DISALLOW_QUERY_WILDCARD_ROBOTS = """User-agent: *
+Disallow: /*?
+"""
 
 
 async def test_robots_parser():
@@ -148,8 +155,40 @@ Allow: /public/
         shutil.rmtree(temp_dir)
         print("\nTest cleanup completed")
 
+def test_robotfileparser_disallow_query_wildcard():
+    """RuleLine patch: Disallow: /*? only matches URLs that carry a query string."""
+    parser = RobotFileParser()
+    parser.parse(DISALLOW_QUERY_WILDCARD_ROBOTS.splitlines())
+    assert parser.can_fetch("*", "https://shop.example/page") is True
+    assert parser.can_fetch("*", "https://shop.example/") is True
+    assert parser.can_fetch("*", "https://shop.example/products/shoes") is True
+    assert parser.can_fetch("*", "https://shop.example/page?q=1") is False
+    assert parser.can_fetch("*", "https://shop.example/?s=search") is False
+
+
+async def test_disallow_query_wildcard_only_blocks_query_urls():
+    """RobotsParser.can_fetch: Disallow: /*? must not collapse to Disallow: /* (#2225)."""
+    temp_dir = tempfile.mkdtemp()
+    try:
+        parser = RobotsParser(cache_dir=temp_dir)
+        parser._cache_rules("shop.example", DISALLOW_QUERY_WILDCARD_ROBOTS)
+
+        assert await parser.can_fetch("https://shop.example/page", "*") is True
+        assert await parser.can_fetch("https://shop.example/", "*") is True
+        assert await parser.can_fetch("https://shop.example/products/shoes", "*") is True
+        assert await parser.can_fetch("https://shop.example/page?q=1", "*") is False
+        assert await parser.can_fetch("https://shop.example/?s=search", "*") is False
+        # Empty-but-present query still counts as carrying a query string
+        assert await parser.can_fetch("https://shop.example/page?", "*") is False
+        print("✓ Disallow: /*? blocks query URLs only (issue #2225)")
+    finally:
+        shutil.rmtree(temp_dir)
+
+
 async def main():
     try:
+        test_robotfileparser_disallow_query_wildcard()
+        await test_disallow_query_wildcard_only_blocks_query_urls()
         await test_robots_parser()
     except Exception as e:
         print(f"Test failed: {str(e)}")
