@@ -712,6 +712,11 @@ class PruningContentFilter(RelevantContentFilter):
         if self._is_preserved(node):
             return
 
+        # Skip pruning for nodes inside <pre> or <code> — whitespace is significant there
+        # (matches the guard in content_scraping_strategy.remove_empty_elements_fast, fix for #1181)
+        if self._is_in_code_block(node):
+            return
+
         text_len = len(node.get_text(strip=True))
         tag_len = len(node.encode_contents().decode("utf-8"))
         link_text_len = sum(
