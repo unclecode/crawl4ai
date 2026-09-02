@@ -1685,11 +1685,11 @@ class CrawlerRunConfig():
         max_scroll_steps: Optional[int] = None,
         process_iframes: bool = False,
         flatten_shadow_dom: bool = False,
-        remove_overlay_elements: bool = False,
-        remove_consent_popups: bool = False,
-        simulate_user: bool = False,
-        override_navigator: bool = False,
-        magic: bool = False,
+        remove_overlay_elements: bool = None,
+        remove_consent_popups: bool = None,
+        simulate_user: bool = None,
+        override_navigator: bool = None,
+        magic: bool = None,
         adjust_viewport_to_content: bool = False,
         # Media Handling Parameters
         screenshot: bool = False,
@@ -1725,7 +1725,7 @@ class CrawlerRunConfig():
         process_in_browser: bool = False,  # Force browser processing for raw:/file:// URLs
         url: str = None,
         base_url: str = None,  # Base URL for markdown link resolution (used with raw: HTML)
-        check_robots_txt: bool = False,
+        check_robots_txt: bool = None,
         user_agent: str = None,
         user_agent_mode: str = None,
         user_agent_generator_config: dict = {},
