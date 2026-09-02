@@ -1473,6 +1473,14 @@ class CrawlerRunConfig():
                           Default: "domcontentloaded".
         page_timeout (int): Timeout in ms for page operations like navigation.
                             Default: 60000 (60 seconds).
+        total_timeout (int or None): Hard ceiling in ms for the whole fetch phase of a
+                            single arun() — every anti-bot attempt and proxy retry
+                            share this one budget. page_timeout only bounds
+                            navigation and the wait_* family; a page that keeps
+                            renavigating can wedge an untimed protocol call and
+                            burn an unbounded amount of wall clock. Set this when
+                            the caller has a real deadline. None disables it.
+                            Default: None.
         wait_for (str or None): A CSS selector or JS condition to wait for before extracting content.
                                 Default: None.
         wait_for_timeout (int or None): Specific timeout in ms for the wait_for condition.
@@ -1666,6 +1674,7 @@ class CrawlerRunConfig():
         # Page Navigation and Timing Parameters
         wait_until: str = "domcontentloaded",
         page_timeout: int = PAGE_TIMEOUT,
+        total_timeout: Optional[int] = None,
         wait_for: str = None,
         wait_for_timeout: int = None,
         wait_for_images: bool = False,
@@ -1796,6 +1805,7 @@ class CrawlerRunConfig():
         # Page Navigation and Timing Parameters
         self.wait_until = wait_until
         self.page_timeout = page_timeout
+        self.total_timeout = total_timeout
         self.wait_for = wait_for
         self.wait_for_timeout = wait_for_timeout
         self.wait_for_images = wait_for_images
@@ -2173,6 +2183,7 @@ class CrawlerRunConfig():
             "shared_data": self.shared_data,
             "wait_until": self.wait_until,
             "page_timeout": self.page_timeout,
+            "total_timeout": self.total_timeout,
             "wait_for": self.wait_for,
             "wait_for_timeout": self.wait_for_timeout,
             "wait_for_images": self.wait_for_images,

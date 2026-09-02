@@ -22,7 +22,12 @@ from .async_logger import AsyncLogger
 from .ssl_certificate import SSLCertificate
 from .user_agent_generator import ValidUAGenerator, UAGen
 from .browser_manager import BrowserManager
-from .browser_adapter import BrowserAdapter, PlaywrightAdapter, UndetectedAdapter
+from .browser_adapter import (
+    EVALUATE_TIMEOUT_S,
+    BrowserAdapter,
+    PlaywrightAdapter,
+    UndetectedAdapter,
+)
 
 import aiofiles
 import aiohttp
@@ -32,6 +37,22 @@ from urllib.parse import urlparse
 from types import MappingProxyType
 import contextlib
 from functools import partial
+
+# --- Bounds for Playwright calls that carry no protocol timeout ------------
+# page.content() and page.evaluate() are sent without a `timeout` field, so the
+# driver arms no timer and they can only end when the target replies or closes.
+# See AsyncPlaywrightCrawlerStrategy._capture_html and browser_adapter.
+HTML_CAPTURE_TIMEOUT_S: Final[float] = 15.0   # per page.content() attempt
+HTML_CAPTURE_TOTAL_TIMEOUT_S: Final[float] = 25.0   # across all attempts
+HTML_CAPTURE_SETTLE_TIMEOUT_S: Final[float] = 5.0   # wait for the next document
+HTML_CAPTURE_ATTEMPTS: Final[int] = 3
+PAGE_CLOSE_TIMEOUT_S: Final[float] = 10.0     # page.close() is unbounded too
+VIRTUAL_SCROLL_TIMEOUT_S: Final[float] = 300.0  # in-page scroll loop, legitimately slow
+# Cosmetic DOM steps that already degrade gracefully (image dimensions, consent
+# and overlay removal). They are worth a few seconds, never worth a minute, so
+# they get a tighter ceiling than the adapter default.
+OPTIONAL_DOM_STEP_TIMEOUT_S: Final[float] = 10.0
+
 
 class AsyncCrawlerStrategy(ABC):
     """
@@ -333,7 +354,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
 
         try:
-            result = await self.adapter.evaluate(page, wrapper_js)
+            # The polling loop above enforces `timeout` itself; the adapter
+            # bound only has to catch a page whose execution context never
+            # settles, so give it headroom rather than racing the JS.
+            result = await self.adapter.evaluate(
+                page, wrapper_js, timeout=timeout / 1000.0 + EVALUATE_TIMEOUT_S
+            )
             return result
         except Exception as e:
             if "Error evaluating condition" in str(e):
@@ -510,6 +536,66 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             raise ValueError(
                 "URL must start with 'http://', 'https://', 'file://', or 'raw:'"
             )
+
+    async def _capture_html(self, page: Page, attempts: int = None) -> str:
+        """Capture the page HTML, tolerating a page that is still navigating.
+
+        `page.content()` carries no protocol timeout — the Python client sends
+        no timeout field, so the driver arms no timer and the call waits on the
+        frame's execution-context promise.  On a page that keeps committing
+        navigations that promise is repeatedly replaced, giving two failure
+        modes for the same race:
+
+        * the context dies *during* the call -> Playwright raises
+          "Unable to retrieve content because the page is navigating and
+          changing the content";
+        * the context is already gone *at* the call -> it blocks forever
+          (`page_timeout` does not cover this; only an external deadline does).
+
+        Both are transient. Wait for the new document to reach
+        domcontentloaded and capture again, which is the documented remedy and
+        is far cheaper than re-running the whole crawl.
+        """
+        attempts = attempts or HTML_CAPTURE_ATTEMPTS
+        # A recoverable race raises immediately, so retries are nearly free; a
+        # wedged page burns a full timeout each time. Bound the retries as a
+        # group so only the wedged case pays, and it pays once.
+        deadline = time.perf_counter() + HTML_CAPTURE_TOTAL_TIMEOUT_S
+        last_err: Optional[BaseException] = None
+        for _i in range(attempts):
+            budget = min(HTML_CAPTURE_TIMEOUT_S, deadline - time.perf_counter())
+            if budget <= 0:
+                break
+            try:
+                return await asyncio.wait_for(page.content(), budget)
+            except asyncio.TimeoutError:
+                last_err = PlaywrightTimeoutError(
+                    f"page.content() did not return within {budget:.0f}s "
+                    f"— the page never stopped navigating"
+                )
+            except Error as e:
+                last_err = e
+            if _i >= attempts - 1:
+                break
+            self.logger.debug(
+                message="HTML capture attempt {n} failed ({err}) — letting the page settle",
+                tag="SCRAPE",
+                params={"n": _i + 1, "err": str(last_err)[:120]},
+            )
+            try:
+                await page.wait_for_load_state(
+                    "domcontentloaded",
+                    timeout=HTML_CAPTURE_SETTLE_TIMEOUT_S * 1000,
+                )
+            except Exception:
+                # The page cannot even reach domcontentloaded, so it is not
+                # between documents — it is stuck. Another capture attempt
+                # would only buy another full timeout. Give up now.
+                break
+        raise last_err or PlaywrightTimeoutError(
+            f"page.content() could not be captured within "
+            f"{HTML_CAPTURE_TOTAL_TIMEOUT_S:g}s"
+        )
 
     async def _crawl_web(
         self, url: str, config: CrawlerRunConfig
@@ -1059,7 +1145,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         await page.wait_for_load_state("domcontentloaded", timeout=5)
                     except PlaywrightTimeoutError:
                         pass
-                    await self.adapter.evaluate(page, update_image_dimensions_js)
+                    await self.adapter.evaluate(
+                        page, update_image_dimensions_js,
+                        timeout=OPTIONAL_DOM_STEP_TIMEOUT_S,
+                    )
                 except Exception as e:
                     self.logger.error(
                         message="Error updating image dimensions: {error}",
@@ -1091,7 +1180,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         message="Shadow DOM flattening returned no content, falling back to page.content()",
                         tag="SCRAPE",
                     )
-                    html = await page.content()
+                    html = await self._capture_html(page)
             elif config.css_selector:
                 try:
                     selectors = [s.strip() for s in config.css_selector.split(',')]
@@ -1112,7 +1201,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 except Error as e:
                     raise RuntimeError(f"Failed to extract HTML content: {str(e)}")
             else:
-                html = await page.content()
+                html = await self._capture_html(page)
 
             await self.execute_hook(
                 "before_return_html", page=page, html=html, context=context, config=config
@@ -1156,7 +1245,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     params={"delay": delay, "url": url},
                 )
                 await asyncio.sleep(delay)
-                return await page.content()
+                return await self._capture_html(page)
 
             # For undetected browsers, retrieve console messages before returning
             if config.capture_console_messages and hasattr(self.adapter, 'retrieve_console_messages'):
@@ -1226,7 +1315,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     all_contexts = page.context.browser.contexts
                     total_pages = sum(len(context.pages) for context in all_contexts)
                     if not (total_pages <= 1 and (self.browser_config.use_managed_browser or self.browser_config.headless)):
-                        await page.close()
+                        # page.close() is also sent without a timeout and waits
+                        # on the target's closed-promise, so a wedged renderer
+                        # can block cleanup indefinitely — including while this
+                        # coroutine is being cancelled by an outer deadline.
+                        await asyncio.wait_for(page.close(), PAGE_CLOSE_TIMEOUT_S)
                 except Exception:
                     pass
 
@@ -1458,8 +1551,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             }
             """
             
-            # Execute virtual scroll capture
-            result = await self.adapter.evaluate(page, virtual_scroll_js, config.to_dict())
+            # Execute virtual scroll capture.  Unlike the other evaluates this
+            # one legitimately runs a long scroll loop inside the page, so it
+            # gets its own generous ceiling rather than the adapter default.
+            result = await self.adapter.evaluate(
+                page, virtual_scroll_js, config.to_dict(),
+                timeout=VIRTUAL_SCROLL_TIMEOUT_S,
+            )
             
             if result.get("replaced", False):
                 self.logger.success(
@@ -1562,7 +1660,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         }};
                     }}
                 }})()
-            """
+            """,
+                timeout=OPTIONAL_DOM_STEP_TIMEOUT_S,
             )
             await page.wait_for_timeout(600)  # Wait for any animations to complete
         except Exception as e:
@@ -1606,7 +1705,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         }};
                     }}
                 }})()
-            """
+            """,
+                timeout=OPTIONAL_DOM_STEP_TIMEOUT_S,
             )
             await page.wait_for_timeout(500)  # Wait for any animations to complete
         except Exception as e:

@@ -403,6 +403,18 @@ class AsyncWebCrawler:
                     _is_raw_url = url.startswith("raw:") or url.startswith("raw://")
 
                     _max_attempts = 1 + getattr(config, "max_retries", 0)
+                    # One shared budget for the whole fetch phase (every attempt
+                    # and every proxy).  page_timeout only bounds navigation and
+                    # the wait_* family; Playwright calls sent without a timeout
+                    # (page.content, page.evaluate, page.close) are not covered by
+                    # anything, so without this a single wedged page can consume
+                    # the caller's entire deadline in silence.
+                    _total_timeout = getattr(config, "total_timeout", None)
+                    _fetch_deadline = (
+                        time.perf_counter() + _total_timeout / 1000.0
+                        if _total_timeout
+                        else None
+                    )
                     _proxy_list = config._get_proxy_list()
                     _original_proxy_config = config.proxy_config
                     _block_reason = ""
@@ -456,8 +468,25 @@ class AsyncWebCrawler:
                                     self.crawler_strategy.update_user_agent(
                                         config.user_agent)
 
-                                async_response = await self.crawler_strategy.crawl(
-                                    url, config=config)
+                                _remaining = None
+                                if _fetch_deadline is not None:
+                                    _remaining = _fetch_deadline - time.perf_counter()
+                                    if _remaining <= 0:
+                                        raise TimeoutError(
+                                            f"Fetch budget of {_total_timeout} ms exhausted "
+                                            f"before attempt {_attempt + 1}/{_max_attempts}")
+                                try:
+                                    async_response = await asyncio.wait_for(
+                                        self.crawler_strategy.crawl(url, config=config),
+                                        timeout=_remaining,
+                                    )
+                                except asyncio.TimeoutError:
+                                    # asyncio.TimeoutError carries no message —
+                                    # name the budget so the failure is attributable.
+                                    raise TimeoutError(
+                                        f"Crawl attempt exceeded the {_total_timeout} ms "
+                                        f"fetch budget ({_remaining:.1f}s remained for "
+                                        f"attempt {_attempt + 1}/{_max_attempts})") from None
 
                                 html = sanitize_input_encode(async_response.html)
                                 screenshot_data = async_response.screenshot
