@@ -197,7 +197,17 @@ class AsyncWebCrawler:
         await self.crawler_strategy.__aexit__(None, None, None)
 
     async def __aenter__(self):
-        return await self.start()
+        try:
+            return await self.start()
+        except Exception:
+            # Ensure partially-initialised Playwright driver is cleaned up
+            # when browser launch fails inside __aenter__.  Without this,
+            # each failed attempt leaks a live `node run-driver` child. (#2155)
+            try:
+                await self.close()
+            except Exception:
+                pass
+            raise
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close()
