@@ -7,6 +7,7 @@ from aiohttp import web
 import tempfile
 import shutil
 import os, sys, time, json
+import pytest
 
 
 # Ecommerce-style rule: block URLs that carry a query string, not the whole site.
@@ -166,6 +167,7 @@ def test_robotfileparser_disallow_query_wildcard():
     assert parser.can_fetch("*", "https://shop.example/?s=search") is False
 
 
+@pytest.mark.asyncio
 async def test_disallow_query_wildcard_only_blocks_query_urls():
     """RobotsParser.can_fetch: Disallow: /*? must not collapse to Disallow: /* (#2225)."""
     temp_dir = tempfile.mkdtemp()
