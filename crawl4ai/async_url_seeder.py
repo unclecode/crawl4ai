@@ -1694,8 +1694,12 @@ class AsyncUrlSeeder:
         if any(pattern in url_lower for pattern in ['?print=', '&print=', '/print/', '_print.']):
             return True
         
-        # 12. Very short paths (likely homepage redirects or errors)
-        if len(path.strip('/')) < 3 and path not in ['/', '/en', '/de', '/fr', '/es', '/it']:
+        # 12. Very short paths (likely homepage redirects or errors).
+        # Compare the slash-stripped path against the whitelist too, so the
+        # canonical trailing-slash form of a language root (e.g. "/en/") is
+        # kept just like "/en" instead of being dropped as nonsense.
+        stripped_path = path.strip('/')
+        if len(stripped_path) < 3 and stripped_path not in ['', 'en', 'de', 'fr', 'es', 'it']:
             return True
         
         return False
