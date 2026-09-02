@@ -182,6 +182,8 @@ async def test_disallow_query_wildcard_only_blocks_query_urls():
         assert await parser.can_fetch("https://shop.example/?s=search", "*") is False
         # Empty-but-present query still counts as carrying a query string
         assert await parser.can_fetch("https://shop.example/page?", "*") is False
+        # page?#frag has a query marker before the fragment and must stay blocked
+        assert await parser.can_fetch("https://shop.example/page?#frag", "*") is False
         print("✓ Disallow: /*? blocks query URLs only (issue #2225)")
     finally:
         shutil.rmtree(temp_dir)

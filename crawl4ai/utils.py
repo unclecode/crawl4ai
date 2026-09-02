@@ -387,8 +387,13 @@ class RobotsParser:
         # urllib.robotparser drops an empty query component, so a URL like
         # https://host/page? is normalized to /page. Keep a query marker so
         # rules such as Disallow: /*? still see that the URL carries '?'.
-        if "?" in url and not parsed.query:
-            url = f"{url}="
+        # Only look at the pre-fragment part so "? in fragment" is not treated
+        # as a query, and rebuild via urlunparse so page?#frag becomes page?=#frag
+        # instead of corrupting the fragment. Bare RobotFileParser.can_fetch
+        # still allows page? — this rewrite is RobotsParser-only.
+        before_hash = url.split("#", 1)[0]
+        if "?" in before_hash and not parsed.query:
+            url = urlunparse(parsed._replace(query="="))
 
         return parser.can_fetch(user_agent, url)
 
