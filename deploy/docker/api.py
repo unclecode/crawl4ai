@@ -729,7 +729,7 @@ async def handle_crawl_request(
                 for key, value in base_config.items():
                     if hasattr(cfg, key):
                         current_value = getattr(cfg, key)
-                        if current_value is None or current_value == "":
+                        if current_value is None:
                             setattr(cfg, key, value)
                 # SSRF: per-URL PDF strategies need the validator wired too
                 if isinstance(cfg.scraping_strategy, PDFContentScrapingStrategy):
@@ -740,7 +740,7 @@ async def handle_crawl_request(
             for key, value in base_config.items():
                 if hasattr(crawler_config, key):
                     current_value = getattr(crawler_config, key)
-                    if current_value is None or current_value == "":
+                    if current_value is None:
                         setattr(crawler_config, key, value)
             effective_config = crawler_config
 
