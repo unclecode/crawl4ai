@@ -683,9 +683,14 @@ class PruningContentFilter(RelevantContentFilter):
             element.extract()
 
     def _remove_unwanted_tags(self, soup):
-        """Removes unwanted tags"""
+        """Removes unwanted tags, respecting preserve_tags whitelist."""
         for tag in self.excluded_tags:
             for element in soup.find_all(tag):
+                # Skip elements that match preserve_tags — they should be kept
+                # even if the tag is in excluded_tags (e.g., <aside> with
+                # preserve_tags=["aside"]).  See #2125.
+                if self.preserve_tags and tag in self.preserve_tags:
+                    continue
                 element.decompose()
 
     def _is_preserved(self, node):
