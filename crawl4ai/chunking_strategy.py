@@ -241,6 +241,10 @@ class OverlappingWindowChunking(ChunkingStrategy):
         if len(words) <= self.window_size:
             return [text]
 
+        # The stride must be positive so ``start`` always advances. Otherwise an
+        # overlap >= window_size leaves start unchanged (or moving backwards),
+        # turning the crawl into an infinite loop that never terminates.
+        stride = max(1, self.window_size - self.overlap)
         start = 0
         while start < len(words):
             end = start + self.window_size
@@ -250,6 +254,6 @@ class OverlappingWindowChunking(ChunkingStrategy):
             if end >= len(words):
                 break
 
-            start = end - self.overlap
+            start += stride
 
         return chunks
