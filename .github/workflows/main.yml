@@ -19,22 +19,28 @@ jobs:
       - name: Send to Google Apps Script (Stars only)
         if: github.event_name == 'watch'
         run: |
-          curl -fSs -X POST "${{ secrets.GOOGLE_SCRIPT_ENDPOINT }}" \
+          curl -fSs -X POST "${GOOGLE_SCRIPT_ENDPOINT}" \
             -H 'Content-Type: application/json' \
             -d '{"url":"${{ github.event.sender.html_url }}"}'
+        env:
+          GOOGLE_SCRIPT_ENDPOINT: ${{ secrets.GOOGLE_SCRIPT_ENDPOINT }}
       - name: Set webhook based on event type
         id: set-webhook
         run: |
           if [ "${{ github.event_name }}" == "discussion" ]; then
-            echo "webhook=${{ secrets.DISCORD_DISCUSSIONS_WEBHOOK }}" >> $GITHUB_OUTPUT
+            echo "webhook=${DISCORD_DISCUSSIONS_WEBHOOK}" >> $GITHUB_OUTPUT
           elif [ "${{ github.event_name }}" == "watch" ]; then
-            echo "webhook=${{ secrets.DISCORD_STAR_GAZERS }}" >> $GITHUB_OUTPUT
+            echo "webhook=${DISCORD_STAR_GAZERS}" >> $GITHUB_OUTPUT
           else
-            echo "webhook=${{ secrets.DISCORD_WEBHOOK }}" >> $GITHUB_OUTPUT
+            echo "webhook=${DISCORD_WEBHOOK}" >> $GITHUB_OUTPUT
           fi
 
+        env:
+          DISCORD_DISCUSSIONS_WEBHOOK: ${{ secrets.DISCORD_DISCUSSIONS_WEBHOOK }}
+          DISCORD_STAR_GAZERS: ${{ secrets.DISCORD_STAR_GAZERS }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       - name: Discord Notification
-        uses: Ilshidur/action-discord@master
+        uses: Ilshidur/action-discord@d2594079a10f1d6739ee50a2471f0ca57418b554 # master
         env:
           DISCORD_WEBHOOK: ${{ steps.set-webhook.outputs.webhook }}
         with:
