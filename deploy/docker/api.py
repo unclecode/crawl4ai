@@ -848,6 +848,10 @@ async def handle_crawl_request(
         # Per-crawl wall-clock deadline exceeded.
         raise HTTPException(status_code=504, detail="Crawl exceeded the time limit")
 
+    except TimeoutError as e:
+        # wait_for selector / JS condition timed out — client error, not server.
+        raise HTTPException(status_code=408, detail=str(e))
+
     except HTTPException:
         # Deliberate status (e.g. 400 SSRF "URL blocked") must pass through
         # rather than be genericized to 500 by the handler below.
