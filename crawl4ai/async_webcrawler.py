@@ -52,7 +52,7 @@ from .utils import (
     compute_head_fingerprint,
 )
 from .cache_validator import CacheValidator, CacheValidationResult
-from .antibot_detector import is_blocked
+from .antibot_detector import is_blocked, effective_status
 
 
 class AsyncWebCrawler:
@@ -509,8 +509,17 @@ class AsyncWebCrawler:
                                     _blocked = False
                                     _block_reason = ""
                                 else:
+                                    # Judge the body by the status that produced
+                                    # it — the LAST hop.  status_code holds the
+                                    # first hop (a 3xx on any redirect), which no
+                                    # status rule in is_blocked() can ever match.
                                     _blocked, _block_reason = is_blocked(
-                                        async_response.status_code, html)
+                                        effective_status(
+                                            async_response.status_code,
+                                            async_response.redirected_status_code,
+                                        ),
+                                        html,
+                                    )
 
                                 _crawl_stats["proxies_used"].append({
                                     "proxy": _proxy.server if _proxy else None,
@@ -554,7 +563,13 @@ class AsyncWebCrawler:
                     if _fallback_fn and not _done and not _is_raw_url:
                         _needs_fallback = (
                             crawl_result is None  # All proxies threw exceptions
-                            or is_blocked(crawl_result.status_code, crawl_result.html or "")[0]
+                            or is_blocked(
+                                effective_status(
+                                    crawl_result.status_code,
+                                    crawl_result.redirected_status_code,
+                                ),
+                                crawl_result.html or "",
+                            )[0]
                         )
                         if _needs_fallback:
                             self.logger.warning(
@@ -628,7 +643,12 @@ class AsyncWebCrawler:
                         _placeholder = bool(getattr(async_response, "placeholder_html", False))
                         if not _fallback_succeeded and not _is_raw_url and not _has_download and not _placeholder:
                             _blocked, _block_reason = is_blocked(
-                                crawl_result.status_code, crawl_result.html or "")
+                                effective_status(
+                                    crawl_result.status_code,
+                                    crawl_result.redirected_status_code,
+                                ),
+                                crawl_result.html or "",
+                            )
                             if _blocked:
                                 crawl_result.success = False
                                 crawl_result.error_message = f"Blocked by anti-bot protection: {_block_reason}"

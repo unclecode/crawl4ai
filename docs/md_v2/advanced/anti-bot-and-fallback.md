@@ -13,6 +13,8 @@ After each crawl attempt, Crawl4AI inspects the HTTP status code and HTML conten
 
 Detection uses structural HTML markers (specific element IDs, script sources, form actions) rather than generic keywords to minimize false positives. A normal page that happens to mention "CAPTCHA" or "Cloudflare" in its content will not be flagged.
 
+**Redirects:** the status code used for detection is the **final** hop of the redirect chain — `redirected_status_code`, falling back to `status_code` when there was no redirect. `CrawlResult.status_code` deliberately reports the *first* hop (see [CrawlResult](../api/crawl-result.md) §1.3/1.4), so a site that redirects `example.com → www.example.com` and then serves a `403` block page is correctly flagged even though `status_code` is `301`.
+
 When all attempts fail and blocking is still detected, the result is returned with `success=False` and `error_message` describing the block reason.
 
 ## Configuration Options
