@@ -580,8 +580,10 @@ class PruningContentFilter(RelevantContentFilter):
             min_word_threshold (int): Minimum word threshold for filtering (optional).
             threshold_type (str): Threshold type for dynamic threshold (default: 'fixed').
             threshold (float): Fixed threshold value (default: 0.48).
-            preserve_classes (list): CSS class names to always keep regardless of score (optional).
-            preserve_tags (list): HTML tag names to always keep regardless of score (optional).
+            preserve_classes (list): CSS class names to always keep, regardless of score
+                or of the element being an excluded tag (optional).
+            preserve_tags (list): HTML tag names to always keep, regardless of score
+                or of the tag being excluded by default (optional).
         """
         super().__init__(None)
         self.min_word_threshold = min_word_threshold
@@ -683,9 +685,9 @@ class PruningContentFilter(RelevantContentFilter):
             element.extract()
 
     def _remove_unwanted_tags(self, soup):
-        """Removes unwanted tags"""
-        for tag in self.excluded_tags:
-            for element in soup.find_all(tag):
+        """Removes unwanted tags, except the ones on the preserve whitelist"""
+        for element in soup.find_all(list(self.excluded_tags)):
+            if not self._is_preserved(element):
                 element.decompose()
 
     def _is_preserved(self, node):
