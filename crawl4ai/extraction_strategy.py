@@ -3,6 +3,7 @@ import inspect
 from typing import Any, List, Dict, Optional, Tuple, Pattern, Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
+import sys
 import time
 from enum import IntFlag, auto
 
@@ -1080,10 +1081,158 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
 
         Args:
             schema (Dict[str, Any]): The schema defining the extraction rules.
+            health_threshold (float, optional): Enables serve-time health checking. A
+                schema is generated and validated against one snapshot of a page, but it
+                is then applied for months while the site keeps changing. When a selector
+                stops matching, extraction does not fail - it returns fewer records, or
+                records with silently empty fields, and the caller is told nothing. With
+                this set, every extraction is scored (see `_health_report`) and anything
+                below the threshold is reported through `on_degraded`. Costs nothing:
+                the score is computed from the records already extracted, with no second
+                pass over the DOM. Defaults to None (off, no behaviour change).
+            on_degraded (Callable[[dict], None], optional): Called with the health report
+                when a extraction scores below `health_threshold`. Defaults to a warning
+                on the strategy's logger, or stderr when there is none.
+            heal_llm_config (LLMConfig, optional): When set, a degraded extraction also
+                triggers ONE regeneration of the schema from the page that degraded it,
+                through `generate_schema`. The replacement is adopted only if it actually
+                scores better on that same page, so a failed repair leaves the old schema
+                in place rather than swapping one broken extractor for another. The field
+                names of the current schema are carried into the request, because
+                everything downstream is keyed on them. Requires `health_threshold`.
+            max_regenerations (int): How many times this strategy may regenerate over its
+                lifetime. Defaults to 1 - a site that is permanently unreadable must not
+                bill for a model call per page.
         """
         super().__init__(**kwargs)
         self.schema = schema
         self.verbose = kwargs.get("verbose", False)
+        self.health_threshold = kwargs.get("health_threshold", None)
+        self.on_degraded = kwargs.get("on_degraded", None)
+        self.heal_llm_config = kwargs.get("heal_llm_config", None)
+        self.max_regenerations = kwargs.get("max_regenerations", 1)
+        self._regenerations = 0
+
+    def _health_report(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Score an extraction that has already happened. No DOM work, no model call.
+
+        `coverage` is the fraction of the schema's declared fields that came back
+        populated in at least one record; a schema whose baseSelector matched nothing
+        scores 0. Both are the shapes site changes actually take: a renamed container
+        empties the result, a renamed field empties one column and leaves the record
+        count untouched - which is the one nothing downstream can see.
+        """
+        declared = [f.get("name") for f in self.schema.get("fields", [])
+                    if f.get("name")]
+        declared += [f.get("name") for f in self.schema.get("baseFields", [])
+                     if f.get("name")]
+        populated = {name for r in results for name in declared
+                     if r.get(name) not in (None, "", [], {})}
+        coverage = (len(populated) / len(declared)) if declared else 1.0
+        return {
+            "records": len(results),
+            "declared_fields": len(declared),
+            "populated_fields": len(populated),
+            "coverage": 0.0 if not results else coverage,
+            "empty_fields": sorted(set(declared) - populated),
+            "healthy": bool(results) and coverage >= (self.health_threshold or 0.0),
+        }
+
+    def _check_health(self, results: List[Dict[str, Any]], url: str = "",
+                      html_content: str = "") -> List[Dict[str, Any]]:
+        """Report an extraction that no longer fits the page it is being applied to, and -
+        when a heal config is present - regenerate the schema from that same page.
+
+        Returns the results to serve: the original ones, or the ones a healed schema
+        produced.
+        """
+        if self.health_threshold is None:
+            return results
+        report = self._health_report(results)
+        if report["healthy"]:
+            return results
+        report["url"] = url
+        report["schema_name"] = self.schema.get("name", "")
+        healed = self._try_heal(report, html_content, url)
+        if healed is not None:
+            return healed
+        if self.on_degraded is not None:
+            self.on_degraded(report)
+            return results
+        message = (
+            f"Extraction schema '{report['schema_name']}' looks stale on {url or 'page'}: "
+            f"{report['records']} record(s), coverage {report['coverage']:.0%} "
+            f"(threshold {self.health_threshold:.0%})"
+            + (f", always-empty field(s): {', '.join(report['empty_fields'])}"
+               if report["empty_fields"] else "")
+            + " - the page has probably changed; regenerate the schema."
+        )
+        logger = getattr(self, "logger", None)
+        if logger is not None:
+            logger.warning(message=message, tag="EXTRACT")
+        else:
+            print(f"[EXTRACT] {message}", file=sys.stderr)
+        return results
+
+    def _try_heal(self, report: Dict[str, Any], html_content: str,
+                  url: str) -> Optional[List[Dict[str, Any]]]:
+        """Regenerate the schema from the page that broke it. None when not attempted or
+        when the replacement did not turn out better.
+
+        The check after regeneration is the point: `generate_schema` validates a candidate
+        against the HTML it was given, but 'the selectors match something' is not the same
+        as 'this extractor is healthy again', and adopting a replacement on the strength of
+        the generator's own opinion is how a stale extractor becomes a differently-stale
+        one. So the candidate is scored by the same measure that raised the alarm, and it
+        has to beat it.
+        """
+        if (self.heal_llm_config is None or not html_content
+                or self._regenerations >= self.max_regenerations):
+            return None
+        self._regenerations += 1
+        schema_type = "XPATH" if "XPath" in type(self).__name__ else "CSS"
+        # Carry the field names over: everything downstream is keyed on them, so a repair
+        # that renames a column is not a repair.
+        target = {f["name"]: "..." for f in self.schema.get("fields", [])
+                  if f.get("name")}
+        try:
+            candidate = JsonElementExtractionStrategy.generate_schema(
+                html=html_content, schema_type=schema_type,
+                target_json_example=json.dumps(target),
+                llm_config=self.heal_llm_config)
+            probe = type(self)(schema=candidate)
+            probe_results = probe.extract(url=url, html_content=html_content)
+            probe.schema, probe.health_threshold = candidate, self.health_threshold
+            new_report = probe._health_report(probe_results)
+        except Exception as e:  # noqa: BLE001 - a failed repair must not fail the crawl
+            self._report_heal(report, None, f"regeneration failed: {e}", url)
+            return None
+        if new_report["coverage"] <= report["coverage"] or not new_report["healthy"]:
+            self._report_heal(report, new_report, "regenerated schema is no better - "
+                              "keeping the current one", url)
+            return None
+        self.schema = candidate
+        self._report_heal(report, new_report, "schema regenerated and adopted", url)
+        return probe_results
+
+    def _report_heal(self, before: Dict[str, Any], after: Optional[Dict[str, Any]],
+                     outcome: str, url: str) -> None:
+        payload = dict(before)
+        payload["heal"] = {"outcome": outcome, "attempt": self._regenerations,
+                           "coverage_before": before["coverage"],
+                           "coverage_after": after["coverage"] if after else None}
+        if self.on_degraded is not None:
+            self.on_degraded(payload)
+            return
+        message = (f"Extraction schema '{before.get('schema_name', '')}' on "
+                   f"{url or 'page'}: {outcome} (coverage "
+                   f"{before['coverage']:.0%}"
+                   + (f" -> {after['coverage']:.0%}" if after else "") + ")")
+        logger = getattr(self, "logger", None)
+        if logger is not None:
+            logger.warning(message=message, tag="EXTRACT")
+        else:
+            print(f"[EXTRACT] {message}", file=sys.stderr)
 
     def extract(
         self, url: str, html_content: str, *q, **kwargs
@@ -1128,7 +1277,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
             if item:
                 results.append(item)
 
-        return results
+        return self._check_health(results, url, html_content)
 
     @abstractmethod
     def _parse_html(self, html_content: str):
