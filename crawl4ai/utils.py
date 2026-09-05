@@ -249,6 +249,22 @@ class VersionManager:
         return installed is None or installed < current
 
 
+def _preserve_bare_query(rules_text: str) -> str:
+    """Append '*' to Allow/Disallow values ending in a bare '?' (e.g. '/*?').
+
+    '/*?' and '/*?*' allow/deny exactly the same URLs; the rewrite only
+    survives parsers that would otherwise drop the trailing '?'.
+    """
+    fixed = []
+    for raw_line in rules_text.splitlines():
+        body, _, _ = raw_line.partition("#")
+        key, sep, value = body.partition(":")
+        if sep and key.strip().lower() in ("allow", "disallow") and value.strip().endswith("?"):
+            raw_line = f"{key.strip()}: {value.strip()}*"
+        fixed.append(raw_line)
+    return "\n".join(fixed)
+
+
 class RobotsParser:
     # Default 7 days cache TTL
     CACHE_TTL = 7 * 24 * 60 * 60
@@ -355,8 +371,10 @@ class RobotsParser:
             return True
 
         # Create parser for this check
-        parser = RobotFileParser() 
-        parser.parse(rules.splitlines())
+        parser = RobotFileParser()
+        # Old Pythons drop a trailing '?' from rules, so '/*?' becomes
+        # '/*' and blocks the whole site. '/*?*' matches the same URLs.
+        parser.parse(_preserve_bare_query(rules).splitlines())
         
         # If parser can't read rules, allow access
         if not parser.mtime():
