@@ -7,6 +7,8 @@ Crawl4AI provides specialized strategies for handling and extracting content fro
 ### Overview
 `PDFCrawlerStrategy` is an implementation of `AsyncCrawlerStrategy` designed specifically for PDF documents. Instead of interpreting the input URL as an HTML webpage, this strategy treats it as a pointer to a PDF file. It doesn't perform deep crawling or HTML parsing itself but rather prepares the PDF source for a dedicated PDF scraping strategy. Its primary role is to identify the PDF source (web URL or local file) and pass it along the processing pipeline in a way that `AsyncWebCrawler` can handle.
 
+> **Must be paired with `PDFContentScrapingStrategy`.** `PDFCrawlerStrategy` fetches and parses nothing on its own — it returns a placeholder response and lets the scraping strategy do the download and extraction. Always set `CrawlerRunConfig(scraping_strategy=PDFContentScrapingStrategy())`. With any other scraping strategy the crawl still reports `success=True`, but the result contains only the placeholder text instead of your PDF content.
+
 ### When to Use
 Use `PDFCrawlerStrategy` when you need to:
 - Process PDF files using the `AsyncWebCrawler`.
@@ -20,8 +22,9 @@ Use `PDFCrawlerStrategy` when you need to:
 -   **`async crawl(self, url: str, **kwargs) -> AsyncCrawlResponse`**:
     -   This method is called by the `AsyncWebCrawler` during the `arun` process.
     -   It takes the `url` (which should point to a PDF) and creates a minimal `AsyncCrawlResponse`.
-    -   The `html` attribute of this response is typically empty or a placeholder, as the actual PDF content processing is deferred to the `PDFContentScrapingStrategy` (or a similar PDF-aware scraping strategy).
+    -   The `html` attribute of this response is a short placeholder string, as the actual PDF content processing is deferred to the `PDFContentScrapingStrategy` (or a similar PDF-aware scraping strategy).
     -   It sets `response_headers` to indicate "application/pdf" and `status_code` to 200.
+    -   It also sets `placeholder_html=True` on the response. This tells `AsyncWebCrawler` that the `html` is a stand-in, so the anti-bot content heuristics skip it — otherwise the short placeholder would be misread as a blocked, near-empty page and the crawl would be marked failed. Any custom crawler strategy that defers content extraction to its scraping strategy should set the same flag.
 -   **`async close(self)`**:
     -   A method for cleaning up any resources used by the strategy. For `PDFCrawlerStrategy`, this is usually minimal.
 -   **`async __aenter__(self)` / `async __aexit__(self, exc_type, exc_val, exc_tb)`**:
@@ -37,8 +40,8 @@ async def main():
     # Initialize the PDF crawler strategy
     pdf_crawler_strategy = PDFCrawlerStrategy()
 
-    # PDFCrawlerStrategy is typically used in conjunction with PDFContentScrapingStrategy
-    # The scraping strategy handles the actual PDF content extraction
+    # PDFCrawlerStrategy must be paired with PDFContentScrapingStrategy —
+    # the scraping strategy is what actually downloads and extracts the PDF
     pdf_scraping_strategy = PDFContentScrapingStrategy()
     run_config = CrawlerRunConfig(scraping_strategy=pdf_scraping_strategy)
 

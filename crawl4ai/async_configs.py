@@ -214,6 +214,29 @@ UNTRUSTED_FORBIDDEN_FIELDS = {
         "override_navigator", "magic", "process_in_browser", "shared_data",
         "session_id",
     },
+    # PDFContentScrapingStrategy has no scalar allowlist (it is kept for its
+    # value fields), so its filesystem-write knobs must be blocked explicitly:
+    # image_save_dir is an unconfined write destination and save_images_locally
+    # turns the write on. extract_images stays allowed - it only returns the
+    # image bytes base64-inline in the response, no disk write.
+    "PDFContentScrapingStrategy": {
+        "image_save_dir", "save_images_locally",
+    },
+}
+
+# Field names that must NEVER be set from an untrusted body on ANY allowed
+# type, checked regardless of per-type allowlist. This is the fail-closed
+# backstop: the per-type maps above only cover BrowserConfig/CrawlerRunConfig,
+# so a strategy that (now or in future) exposes a filesystem-write, code, or
+# routing constructor arg is caught here even with no explicit allowlist.
+# Presence => 400 (loud), matching js_code/extra_args behavior.
+UNTRUSTED_GLOBAL_FORBIDDEN_FIELDS = {
+    # filesystem write / read sinks
+    "image_save_dir", "save_images_locally", "downloads_path", "user_data_dir",
+    "output_path", "save_path", "file_path", "local_path", "storage_state",
+    # code / command execution
+    "js_code", "js_code_before_wait", "c4a_script", "init_scripts",
+    "code", "command", "hook", "hooks",
 }
 
 # Scalar knobs an untrusted body MAY set, per class. A field not listed here is
@@ -244,6 +267,7 @@ UNTRUSTED_FIELD_ALLOWLIST = {
         "fetch_ssl_certificate",
         # timing / waiting
         "wait_until", "page_timeout", "wait_for", "wait_for_timeout",
+        "body_visibility_timeout",
         "wait_for_images", "delay_before_return_html", "mean_delay", "max_range",
         # scrolling / rendering
         "ignore_body_visibility", "scan_full_page", "scroll_delay",
@@ -272,6 +296,8 @@ UNTRUSTED_FIELD_ALLOWLIST = {
 _MAX_TIMEOUT_MS = 60_000
 _MAX_SCROLL_STEPS = 1000
 _MAX_VIEWPORT = 4000
+_MAX_PDF_BYTES = 100 * 1024 * 1024
+_MAX_PDF_PAGES = 2000
 
 
 def _filter_untrusted_fields(type_name: str, params: dict) -> dict:
@@ -280,7 +306,7 @@ def _filter_untrusted_fields(type_name: str, params: dict) -> dict:
     allowlist = UNTRUSTED_FIELD_ALLOWLIST.get(type_name)  # None => keep all non-forbidden
     out = {}
     for key, value in params.items():
-        if key in forbidden:
+        if key in UNTRUSTED_GLOBAL_FORBIDDEN_FIELDS or key in forbidden:
             raise UntrustedConfigError(
                 f"field '{key}' is not permitted on {type_name} from an untrusted request"
             )
@@ -299,7 +325,7 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
         return min(int(v), _MAX_TIMEOUT_MS)
 
     if type_name == "CrawlerRunConfig":
-        for f in ("page_timeout", "wait_for_timeout"):
+        for f in ("page_timeout", "wait_for_timeout", "body_visibility_timeout"):
             if f in params:
                 params[f] = _cap_timeout(params[f])
         if isinstance(params.get("max_scroll_steps"), int):
@@ -308,6 +334,17 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
         for f in ("viewport_width", "viewport_height"):
             if isinstance(params.get(f), int):
                 params[f] = max(1, min(params[f], _MAX_VIEWPORT))
+    elif type_name == "PDFContentScrapingStrategy":
+        # This class has no field allowlist, so without clamping a body could
+        # simply raise its own caps back to unbounded and re-open the DoS.
+        for f, cap in (("max_pdf_bytes", _MAX_PDF_BYTES), ("max_pdf_pages", _MAX_PDF_PAGES)):
+            if f in params:
+                v = params[f]
+                # <=0 or non-int would read as "no limit"; pin to the cap.
+                params[f] = cap if not isinstance(v, int) or v <= 0 else min(v, cap)
+        # Rasterizing every page is the most expensive thing this strategy can
+        # do, and nothing about untrusted crawling needs it.
+        params["extract_images"] = False
     return params
 
 
@@ -1463,6 +1500,8 @@ class CrawlerRunConfig():
                         Default: False.
         ignore_body_visibility (bool): If True, ignore whether the body is visible before proceeding.
                                        Default: True.
+        body_visibility_timeout (int): Maximum time in ms to wait for the body to become visible.
+                                       Default: 30000.
         scan_full_page (bool): If True, scroll through the entire page to load all content.
                                Default: False.
         scroll_delay (float): Delay in seconds between scroll steps if scan_full_page is True.
@@ -1640,6 +1679,7 @@ class CrawlerRunConfig():
         c4a_script: Union[str, List[str]] = None,
         js_only: bool = False,
         ignore_body_visibility: bool = True,
+        body_visibility_timeout: int = 30000,
         scan_full_page: bool = False,
         scroll_delay: float = 0.2,
         max_scroll_steps: Optional[int] = None,
@@ -1770,6 +1810,13 @@ class CrawlerRunConfig():
         self.c4a_script = c4a_script
         self.js_only = js_only
         self.ignore_body_visibility = ignore_body_visibility
+        if (
+            not isinstance(body_visibility_timeout, (int, float))
+            or isinstance(body_visibility_timeout, bool)
+            or body_visibility_timeout <= 0
+        ):
+            raise ValueError("body_visibility_timeout must be a positive number")
+        self.body_visibility_timeout = body_visibility_timeout
         self.scan_full_page = scan_full_page
         self.scroll_delay = scroll_delay
         self.max_scroll_steps = max_scroll_steps
@@ -2137,6 +2184,7 @@ class CrawlerRunConfig():
             "js_code_before_wait": self.js_code_before_wait,
             "js_only": self.js_only,
             "ignore_body_visibility": self.ignore_body_visibility,
+            "body_visibility_timeout": self.body_visibility_timeout,
             "scan_full_page": self.scan_full_page,
             "scroll_delay": self.scroll_delay,
             "max_scroll_steps": self.max_scroll_steps,

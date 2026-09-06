@@ -807,10 +807,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 status_code = 200
                 response_headers = {}
 
-            # Wait for body element and visibility
-            # Skip entirely when ignore_body_visibility=True (the default)
-            # to avoid a hardcoded 30s penalty on pages where body is never visible
-            # (e.g., AngularJS ng-cloak, Vue v-cloak).  See #2129.
+            # Wait for body element and visibility.
+            # Skip entirely when ignore_body_visibility=True (the default) to
+            # avoid the hardcoded 30s attached wait and the visibility wait on
+            # pages where body is never visible (ng-cloak / v-cloak). See #2129.
+            # This supersedes the #2144 wasted-wait warning: with both waits
+            # skipped there is no budget-burning wait left to warn about, so the
+            # per-crawl delay that warning reported no longer exists.
             if not config.ignore_body_visibility:
                 try:
                     await page.wait_for_selector("body", state="attached", timeout=30000)
@@ -822,12 +825,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                             const element = document.body;
                             if (!element) return false;
                             const style = window.getComputedStyle(element);
-                            const isVisible = style.display !== 'none' &&
-                                            style.visibility !== 'hidden' &&
+                            const isVisible = style.display !== 'none' && 
+                                            style.visibility !== 'hidden' && 
                                             style.opacity !== '0';
                             return isVisible;
-                        }"",
-                        timeout=30000,
+                        }""",
+                        timeout=config.body_visibility_timeout,
                     )
 
                     if not is_visible:
@@ -844,8 +847,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                             params={"info": visibility_info},
                         )
 
-                    raise Error(f"Body element is hidden: {visibility_info}")
-
+                    if not config.ignore_body_visibility:
+                        raise Error(f"Body element is hidden: {visibility_info}")
 
             # try:
             #     await page.wait_for_selector("body", state="attached", timeout=30000)
@@ -1538,7 +1541,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 }})()
             """
             )
-            await page.wait_for_timeout(500)  # Wait for any animations to complete
+            await page.wait_for_timeout(600)  # Wait for any animations to complete
         except Exception as e:
             self.logger.warning(
                 message="Failed to remove overlay elements: {error}",

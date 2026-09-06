@@ -1,7 +1,12 @@
 """Tests for BrowserConfig.set_defaults / CrawlerRunConfig.set_defaults."""
 
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
+
 from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
+from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
 
 
 @pytest.fixture(autouse=True)
@@ -226,13 +231,57 @@ class TestDumpLoad:
         assert loaded.headless is False
 
     def test_crawler_run_config_dump_load(self):
-        CrawlerRunConfig.set_defaults(verbose=False, scan_full_page=True)
+        assert CrawlerRunConfig().body_visibility_timeout == 30000
+        CrawlerRunConfig.set_defaults(
+            verbose=False, scan_full_page=True, body_visibility_timeout=2000
+        )
         cfg = CrawlerRunConfig()
         data = cfg.dump()
         CrawlerRunConfig.reset_defaults()
         loaded = CrawlerRunConfig.load(data)
         assert loaded.verbose is False
         assert loaded.scan_full_page is True
+        assert loaded.body_visibility_timeout == 2000
+
+    @pytest.mark.parametrize("timeout", [None, 0, -1, "1000", True])
+    def test_body_visibility_timeout_must_be_positive_number(self, timeout):
+        with pytest.raises(ValueError, match="must be a positive number"):
+            CrawlerRunConfig(body_visibility_timeout=timeout)
+
+    def test_untrusted_body_visibility_timeout_is_clamped(self):
+        from crawl4ai.async_configs import Provenance
+
+        config = CrawlerRunConfig.load(
+            {"body_visibility_timeout": 500_000}, provenance=Provenance.UNTRUSTED
+        )
+        assert config.body_visibility_timeout == 60_000
+
+    @pytest.mark.asyncio
+    async def test_body_visibility_timeout_reaches_wait(self):
+        page = MagicMock()
+        page.evaluate = AsyncMock()
+        page.set_content = AsyncMock()
+        page.wait_for_selector = AsyncMock()
+        page.content = AsyncMock(return_value="<body>visible</body>")
+
+        strategy = AsyncPlaywrightCrawlerStrategy.__new__(
+            AsyncPlaywrightCrawlerStrategy
+        )
+        strategy.browser_config = SimpleNamespace(
+            use_persistent_context=False, accept_downloads=False, text_mode=True
+        )
+        strategy.browser_manager = SimpleNamespace(
+            get_page=AsyncMock(return_value=(page, MagicMock()))
+        )
+        strategy.execute_hook = AsyncMock()
+        strategy.csp_compliant_wait = AsyncMock(return_value=True)
+
+        config = CrawlerRunConfig(
+            session_id="body-timeout-test", body_visibility_timeout=1234
+        )
+        await strategy._crawl_web("raw:<body>visible</body>", config)
+
+        assert strategy.csp_compliant_wait.await_args.kwargs["timeout"] == 1234
 
     def test_to_dict_includes_user_default_values(self):
         BrowserConfig.set_defaults(headless=False)

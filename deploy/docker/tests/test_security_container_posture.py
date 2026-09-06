@@ -78,8 +78,8 @@ class TestSupervisord:
     def test_redis_requires_password(self, supervisord):
         assert "--requirepass" in supervisord
 
-    def test_redis_bound_loopback(self, supervisord):
-        assert "--bind 127.0.0.1" in supervisord
+    def test_redis_bound_loopback_with_optional_ipv6(self, supervisord):
+        assert "--bind 127.0.0.1 -::1" in supervisord
 
     def test_gunicorn_bind_is_env_driven(self, supervisord):
         # entrypoint.sh resolves GUNICORN_BIND (loopback unless a credential).
@@ -104,7 +104,14 @@ class TestCompose:
         assert "shm_size" in compose
 
     def test_pids_limit(self, compose):
-        assert "pids_limit" in compose
+        # Parse, don't grep: a raw-text search matched the word "pids_limit"
+        # inside a comment and guarded nothing. The cap lives under
+        # deploy.resources.limits (not pids_limit) for Compose v5 compatibility.
+        import yaml
+
+        base = yaml.safe_load(compose)["x-base-config"]
+        assert "pids_limit" not in base
+        assert base["deploy"]["resources"]["limits"]["pids"] == 512
 
     def test_read_only_runtime_tmpfs_are_appuser_owned(self, compose):
         assert "/var/lib/redis:uid=999,gid=999,mode=0700" in compose

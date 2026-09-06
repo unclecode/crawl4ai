@@ -159,6 +159,7 @@ Use these for controlling whether you read or write from a local content cache. 
 | **`c4a_script`**           | `str or list[str]` (None)      | C4A script that compiles to JavaScript. Alternative to writing raw JS.                                                                 |
 | **`js_only`**              | `bool` (False)                 | If `True`, indicates we're reusing an existing session and only applying JS. No full reload.                                           |
 | **`ignore_body_visibility`** | `bool` (True)                | Skip checking if `<body>` is visible. Usually best to keep `True`.                                                                     |
+| **`body_visibility_timeout`** | `int` (30000)               | Maximum time in milliseconds to wait for `<body>` to become visible. Must be positive.                                                  |
 | **`scan_full_page`**       | `bool` (False)                 | If `True`, auto-scroll the page to load dynamic content (infinite scroll).                                                              |
 | **`scroll_delay`**         | `float` (0.2)                  | Delay between scroll steps when scanning the full page (`scan_full_page=True`) or capturing full-page screenshots. |
 | **`max_scroll_steps`**     | `int or None` (None)           | Maximum number of scroll steps during full page scan. If None, scrolls until entire page is loaded.                                     |
