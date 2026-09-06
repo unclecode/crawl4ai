@@ -338,6 +338,7 @@ class AsyncCrawlResponse(BaseModel):
     mhtml_data: Optional[str] = None
     get_delayed_content: Optional[Callable[[Optional[float]], Awaitable[str]]] = None
     downloaded_files: Optional[List[str]] = None
+    placeholder_html: bool = False # True if html is a stand-in for the content, actual content is produced by the scraping strategy (eg. using PDFCrawlerStrategy)
     ssl_certificate: Optional[SSLCertificate] = None
     redirected_url: Optional[str] = None
     redirected_status_code: Optional[int] = None

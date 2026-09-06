@@ -116,6 +116,17 @@ EOL
 
 > The server will be available at `http://localhost:11235`. Visit `/playground` to access the interactive testing interface.
 
+*   **Behind a corporate proxy:** if the host reaches the internet only through
+    an HTTP proxy, set the standard `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY`
+    env vars (Docker's `proxies` config injects them automatically) — the
+    server's egress proxy chains through it while keeping its SSRF protections
+    (the upstream is asked to CONNECT to an already-validated, pinned IP).
+    `CRAWL4AI_UPSTREAM_PROXY` overrides the env vars. Basic auth via
+    `http://user:pass@proxy:port` is supported; for NTLM/Kerberos proxies,
+    front them with a local translator (e.g. `cntlm`, `px`) and point
+    `CRAWL4AI_UPSTREAM_PROXY` at it. Proxies that refuse CONNECT-to-an-IP, or
+    containers with no DNS at all, are not yet supported.
+
 #### 4. Stopping the Container
 
 ```bash
