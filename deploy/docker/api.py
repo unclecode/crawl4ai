@@ -96,9 +96,12 @@ logger = logging.getLogger(__name__)
 
 def _raise_for_crawl_failure(result):
     if not result.success:
+        err = result.error_message or "Crawl failed"
+        # 403 for anti-bot / blocked results (PR #2185), 500 for other failures.
+        code = status.HTTP_403_FORBIDDEN if "blocked" in err.lower() or "anti-bot" in err.lower() else status.HTTP_500_INTERNAL_SERVER_ERROR
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=result.error_message,
+            status_code=code,
+            detail=err,
         )
 
 
