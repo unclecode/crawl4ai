@@ -161,8 +161,12 @@ async def restart_permanent(cfg: BrowserConfig):
         old, PERMANENT = PERMANENT, None
 
     if old:
-        with suppress(Exception):
-            await old.close()
+        try:
+            await asyncio.wait_for(old.close(), timeout=60)
+        except asyncio.TimeoutError:
+            logger.warning("Timed out closing old permanent browser; continuing restart")
+        except Exception:
+            pass
 
     await init_permanent(cfg)
 
