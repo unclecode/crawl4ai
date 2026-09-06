@@ -812,6 +812,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await page.wait_for_selector("body", state="attached", timeout=30000)
 
                 # Use the new check_visibility function with csp_compliant_wait
+                _visibility_wait_start = time.perf_counter()
                 is_visible = await self.csp_compliant_wait(
                     page,
                     """() => {
@@ -823,8 +824,37 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                                         style.opacity !== '0';
                         return isVisible;
                     }""",
-                    timeout=30000,
+                    timeout=config.body_visibility_timeout,
                 )
+
+                _visibility_wait_ms = (
+                    time.perf_counter() - _visibility_wait_start
+                ) * 1000
+
+                # csp_compliant_wait also returns False when the evaluation itself
+                # fails (page closed, context destroyed by a redirect), which costs
+                # no time — only warn about a wait that actually burned its budget.
+                if (
+                    not is_visible
+                    and config.ignore_body_visibility
+                    and _visibility_wait_ms >= config.body_visibility_timeout * 0.9
+                ):
+                    # The wait timed out and its result is about to be discarded, so
+                    # the crawl still succeeds — just this much slower, on every crawl
+                    # of this page. force_verbose because the whole point is that the
+                    # delay is otherwise invisible, and the servers and batch jobs that
+                    # most need to see it run with verbose off (see #2144).
+                    self.logger.warning(
+                        message=(
+                            "Body never became visible after {elapsed}ms — the page may "
+                            "use ng-cloak/v-cloak. This delay is added to every crawl of "
+                            "this page; lower CrawlerRunConfig.body_visibility_timeout "
+                            "to shorten it."
+                        ),
+                        tag="WARNING",
+                        params={"elapsed": round(_visibility_wait_ms)},
+                        force_verbose=True,
+                    )
 
                 if not is_visible and not config.ignore_body_visibility:
                     visibility_info = await self.check_visibility(page)
@@ -1534,7 +1564,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 }})()
             """
             )
-            await page.wait_for_timeout(500)  # Wait for any animations to complete
+            await page.wait_for_timeout(600)  # Wait for any animations to complete
         except Exception as e:
             self.logger.warning(
                 message="Failed to remove overlay elements: {error}",

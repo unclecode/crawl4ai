@@ -292,6 +292,7 @@ async () => {
     // =========================================================================
     // Phase 2: Try CMP JavaScript APIs
     // =========================================================================
+    let apiCalled = false;
 
     // IAB TCF v2 API
     if (typeof window.__tcfapi === 'function') {
@@ -304,6 +305,7 @@ async () => {
     if (typeof window.Didomi !== 'undefined') {
         try {
             window.Didomi.setUserAgreeToAll();
+            apiCalled = true;
         } catch (e) { /* continue */ }
     }
 
@@ -311,6 +313,7 @@ async () => {
     if (typeof window.Cookiebot !== 'undefined') {
         try {
             window.Cookiebot.submitCustomConsent(true, true, true);
+            apiCalled = true;
         } catch (e) { /* continue */ }
     }
 
@@ -318,6 +321,7 @@ async () => {
     if (typeof window.Osano !== 'undefined') {
         try {
             window.Osano.cm.acceptAll();
+            apiCalled = true;
         } catch (e) { /* continue */ }
     }
 
@@ -325,11 +329,12 @@ async () => {
     if (typeof window.klaro !== 'undefined') {
         try {
             window.klaro.getManager().acceptAll();
+            apiCalled = true;
         } catch (e) { /* continue */ }
     }
 
-    // Wait for CMP animations/transitions
-    await new Promise(r => setTimeout(r, 500));
+    // Wait for CMP animations/transitions - only when a consent action actually fired
+    if (accepted || apiCalled) await new Promise(r => setTimeout(r, 500));
 
     // =========================================================================
     // Phase 3: Remove known CMP containers by selector

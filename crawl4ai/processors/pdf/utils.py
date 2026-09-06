@@ -97,10 +97,14 @@ def clean_pdf_text_to_html(page_number, text):
             para = ' '.join(current_paragraph)
             para = re.sub(r'\s+', ' ', para).strip()
             if para:
-                # escaped_para = html.escape(para)
-                escaped_para = para
-                # escaped_para = re.sub(r'\.\n', '.\n\n', escaped_para)
-                # Split escaped_para by <|break|> to avoid HTML escaping
+                # Paragraph text comes verbatim from the PDF and is attacker-
+                # controlled. Escape it so markup like <img onerror=...> cannot
+                # survive into cleaned_html and execute when the result is
+                # rendered (DOM XSS). Every other sink in this function already
+                # escapes; this one was the gap.
+                escaped_para = html.escape(para)
+                # Whitespace was collapsed above, so this split yields a single
+                # element -- kept only to preserve the original structure.
                 escaped_para = escaped_para.split('.\n\n')
                 # Wrap each part in <p> tag
                 escaped_para = [f'<p>{part}</p>' for part in escaped_para]

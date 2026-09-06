@@ -617,6 +617,25 @@
             }
         }
 
+        // Build a useful error message from a failed HTTP response
+        function httpErrorMessage(response, data) {
+            let detail = data && (data.detail || data.error);
+            // FastAPI 422s send detail as an array of error objects; other
+            // non-strings would render as [object Object].
+            if (Array.isArray(detail)) {
+                detail = detail.map(e => e && e.msg ? `${(e.loc || []).join('.')}: ${e.msg}` : JSON.stringify(e)).join('; ');
+            } else if (detail && typeof detail !== 'string') {
+                detail = JSON.stringify(detail);
+            }
+            let msg = detail || `HTTP ${response.status}`;
+            if (response.status === 401) {
+                msg += getToken()
+                    ? ' — token rejected; check the API token in the token bar (top right)'
+                    : ' — set your API token in the token bar (top right)';
+            }
+            return msg;
+        }
+
         // Generate code snippets
         function generateSnippets(api, payload, method = 'POST') {
             // Python snippet
@@ -747,11 +766,11 @@
                         method: 'GET',
                         headers: { 'Accept': 'application/json' }
                     });
-                    responseData = await response.json();
+                    responseData = await response.json().catch(() => ({}));
                     const time = Math.round(performance.now() - startTime);
                     if (!response.ok) {
                         updateStatus('error', time);
-                        throw new Error(responseData.error || 'Request failed');
+                        throw new Error(httpErrorMessage(response, responseData));
                     }
                     updateStatus('success', time);
                     document.querySelector('#response-content code').textContent = JSON.stringify(responseData, null, 2);
@@ -764,6 +783,12 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
+
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        updateStatus('error', Math.round(performance.now() - startTime));
+                        throw new Error(httpErrorMessage(response, errData));
+                    }
 
                     const reader = response.body.getReader();
                     let text = '';
@@ -804,12 +829,12 @@
                         body: JSON.stringify(payload)
                     });
 
-                    responseData = await response.json();
+                    responseData = await response.json().catch(() => ({}));
                     const time = Math.round(performance.now() - startTime);
 
                     if (!response.ok) {
                         updateStatus('error', time);
-                        throw new Error(responseData.error || 'Request failed');
+                        throw new Error(httpErrorMessage(response, responseData));
                     }
 
                     updateStatus(
@@ -975,9 +1000,11 @@
             // Save current scroll position (important for large code blocks)
             const scrollTop = element.parentElement.scrollTop;
 
-            // Reset the element
-            const text = element.textContent;
-            element.innerHTML = text;
+            // Reset highlight.js state. NOTE: do NOT round-trip through
+            // innerHTML here — the response text contains attacker-controlled
+            // crawled content and `element.innerHTML = element.textContent`
+            // re-parses it as live HTML (DOM-based XSS). highlight.js renders
+            // safely from textContent and emits escaped markup.
             element.removeAttribute('data-highlighted');
 
             // Reapply highlighting

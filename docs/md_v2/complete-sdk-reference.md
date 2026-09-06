@@ -1791,6 +1791,7 @@ run_cfg = CrawlerRunConfig(
 | **`js_code_before_wait`**  | `str or list[str]` (None)      | JavaScript to run **before** `wait_for`. Use for triggering loading that `wait_for` then checks.                                       |
 | **`js_only`**              | `bool` (False)                 | If `True`, indicates we're reusing an existing session and only applying JS. No full reload.                                           |
 | **`ignore_body_visibility`** | `bool` (True)                | Skip checking if `<body>` is visible. Usually best to keep `True`.                                                                     |
+| **`body_visibility_timeout`** | `int` (30000)               | Maximum time in milliseconds to wait for `<body>` to become visible. Must be positive.                                                  |
 | **`scan_full_page`**       | `bool` (False)                 | If `True`, auto-scroll the page to load dynamic content (infinite scroll).                                                              |
 | **`scroll_delay`**         | `float` (0.2)                  | Delay between scroll steps when scanning the full page (`scan_full_page=True`) or capturing full-page screenshots. |
 | **`process_iframes`**      | `bool` (False)                 | Inlines iframe content for single-page extraction.                                                                                     |
