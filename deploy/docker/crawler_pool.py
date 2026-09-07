@@ -20,7 +20,24 @@ LOCK = asyncio.Lock()
 # Config
 MEM_LIMIT = CONFIG.get("crawler", {}).get("memory_threshold_percent", 95.0)
 BASE_IDLE_TTL = CONFIG.get("crawler", {}).get("pool", {}).get("idle_ttl_sec", 300)
+RECYCLE_PAGES = CONFIG.get("crawler", {}).get("pool", {}).get("max_pages_before_recycle", 0)
 DEFAULT_CONFIG_SIG = None  # Cached sig for default config
+
+
+def _apply_pool_defaults(cfg: BrowserConfig) -> BrowserConfig:
+    """Apply pool-owned policy to a browser config before it is pooled.
+
+    Browsers handed out by this pool are long-lived, and the endpoints build
+    their BrowserConfig from the request body (see api.py handle_crawl_request),
+    so config.yml's browser kwargs never reach them. Pooling is what makes a
+    browser long-lived, so the pool is where its recycling policy belongs.
+
+    Applied before _sig() so every request shares one signature and pooling is
+    unaffected. An explicit per-request value wins. See #2231.
+    """
+    if RECYCLE_PAGES and not cfg.max_pages_before_recycle:
+        cfg.max_pages_before_recycle = RECYCLE_PAGES
+    return cfg
 
 
 def get_pool_snapshot() -> dict:
@@ -54,7 +71,7 @@ def _is_default_config(sig: str) -> bool:
 
 async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
     """Get crawler from pool with tiered strategy."""
-    sig = _sig(cfg)
+    sig = _sig(_apply_pool_defaults(cfg))
     async with LOCK:
         # Check permanent browser for default config
         if PERMANENT and _is_default_config(sig):
@@ -135,7 +152,7 @@ async def init_permanent(cfg: BrowserConfig):
     async with LOCK:
         if PERMANENT:
             return
-        DEFAULT_CONFIG_SIG = _sig(cfg)
+        DEFAULT_CONFIG_SIG = _sig(_apply_pool_defaults(cfg))
         logger.info("🔥 Creating permanent default browser")
         PERMANENT = AsyncWebCrawler(config=cfg, thread_safe=False)
         await PERMANENT.start()

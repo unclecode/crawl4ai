@@ -84,18 +84,18 @@ crawler:
   pool:
     max_pages: 40                          # ← GLOBAL_SEM permits
     idle_ttl_sec: 300                     # ← 30 min janitor cutoff
+    # Pooled browsers are long-lived and reuse one browser context per config.
+    # Real sites leave state in that context (cookies, localStorage, service
+    # workers) which is never cleared, and navigation gets measurably slower as
+    # it builds up. Recycling by pages served bounds it: the context is replaced
+    # inside the same Chromium process, old contexts drain on their own, and it
+    # works under sustained load — unlike the janitor, which only closes *idle*
+    # browsers and so never fires on a busy server. 0 disables. See #2231.
+    max_pages_before_recycle: 200
   browser:
     kwargs:
       headless: true
       text_mode: true
-      # Pooled browsers are long-lived, and their browser context is reused for
-      # every crawl that shares a config. Real sites leave state in that context
-      # (cookies, localStorage, service workers) which is never cleared, and
-      # navigation gets measurably slower as it builds up. Recycling by pages
-      # served bounds that: the context is replaced inside the same Chromium
-      # process, old contexts drain on their own, and it works under sustained
-      # load (unlike the janitor, which only closes *idle* browsers). See #2231.
-      max_pages_before_recycle: 200
     extra_args:
       # - "--single-process"
       # SECURITY: --no-sandbox disables the Chromium renderer sandbox (a renderer
