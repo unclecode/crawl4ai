@@ -36,6 +36,7 @@ from functools import lru_cache
 
 from packaging import version
 from . import __version__
+from .egress_policy import proxy_url
 from typing import Sequence
 
 from itertools import chain
@@ -340,8 +341,16 @@ class RobotsParser:
                 scheme = parsed.scheme or 'http'
                 robots_url = f"{scheme}://{domain}/robots.txt"
                 
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(robots_url, timeout=2, ssl=False) as response:
+                # proxy=None unless an embedder installed one (the Docker
+                # server does). Without it this fetch is a caller-chosen URL on
+                # an unguarded client: it reached internal hosts directly and
+                # followed redirects into them.
+                # ssl=False is gone: a bad certificate now raises, and the
+                # except below fails open, so robots is ignored rather than
+                # respected -- more crawling, never a broken crawl.
+                timeout = aiohttp.ClientTimeout(total=2)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get(robots_url, proxy=proxy_url()) as response:
                         if response.status == 200:
                             rules = await response.text()
                             self._cache_rules(domain, rules)

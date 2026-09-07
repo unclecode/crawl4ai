@@ -298,6 +298,9 @@ _MAX_SCROLL_STEPS = 1000
 _MAX_VIEWPORT = 4000
 _MAX_PDF_BYTES = 100 * 1024 * 1024
 _MAX_PDF_PAGES = 2000
+_MAX_LINK_PREVIEW_LINKS = 100      # the class default
+_MAX_LINK_PREVIEW_CONCURRENCY = 10  # the class default
+_MAX_LINK_PREVIEW_TIMEOUT_S = 10    # seconds here, not ms
 
 
 def _filter_untrusted_fields(type_name: str, params: dict) -> dict:
@@ -345,6 +348,18 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
         # Rasterizing every page is the most expensive thing this strategy can
         # do, and nothing about untrusted crawling needs it.
         params["extract_images"] = False
+    elif type_name == "LinkPreviewConfig":
+        # Also no field allowlist, and each link is a separate outbound fetch:
+        # unclamped, one request body can order millions of them at any
+        # concurrency it likes.
+        for f, cap in (
+            ("max_links", _MAX_LINK_PREVIEW_LINKS),
+            ("concurrency", _MAX_LINK_PREVIEW_CONCURRENCY),
+            ("timeout", _MAX_LINK_PREVIEW_TIMEOUT_S),
+        ):
+            if f in params:
+                v = params[f]
+                params[f] = cap if not isinstance(v, int) or v <= 0 else min(v, cap)
     return params
 
 
