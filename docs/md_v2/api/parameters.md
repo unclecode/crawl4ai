@@ -140,6 +140,7 @@ Use these for controlling whether you read or write from a local content cache. 
 |----------------------------|-------------------------|----------------------------------------------------------------------------------------------------------------------|
 | **`wait_until`**           | `str` (domcontentloaded)| Condition for navigation to "complete". Often `"networkidle"` or `"domcontentloaded"`.                               |
 | **`page_timeout`**         | `int` (60000 ms)        | Timeout for page navigation or JS steps. Increase for slow sites.                                                    |
+| **`crawl_timeout`**        | `int or None` (None)    | Timeout in ms for the whole page visit, from navigation to final HTML, including `js_code` and hooks. On expiry the page is closed and the crawl fails. None = no limit. |
 | **`wait_for`**             | `str or None`           | Wait for a CSS (`"css:selector"`) or JS (`"js:() => bool"`) condition before content extraction.                     |
 | **`wait_for_timeout`**     | `int or None` (None)    | Specific timeout in ms for the `wait_for` condition. If None, uses `page_timeout`.                                   |
 | **`wait_for_images`**      | `bool` (False)          | Wait for images to load before finishing. Slows down if you only want text.                                          |

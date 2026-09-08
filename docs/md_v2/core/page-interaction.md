@@ -218,8 +218,9 @@ result = await crawler.arun(url="https://github.com/search", config=config)
 ## 4. Timing Control
 
 1. **`page_timeout`** (ms): Overall page load or script execution time limit.  
-2. **`delay_before_return_html`** (seconds): Wait an extra moment before capturing the final HTML.  
-3. **`mean_delay`** & **`max_range`**: If you call `arun_many()` with multiple URLs, these add a random pause between each request.
+2. **`crawl_timeout`** (ms): Limit for the whole page visit, navigation to final HTML, including `js_code` and hooks. None = no limit.  
+3. **`delay_before_return_html`** (seconds): Wait an extra moment before capturing the final HTML.  
+4. **`mean_delay`** & **`max_range`**: If you call `arun_many()` with multiple URLs, these add a random pause between each request.
 
 **Example**:
 

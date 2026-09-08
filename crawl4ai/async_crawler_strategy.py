@@ -526,18 +526,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             AsyncCrawlResponse: The response containing HTML, headers, status code, and optional data
         """
         config.url = url
-        response_headers = {}
-        execution_result = None
-        status_code = None
-        redirected_url = url
-        redirected_status_code = None
 
         # Reset downloaded files list for new crawl
         self._downloaded_files = []
-        
-        # Initialize capture lists
-        captured_requests = []
-        captured_console = []
 
         # Handle user agent with magic mode.
         # For persistent contexts the UA is locked at browser launch time
@@ -573,6 +564,28 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await page.evaluate("window.stop()")
             except Exception:
                 pass
+
+        if not config.crawl_timeout:
+            return await self._crawl_page(url, config, page, context, ua_changed)
+        try:
+            return await asyncio.wait_for(
+                asyncio.create_task(self._crawl_page(url, config, page, context, ua_changed)), config.crawl_timeout / 1000
+            )
+        except asyncio.TimeoutError:
+            await self._close_unresponsive_page(page, config)
+            raise RuntimeError(f"Crawl exceeded crawl_timeout of {config.crawl_timeout} ms")
+
+    async def _crawl_page(
+        self, url: str, config: CrawlerRunConfig, page: Page, context, ua_changed: bool
+    ) -> AsyncCrawlResponse:
+        """The page visit itself (navigation to final HTML plus cleanup); bounded by crawl_timeout in _crawl_web."""
+        response_headers = {}
+        execution_result = None
+        status_code = None
+        redirected_url = url
+        redirected_status_code = None
+        captured_requests = []
+        captured_console = []
 
         try:
             # Push updated UA + sec-ch-ua to the page so the server sees them
@@ -1198,37 +1211,77 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             raise e
 
         finally:
-            # Always clean up event listeners to prevent accumulation
-            # across reuses (even for session pages).
+            async def _cleanup():
+                # Always clean up event listeners to prevent accumulation
+                # across reuses (even for session pages).
+                try:
+                    if config.capture_network_requests:
+                        page.remove_listener("request", handle_request_capture)
+                        page.remove_listener("response", handle_response_capture)
+                        page.remove_listener("requestfailed", handle_request_failed_capture)
+                    if config.capture_console_messages:
+                        if hasattr(self.adapter, 'retrieve_console_messages'):
+                            final_messages = await asyncio.wait_for(self.adapter.retrieve_console_messages(page), 5)
+                            captured_console.extend(final_messages)
+                        await asyncio.wait_for(self.adapter.cleanup_console_capture(page, handle_console, handle_error), 5)
+                except Exception:
+                    pass
+
+                if not config.session_id:
+                    # ALWAYS decrement refcount first — must succeed even if
+                    # the browser crashed or the page is in a bad state.
+                    try:
+                        await self.browser_manager.release_page_with_context(page)
+                    except Exception:
+                        pass
+
+                    # Close the page unless it's the last one in a headless/managed browser
+                    try:
+                        all_contexts = page.context.browser.contexts
+                        total_pages = sum(len(context.pages) for context in all_contexts)
+                        if not (total_pages <= 1 and (self.browser_config.use_managed_browser or self.browser_config.headless)):
+                            await page.close()
+                    except Exception:
+                        pass
+
+            # Shielded so a cancel landing mid-cleanup cannot skip page.close(); the cancel is re-raised once cleanup is done
+            cleanup = asyncio.create_task(_cleanup())
             try:
-                if config.capture_network_requests:
-                    page.remove_listener("request", handle_request_capture)
-                    page.remove_listener("response", handle_response_capture)
-                    page.remove_listener("requestfailed", handle_request_failed_capture)
-                if config.capture_console_messages:
-                    if hasattr(self.adapter, 'retrieve_console_messages'):
-                        final_messages = await self.adapter.retrieve_console_messages(page)
-                        captured_console.extend(final_messages)
-                    await self.adapter.cleanup_console_capture(page, handle_console, handle_error)
-            except Exception:
-                pass
+                await asyncio.shield(cleanup)
+            except asyncio.CancelledError:
+                await asyncio.shield(cleanup)
+                raise
 
-            if not config.session_id:
-                # ALWAYS decrement refcount first — must succeed even if
-                # the browser crashed or the page is in a bad state.
-                try:
-                    await self.browser_manager.release_page_with_context(page)
-                except Exception:
-                    pass
+    async def _close_unresponsive_page(self, page: Page, config: CrawlerRunConfig) -> None:
+        """
+        Close (or drop the session of) a page whose crawl hit crawl_timeout.
 
-                # Close the page unless it's the last one in a headless/managed browser
-                try:
-                    all_contexts = page.context.browser.contexts
-                    total_pages = sum(len(context.pages) for context in all_contexts)
-                    if not (total_pages <= 1 and (self.browser_config.use_managed_browser or self.browser_config.headless)):
-                        await page.close()
-                except Exception:
-                    pass
+        Args:
+            page (Page): The Playwright page instance
+            config (CrawlerRunConfig): Crawler Config to check for session_id
+        """
+        async def _close():
+            browser = page.context.browser
+            if not page.is_closed() and browser and sum(len(c.pages) for c in browser.contexts) <= 1:
+                await page.context.new_page()  # a headed managed Chrome exits when its last tab closes
+            if config.session_id:
+                self.logger.warning(
+                    message="Dropping session {session_id}: crawl exceeded crawl_timeout",
+                    tag="TIMEOUT",
+                    params={"session_id": config.session_id},
+                )
+                await self.browser_manager.kill_session(config.session_id)
+            elif not page.is_closed():
+                await page.close()
+
+        try:
+            await asyncio.wait_for(_close(), 5)
+        except Exception as e:
+            self.logger.warning(
+                message="Could not close unresponsive page: {error}",
+                tag="TIMEOUT",
+                params={"error": str(e)},
+            )
 
     # async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1):
     async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1, max_scroll_steps: Optional[int] = None):
