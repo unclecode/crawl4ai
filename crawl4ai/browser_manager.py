@@ -244,20 +244,27 @@ class ManagedBrowser:
         # Start browser process
         try:
             # Use DETACHED_PROCESS flag on Windows to fully detach the process
-            # On Unix, we'll use preexec_fn=os.setpgrp to start the process in a new process group
+            # On Unix, use start_new_session=True to start the process in a new
+            # session/process group. preexec_fn=os.setpgrp runs Python code
+            # between fork() and exec() in the child, which is unsafe in a
+            # multi-threaded parent (e.g. a gunicorn/uvicorn worker) since the
+            # child only inherits the calling thread and can deadlock or crash
+            # on a lock (allocator, import lock) held by another thread at
+            # fork time. start_new_session=True performs the equivalent
+            # setsid() natively without running Python in the child.
             if sys.platform == "win32":
                 self.browser_process = subprocess.Popen(
-                    args, 
-                    stdout=subprocess.PIPE, 
+                    args,
+                    stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
                 )
             else:
                 self.browser_process = subprocess.Popen(
-                    args, 
-                    stdout=subprocess.PIPE, 
+                    args,
+                    stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    preexec_fn=os.setpgrp  # Start in a new process group
+                    start_new_session=True  # Start in a new session/process group
                 )
                 
             # If verbose is True print args used to run the process
