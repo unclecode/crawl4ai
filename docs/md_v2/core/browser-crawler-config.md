@@ -298,6 +298,7 @@ class CrawlerRunConfig:
     - **`scan_full_page`**: If `True`, scroll through the entire page to load all content
     - **`wait_until`**: Condition to wait for when navigating (e.g., "domcontentloaded", "networkidle")
     - **`page_timeout`**: Timeout in milliseconds for page operations (default: 60000)
+    - **`crawl_timeout`**: Timeout in milliseconds for the whole page visit, navigation to final HTML, including `js_code` and hooks (default: None, no limit)
     - **`delay_before_return_html`**: Delay in seconds before retrieving final HTML.
 
 13.⠀**`url_matcher`** & **`match_mode`**:  

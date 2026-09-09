@@ -266,7 +266,7 @@ UNTRUSTED_FIELD_ALLOWLIST = {
         "no_cache_write", "check_cache_freshness", "cache_validation_timeout",
         "fetch_ssl_certificate",
         # timing / waiting
-        "wait_until", "page_timeout", "wait_for", "wait_for_timeout",
+        "wait_until", "page_timeout", "crawl_timeout", "wait_for", "wait_for_timeout",
         "body_visibility_timeout",
         "wait_for_images", "delay_before_return_html", "mean_delay", "max_range",
         # scrolling / rendering
@@ -325,7 +325,7 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
         return min(int(v), _MAX_TIMEOUT_MS)
 
     if type_name == "CrawlerRunConfig":
-        for f in ("page_timeout", "wait_for_timeout", "body_visibility_timeout"):
+        for f in ("page_timeout", "crawl_timeout", "wait_for_timeout", "body_visibility_timeout"):
             if f in params:
                 params[f] = _cap_timeout(params[f])
         if isinstance(params.get("max_scroll_steps"), int):
@@ -1473,6 +1473,9 @@ class CrawlerRunConfig():
                           Default: "domcontentloaded".
         page_timeout (int): Timeout in ms for page operations like navigation.
                             Default: 60000 (60 seconds).
+        crawl_timeout (int or None): Timeout in ms for the whole page visit, from navigation to final HTML,
+                                     including js_code and hooks. None = no limit.
+                                     Default: None.
         wait_for (str or None): A CSS selector or JS condition to wait for before extracting content.
                                 Default: None.
         wait_for_timeout (int or None): Specific timeout in ms for the wait_for condition.
@@ -1666,6 +1669,7 @@ class CrawlerRunConfig():
         # Page Navigation and Timing Parameters
         wait_until: str = "domcontentloaded",
         page_timeout: int = PAGE_TIMEOUT,
+        crawl_timeout: Optional[int] = None,
         wait_for: str = None,
         wait_for_timeout: int = None,
         wait_for_images: bool = False,
@@ -1796,6 +1800,7 @@ class CrawlerRunConfig():
         # Page Navigation and Timing Parameters
         self.wait_until = wait_until
         self.page_timeout = page_timeout
+        self.crawl_timeout = crawl_timeout
         self.wait_for = wait_for
         self.wait_for_timeout = wait_for_timeout
         self.wait_for_images = wait_for_images
@@ -2173,6 +2178,7 @@ class CrawlerRunConfig():
             "shared_data": self.shared_data,
             "wait_until": self.wait_until,
             "page_timeout": self.page_timeout,
+            "crawl_timeout": self.crawl_timeout,
             "wait_for": self.wait_for,
             "wait_for_timeout": self.wait_for_timeout,
             "wait_for_images": self.wait_for_images,

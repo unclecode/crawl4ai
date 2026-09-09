@@ -74,6 +74,7 @@ security:
 crawler:
   base_config:
     simulate_user: true
+    crawl_timeout: 180000   # ms; bounds the whole page visit so a hung page cannot pin a renderer
   memory_threshold_percent: 95.0
   rate_limiter:
     enabled: true
