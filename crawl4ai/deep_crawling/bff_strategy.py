@@ -216,6 +216,8 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             queue_items = self._resume_state.get("queue_items", [])
             for item in queue_items:
                 await queue.put((item["score"], item["depth"], item["url"], item["parent_url"]))
+            # `queued` tracks every URL ever pushed onto the queue
+            queued: Set[str] = set(visited) | {item["url"] for item in queue_items}
             # Initialize shadow list if callback is set
             if self._on_state_change:
                 self._queue_shadow = [
@@ -227,6 +229,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             initial_score = self.url_scorer.score(start_url) if self.url_scorer else 0
             await queue.put((-initial_score, 0, start_url, None))
             visited: Set[str] = set()
+            queued: Set[str] = {start_url}
             depths: Dict[str, int] = {start_url: 0}
             # Initialize shadow list if callback is set
             if self._on_state_change:
@@ -313,6 +316,9 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                     await self.link_discovery(result, url, depth, visited, new_links, depths)
                     
                     for new_url, new_parent in new_links:
+                        # Skip URLs already sitting in the queue
+                        if new_url in queued:
+                            continue
                         new_depth = depths.get(new_url, depth + 1)
                         new_score = self.url_scorer.score(new_url) if self.url_scorer else 0
                         # Skip URLs with scores below the threshold
@@ -322,6 +328,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                             )
                             self.stats.urls_skipped += 1
                             continue
+                        queued.add(new_url)
                         queue_item = (-new_score, new_depth, new_url, new_parent)
                         await queue.put(queue_item)
                         # Add to shadow list if tracking
