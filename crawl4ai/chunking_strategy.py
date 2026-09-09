@@ -119,7 +119,7 @@ class TopicSegmentationChunking(ChunkingStrategy):
         # Tokenize and remove stopwords and punctuation
         import nltk as nl
 
-        tokens = nl.toknize.word_tokenize(text)
+        tokens = nl.tokenize.word_tokenize(text)
         tokens = [
             token.lower()
             for token in tokens
