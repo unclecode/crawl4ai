@@ -71,6 +71,10 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         self._last_state: Optional[Dict[str, Any]] = None
         # Shadow list for queue items (only used when on_state_change is set)
         self._queue_shadow: Optional[List[Tuple[float, int, str, Optional[str]]]] = None
+        # URLs already scored/enqueued this crawl. Kept separate from `visited`
+        # (which tracks dequeued URLs) so a URL discovered by two sibling pages
+        # in the same batch is only pushed onto the priority queue once.
+        self._enqueued: Set[str] = set()
 
     async def can_process_url(self, url: str, depth: int) -> bool:
         """
@@ -177,12 +181,16 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         for link in links:
             url = link.get("href")
             base_url = normalize_url_for_deep_crawl(url, source_url)
-            if base_url in visited:
+            if base_url in visited or base_url in self._enqueued:
                 continue
             if not await self.can_process_url(base_url, new_depth):
                 self.stats.urls_skipped += 1
                 continue
-                
+
+            # Mark as enqueued now (not just when it's later put on the queue)
+            # so a second inbound link to the same URL, discovered from a
+            # sibling page later in this batch, is skipped here too.
+            self._enqueued.add(base_url)
             valid_links.append(base_url)
             
         # Record the new depths and add to next_links
@@ -216,6 +224,9 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             queue_items = self._resume_state.get("queue_items", [])
             for item in queue_items:
                 await queue.put((item["score"], item["depth"], item["url"], item["parent_url"]))
+            # Already-visited and already-queued URLs are both settled; new
+            # discoveries should skip them.
+            self._enqueued = visited | {item["url"] for item in queue_items}
             # Initialize shadow list if callback is set
             if self._on_state_change:
                 self._queue_shadow = [
@@ -228,6 +239,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             await queue.put((-initial_score, 0, start_url, None))
             visited: Set[str] = set()
             depths: Dict[str, int] = {start_url: 0}
+            self._enqueued = {start_url}
             # Initialize shadow list if callback is set
             if self._on_state_change:
                 self._queue_shadow = [(-initial_score, 0, start_url, None)]
