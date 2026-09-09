@@ -10,12 +10,12 @@ from .filters import FilterChain
 from .scorers import URLScorer
 from . import DeepCrawlStrategy
 
-from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult, RunManyReturn
+from ..types import AsyncWebCrawler, BaseDispatcher, CrawlerRunConfig, CrawlResult, RunManyReturn
 from ..utils import normalize_url_for_deep_crawl
 
 from math import inf as infinity
 
-# Configurable batch size for processing items from the priority queue
+# Default batch size for processing items from the priority queue
 BATCH_SIZE = 10
 
 
@@ -47,6 +47,11 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         on_state_change: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
         # Optional cancellation callback - checked before each URL is processed
         should_cancel: Optional[Callable[[], Union[bool, Awaitable[bool]]]] = None,
+        # Number of items pulled from the priority queue per round and handed
+        # to arun_many() at once. Defaults to 10.
+        batch_size: int = BATCH_SIZE,
+        # Optional dispatcher forwarded to arun_many() for each batch
+        dispatcher: Optional[BaseDispatcher] = None,
     ):
         self.max_depth = max_depth
         self.filter_chain = filter_chain
@@ -54,6 +59,8 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         self.include_external = include_external
         self.score_threshold = score_threshold
         self.max_pages = max_pages
+        self.batch_size = batch_size
+        self.dispatcher = dispatcher
         # self.logger = logger or logging.getLogger(__name__)
         # Ensure logger is always a Logger instance, not a dict from serialization
         if isinstance(logger, logging.Logger):
@@ -245,15 +252,15 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
 
             # Calculate how many more URLs we can process in this batch
             remaining = self.max_pages - self._pages_crawled
-            batch_size = min(BATCH_SIZE, remaining)
-            if batch_size <= 0:
+            effective_batch_size = min(self.batch_size, remaining)
+            if effective_batch_size <= 0:
                 # No more pages to crawl
                 self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping crawl")
                 break
-                
+
             batch: List[Tuple[float, int, str, Optional[str]]] = []
-            # Retrieve up to BATCH_SIZE items from the priority queue.
-            for _ in range(BATCH_SIZE):
+            # Retrieve up to self.batch_size items from the priority queue.
+            for _ in range(self.batch_size):
                 if queue.empty():
                     break
                 item = await queue.get()
@@ -278,7 +285,12 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             # make subsequent queue ordering depend on network timing.
             urls = [item[2] for item in batch]
             batch_config = config.clone(deep_crawl_strategy=None, stream=True)
-            stream_gen = await crawler.arun_many(urls=urls, config=batch_config)
+            arun_many_kwargs = (
+                {"dispatcher": self.dispatcher} if self.dispatcher is not None else {}
+            )
+            stream_gen = await crawler.arun_many(
+                urls=urls, config=batch_config, **arun_many_kwargs
+            )
             results_by_url: Dict[str, CrawlResult] = {}
             async for result in stream_gen:
                 results_by_url[result.url] = result

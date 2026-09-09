@@ -8,8 +8,8 @@ from urllib.parse import urlparse
 from ..models import TraversalStats
 from .filters import FilterChain
 from .scorers import URLScorer
-from . import DeepCrawlStrategy  
-from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult
+from . import DeepCrawlStrategy
+from ..types import AsyncWebCrawler, BaseDispatcher, CrawlerRunConfig, CrawlResult
 from ..utils import normalize_url_for_deep_crawl, efficient_normalize_url_for_deep_crawl
 from math import inf as infinity
 
@@ -36,6 +36,8 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         on_state_change: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
         # Optional cancellation callback - checked before each URL is processed
         should_cancel: Optional[Callable[[], Union[bool, Awaitable[bool]]]] = None,
+        # Optional dispatcher forwarded to arun_many() for each level
+        dispatcher: Optional[BaseDispatcher] = None,
     ):
         self.max_depth = max_depth
         self.filter_chain = filter_chain
@@ -43,6 +45,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         self.include_external = include_external
         self.score_threshold = score_threshold
         self.max_pages = max_pages
+        self.dispatcher = dispatcher
         # self.logger = logger or logging.getLogger(__name__)
         # Ensure logger is always a Logger instance, not a dict from serialization
         if isinstance(logger, logging.Logger):
@@ -251,7 +254,15 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
 
             # Clone the config to disable deep crawling recursion and enforce batch mode.
             batch_config = config.clone(deep_crawl_strategy=None, stream=False)
-            batch_results = await crawler.arun_many(urls=urls, config=batch_config)
+            # Only pass `dispatcher` when explicitly set, so the call shape is
+            # unchanged (and test doubles built against the old signature keep
+            # working) for the common case of relying on arun_many()'s own default.
+            arun_many_kwargs = (
+                {"dispatcher": self.dispatcher} if self.dispatcher is not None else {}
+            )
+            batch_results = await crawler.arun_many(
+                urls=urls, config=batch_config, **arun_many_kwargs
+            )
 
             for result in batch_results:
                 url = result.url
@@ -339,8 +350,13 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             visited.update(urls)
 
             stream_config = config.clone(deep_crawl_strategy=None, stream=True)
-            stream_gen = await crawler.arun_many(urls=urls, config=stream_config)
-            
+            arun_many_kwargs = (
+                {"dispatcher": self.dispatcher} if self.dispatcher is not None else {}
+            )
+            stream_gen = await crawler.arun_many(
+                urls=urls, config=stream_config, **arun_many_kwargs
+            )
+
             # Keep track of processed results for this batch
             results_count = 0
             async for result in stream_gen:
