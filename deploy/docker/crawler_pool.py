@@ -142,6 +142,35 @@ async def init_permanent(cfg: BrowserConfig):
         LAST_USED[DEFAULT_CONFIG_SIG] = time.time()
         USAGE_COUNT[DEFAULT_CONFIG_SIG] = 0
 
+async def restart_permanent(cfg: BrowserConfig):
+    """Replace the permanent browser with a freshly started one.
+
+    Only the detach happens under LOCK. The close and the re-create must not:
+    ``init_permanent()`` acquires LOCK itself and ``asyncio.Lock`` is not
+    reentrant, so restarting while holding it deadlocks the pool for the life
+    of the process, and ``close()`` on a wedged browser would block every
+    ``get_crawler()`` for as long as it hangs.
+
+    Clearing the global is what lets ``init_permanent()`` past its
+    "already initialized" guard. Between the detach and the re-create a
+    request carrying the default config falls through to the normal pool
+    path and creates a cold-pool browser; the janitor reaps it once idle.
+    """
+    global PERMANENT
+    async with LOCK:
+        old, PERMANENT = PERMANENT, None
+
+    if old:
+        try:
+            await asyncio.wait_for(old.close(), timeout=60)
+        except asyncio.TimeoutError:
+            logger.warning("Timed out closing old permanent browser; continuing restart")
+        except Exception:
+            pass
+
+    await init_permanent(cfg)
+
+
 async def close_all():
     """Close all browsers."""
     async with LOCK:

@@ -235,11 +235,14 @@ async def kill_browser(req: KillBrowserRequest):
             else:
                 browser = COLD_POOL.pop(target_sig)
 
-            with suppress(Exception):
-                await browser.close()
-
             LAST_USED.pop(target_sig, None)
             USAGE_COUNT.pop(target_sig, None)
+
+        # Closed outside LOCK: the browser is already detached from the pool, so
+        # nothing else can hand it out, and a close that hangs no longer blocks
+        # every get_crawler() behind it.
+        with suppress(Exception):
+            await browser.close()
 
         logger.info(f"🔪 Killed {pool_type} browser (sig={target_sig[:8]})")
 
@@ -262,26 +265,25 @@ async def restart_browser(req: KillBrowserRequest):
         sig: Browser config signature (first 8 chars), or "permanent"
     """
     try:
-        from crawler_pool import (PERMANENT, HOT_POOL, COLD_POOL, LAST_USED,
-                                  USAGE_COUNT, LOCK, DEFAULT_CONFIG_SIG, init_permanent)
-        from crawl4ai import AsyncWebCrawler, BrowserConfig
+        from crawler_pool import (HOT_POOL, COLD_POOL, LAST_USED,
+                                  USAGE_COUNT, LOCK, DEFAULT_CONFIG_SIG,
+                                  restart_permanent)
+        from crawl4ai import BrowserConfig
         from contextlib import suppress
-        import time
 
         # Handle permanent browser restart
         if req.sig == "permanent" or (DEFAULT_CONFIG_SIG and DEFAULT_CONFIG_SIG.startswith(req.sig)):
-            async with LOCK:
-                if PERMANENT:
-                    with suppress(Exception):
-                        await PERMANENT.close()
-
-                # Reinitialize permanent
-                from utils import load_config
-                config = load_config()
-                await init_permanent(BrowserConfig(
-                    extra_args=config["crawler"]["browser"].get("extra_args", []),
-                    **config["crawler"]["browser"].get("kwargs", {}),
-                ))
+            # restart_permanent() does the detach under LOCK and the close and
+            # re-create outside it. Doing any of that here, under LOCK, is what
+            # used to deadlock the pool: init_permanent() takes the same
+            # non-reentrant lock.
+            from utils import load_config
+            from server import _browser_extra_args
+            config = load_config()
+            await restart_permanent(BrowserConfig(
+                extra_args=_browser_extra_args(),
+                **config["crawler"]["browser"].get("kwargs", {}),
+            ))
 
             logger.info("🔄 Restarted permanent browser")
             return {"success": True, "restarted": "permanent"}
@@ -316,13 +318,16 @@ async def restart_browser(req: KillBrowserRequest):
             else:
                 browser = COLD_POOL.pop(target_sig)
 
-            with suppress(Exception):
-                await browser.close()
-
             # Note: We can't easily recreate with same config without storing it
             # For now, just kill and let new requests create fresh ones
             LAST_USED.pop(target_sig, None)
             USAGE_COUNT.pop(target_sig, None)
+
+        # Closed outside LOCK: the browser is already detached from the pool, so
+        # nothing else can hand it out, and a close that hangs no longer blocks
+        # every get_crawler() behind it.
+        with suppress(Exception):
+            await browser.close()
 
         logger.info(f"🔄 Restarted {pool_type} browser (sig={target_sig[:8]})")
 
