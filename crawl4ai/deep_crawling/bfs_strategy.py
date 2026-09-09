@@ -248,6 +248,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
 
             next_level: List[Tuple[str, Optional[str]]] = []
             urls = [url for url, _ in current_level]
+            parent_by_url = dict(current_level)
 
             # Clone the config to disable deep crawling recursion and enforce batch mode.
             batch_config = config.clone(deep_crawl_strategy=None, stream=False)
@@ -258,7 +259,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 depth = depths.get(url, 0)
                 result.metadata = result.metadata or {}
                 result.metadata["depth"] = depth
-                parent_url = next((parent for (u, parent) in current_level if u == url), None)
+                parent_url = parent_by_url.get(url)
                 result.metadata["parent_url"] = parent_url
                 results.append(result)
 
@@ -336,11 +337,12 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
 
             next_level: List[Tuple[str, Optional[str]]] = []
             urls = [url for url, _ in current_level]
+            parent_by_url = dict(current_level)
             visited.update(urls)
 
             stream_config = config.clone(deep_crawl_strategy=None, stream=True)
             stream_gen = await crawler.arun_many(urls=urls, config=stream_config)
-            
+
             # Keep track of processed results for this batch
             results_count = 0
             async for result in stream_gen:
@@ -348,7 +350,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 depth = depths.get(url, 0)
                 result.metadata = result.metadata or {}
                 result.metadata["depth"] = depth
-                parent_url = next((parent for (u, parent) in current_level if u == url), None)
+                parent_url = parent_by_url.get(url)
                 result.metadata["parent_url"] = parent_url
                 
                 # Count only successful crawls
