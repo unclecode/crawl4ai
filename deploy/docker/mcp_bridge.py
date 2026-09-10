@@ -95,7 +95,7 @@ def attach_mcp(
     mcp = Server(server_name)
 
     # tools: Dict[str, Callable] = {}
-    tools: Dict[str, Tuple[Callable, Callable]] = {}
+    tools: Dict[str, Tuple[Callable, Callable, Any]] = {}
     resources: Dict[str, Callable] = {}
     templates: Dict[str, Callable] = {}
 
@@ -112,7 +112,7 @@ def attach_mcp(
         #     tools[key] = _make_http_proxy(base_url, route)
         if kind == "tool":
             proxy = _make_http_proxy(base_url, route, timeout=timeout)
-            tools[key] = (proxy, fn)
+            tools[key] = (proxy, fn, route)
             continue
         if kind == "resource":
             resources[key] = fn
@@ -120,8 +120,18 @@ def attach_mcp(
             templates[key] = fn
 
     # helpers for JSON‑Schema
-    def _schema(model: type[BaseModel] | None) -> dict:
-        return {"type": "object"} if model is None else model.model_json_schema()
+    def _schema(model: type[BaseModel] | None, route) -> dict:
+        if model is not None:
+            return model.model_json_schema()
+
+        method = next(iter(route.methods - {"HEAD", "OPTIONS"})).lower()
+        operation = app.openapi()["paths"][route.path][method]
+        parameters = operation.get("parameters", [])
+        return {
+            "type": "object",
+            "properties": {p["name"]: p["schema"] for p in parameters},
+            "required": [p["name"] for p in parameters if p.get("required")],
+        }
 
     def _body_model(fn: Callable) -> type[BaseModel] | None:
         for p in inspect.signature(fn).parameters.values():
@@ -134,9 +144,9 @@ def attach_mcp(
     @mcp.list_tools()
     async def _list_tools() -> List[t.Tool]:
         out = []
-        for k, (proxy, orig_fn) in tools.items():
+        for k, (proxy, orig_fn, route) in tools.items():
             desc   = getattr(orig_fn, "__mcp_description__", None) or inspect.getdoc(orig_fn) or ""
-            schema = getattr(orig_fn, "__mcp_schema__", None) or _schema(_body_model(orig_fn))
+            schema = getattr(orig_fn, "__mcp_schema__", None) or _schema(_body_model(orig_fn), route)
             out.append(
                 t.Tool(name=k, description=desc, inputSchema=schema)
             )
@@ -148,7 +158,7 @@ def attach_mcp(
         if name not in tools:
             raise HTTPException(404, "tool not found")
         
-        proxy, _ = tools[name]
+        proxy, _, _ = tools[name]
         try:
             res = await proxy(**(arguments or {}))
         except HTTPException as exc:
