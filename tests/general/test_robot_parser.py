@@ -123,6 +123,44 @@ Allow: /public/
         finally:
             await runner.cleanup()
 
+        # 4b. Test query-string disallow (Disallow: /*?) on a separate host port.
+        # Plain URLs must stay crawlable while query URLs are denied (RFC 9309).
+        async def start_query_server():
+            query_app = web.Application()
+
+            async def query_robots(request):
+                return web.Response(text="User-agent: *\nDisallow: /*?\n")
+
+            query_app.router.add_get('/robots.txt', query_robots)
+            query_runner = web.AppRunner(query_app)
+            await query_runner.setup()
+            query_site = web.TCPSite(query_runner, 'localhost', 8081)
+            await query_site.start()
+            return query_runner
+
+        query_runner = await start_query_server()
+        try:
+            print("\n4b. Testing query-string robots.txt rules...")
+            query_base = "http://localhost:8081"
+
+            result = await parser.can_fetch(f"{query_base}/", "bot")
+            print(f"Plain root (/): {'allowed' if result else 'denied'}")
+            assert result, "Plain root should be allowed with Disallow: /*?"
+
+            result = await parser.can_fetch(f"{query_base}/article", "bot")
+            print(f"Plain page (/article): {'allowed' if result else 'denied'}")
+            assert result, "Plain page should be allowed with Disallow: /*?"
+
+            result = await parser.can_fetch(f"{query_base}/?page=2", "bot")
+            print(f"Query root (/?page=2): {'allowed' if result else 'denied'}")
+            assert not result, "Query root should be denied with Disallow: /*?"
+
+            result = await parser.can_fetch(f"{query_base}/article?ref=x", "bot")
+            print(f"Query page (/article?ref=x): {'allowed' if result else 'denied'}")
+            assert not result, "Query page should be denied with Disallow: /*?"
+        finally:
+            await query_runner.cleanup()
+
         # 5. Cache manipulation
         print("\n5. Testing cache manipulation...")
         
