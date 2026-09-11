@@ -378,7 +378,7 @@ async def handle_markdown_request(
 
         cache_mode = CacheMode.ENABLED if cache == "1" else CacheMode.WRITE_ONLY
 
-        from crawler_pool import get_crawler, release_crawler
+        from crawler_pool import get_crawler, get_unpooled_crawler, release_crawler
         from utils import load_config as _load_config
         _cfg = _load_config()
         browser_cfg = BrowserConfig(
@@ -604,13 +604,17 @@ def create_task_response(task: dict, task_id: str, base_url: str) -> dict:
     return response
 
 async def _dispose_crawler(crawler):
-    """Close a dedicated PDF crawler (not pooled) or release a pooled one."""
-    from crawl4ai.processors.pdf import PDFCrawlerStrategy
+    """Close a crawler that was started outside the pool, or release a pooled one.
+
+    Whoever starts a crawler outside the pool marks it `pooled = False`, so
+    this does not have to infer it from the strategy type - which only ever
+    recognised the PDF case.
+    """
     from crawler_pool import release_crawler
-    if isinstance(crawler.crawler_strategy, PDFCrawlerStrategy):
-        await crawler.close()
-    else:
+    if getattr(crawler, "pooled", True):
         await release_crawler(crawler)
+    else:
+        await crawler.close()
 
 async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) -> AsyncGenerator[bytes, None]:
     """Stream results with heartbeats and completion markers."""
@@ -698,7 +702,7 @@ async def handle_crawl_request(
             ) if config["crawler"]["rate_limiter"]["enabled"] else None
         )
         
-        from crawler_pool import get_crawler, release_crawler
+        from crawler_pool import get_crawler, get_unpooled_crawler, release_crawler
         from crawl4ai.processors.pdf import PDFContentScrapingStrategy, PDFCrawlerStrategy
         is_pdf_crawl = isinstance(crawler_config.scraping_strategy, PDFContentScrapingStrategy)
         if is_pdf_crawl:
@@ -710,6 +714,13 @@ async def handle_crawl_request(
             # Use PDFCrawlerStrategy when scraping PDFs, as headless Chromium can't render PDFs inline
             crawler = AsyncWebCrawler(crawler_strategy=PDFCrawlerStrategy())
             await crawler.start()
+            crawler.pooled = False
+        elif hooks_config:
+            # A hook changes the browser context it runs in, and that change
+            # outlives the request: cookies it adds stay in the context, and
+            # the context is shared with whatever request comes next. So a
+            # request that brings hooks gets a browser of its own.
+            crawler = await get_unpooled_crawler(browser_config)
         else:
             crawler = await get_crawler(browser_config)
         
@@ -880,10 +891,7 @@ async def handle_crawl_request(
         )
     finally:
         if crawler:
-            if is_pdf_crawl:
-                await crawler.close()  # not pooled; release_crawler would be a no-op
-            else:
-                await release_crawler(crawler)
+            await _dispose_crawler(crawler)
 
 async def handle_stream_crawl_request(
     urls: List[str],
@@ -926,7 +934,7 @@ async def handle_stream_crawl_request(
                 ),
             )
 
-        from crawler_pool import get_crawler
+        from crawler_pool import get_crawler, get_unpooled_crawler
         from crawl4ai.processors.pdf import PDFContentScrapingStrategy, PDFCrawlerStrategy
         if isinstance(crawler_config.scraping_strategy, PDFContentScrapingStrategy):
             if hooks_config:
@@ -937,6 +945,13 @@ async def handle_stream_crawl_request(
             # Use PDFCrawlerStrategy when scraping PDFs, as headless Chromium can't render PDFs inline
             crawler = AsyncWebCrawler(crawler_strategy=PDFCrawlerStrategy())
             await crawler.start()
+            crawler.pooled = False
+        elif hooks_config:
+            # A hook changes the browser context it runs in, and that change
+            # outlives the request: cookies it adds stay in the context, and
+            # the context is shared with whatever request comes next. So a
+            # request that brings hooks gets a browser of its own.
+            crawler = await get_unpooled_crawler(browser_config)
         else:
             crawler = await get_crawler(browser_config)
 
