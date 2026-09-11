@@ -118,6 +118,27 @@ async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
         USAGE_COUNT[sig] = 1
         return crawler
 
+async def get_unpooled_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
+    """Start a crawler for one request only, outside the pool.
+
+    Hooks are attached to the crawler that serves a request, and what they do
+    to its browser context - cookies, headers, routes - outlives the request.
+    A pooled crawler would carry that into whatever comes next, so a request
+    that brings hooks gets a browser of its own. Close it when done; it is in
+    no pool, so the janitor will never come for it.
+    """
+    mem_pct = get_container_memory_percent()
+    if mem_pct >= MEM_LIMIT:
+        logger.error(f"💥 Memory pressure: {mem_pct:.1f}% >= {MEM_LIMIT}%")
+        raise MemoryError(f"Memory at {mem_pct:.1f}%, refusing new browser")
+
+    logger.info(f"🔒 Creating unpooled browser for hooked request (mem={mem_pct:.1f}%)")
+    crawler = AsyncWebCrawler(config=cfg, thread_safe=False)
+    await crawler.start()
+    crawler.pooled = False
+    return crawler
+
+
 async def release_crawler(crawler: AsyncWebCrawler):
     """Decrement active request count for a pooled crawler.
 
