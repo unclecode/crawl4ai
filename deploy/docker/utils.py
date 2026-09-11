@@ -351,13 +351,56 @@ _BLOCKED_HOSTNAMES = {
 ALLOW_INTERNAL_URLS = os.environ.get("CRAWL4AI_ALLOW_INTERNAL_URLS", "false").lower() == "true"
 
 
+def _delegated_to_upstream(url: str) -> bool:
+    """True when this host was delegated to the upstream proxy by the operator.
+
+    CRAWL4AI_UPSTREAM_PROXY_DNS_SUFFIXES lists names an upstream resolves on our
+    behalf (see egress_proxy). Such names are expected not to resolve here, so
+    checking them locally rejects precisely the targets the operator configured.
+    Narrow by construction: an empty list disables it, only listed suffixes
+    match, only the allowed ports qualify, and an IP literal never does — there
+    is no name to delegate, so link-local and metadata addresses stay blocked
+    whatever is listed.
+
+    The parsing and matching are imported from egress_proxy rather than repeated
+    here, so this check and the proxy cannot drift into disagreeing about which
+    names are delegated — a disagreement would be a hole, not a mismatch.
+    """
+    from egress_proxy import normalize_host, passthrough_ports, passthrough_suffixes
+
+    suffixes = passthrough_suffixes()
+    if not suffixes:
+        return False
+    try:
+        parsed = urlparse(str(url))
+        raw_host = parsed.hostname or ""
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    except ValueError:
+        # An unparseable port names no delegated target; fall back to the check.
+        return False
+    if port not in passthrough_ports():
+        return False
+    try:
+        ipaddress.ip_address(raw_host.strip().rstrip("."))
+        return False
+    except ValueError:
+        pass
+    host = normalize_host(raw_host)
+    if not host:
+        return False
+    return any(host == s or host.endswith("." + s) for s in suffixes)
+
+
 def validate_url_destination(url: str) -> None:
     """Block crawl URLs targeting internal/private networks (SSRF protection).
     Skipped when CRAWL4AI_ALLOW_INTERNAL_URLS=true.
+    Skipped for hosts delegated via CRAWL4AI_UPSTREAM_PROXY_DNS_SUFFIXES.
     Skipped for raw: URLs (inline HTML, no network fetch)."""
     if ALLOW_INTERNAL_URLS:
         return
     if str(url).startswith(("raw:", "raw://")):
+        return
+    if _delegated_to_upstream(url):
         return
     try:
         validate_webhook_url(url)
