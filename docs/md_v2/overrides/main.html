@@ -6,6 +6,13 @@
 <script>
     document.documentElement.setAttribute("data-theme", "dark");
 </script>
+<script>
+/* the cloud banner's state before the first paint: big (default) · small (after close) · off (after
+   "don't show this again"); a signed-in cloud user (the c4_user marker cookie on .crawl4ai.com) gets small */
+(function(){try{var v=JSON.parse(localStorage.getItem("c4-cloud-banner")||"null");var s=(v&&v.version===1)?v.state:"big";
+if(s==="big"&&/(^|; )c4_user=1(;|$)/.test(document.cookie))s="small";document.documentElement.setAttribute("data-c4b",s);}
+catch(e){document.documentElement.setAttribute("data-c4b","big");}})();
+</script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pushfeedback/dist/pushfeedback/pushfeedback.css">
 
 <style>
@@ -37,6 +44,11 @@
 </style>
 <script type="module"
     src="https://cdn.jsdelivr.net/npm/pushfeedback@latest/dist/pushfeedback/pushfeedback.esm.js"></script>
+{% endblock %}
+
+{% block top_nav %}
+{{ super() }}
+{% include "partials/cloud-banner.html" %}
 {% endblock %}
 
 {% block footer %}
