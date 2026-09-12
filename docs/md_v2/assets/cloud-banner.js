@@ -12,11 +12,11 @@
   var STORE = "c4-cloud-banner", VERSION = 1, SINK = "https://gate.crawl4ai.com/v1/t";
   var KEY = '<span class="c4b-k">YOUR_KEY</span>';
   var BLOCKS = {
-    claude:   '<span class="c4b-cmt"># Claude Code · one line</span>\nclaude mcp add --transport http crawl4ai https://gate.crawl4ai.com/mcp \\\n  --header "Authorization: Bearer ' + KEY + '"',
-    codex:    '<span class="c4b-cmt"># Codex · ~/.codex/config.toml</span>\n[mcp_servers.crawl4ai]\nurl = "https://gate.crawl4ai.com/mcp"\nhttp_headers = { Authorization = "Bearer ' + KEY + '" }',
-    opencode: '<span class="c4b-cmt"># OpenCode · opencode.json</span>\n{ "mcp": { "crawl4ai": {\n    "type": "remote",\n    "url": "https://gate.crawl4ai.com/mcp",\n    "headers": { "Authorization": "Bearer ' + KEY + '" } } } }',
-    cursor:   '<span class="c4b-cmt"># Cursor · .cursor/mcp.json</span>\n{ "mcpServers": { "crawl4ai": {\n    "url": "https://gate.crawl4ai.com/mcp",\n    "headers": { "Authorization": "Bearer ' + KEY + '" } } } }',
-    curl:     '<span class="c4b-cmt"># curl · one request</span>\ncurl -s "https://gate.crawl4ai.com/search?q=web+scraping+in+2026" \\\n  -H "Authorization: Bearer ' + KEY + '"'
+    claude:   '<span class="c4b-cmt"># Claude Code · one line</span>\nclaude mcp add --transport http crawl4ai https://api.crawl4ai.com/mcp \\\n  --header "Authorization: Bearer ' + KEY + '"',
+    codex:    '<span class="c4b-cmt"># Codex · ~/.codex/config.toml</span>\n[mcp_servers.crawl4ai]\nurl = "https://api.crawl4ai.com/mcp"\nhttp_headers = { Authorization = "Bearer ' + KEY + '" }',
+    opencode: '<span class="c4b-cmt"># OpenCode · opencode.json</span>\n{ "mcp": { "crawl4ai": {\n    "type": "remote",\n    "url": "https://api.crawl4ai.com/mcp",\n    "headers": { "Authorization": "Bearer ' + KEY + '" } } } }',
+    cursor:   '<span class="c4b-cmt"># Cursor · .cursor/mcp.json</span>\n{ "mcpServers": { "crawl4ai": {\n    "url": "https://api.crawl4ai.com/mcp",\n    "headers": { "Authorization": "Bearer ' + KEY + '" } } } }',
+    curl:     '<span class="c4b-cmt"># curl · one request</span>\ncurl -s "https://api.crawl4ai.com/search?q=web+scraping+in+2026" \\\n  -H "Authorization: Bearer ' + KEY + '"'
   };
 
   /* ---- the anonymous id (the same shape as the landing's beacon) and the event sender ---- */
