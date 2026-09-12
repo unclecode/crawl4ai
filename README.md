@@ -13,12 +13,11 @@
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/unclecode?style=flat&logo=GitHub-Sponsors&label=Sponsors&color=pink)](https://github.com/sponsors/unclecode)
 
 ---
-#### 🚀 Crawl4AI Cloud API — Closed Beta (Launching Soon)
-Reliable, large-scale web extraction, now built to be _**drastically more cost-effective**_ than any of the existing solutions.
+#### ☁️ Crawl4AI Cloud is live — the same crawler, hosted
+No browsers to run, no proxies to buy, no cookies to babysit. One key with **$5 of free credit**, and your AI agent can search, scrape, crawl and extract the web through the engine you already use. Works in Claude Code, Codex, OpenCode and Cursor with one pasted line.
 
-👉 **Apply [here](https://forms.gle/E9MyPaNXACnAMaqG7) for early access**  
-_We’ll be onboarding in phases and working closely with early users.
-Limited slots._
+👉 **[Get a key in 10 seconds](https://crawl4ai.com/?ref=readme)** · [Cloud docs](https://crawl4ai.com/docs?ref=readme)  
+_The library stays open source, forever. The cloud is for the days you want to build fast and let us run the infrastructure._
 
 ---
 

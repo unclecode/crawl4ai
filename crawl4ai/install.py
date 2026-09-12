@@ -63,7 +63,13 @@ def post_install():
     # TODO: Will be added in the future
     # setup_builtin_browser()
     logger.success("Post-installation setup completed!", tag="COMPLETE")
-    
+    try:
+        from .cloud_notice import show_at_install
+
+        show_at_install(logger)
+    except Exception:
+        pass
+
 def setup_builtin_browser():
     """Set up a builtin browser for use with Crawl4AI"""
     try:

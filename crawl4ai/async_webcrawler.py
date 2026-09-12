@@ -182,6 +182,12 @@ class AsyncWebCrawler:
         """
         await self.crawler_strategy.__aenter__()
         self.logger.info(f"Crawl4AI {crawl4ai_version}", tag="INIT")
+        try:
+            from .cloud_notice import show_once
+
+            show_once(self.logger)
+        except Exception:
+            pass
         self.ready = True
         return self
 

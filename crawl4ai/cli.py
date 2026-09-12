@@ -1648,6 +1648,12 @@ def main():
     import sys
     if len(sys.argv) < 2 or sys.argv[1] not in cli.commands:
         sys.argv.insert(1, "crawl")
+    try:
+        from .cloud_notice import show_once
+
+        show_once()
+    except Exception:
+        pass
     cli()
 
 if __name__ == "__main__":
