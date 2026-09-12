@@ -253,9 +253,13 @@ class RobotsParser:
     # Default 7 days cache TTL
     CACHE_TTL = 7 * 24 * 60 * 60
 
-    def __init__(self, cache_dir=None, cache_ttl=None):
+    def __init__(self, cache_dir=None, cache_ttl=None, verify_ssl=True):
         self.cache_dir = cache_dir or os.path.join(get_home_folder(), ".crawl4ai", "robots")
         self.cache_ttl = cache_ttl or self.CACHE_TTL
+        # TLS verification is ON by default: an on-path attacker must not be able to
+        # forge robots.txt and silently flip Disallow rules (see issue #2252).
+        # Opt out explicitly (self-hosted mirrors / debug only) via verify_ssl=False.
+        self.verify_ssl = verify_ssl
         os.makedirs(self.cache_dir, exist_ok=True)
         self.db_path = os.path.join(self.cache_dir, "robots_cache.db")
         self._init_db()
@@ -341,7 +345,11 @@ class RobotsParser:
                 robots_url = f"{scheme}://{domain}/robots.txt"
                 
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(robots_url, timeout=2, ssl=False) as response:
+                    # aiohttp's `ssl=None` means "use the default context" (certificates
+                    # verified). For plain http:// the argument is ignored, so this stays
+                    # a no-op for http while restoring verification for https (#2252).
+                    ssl_ctx = None if self.verify_ssl else False
+                    async with session.get(robots_url, timeout=2, ssl=ssl_ctx) as response:
                         if response.status == 200:
                             rules = await response.text()
                             self._cache_rules(domain, rules)
