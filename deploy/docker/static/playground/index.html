@@ -686,29 +686,31 @@
         async function runCrawl() {
             const endpoint = document.getElementById('endpoint').value;
             const urls = document.getElementById('urls').value.trim().split(/\n/).filter(u => u);
-            // 1) grab python from CodeMirror, validate via /config/dump
+            // 1) grab python from CodeMirror, validate via /config/dump.
+            // Advanced Config is /crawl-only, so md/llm skip this entirely.
             let advConfig = {};
-            try {
-                const cfgJson = await pyConfigToJson(); // may throw
-                if (Object.keys(cfgJson).length) {
-                    const cfgType = document.getElementById('cfg-type').value;
-                    advConfig = cfgType === 'CrawlerRunConfig'
-                        ? { crawler_config: cfgJson }
-                        : { browser_config: cfgJson };
-                }
-            } catch (err) {
-                const codeText = cm.getValue();
-                const streamFlag = /stream\s*=\s*True/i.test(codeText);
-                const isCrawlEndpoint = document.getElementById('endpoint').value === 'crawl';
-                if (isCrawlEndpoint && streamFlag) {
-                    // Fallback: minimal dump-shaped config so shouldUseStream + server load agree
-                    advConfig = { crawler_config: { type: 'CrawlerRunConfig', params: { stream: true } } };
-                } else {
-                    updateStatus('error');
-                    document.querySelector('#response-content code').textContent =
-                        JSON.stringify({ error: err.message }, null, 2);
-                    forceHighlightElement(document.querySelector('#response-content code'));
-                    return; // stop run
+            if (endpoint === 'crawl' || endpoint === 'crawl_stream') {
+                try {
+                    const cfgJson = await pyConfigToJson(); // may throw
+                    if (Object.keys(cfgJson).length) {
+                        const cfgType = document.getElementById('cfg-type').value;
+                        advConfig = cfgType === 'CrawlerRunConfig'
+                            ? { crawler_config: cfgJson }
+                            : { browser_config: cfgJson };
+                    }
+                } catch (err) {
+                    const codeText = cm.getValue();
+                    const streamFlag = /stream\s*=\s*True/i.test(codeText);
+                    if (streamFlag) {
+                        // Fallback: minimal dump-shaped config so shouldUseStream + server load agree
+                        advConfig = { crawler_config: { type: 'CrawlerRunConfig', params: { stream: true } } };
+                    } else {
+                        updateStatus('error');
+                        document.querySelector('#response-content code').textContent =
+                            JSON.stringify({ error: err.message }, null, 2);
+                        forceHighlightElement(document.querySelector('#response-content code'));
+                        return; // stop run
+                    }
                 }
             }
 
