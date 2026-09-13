@@ -225,7 +225,10 @@ def _parse_head(src: str) -> Dict[str, Any]:
                 except json.JSONDecodeError:
                     pass
         # Extract html lang attribute
-        html_elem = doc.find(".//html")
+        # ``fromstring`` returns the document's ``<html>`` element for a
+        # complete HTML document. ``.//html`` only searches descendants, so
+        # it misses that root element and drops its language declaration.
+        html_elem = doc if doc.tag.lower() == "html" else doc.find(".//html")
         if html_elem is not None:
             info["lang"] = html_elem.attrib.get("lang", "")
         return info
