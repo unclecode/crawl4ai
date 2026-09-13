@@ -233,6 +233,7 @@ class DefaultTableExtraction(TableExtractionStrategy):
         # Extract headers with colspan handling
         headers = []
         thead_rows = table.xpath(".//thead/tr")
+        implicit_header_row = None
         if thead_rows:
             header_cells = thead_rows[0].xpath(".//th")
             for cell in header_cells:
@@ -243,19 +244,44 @@ class DefaultTableExtraction(TableExtractionStrategy):
             # Check first row for headers
             first_row = table.xpath(".//tr[1]")
             if first_row:
-                for cell in first_row[0].xpath(".//th|.//td"):
+                implicit_header_row = first_row[0]
+                for cell in implicit_header_row.xpath(".//th|.//td"):
                     text = cell.text_content().strip()
                     colspan = int(cell.get("colspan", 1))
                     headers.extend([text] * colspan)
-        
-        # Extract rows with colspan handling
+
+        # Extract rows, expanding rowspan/colspan into a rectangular grid so
+        # row-header cells (<th> inside <tbody>) are kept and rowspan values
+        # are repeated into every row they cover (see issue #2258).
         rows = []
+        pending_rowspans: Dict[int, List[Any]] = {}
         for row in table.xpath(".//tr[not(ancestor::thead)]"):
+            if row is implicit_header_row:
+                continue
             row_data = []
-            for cell in row.xpath(".//td"):
-                text = cell.text_content().strip()
-                colspan = int(cell.get("colspan", 1))
-                row_data.extend([text] * colspan)
+            col_idx = 0
+            cells = iter(row.xpath("./th|./td"))
+            current_cell = next(cells, None)
+            while current_cell is not None or col_idx in pending_rowspans:
+                pending = pending_rowspans.get(col_idx)
+                if pending is not None:
+                    text, remaining = pending
+                    row_data.append(text)
+                    if remaining <= 1:
+                        del pending_rowspans[col_idx]
+                    else:
+                        pending_rowspans[col_idx][1] = remaining - 1
+                    col_idx += 1
+                    continue
+                text = current_cell.text_content().strip()
+                colspan = int(current_cell.get("colspan", 1) or 1)
+                rowspan = int(current_cell.get("rowspan", 1) or 1)
+                for _ in range(max(colspan, 1)):
+                    row_data.append(text)
+                    if rowspan > 1:
+                        pending_rowspans[col_idx] = [text, rowspan - 1]
+                    col_idx += 1
+                current_cell = next(cells, None)
             if row_data:
                 rows.append(row_data)
         
