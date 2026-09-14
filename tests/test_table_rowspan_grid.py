@@ -7,6 +7,8 @@ ignored entirely, so a spanning value never reached the rows it covers.
 https://github.com/unclecode/crawl4ai/issues/2258
 """
 
+import time
+
 from lxml import html as lhtml
 
 from crawl4ai import DefaultTableExtraction
@@ -121,3 +123,40 @@ def test_key_value_first_row_is_not_mistaken_for_a_header():
     <tr><th scope="row">Drink</th><td>Apple cider</td></tr>
     </table>""")
     assert tables[0]["rows"] == [["Food", "Apple pie"], ["Drink", "Apple cider"]]
+
+
+def test_absurd_spans_are_clamped_instead_of_exploding():
+    """rowspan * colspan is a product, and scraped HTML is untrusted.
+
+    One crafted cell must not be able to hang the crawl. rowspan is bounded by
+    the rows that exist, colspan by the HTML Standard's cap.
+    """
+    html = """
+    <table>
+    <thead><tr><th>A</th><th>B</th></tr></thead>
+    <tbody>
+    <tr><td rowspan="1000000" colspan="1000000">X</td><td>b1</td></tr>
+    <tr><td>c1</td><td>c2</td></tr>
+    </tbody></table>"""
+    started = time.perf_counter()
+    tables = _extract(html)
+    elapsed = time.perf_counter() - started
+
+    assert elapsed < 2, f"clamping regressed: took {elapsed:.1f}s"
+    rows = tables[0]["rows"]
+    assert len(rows) == 2, "rowspan must not invent rows beyond the table"
+    limit = DefaultTableExtraction.COLSPAN_LIMIT
+    assert all(len(row) <= limit for row in rows), "colspan must be capped"
+
+
+def test_invalid_span_attribute_counts_as_one():
+    """Browsers treat junk spans as 1; parsing must not raise on them."""
+    tables = _extract("""
+    <table>
+    <thead><tr><th>A</th><th>B</th></tr></thead>
+    <tbody>
+    <tr><td colspan="100%">a</td><td>b</td></tr>
+    <tr><td rowspan="lots">c</td><td>d</td></tr>
+    <tr><td colspan="-3">e</td><td>f</td></tr>
+    </tbody></table>""")
+    assert tables[0]["rows"] == [["a", "b"], ["c", "d"], ["e", "f"]]

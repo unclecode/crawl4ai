@@ -210,8 +210,11 @@ class DefaultTableExtraction(TableExtractionStrategy):
         threshold = kwargs.get("table_score_threshold", self.table_score_threshold)
         return score >= threshold
     
-    @staticmethod
-    def _build_grid(rows: List[etree.Element]) -> List[List[str]]:
+    # HTML Standard caps colspan at 1000; browsers clamp to the same value.
+    COLSPAN_LIMIT = 1000
+
+    @classmethod
+    def _build_grid(cls, rows: List[etree.Element]) -> List[List[str]]:
         """Lay <tr> cells into a rectangular grid, honouring colspan/rowspan.
 
         Each cell writes its text into every slot of the rectangle it spans,
@@ -221,9 +224,14 @@ class DefaultTableExtraction(TableExtractionStrategy):
         """
         grid: List[List[str]] = [[] for _ in rows]
 
+        def span(value, limit: int) -> int:
+            """Read a span attribute the way a browser does: junk counts as 1."""
+            try:
+                return min(max(int(value), 1), limit)
+            except (TypeError, ValueError):
+                return 1
+
         def put(r: int, c: int, text: str) -> None:
-            if r >= len(grid):  # rowspan reaching past the last row
-                return
             row = grid[r]
             row.extend([None] * (c + 1 - len(row)))
             row[c] = text
@@ -234,8 +242,13 @@ class DefaultTableExtraction(TableExtractionStrategy):
                 while c < len(grid[r]) and grid[r][c] is not None:
                     c += 1  # slot already taken by a rowspan from above
                 text = cell.text_content().strip()
-                colspan = max(int(cell.get("colspan") or 1), 1)
-                rowspan = max(int(cell.get("rowspan") or 1), 1)
+                # Both spans are clamped, so one crafted cell cannot make the
+                # work explode: scraped HTML is untrusted, and rowspan*colspan
+                # is a product. COLSPAN_LIMIT is the HTML Standard's cap, which
+                # is what browsers apply; a rowspan cannot reach past the last
+                # row, which is a tighter bound than the standard's 65534.
+                colspan = span(cell.get("colspan"), cls.COLSPAN_LIMIT)
+                rowspan = span(cell.get("rowspan"), len(grid) - r)
                 for dr in range(rowspan):
                     for dc in range(colspan):
                         put(r + dr, c + dc, text)
