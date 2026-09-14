@@ -568,11 +568,14 @@
         }
 
         // Validate the editor's params against /config/dump and return the
-        // normalized { type, params } the crawl endpoints expect. Throws with the
-        // server's message so the caller can surface the offending field.
+        // { type, params } the crawl endpoints expect. Throws with the server's
+        // message so the caller can surface the offending field.
         async function validateConfig() {
             const text = cm.getValue().trim();
-            if (!text) return {};
+            if (!text) {
+                setCfgStatus('', 'text-secondary');  // no config is not an error
+                return {};
+            }
 
             let params;
             try {
@@ -585,7 +588,10 @@
                 setCfgStatus('✖ expected a JSON object', 'text-red-400');
                 throw new Error('Advanced Config must be a JSON object of parameters');
             }
-            if (!Object.keys(params).length) return {};
+            if (!Object.keys(params).length) {
+                setCfgStatus('', 'text-secondary');  // no config is not an error
+                return {};
+            }
 
             const cfgType = document.getElementById('cfg-type').value;
             const res = await authFetch('/config/dump', {
@@ -601,7 +607,11 @@
             }
 
             setCfgStatus('✓ validated', 'text-green-400');
-            return await res.json();
+            // Send back what the user typed, not /config/dump's echo. dump()
+            // fills in server-derived fields -- BrowserConfig gains generated
+            // `headers` -- that the untrusted gate then refuses on /crawl, so
+            // the echo is a validation result, not a re-submittable payload.
+            return { type: cfgType, params };
         }
 
         // ================ SERVER COMMUNICATION ================

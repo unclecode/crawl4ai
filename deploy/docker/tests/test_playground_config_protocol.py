@@ -96,10 +96,29 @@ class TestTemplatesSurviveTheUntrustedGate(unittest.TestCase):
     def test_stream_reaches_the_shape_should_use_stream_reads(self):
         """runCrawl picks the streaming endpoint off crawler_config.params.stream."""
         params = json.loads(read_templates()["CrawlerRunConfig"])
-        dumped = CrawlerRunConfig.load(
-            {"type": "CrawlerRunConfig", "params": params}, provenance=Provenance.UNTRUSTED
+        self.assertIs(params.get("stream"), True)
+
+    def test_the_validated_params_are_forwarded_not_the_dump_echo(self):
+        """dump() adds server-derived fields the untrusted gate then refuses.
+
+        BrowserConfig picks up generated `headers`, which is not allowlisted, so
+        posting /config/dump's echo to /crawl 400s. The page must forward the
+        params the user typed.
+        """
+        params = json.loads(read_templates()["BrowserConfig"])
+        echo = BrowserConfig.load(
+            {"type": "BrowserConfig", "params": params}, provenance=Provenance.UNTRUSTED
         ).dump()
-        self.assertIs(dumped["params"].get("stream"), True)
+        forbidden = set(echo["params"]) - UNTRUSTED_FIELD_ALLOWLIST["BrowserConfig"]
+        self.assertTrue(
+            forbidden,
+            "if dump() ever became re-submittable this guard can go, but check the page first",
+        )
+        page = read_page()
+        self.assertIn("return { type: cfgType, params };", page,
+                      "validateConfig must forward the typed params, not the echo")
+        self.assertNotIn("return await res.json();", page,
+                         "the /config/dump echo must not be forwarded to /crawl")
 
     def test_the_old_code_protocol_is_still_refused(self):
         """Guards the reason for this change: {type, code} cannot come back."""
