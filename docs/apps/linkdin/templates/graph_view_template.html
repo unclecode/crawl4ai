@@ -259,6 +259,24 @@
             }[ch]));
         }
 
+        // Untrusted URLs (profile_url, avatar_url, person id) must not be assigned
+        // to href/src as-is: entity escaping does not block a `javascript:` (or
+        // other non-http) scheme reaching setAttribute. Only allow http(s) or
+        // scheme-relative URLs through; anything else falls back to '#'.
+        function safeUrl(value, fallback = '#') {
+            const raw = String(value ?? '').trim();
+            if (!raw) return fallback;
+            try {
+                const parsed = new URL(raw, 'https://example.com/');
+                if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+                    return escapeHtml(raw);
+                }
+            } catch (e) {
+                // Malformed URL - fall through to fallback.
+            }
+            return fallback;
+        }
+
         // Check localStorage first, otherwise fetch default data
         let data;
         // Toast notification function
@@ -621,7 +639,7 @@
            </div>
            <div class="flex items-center gap-2">
              <span class="text-xs px-2 py-0.5 rounded-full" style="background-color:${colorForScore(n.decision_score)}">${(n.decision_score * 100).toFixed(0)}%</span>
-             <a href="${escapeHtml(n.profile_url || '')}" target="_blank" class="text-emerald-400 hover:text-emerald-300 text-xs">
+             <a href="${safeUrl(n.profile_url)}" target="_blank" class="text-emerald-400 hover:text-emerald-300 text-xs">
                <i class="fab fa-linkedin"></i>
              </a>
            </div>
@@ -730,7 +748,7 @@
                 box.innerHTML = `
                     <div class="bg-neutral-800 rounded-lg p-4">
                       <div class="flex items-start space-x-3">
-                        <img src="${p.avatar_url ? escapeHtml(p.avatar_url) : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(p.name)}"
+                        <img src="${safeUrl(p.avatar_url, 'https://ui-avatars.com/api/?name=' + encodeURIComponent(p.name))}"
                              class="h-16 w-16 rounded-full object-cover border-2 border-neutral-700"/>
                         <div class="flex-1">
                           <div class="flex justify-between items-start">
@@ -764,7 +782,7 @@
                           </div>
 
                           <div class="mt-3 flex justify-end">
-                            <a href="${escapeHtml(p.id || '')}" target="_blank"
+                            <a href="${safeUrl(p.id)}" target="_blank"
                                class="bg-emerald-800 hover:bg-emerald-700 text-emerald-100 px-3 py-1 rounded text-xs flex items-center transition-colors">
                               <i class="fab fa-linkedin mr-1"></i> View on LinkedIn
                             </a>
