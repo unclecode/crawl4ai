@@ -361,7 +361,7 @@ class TestMaxTimeoutCeiling:
 
     # A typo must not silently widen a DoS bound, so the default is kept and
     # the operator is told rather than left to find out under load.
-    @pytest.mark.parametrize("value", ["", "abc", "0", "-1", "60_000", "1e5"])
+    @pytest.mark.parametrize("value", ["", "abc", "0", "-1", "1e5"])
     def test_a_non_positive_integer_keeps_the_default(self, monkeypatch, value):
         monkeypatch.setenv("CRAWL4AI_MAX_TIMEOUT_MS", value)
 
@@ -372,6 +372,38 @@ class TestMaxTimeoutCeiling:
             )
 
         assert config.page_timeout == 60_000
+
+    def test_an_underscored_integer_is_accepted(self, monkeypatch):
+        # int("60_000") == 60000 in Python, so this is a valid ceiling, not a typo.
+        monkeypatch.setenv("CRAWL4AI_MAX_TIMEOUT_MS", "120_000")
+
+        config = CrawlerRunConfig.load(
+            {"page_timeout": 500_000}, provenance=Provenance.UNTRUSTED
+        )
+
+        assert config.page_timeout == 120_000
+
+    def test_malformed_timeout_falls_back_to_the_default_not_the_ceiling(
+        self, monkeypatch
+    ):
+        # The one field an untrusted caller gets for free must not inherit a
+        # raised ceiling just by being junk.
+        monkeypatch.setenv("CRAWL4AI_MAX_TIMEOUT_MS", "300000")
+
+        config = CrawlerRunConfig.load(
+            {"page_timeout": 0}, provenance=Provenance.UNTRUSTED
+        )
+
+        assert config.page_timeout == 60_000
+
+    def test_malformed_timeout_respects_a_tightened_ceiling(self, monkeypatch):
+        monkeypatch.setenv("CRAWL4AI_MAX_TIMEOUT_MS", "5000")
+
+        config = CrawlerRunConfig.load(
+            {"page_timeout": "abc"}, provenance=Provenance.UNTRUSTED
+        )
+
+        assert config.page_timeout == 5_000
 
     @pytest.mark.parametrize("value", ["abc", "0", "-1"])
     def test_a_bad_value_warns(self, monkeypatch, value):

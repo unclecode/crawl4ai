@@ -357,8 +357,10 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
 
     def _cap_timeout(v):
         # 0 historically meant "no timeout"; treat as the cap, never unbounded.
+        # Malformed input is the one value an attacker gets for free, so it
+        # falls back to the 60s default rather than to a raised ceiling.
         if not isinstance(v, (int, float)) or v <= 0:
-            return ceiling
+            return min(_DEFAULT_MAX_TIMEOUT_MS, ceiling)
         return min(int(v), ceiling)
 
     if type_name == "CrawlerRunConfig":
