@@ -210,6 +210,20 @@ class DefaultTableExtraction(TableExtractionStrategy):
         threshold = kwargs.get("table_score_threshold", self.table_score_threshold)
         return score >= threshold
     
+    @staticmethod
+    def _span(cell: etree.Element, name: str) -> int:
+        """`colspan`/`rowspan` as a positive count.
+
+        The value comes from the document, so it can be absent, empty, `0`, or
+        not a number at all. A table must not be turned into an error by any of
+        those, and a browser treats them all as "no span", so they mean 1 here.
+        """
+        try:
+            span = int(cell.get(name, 1))
+        except (TypeError, ValueError):
+            return 1
+        return span if span > 0 else 1
+
     def extract_table_data(self, table: etree.Element) -> Dict[str, Any]:
         """
         Extract structured data from a table element.
@@ -232,30 +246,64 @@ class DefaultTableExtraction(TableExtractionStrategy):
         
         # Extract headers with colspan handling
         headers = []
+        header_row = None
         thead_rows = table.xpath(".//thead/tr")
         if thead_rows:
             header_cells = thead_rows[0].xpath(".//th")
             for cell in header_cells:
                 text = cell.text_content().strip()
-                colspan = int(cell.get("colspan", 1))
+                colspan = self._span(cell, "colspan")
                 headers.extend([text] * colspan)
         else:
             # Check first row for headers
             first_row = table.xpath(".//tr[1]")
             if first_row:
-                for cell in first_row[0].xpath(".//th|.//td"):
+                header_row = first_row[0]
+                for cell in header_row.xpath(".//th|.//td"):
                     text = cell.text_content().strip()
-                    colspan = int(cell.get("colspan", 1))
+                    colspan = self._span(cell, "colspan")
                     headers.extend([text] * colspan)
         
-        # Extract rows with colspan handling
+        # Extract rows with colspan and rowspan handling.
+        #
+        # `th` counts as a body cell: a `<th scope="row">` is the key column of
+        # a documentation table, and reading only `td` dropped it and shifted
+        # every other cell one place left.
+        #
+        # A `rowspan` cell occupies its column in the rows below it as well, so
+        # its value is carried down; without that the rows under it shift left
+        # by one and no longer line up with the header.
         rows = []
+        carried: Dict[int, List[Any]] = {}
         for row in table.xpath(".//tr[not(ancestor::thead)]"):
+            # The first row is the header when there is no thead, and it is in
+            # this set too. Emitting it again would repeat it as data.
+            if header_row is not None and row is header_row:
+                continue
             row_data = []
-            for cell in row.xpath(".//td"):
+            column = 0
+            cells = row.xpath(".//th|.//td")
+            index = 0
+            while index < len(cells) or column in carried:
+                if column in carried:
+                    text, remaining = carried[column]
+                    row_data.append(text)
+                    if remaining > 1:
+                        carried[column] = [text, remaining - 1]
+                    else:
+                        del carried[column]
+                    column += 1
+                    continue
+                cell = cells[index]
+                index += 1
                 text = cell.text_content().strip()
-                colspan = int(cell.get("colspan", 1))
-                row_data.extend([text] * colspan)
+                colspan = self._span(cell, "colspan")
+                rowspan = self._span(cell, "rowspan")
+                for _ in range(colspan):
+                    row_data.append(text)
+                    if rowspan > 1:
+                        carried[column] = [text, rowspan - 1]
+                    column += 1
             if row_data:
                 rows.append(row_data)
         
