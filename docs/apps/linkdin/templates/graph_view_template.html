@@ -533,7 +533,7 @@
                         <div class="flex justify-between items-center text-xs">
                             <div class="flex items-center">
                                 <i class="fa fa-users mr-1 text-neutral-400"></i>
-                                <span>${n.followers?.toLocaleString() || '0'} followers</span>
+                                <span>${escapeHtml(n.followers?.toLocaleString() || '0')} followers</span>
                             </div>
                             <a href="https://www.linkedin.com${escapeHtml(n.handle || '')}" target="_blank" class="text-emerald-400 hover:text-emerald-300">
                                 <i class="fab fa-linkedin mr-1"></i>View on LinkedIn
@@ -769,7 +769,7 @@
                             </div>
                             <div class="flex items-center">
                               <i class="fas fa-calendar-alt w-5 text-neutral-500"></i>
-                              <span class="ml-1">${p.yoe_current || '?'} years at company</span>
+                              <span class="ml-1">${escapeHtml(p.yoe_current || '?')} years at company</span>
                             </div>
                             <div class="flex items-center">
                               <i class="fas fa-briefcase w-5 text-neutral-500"></i>
@@ -777,7 +777,7 @@
                             </div>
                             <div class="flex items-center">
                               <i class="fas fa-user-friends w-5 text-neutral-500"></i>
-                              <span class="ml-1">${p.connection_count || '?'} connections</span>
+                              <span class="ml-1">${escapeHtml(p.connection_count || '?')} connections</span>
                             </div>
                           </div>
 
@@ -1147,7 +1147,7 @@
                             <div class="text-neutral-400">${escapeHtml(node.industry || 'Industry: N/A')}</div>
                             <div class="flex items-center mt-1">
                                 <i class="fas fa-users mr-1 text-blue-400"></i>
-                                <span>${node.followers?.toLocaleString() || '0'} followers</span>
+                                <span>${escapeHtml(node.followers?.toLocaleString() || '0')} followers</span>
                             </div>
                             <div class="mt-1">${escapeHtml(node.about || '')}</div>
                         `;

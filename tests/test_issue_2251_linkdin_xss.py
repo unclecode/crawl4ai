@@ -149,6 +149,7 @@ EXPECTED_ESCAPED_SNIPPETS = [
     "${escapeHtml(n.industry || 'N/A')}",
     "${escapeHtml(n.about || 'No description available')}",
     "https://www.linkedin.com${escapeHtml(n.handle || '')}",
+    "<span>${escapeHtml(n.followers?.toLocaleString() || '0')} followers</span>",
     # 2. renderOrg (was: ${companyName}, ${n.name}, ${n.title}, ${n.profile_url})
     '<h2 class="font-semibold text-lg text-blue-400">${escapeHtml(companyName)}</h2>',
     '<div class="font-medium">${escapeHtml(n.name)}</div>',
@@ -161,6 +162,8 @@ EXPECTED_ESCAPED_SNIPPETS = [
     "${escapeHtml(p.dept || 'Department not specified')}",
     "${escapeHtml(p.title_level || 'Level not specified')}",
     '<a href="${safeUrl(p.id)}"',
+    '<span class="ml-1">${escapeHtml(p.yoe_current || \'?\')} years at company</span>',
+    '<span class="ml-1">${escapeHtml(p.connection_count || \'?\')} connections</span>',
     # 4. AI chat drawer (was: raw text += ..., marked.parse(text) unsanitized)
     'el.lastChild.innerHTML += escapeHtml(text).replace(/\\n/g, "<br>")',
     "contentEl.innerHTML = DOMPurify.sanitize(marked.parse(text))",
@@ -168,6 +171,7 @@ EXPECTED_ESCAPED_SNIPPETS = [
     '<div class="font-semibold text-neutral-200">${escapeHtml(node.name)}</div>',
     "${escapeHtml(node.industry || 'Industry: N/A')}",
     '<div class="mt-1">${escapeHtml(node.about || \'\')}</div>',
+    "<span>${escapeHtml(node.followers?.toLocaleString() || '0')} followers</span>",
 ]
 
 
@@ -196,6 +200,13 @@ UNESCAPED_VULNERABLE_PATTERNS = [
     "<a href=\"${escapeHtml(n.profile_url || '')}\"",
     "<a href=\"${escapeHtml(p.id || '')}\"",
     "${p.avatar_url ? escapeHtml(p.avatar_url) : ",
+    # Fields that were entirely unescaped (not even entity-escaped): a string
+    # payload survives escapeHtml-free interpolation since .toLocaleString()
+    # is also a String.prototype method that returns the string unchanged.
+    "<span>${n.followers?.toLocaleString() || '0'} followers</span>",
+    "<span>${node.followers?.toLocaleString() || '0'} followers</span>",
+    '<span class="ml-1">${p.yoe_current || \'?\'} years at company</span>',
+    '<span class="ml-1">${p.connection_count || \'?\'} connections</span>',
 ]
 
 
