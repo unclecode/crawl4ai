@@ -561,7 +561,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         # previous navigation to prevent timeouts on the next goto().
         if config.session_id:
             try:
-                await page.evaluate("window.stop()")
+                await asyncio.wait_for(page.evaluate("window.stop()"), 2)  # a session page may already be hung
             except Exception:
                 pass
 

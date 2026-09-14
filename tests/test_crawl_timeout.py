@@ -18,6 +18,7 @@ from crawl4ai import AsyncWebCrawler, BrowserConfig, CacheMode, CrawlerRunConfig
 TRAP_HTML = b"""<!doctype html><html><head><title>trap</title></head><body><p>hi</p>
 <script>document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){while(true){}},0);});</script>
 </body></html>"""
+LATE_TRAP_HTML = TRAP_HTML.replace(b"},0);", b"},4000);").replace(b"<p>hi</p>", b"<p>filler text so the anti-bot check does not flag a near-empty page</p>" * 20)  # goes busy 4 s after load
 OK_HTML = b"<html><body><p>ok</p>" + b"<p>filler text so the anti-bot check does not flag a near-empty page</p>" * 20 + b"</body></html>"
 
 
@@ -26,7 +27,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/html")
         self.end_headers()
-        self.wfile.write(TRAP_HTML if self.path == "/trap" else OK_HTML)
+        self.wfile.write({"/trap": TRAP_HTML, "/late-trap": LATE_TRAP_HTML}.get(self.path, OK_HTML))
 
     def log_message(self, *args):
         pass
@@ -85,6 +86,23 @@ async def test_trap_session_is_dropped_and_next_crawl_works(base_url):
         assert result.success is True
         assert "ok" in result.html
         assert "trap-session" in bm.sessions  # normal crawl keeps the session page
+
+
+@pytest.mark.asyncio
+async def test_session_page_hung_between_crawls_fails_within_crawl_timeout(base_url):
+    """The window.stop() sent to a reused session page runs before the timed visit; it must not hang on a busy page."""
+    cfg = _cfg(session_id="late-session")
+    async with AsyncWebCrawler(config=BrowserConfig(headless=True)) as crawler:
+        result = await asyncio.wait_for(crawler.arun(base_url + "/late-trap", config=cfg), 20)
+        assert result.success is True
+        await asyncio.sleep(5)  # page is now spinning
+
+        t0 = time.perf_counter()
+        result = await asyncio.wait_for(crawler.arun(base_url + "/late-trap", config=cfg), 25)
+        assert result.success is False
+        assert "exceeded crawl_timeout" in result.error_message
+        assert time.perf_counter() - t0 < 15
+        assert "late-session" not in crawler.crawler_strategy.browser_manager.sessions
 
 
 @pytest.mark.asyncio
