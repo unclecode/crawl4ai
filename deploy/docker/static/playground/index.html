@@ -33,10 +33,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.11/clipboard.min.js"></script>
-    <!-- CodeMirror (python mode) -->
+    <!-- CodeMirror (JSON mode) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/darcula.min.css">
@@ -251,7 +251,7 @@
                 <!-- Advanced config for /crawl endpoints -->
                 <details id="adv-config" class="mb-4">
                     <summary class="text-sm text-secondary cursor-pointer">Advanced Config <span
-                        class="text-xs text-primary">(Python → auto‑JSON)</span></summary>
+                        class="text-xs text-primary">(JSON params)</span></summary>
 
                     <!-- Toolbar -->
                     <div class="flex items-center justify-end space-x-3 mt-2">
@@ -498,12 +498,24 @@
         });
 
         // ================ ADVANCED CONFIG EDITOR ================
+        // The server validates every field against UNTRUSTED_FIELD_ALLOWLIST, so the
+        // editor holds the `params` object literally rather than a Python snippet:
+        // /config/dump stopped eval-ing code in the 0.8.x security work (issue #2260).
+        const TEMPLATES = {
+            CrawlerRunConfig: `{
+    "stream": true,
+    "cache_mode": "bypass"
+}`,
+            BrowserConfig: `{
+    "headless": true,
+    "viewport_width": 1280,
+    "viewport_height": 720
+}`,
+        };
+
         const cm = CodeMirror(document.getElementById('adv-editor'), {
-            value: `CrawlerRunConfig(
-    stream=True,
-    cache_mode=CacheMode.BYPASS,
-)`,
-            mode: 'python',
+            value: TEMPLATES.CrawlerRunConfig,
+            mode: 'application/json',
             lineNumbers: true,
             theme: 'darcula',
             tabSize: 4,
@@ -513,23 +525,9 @@
             lineWrapping: true,
         });
 
-        const TEMPLATES = {
-            CrawlerRunConfig: `CrawlerRunConfig(
-    stream=True,
-    cache_mode=CacheMode.BYPASS,
-)`,
-            BrowserConfig: `BrowserConfig(
-    headless=True,
-    extra_args=[
-        "--no-sandbox",
-        "--disable-gpu",
-    ],
-)`,
-        };
-
         document.getElementById('cfg-type').addEventListener('change', (e) => {
             cm.setValue(TEMPLATES[e.target.value]);
-            document.getElementById('cfg-status').textContent = '';
+            setCfgStatus('', 'text-secondary');
         });
         
         // Handle endpoint selection change to show appropriate options
@@ -539,6 +537,10 @@
             const llmOptions = document.getElementById('llm-options');
             const advConfig = document.getElementById('adv-config');
             
+            // Advanced Config is /crawl-only; clear its status so a previous
+            // run's '✖ config error' does not linger on md/llm (#2260).
+            setCfgStatus('', 'text-secondary');
+
             // Hide all option sections first
             mdOptions.classList.add('hidden');
             llmOptions.classList.add('hidden');
@@ -559,30 +561,46 @@
             }
         });
 
-        async function pyConfigToJson() {
-            const code = cm.getValue().trim();
-            if (!code) return {};
+        function setCfgStatus(text, cls) {
+            const el = document.getElementById('cfg-status');
+            el.textContent = text;
+            el.className = 'text-xs ml-2 ' + cls;
+        }
 
-            // Server requires `type` alongside `code` (CrawlerRunConfig | BrowserConfig).
-            // The UI already tracks this in #cfg-type; omitting it always 400s Advanced Config.
+        // Validate the editor's params against /config/dump and return the
+        // normalized { type, params } the crawl endpoints expect. Throws with the
+        // server's message so the caller can surface the offending field.
+        async function validateConfig() {
+            const text = cm.getValue().trim();
+            if (!text) return {};
+
+            let params;
+            try {
+                params = JSON.parse(text);
+            } catch (err) {
+                setCfgStatus('✖ not valid JSON', 'text-red-400');
+                throw new Error('Advanced Config is not valid JSON: ' + err.message);
+            }
+            if (params === null || typeof params !== 'object' || Array.isArray(params)) {
+                setCfgStatus('✖ expected a JSON object', 'text-red-400');
+                throw new Error('Advanced Config must be a JSON object of parameters');
+            }
+            if (!Object.keys(params).length) return {};
+
             const cfgType = document.getElementById('cfg-type').value;
             const res = await authFetch('/config/dump', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type: cfgType, code }),
+                body: JSON.stringify({ type: cfgType, params }),
             });
 
-            const statusEl = document.getElementById('cfg-status');
             if (!res.ok) {
                 const msg = await res.text();
-                statusEl.textContent = '✖ config error';
-                statusEl.className = 'text-xs text-red-400';
+                setCfgStatus('✖ config error', 'text-red-400');
                 throw new Error(msg || 'Invalid config');
             }
 
-            statusEl.textContent = '✓ parsed';
-            statusEl.className = 'text-xs text-green-400';
-
+            setCfgStatus('✓ validated', 'text-green-400');
             return await res.json();
         }
 
@@ -686,12 +704,12 @@
         async function runCrawl() {
             const endpoint = document.getElementById('endpoint').value;
             const urls = document.getElementById('urls').value.trim().split(/\n/).filter(u => u);
-            // 1) grab python from CodeMirror, validate via /config/dump.
+            // 1) grab the params from CodeMirror, validate via /config/dump.
             // Advanced Config is /crawl-only, so md/llm skip this entirely.
             let advConfig = {};
             if (endpoint === 'crawl' || endpoint === 'crawl_stream') {
                 try {
-                    const cfgJson = await pyConfigToJson(); // may throw
+                    const cfgJson = await validateConfig(); // may throw
                     if (Object.keys(cfgJson).length) {
                         const cfgType = document.getElementById('cfg-type').value;
                         advConfig = cfgType === 'CrawlerRunConfig'
@@ -699,18 +717,13 @@
                             : { browser_config: cfgJson };
                     }
                 } catch (err) {
-                    const codeText = cm.getValue();
-                    const streamFlag = /stream\s*=\s*True/i.test(codeText);
-                    if (streamFlag) {
-                        // Fallback: minimal dump-shaped config so shouldUseStream + server load agree
-                        advConfig = { crawler_config: { type: 'CrawlerRunConfig', params: { stream: true } } };
-                    } else {
-                        updateStatus('error');
-                        document.querySelector('#response-content code').textContent =
-                            JSON.stringify({ error: err.message }, null, 2);
-                        forceHighlightElement(document.querySelector('#response-content code'));
-                        return; // stop run
-                    }
+                    // No fallback: a rejected config used to be swapped for a
+                    // stream-only one, which silently discarded everything else (#2260).
+                    updateStatus('error');
+                    document.querySelector('#response-content code').textContent =
+                        JSON.stringify({ error: err.message }, null, 2);
+                    forceHighlightElement(document.querySelector('#response-content code'));
+                    return; // stop run
                 }
             }
 
