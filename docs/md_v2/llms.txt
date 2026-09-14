@@ -1,0 +1,70 @@
+# Crawl4AI
+
+> Crawl4AI is an open-source, LLM-friendly web crawler and scraper for Python. It turns web pages into clean markdown for RAG and agent pipelines, with adaptive crawling, structured extraction (CSS, XPath, or LLM), deep crawling, and a self-hostable Docker server. These docs cover setup, the AsyncWebCrawler API, extraction strategies, and advanced browser control.
+
+## Getting started
+
+- [Home](https://docs.crawl4ai.com/): Overview, quick example, and how the documentation is organized
+- [Installation](https://docs.crawl4ai.com/core/installation/): Install the library and browser dependencies
+- [Quickstart](https://docs.crawl4ai.com/core/quickstart/): First crawl, common patterns, and where to go next
+- [Command-line interface](https://docs.crawl4ai.com/core/cli/): The `crwl` CLI for crawling without writing code
+- [Self-hosting](https://docs.crawl4ai.com/core/self-hosting/): Run the Crawl4AI server with Docker
+
+## Core crawling
+
+- [Simple crawling](https://docs.crawl4ai.com/core/simple-crawling/): Basic AsyncWebCrawler usage and result handling
+- [Browser and crawler config](https://docs.crawl4ai.com/core/browser-crawler-config/): BrowserConfig and CrawlerRunConfig options
+- [Crawler result](https://docs.crawl4ai.com/core/crawler-result/): Everything returned in a CrawlResult
+- [Markdown generation](https://docs.crawl4ai.com/core/markdown-generation/): How HTML becomes clean markdown
+- [Fit markdown](https://docs.crawl4ai.com/core/fit-markdown/): Content filtering with pruning and BM25
+- [Content selection](https://docs.crawl4ai.com/core/content-selection/): Target or exclude parts of a page
+- [Page interaction](https://docs.crawl4ai.com/core/page-interaction/): Click, scroll, fill forms, and wait for content
+- [Deep crawling](https://docs.crawl4ai.com/core/deep-crawling/): Multi-page crawls with BFS/DFS/Best-First strategies
+- [URL seeding](https://docs.crawl4ai.com/core/url-seeding/): Discover URLs from sitemaps and Common Crawl before crawling
+- [Cache modes](https://docs.crawl4ai.com/core/cache-modes/): Caching behavior and how to control it
+- [Link and media extraction](https://docs.crawl4ai.com/core/link-media/): Extract links, images, and downloadable media
+- [Table extraction](https://docs.crawl4ai.com/core/table_extraction/): Turn HTML tables into structured data
+- [Local files and raw HTML](https://docs.crawl4ai.com/core/local-files/): Crawl file:// paths and raw HTML strings
+- [C4A-Script](https://docs.crawl4ai.com/core/c4a-script/): The scripting language for browser automation steps
+
+## Extraction
+
+- [LLM-free strategies](https://docs.crawl4ai.com/extraction/no-llm-strategies/): Structured extraction with CSS selectors and XPath
+- [LLM strategies](https://docs.crawl4ai.com/extraction/llm-strategies/): Schema-based extraction with any LLM provider
+- [Chunking](https://docs.crawl4ai.com/extraction/chunking/): Chunk content for RAG pipelines
+- [Clustering strategies](https://docs.crawl4ai.com/extraction/clustring-strategies/): Cosine-similarity clustering for topic extraction
+
+## Advanced
+
+- [Adaptive crawling](https://docs.crawl4ai.com/advanced/adaptive-strategies/): Crawls that decide when they have gathered enough information
+- [Multi-URL crawling](https://docs.crawl4ai.com/advanced/multi-url-crawling/): Concurrent crawls with arun_many and dispatchers
+- [Crawl dispatcher](https://docs.crawl4ai.com/advanced/crawl-dispatcher/): Memory-adaptive concurrency control
+- [Identity-based crawling](https://docs.crawl4ai.com/advanced/identity-based-crawling/): Persistent profiles and authenticated crawling
+- [Session management](https://docs.crawl4ai.com/advanced/session-management/): Reuse browser sessions across requests
+- [Hooks and auth](https://docs.crawl4ai.com/advanced/hooks-auth/): Lifecycle hooks for custom browser logic
+- [Proxy and security](https://docs.crawl4ai.com/advanced/proxy-security/): Proxies, rotation, and secure crawling
+- [Anti-bot and fallback](https://docs.crawl4ai.com/advanced/anti-bot-and-fallback/): Stealth options and fallback strategies
+- [Undetected browser](https://docs.crawl4ai.com/advanced/undetected-browser/): Use the undetected browser adapter
+- [Virtual scroll](https://docs.crawl4ai.com/advanced/virtual-scroll/): Capture virtualized infinite-scroll content
+- [Lazy loading](https://docs.crawl4ai.com/advanced/lazy-loading/): Handle lazily loaded images and content
+- [Network and console capture](https://docs.crawl4ai.com/advanced/network-console-capture/): Record network requests and console logs
+- [PDF parsing](https://docs.crawl4ai.com/advanced/pdf-parsing/): Crawl and parse PDF documents
+- [File downloading](https://docs.crawl4ai.com/advanced/file-downloading/): Download files during crawls
+- [SSL certificates](https://docs.crawl4ai.com/advanced/ssl-certificate/): Capture and inspect SSL certificates
+
+## API reference
+
+- [AsyncWebCrawler](https://docs.crawl4ai.com/api/async-webcrawler/): Constructor, lifecycle, and configuration
+- [arun()](https://docs.crawl4ai.com/api/arun/): Crawl a single URL
+- [arun_many()](https://docs.crawl4ai.com/api/arun_many/): Crawl many URLs concurrently
+- [Parameters](https://docs.crawl4ai.com/api/parameters/): Complete parameter reference
+- [CrawlResult](https://docs.crawl4ai.com/api/crawl-result/): Result object reference
+- [Strategies](https://docs.crawl4ai.com/api/strategies/): Extraction, chunking, and markdown strategy reference
+- [AdaptiveCrawler](https://docs.crawl4ai.com/api/adaptive-crawler/): Adaptive crawling API
+- [C4A-Script reference](https://docs.crawl4ai.com/api/c4a-script-reference/): Full C4A-Script command reference
+
+## Optional
+
+- [Blog](https://docs.crawl4ai.com/blog/): Release notes and articles
+- [LLMText app](https://docs.crawl4ai.com/apps/llmtxt/why/): Crawl4AI's tool for generating llms.txt context files from any docs site
+- [Contributing](https://docs.crawl4ai.com/CONTRIBUTING/): How to contribute to Crawl4AI
