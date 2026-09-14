@@ -179,11 +179,17 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             base_url = normalize_url_for_deep_crawl(url, source_url)
             if base_url in visited:
                 continue
+            # Already queued at an equal or shallower depth: a second entry would
+            # be scored and dropped for nothing. A strictly shallower find still
+            # has to re-queue, so the URL is crawled at its true distance from the
+            # start and its own children stay inside max_depth.
+            queued_depth = depths.get(base_url)
+            if queued_depth is not None and queued_depth <= new_depth:
+                continue
             if not await self.can_process_url(base_url, new_depth):
                 self.stats.urls_skipped += 1
                 continue
                 
-            visited.add(base_url)
             valid_links.append(base_url)
             
         # Record the new depths and add to next_links
@@ -215,10 +221,6 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             self._pages_crawled = self._resume_state.get("pages_crawled", 0)
             # Restore queue from saved items
             queue_items = self._resume_state.get("queue_items", [])
-            # Older checkpoints could hold a URL twice and recorded only crawled
-            # URLs in "visited"; drop the repeats and treat everything queued as seen.
-            queue_items = list({item["url"]: item for item in queue_items}.values())
-            visited.update(item["url"] for item in queue_items)
             for item in queue_items:
                 await queue.put((item["score"], item["depth"], item["url"], item["parent_url"]))
             # Initialize shadow list if callback is set
@@ -231,7 +233,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             # Original initialization
             initial_score = self.url_scorer.score(start_url) if self.url_scorer else 0
             await queue.put((-initial_score, 0, start_url, None))
-            visited: Set[str] = {start_url}
+            visited: Set[str] = set()
             depths: Dict[str, int] = {start_url: 0}
             # Initialize shadow list if callback is set
             if self._on_state_change:
@@ -268,6 +270,10 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                         self._queue_shadow.remove(item)
                     except ValueError:
                         pass  # Item may have been removed already
+                score, depth, url, parent_url = item
+                if url in visited:
+                    continue
+                visited.add(url)
                 batch.append(item)
 
             if not batch:

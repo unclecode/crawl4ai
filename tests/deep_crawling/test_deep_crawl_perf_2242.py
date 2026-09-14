@@ -121,7 +121,7 @@ async def test_bfs_level_bookkeeping_scales_linearly():
 
 @pytest.mark.asyncio
 async def test_best_first_queues_a_shared_url_once():
-    """Two parents linking to the same page must enqueue it a single time."""
+    """Two parents at the same depth must enqueue a shared child only once."""
     link_map = {
         ROOT: [f"{ROOT}/a", f"{ROOT}/b"],
         f"{ROOT}/a": [f"{ROOT}/shared"],
@@ -145,3 +145,37 @@ async def test_best_first_queues_a_shared_url_once():
     for queue in snapshots:
         assert not [u for u, n in Counter(queue).items() if n > 1], f"duplicate in queue: {queue}"
     assert sorted(crawled) == sorted(link_map)
+
+
+@pytest.mark.asyncio
+async def test_best_first_keeps_the_shallowest_depth_for_a_shared_url():
+    """De-duplicating must not freeze a URL at the depth it was first seen.
+
+    ROOT -> A, B, F0..F11;  A -> C;  C -> X;  B -> X;  X -> LEAF
+
+    The scores crawl C before B, so X is discovered first at depth 3 and only
+    later at depth 2. The twelve fillers push B out of the first BATCH_SIZE
+    pull, which is what lets C run ahead of B - without them both land in one
+    batch and the ordering that exposes this never happens.
+
+    If the shallower re-discovery is dropped as a duplicate, X stays at depth 3
+    and link_discovery bails at 4 > max_depth, losing LEAF.
+    """
+    a, b, c, x, leaf = (f"{ROOT}/{p}" for p in ("a", "b", "c", "x", "leaf"))
+    fillers = [f"{ROOT}/f{i}" for i in range(12)]
+    link_map = {ROOT: [a, b] + fillers, a: [c], c: [x], b: [x], x: [leaf]}
+    scores = {a: 0.9, b: 0.1, c: 0.95, x: 0.5, leaf: 0.5, **{f: 0.8 for f in fillers}}
+
+    class DictScorer:
+        def score(self, url):
+            return scores.get(url, 0.0)
+
+    strategy = BestFirstCrawlingStrategy(max_depth=3, max_pages=100, url_scorer=DictScorer())
+    crawled = {
+        r.url: r.metadata["depth"]
+        async for r in strategy._arun_stream(ROOT, make_crawler(link_map), make_config(stream=True))
+    }
+
+    assert crawled[x] == 2, "X must be crawled at its shallowest depth, not the first one seen"
+    assert leaf in crawled, "LEAF is within max_depth once X sits at depth 2"
+    assert crawled == {ROOT: 0, a: 1, b: 1, c: 2, x: 2, leaf: 3, **{f: 1 for f in fillers}}
