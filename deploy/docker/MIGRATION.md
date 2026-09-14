@@ -170,6 +170,25 @@ limits:
 
 To keep the previous behavior exactly, set the caps you don't want to `0`.
 
+### Timeouts from a request are capped at 60s
+
+`page_timeout`, `wait_for_timeout`, and `body_visibility_timeout` arriving in a
+request body are clamped to 60000ms, so a client asking for more is given 60s
+and its crawl fails with `Page.goto: Timeout 60000ms exceeded`.
+
+That bound is right for a server reachable by untrusted callers. A deployment
+that is not public — a crawler on a private network fetching pages that
+legitimately take minutes — can raise it:
+
+```bash
+CRAWL4AI_MAX_TIMEOUT_MS=300000
+```
+
+A request still only gets the timeout it asks for; this sets the ceiling, and
+a smaller value tightens it. A value that is not a positive integer is refused
+with a warning and the 60000ms default kept, so a typo cannot silently widen
+the bound.
+
 ### Error responses are generic
 
 5xx responses return `{"error": "Internal server error", "correlation_id": "…"}`.

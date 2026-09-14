@@ -1,11 +1,12 @@
 """Tests for BrowserConfig.set_defaults / CrawlerRunConfig.set_defaults."""
 
+import warnings
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
+from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig, Provenance
 from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
 
 
@@ -310,3 +311,80 @@ class TestClassIsolation:
         BrowserConfig.reset_defaults()
         assert BrowserConfig.get_defaults() == {}
         assert CrawlerRunConfig.get_defaults() == {"verbose": False}
+
+
+# ── Untrusted timeout ceiling ──────────────────────────────────────────
+
+
+class TestMaxTimeoutCeiling:
+    """CRAWL4AI_MAX_TIMEOUT_MS raises (or lowers) the untrusted clamp."""
+
+    TIMEOUT_FIELDS = ("page_timeout", "wait_for_timeout", "body_visibility_timeout")
+
+    @pytest.mark.parametrize("field", TIMEOUT_FIELDS)
+    def test_defaults_to_60s_when_unset(self, monkeypatch, field):
+        monkeypatch.delenv("CRAWL4AI_MAX_TIMEOUT_MS", raising=False)
+
+        config = CrawlerRunConfig.load(
+            {field: 500_000}, provenance=Provenance.UNTRUSTED
+        )
+
+        assert getattr(config, field) == 60_000
+
+    @pytest.mark.parametrize("field", TIMEOUT_FIELDS)
+    def test_env_raises_the_ceiling(self, monkeypatch, field):
+        monkeypatch.setenv("CRAWL4AI_MAX_TIMEOUT_MS", "300000")
+
+        config = CrawlerRunConfig.load(
+            {field: 300_000}, provenance=Provenance.UNTRUSTED
+        )
+
+        assert getattr(config, field) == 300_000
+
+    def test_a_request_over_the_raised_ceiling_is_still_clamped(self, monkeypatch):
+        monkeypatch.setenv("CRAWL4AI_MAX_TIMEOUT_MS", "300000")
+
+        config = CrawlerRunConfig.load(
+            {"page_timeout": 900_000}, provenance=Provenance.UNTRUSTED
+        )
+
+        assert config.page_timeout == 300_000
+
+    def test_env_can_tighten_the_ceiling(self, monkeypatch):
+        monkeypatch.setenv("CRAWL4AI_MAX_TIMEOUT_MS", "5000")
+
+        config = CrawlerRunConfig.load(
+            {"page_timeout": 30_000}, provenance=Provenance.UNTRUSTED
+        )
+
+        assert config.page_timeout == 5_000
+
+    # A typo must not silently widen a DoS bound, so the default is kept and
+    # the operator is told rather than left to find out under load.
+    @pytest.mark.parametrize("value", ["", "abc", "0", "-1", "60_000", "1e5"])
+    def test_a_non_positive_integer_keeps_the_default(self, monkeypatch, value):
+        monkeypatch.setenv("CRAWL4AI_MAX_TIMEOUT_MS", value)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            config = CrawlerRunConfig.load(
+                {"page_timeout": 500_000}, provenance=Provenance.UNTRUSTED
+            )
+
+        assert config.page_timeout == 60_000
+
+    @pytest.mark.parametrize("value", ["abc", "0", "-1"])
+    def test_a_bad_value_warns(self, monkeypatch, value):
+        monkeypatch.setenv("CRAWL4AI_MAX_TIMEOUT_MS", value)
+
+        with pytest.warns(UserWarning, match="CRAWL4AI_MAX_TIMEOUT_MS"):
+            CrawlerRunConfig.load(
+                {"page_timeout": 1_000}, provenance=Provenance.UNTRUSTED
+            )
+
+    def test_trusted_config_is_never_clamped(self, monkeypatch):
+        monkeypatch.delenv("CRAWL4AI_MAX_TIMEOUT_MS", raising=False)
+
+        config = CrawlerRunConfig(page_timeout=900_000)
+
+        assert config.page_timeout == 900_000
