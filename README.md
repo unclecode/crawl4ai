@@ -331,6 +331,13 @@ docker run -d -p 11235:11235 --name crawl4ai --shm-size=1g unclecode/crawl4ai:la
 # Or the playground at http://localhost:11235/playground
 ```
 
+You can also deploy Crawl4AI with one click using the official [Easypanel](https://easypanel.io) template:
+
+[![Deploy on Easypanel][easypanel-btn]][easypanel-deploy]
+
+[easypanel-btn]: https://easypanel.io/img/deploy-on-easypanel-40.svg
+[easypanel-deploy]: https://easypanel.io/templates/crawel4ai
+
 ### Quick Test
 
 Run a quick test (works for both Docker options):
