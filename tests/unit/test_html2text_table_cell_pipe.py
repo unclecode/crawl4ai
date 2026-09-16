@@ -90,3 +90,33 @@ def test_bypass_tables_is_left_alone(converter):
     instance.bypass_tables = True
 
     assert "a|b" in instance.handle(html)
+
+
+@pytest.mark.parametrize("converter", CONVERTERS)
+def test_the_table_padder_splits_on_unescaped_pipes_only(converter):
+    """`pad_tables` reformats the finished table, so it has to agree.
+
+    Splitting the row on every pipe turned an escaped one back into a column
+    boundary and the padded table came out wider than its header.
+    """
+    html = "<table><tr><th>Name</th><th>Modes</th></tr><tr><td>codec</td><td>a|b|c</td></tr></table>"
+    instance = converter(bodywidth=0)
+    instance.pad_tables = True
+
+    rows = _rows(instance.handle(html))
+
+    assert [len(row) for row in rows] == [2, 2, 2]
+    assert rows[-1] == ["codec", "a|b|c"]
+
+
+@pytest.mark.parametrize("converter", CONVERTERS)
+def test_the_table_padder_leaves_a_plain_table_alone(converter):
+    html = "<table><tr><th>Name</th><th>Value</th></tr><tr><td>codec</td><td>x</td></tr></table>"
+    instance = converter(bodywidth=0)
+    instance.pad_tables = True
+
+    rows = _rows(instance.handle(html))
+
+    assert rows[0] == ["Name", "Value"]
+    assert rows[-1] == ["codec", "x"]
+
