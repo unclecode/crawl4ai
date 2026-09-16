@@ -157,8 +157,25 @@ class ManagedBrowser:
             host (str): Host for debugging the browser. Default: "localhost".
             debugging_port (int): Port for debugging the browser. Default: 9222.
             cdp_url (str or None): CDP URL to connect to the browser. Default: None.
-            browser_config (BrowserConfig): Configuration object containing all browser settings. Default: None.
+            browser_config (BrowserConfig): Configuration object carrying the same settings. When
+                                            given it is used as-is and the individual arguments
+                                            above are ignored; when omitted one is built from
+                                            them. Default: None.
         """
+        if browser_config is None:
+            # Every attribute below is read off `browser_config`, so without this the
+            # documented all-arguments form raised
+            # `AttributeError: 'NoneType' object has no attribute 'browser_type'`, and the
+            # arguments themselves reached nothing.
+            browser_config = BrowserConfig(
+                browser_type=browser_type,
+                headless=headless,
+                user_data_dir=user_data_dir,
+                host=host,
+                debugging_port=debugging_port,
+                cdp_url=cdp_url,
+            )
+
         self.browser_type = browser_config.browser_type
         self.user_data_dir = browser_config.user_data_dir
         self.headless = browser_config.headless
