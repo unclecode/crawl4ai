@@ -134,14 +134,15 @@ Allow: /public/
             query_app.router.add_get('/robots.txt', query_robots)
             query_runner = web.AppRunner(query_app)
             await query_runner.setup()
-            query_site = web.TCPSite(query_runner, 'localhost', 8081)
+            query_site = web.TCPSite(query_runner, '127.0.0.1', 0)
             await query_site.start()
-            return query_runner
+            query_port = query_runner.addresses[0][1]
+            return query_runner, query_port
 
-        query_runner = await start_query_server()
+        query_runner, query_port = await start_query_server()
         try:
             print("\n4b. Testing query-string robots.txt rules...")
-            query_base = "http://localhost:8081"
+            query_base = f"http://127.0.0.1:{query_port}"
 
             result = await parser.can_fetch(f"{query_base}/", "bot")
             print(f"Plain root (/): {'allowed' if result else 'denied'}")

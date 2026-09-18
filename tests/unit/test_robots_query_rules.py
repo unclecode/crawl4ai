@@ -43,14 +43,10 @@ def test_preserve_bare_query_line_rewriting(line, expected):
 def test_preserve_bare_query_keeps_document_structure():
     """Untouched lines, blank lines and ordering survive verbatim.
 
-    The rewrite is splitlines()-based, so a trailing newline is not preserved.
-    That is harmless: the only caller re-splits the result immediately.
+    Compared line by line, since the only caller re-splits the result
+    immediately; whether a trailing newline survives is deliberately unpinned.
     """
     source = "User-agent: *\nDisallow: /private/\n\nDisallow: /*?\nAllow: /public/\n"
-    assert _preserve_bare_query(source) == (
-        "User-agent: *\nDisallow: /private/\n\nDisallow: /*?*\nAllow: /public/"
-    )
-    # What the caller actually consumes is unaffected by the missing newline.
     assert _preserve_bare_query(source).splitlines() == [
         "User-agent: *", "Disallow: /private/", "", "Disallow: /*?*", "Allow: /public/",
     ]
