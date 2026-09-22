@@ -18,6 +18,7 @@ jobs:
     steps:
       - name: Send to Google Apps Script (Stars only)
         if: github.event_name == 'watch'
+        continue-on-error: true
         run: |
           curl -fSs -X POST "${{ secrets.GOOGLE_SCRIPT_ENDPOINT }}" \
             -H 'Content-Type: application/json' \

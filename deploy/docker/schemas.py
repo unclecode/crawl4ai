@@ -42,6 +42,14 @@ class HookConfig(BaseModel):
         le=120,
         description="Timeout in seconds for each hook execution",
     )
+    # Legacy 0.8.x field: inline-Python hook code, removed in 0.9.0 (it was an
+    # exec()-based RCE surface). Captured here (instead of being dropped by
+    # pydantic) solely so the server can tell the caller it was NOT executed;
+    # it is never run.
+    code: Optional[Any] = Field(
+        default=None,
+        description="REMOVED in 0.9.0: inline hook code is accepted for compatibility but never executed",
+    )
 
     class Config:
         json_schema_extra = {
@@ -84,14 +92,29 @@ class ScreenshotRequest(BaseModel):
     url: str
     screenshot_wait_for: Optional[float] = 2
     wait_for_images: Optional[bool] = False
-    # output_path removed: callers never name a filesystem path (it was an
-    # arbitrary-write -> RCE vector). The server writes to the sandboxed
-    # artifact store and returns an opaque artifact_id.
+    # Deprecated no-op: caller paths were an arbitrary-write -> RCE vector.
+    # Never written; the server stores results in the artifact store instead.
+    output_path: Optional[str] = Field(
+        default=None,
+        deprecated=True,
+        description=(
+            "REMOVED in 0.9.0 and ignored - no file is written. Results are "
+            "stored server-side; fetch via GET /artifacts/{artifact_id}."
+        ),
+    )
 
 
 class PDFRequest(BaseModel):
     url: str
-    # output_path removed (see ScreenshotRequest).
+    # output_path deprecated no-op (see ScreenshotRequest).
+    output_path: Optional[str] = Field(
+        default=None,
+        deprecated=True,
+        description=(
+            "REMOVED in 0.9.0 and ignored - no file is written. Results are "
+            "stored server-side; fetch via GET /artifacts/{artifact_id}."
+        ),
+    )
 
 
 class JSEndpointRequest(BaseModel):

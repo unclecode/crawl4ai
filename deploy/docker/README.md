@@ -59,10 +59,10 @@ Pull and run images directly from Docker Hub without building locally.
 
 #### 1. Pull the Image
 
-Our latest stable release is `0.8.6`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
+Our latest stable release is `0.9.2`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
 
 ```bash
-# Pull the latest stable version (0.8.6)
+# Pull the latest stable version (0.9.2)
 docker pull unclecode/crawl4ai:0.8.6
 
 # Or use the latest tag
@@ -115,6 +115,17 @@ EOL
     ```
 
 > The server will be available at `http://localhost:11235`. Visit `/playground` to access the interactive testing interface.
+
+*   **Behind a corporate proxy:** if the host reaches the internet only through
+    an HTTP proxy, set the standard `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY`
+    env vars (Docker's `proxies` config injects them automatically) — the
+    server's egress proxy chains through it while keeping its SSRF protections
+    (the upstream is asked to CONNECT to an already-validated, pinned IP).
+    `CRAWL4AI_UPSTREAM_PROXY` overrides the env vars. Basic auth via
+    `http://user:pass@proxy:port` is supported; for NTLM/Kerberos proxies,
+    front them with a local translator (e.g. `cntlm`, `px`) and point
+    `CRAWL4AI_UPSTREAM_PROXY` at it. Proxies that refuse CONNECT-to-an-IP, or
+    containers with no DNS at all, are not yet supported.
 
 #### 4. Stopping the Container
 

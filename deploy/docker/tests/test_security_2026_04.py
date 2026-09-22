@@ -82,23 +82,29 @@ DEPLOY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 # ============================================================================
 
 class TestOutputPathRemoved(unittest.TestCase):
-    """output_path is gone; the server owns paths via the artifact store.
+    """output_path never reaches the filesystem; the server owns paths via the
+    artifact store.
 
     The old string-only validate_output_path was bypassable (symlink/TOCTOU,
     sibling-prefix '...-evil') -> arbitrary write -> RCE. The fix is to never
-    accept a caller path at all. Behavioral artifact-store coverage (O_NOFOLLOW,
-    O_EXCL, hex id, TTL, quota) lives in test_security_artifact_store.py.
+    use a caller path: output_path exists only as a deprecated no-op for 0.8.x
+    compatibility and must stay that way. Artifact-store coverage lives in
+    test_security_artifact_store.py; warning behavior in test_legacy_compat.py.
     """
 
-    def test_screenshot_request_has_no_output_path(self):
+    def test_screenshot_output_path_is_deprecated_noop(self):
         sys.path.insert(0, DEPLOY_DIR)
         from schemas import ScreenshotRequest
-        self.assertNotIn("output_path", ScreenshotRequest.model_fields)
+        field = ScreenshotRequest.model_fields["output_path"]
+        self.assertTrue(field.deprecated, "output_path must be marked deprecated")
+        self.assertIsNone(field.default)
 
-    def test_pdf_request_has_no_output_path(self):
+    def test_pdf_output_path_is_deprecated_noop(self):
         sys.path.insert(0, DEPLOY_DIR)
         from schemas import PDFRequest
-        self.assertNotIn("output_path", PDFRequest.model_fields)
+        field = PDFRequest.model_fields["output_path"]
+        self.assertTrue(field.deprecated, "output_path must be marked deprecated")
+        self.assertIsNone(field.default)
 
     def test_validate_output_path_deleted(self):
         sys.path.insert(0, DEPLOY_DIR)
@@ -110,18 +116,21 @@ class TestOutputPathRemoved(unittest.TestCase):
 
 
 class TestPydanticPathValidator(unittest.TestCase):
-    """output_path (and its traversal validator) are gone entirely.
+    """The traversal validator is gone entirely.
 
     Traversal rejection used to be the mitigation; the real fix is that no
-    caller path is accepted at all, so there is nothing to traverse. The
-    sandboxed artifact store owns all paths now.
+    caller path is ever *used*, so there is nothing to traverse. output_path
+    survives only as a deprecated no-op field (see TestOutputPathRemoved); the
+    sandboxed artifact store owns all paths.
     """
 
-    def test_no_output_path_field_on_request_models(self):
+    def test_output_path_is_inert_on_request_models(self):
         sys.path.insert(0, DEPLOY_DIR)
         from schemas import ScreenshotRequest, PDFRequest
-        self.assertNotIn("output_path", ScreenshotRequest.model_fields)
-        self.assertNotIn("output_path", PDFRequest.model_fields)
+        for model in (ScreenshotRequest, PDFRequest):
+            field = model.model_fields["output_path"]
+            self.assertTrue(field.deprecated)
+            self.assertIsNone(field.default)
 
     def test_traversal_validator_removed(self):
         # No reject_traversal validator should remain registered on the models.
@@ -138,14 +147,17 @@ class TestPydanticPathValidator(unittest.TestCase):
 
 class TestMonitorAuthStructural(unittest.TestCase):
 
-    def test_monitor_router_has_auth(self):
+    def test_monitor_router_has_no_http_only_dep(self):
+        """Router-level token_dep was removed because it is HTTP-only and broke
+        the WebSocket upgrade on /monitor/ws.  Auth is enforced by
+        AuthGateMiddleware; destructive routes keep Depends(require_admin)."""
         with open(os.path.join(DEPLOY_DIR, "server.py")) as f:
             source = f.read()
-        # Find the line with monitor_router
         for line in source.splitlines():
             if "monitor_router" in line and "include_router" in line:
-                self.assertIn("dependencies=", line,
-                    "Monitor router must have dependencies=[Depends(token_dep)]")
+                self.assertNotIn("dependencies=", line,
+                    "Monitor router must NOT have router-level token_dep "
+                    "(breaks WS); auth is enforced by AuthGateMiddleware")
                 return
         self.fail("Could not find monitor_router include_router line")
 

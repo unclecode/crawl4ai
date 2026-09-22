@@ -179,6 +179,13 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             base_url = normalize_url_for_deep_crawl(url, source_url)
             if base_url in visited:
                 continue
+            # Already queued at an equal or shallower depth: a second entry would
+            # be scored and dropped for nothing. A strictly shallower find still
+            # has to re-queue, so the URL is crawled at its true distance from the
+            # start and its own children stay inside max_depth.
+            queued_depth = depths.get(base_url)
+            if queued_depth is not None and queued_depth <= new_depth:
+                continue
             if not await self.can_process_url(base_url, new_depth):
                 self.stats.urls_skipped += 1
                 continue
@@ -272,17 +279,21 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             if not batch:
                 continue
 
-            # Process the current batch of URLs.
+            # Process the current batch of URLs concurrently, but process the
+            # results in the original priority-queue order. arun_many streams
+            # results as requests finish, so discovering links immediately can
+            # make subsequent queue ordering depend on network timing.
             urls = [item[2] for item in batch]
             batch_config = config.clone(deep_crawl_strategy=None, stream=True)
             stream_gen = await crawler.arun_many(urls=urls, config=batch_config)
+            results_by_url: Dict[str, CrawlResult] = {}
             async for result in stream_gen:
-                result_url = result.url
-                # Find the corresponding tuple from the batch.
-                corresponding = next((item for item in batch if item[2] == result_url), None)
-                if not corresponding:
+                results_by_url[result.url] = result
+
+            for score, depth, url, parent_url in batch:
+                result = results_by_url.get(url)
+                if result is None:
                     continue
-                score, depth, url, parent_url = corresponding
                 result.metadata = result.metadata or {}
                 result.metadata["depth"] = depth
                 result.metadata["parent_url"] = parent_url
@@ -306,7 +317,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                 if result.success:
                     # Discover new links from this result
                     new_links: List[Tuple[str, Optional[str]]] = []
-                    await self.link_discovery(result, result_url, depth, visited, new_links, depths)
+                    await self.link_discovery(result, url, depth, visited, new_links, depths)
                     
                     for new_url, new_parent in new_links:
                         new_depth = depths.get(new_url, depth + 1)

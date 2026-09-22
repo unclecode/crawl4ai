@@ -16,3 +16,8 @@ We thank the following security researchers for their responsible disclosure:
 | Y4tacker | y4tacker@gmail.com | Download path traversal -> file write; Chromium launch-arg injection via extra_args (0.9.0) | 2026-06-18 |
 | KOH Jun Sheng ([seankohjs](https://github.com/seankohjs)) | jskoh.2023@scis.smu.edu.sg | SSRF on the streaming crawl path /crawl/stream (0.9.0) | 2026-06-18 |
 | UDU_RisePho | GitHub: [hoanggxyuuki](https://github.com/hoanggxyuuki) | Chromium launch-flag RCE class via extra_args (0.9.0) | 2026-06-18 |
+| Y4tacker | GitHub: [Y4tacker](https://github.com/Y4tacker) | Hook system exec() sandbox escape (MRO chain RCE), Chromium launch-arg injection (--utility-cmd-prefix RCE), HTTP crawler path traversal arbitrary file write | 2026-07-09 |
+| Rafael | GitHub: [rafaelfiguereod-stack](https://github.com/rafaelfiguereod-stack) | Reported SSRF, LLM key exfiltration, and auth gaps (already fixed / not exploitable in current code) | 2026-07-09 |
+| Zhixi "Jace" Sun | GitHub: [manus-use](https://github.com/manus-use) | Arbitrary file write via unconfined PDFContentScrapingStrategy image-write fields in untrusted config bodies (0.9.3) | 2026-08-24 |
+| Nguyen Tran Thanh Lam | GitHub: [c240030](https://github.com/c240030) | SSRF via PDF download redirects, DoS via unbounded PDF size and page count, XSS via unescaped PDF text in cleaned_html (0.9.3) | 2026-07-27 |
+| e1codes | GitHub: [e1codes](https://github.com/e1codes) | DOM-based XSS in the Docker Playground leading to operator API-token theft (0.9.3) | 2026-07-24 |

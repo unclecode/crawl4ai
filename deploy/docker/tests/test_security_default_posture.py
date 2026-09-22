@@ -6,7 +6,8 @@ This is the acceptance gate for the Docker-server security hardening
 asserts the secure-by-default end state:
 
   - every mutating + read endpoint, static mount, and MCP transport requires
-    auth out of the box (R1); only the health check is public,
+    auth out of the box (R1); only the health check and UI shell pages
+    (dashboard/playground) are public,
   - the token endpoint will not freely mint credentials when no api_token /
     secret is configured (R1),
   - strong security headers + a strict CSP are present on every response even
@@ -24,6 +25,8 @@ Run:  pytest deploy/docker/tests/test_security_default_posture.py -v
 """
 
 import pytest
+
+from redis_config import build_rate_limit_storage_uri, build_redis_url
 
 pytestmark = pytest.mark.posture
 
@@ -66,10 +69,11 @@ PROTECTED_ENDPOINTS = [
     ("get", "/monitor/timeline", None),
     # MCP transport (must be gated; today it is open AND launders credentials)
     ("get", "/mcp/schema", None),
-    # static mounts (dashboard / playground served unauthenticated today)
-    ("get", "/dashboard/", None),
-    ("get", "/playground/", None),
 ]
+
+# UI shell pages that are intentionally public — they serve only static
+# HTML/CSS/JS and contain no data.  All data routes behind them remain gated.
+PUBLIC_UI_PATHS = ["/dashboard/", "/playground/"]
 
 
 def _call(client, method, path, body):
@@ -88,6 +92,15 @@ class TestDefaultDeployIsSafe:
         """The health endpoint is the one intentionally public route."""
         r = stock_client.get(HEALTH)
         assert r.status_code == 200
+
+    @pytest.mark.parametrize("path", PUBLIC_UI_PATHS, ids=PUBLIC_UI_PATHS)
+    def test_ui_shell_is_public(self, stock_client, path):
+        """UI shells serve static HTML only — no data — so they load without auth."""
+        r = stock_client.get(path)
+        assert r.status_code == 200, (
+            f"GET {path} returned {r.status_code}; expected 200. "
+            f"UI shell pages must be publicly accessible."
+        )
 
     @pytest.mark.parametrize(
         "method,path,body",
@@ -174,6 +187,52 @@ class TestDefaultDeployIsSafe:
         assert loopback or pw, (
             "redis is neither loopback-bound nor password-protected"
         )
+
+    def test_redis_url_includes_acl_username_and_encoded_password(self, monkeypatch):
+        """Redis URLs must authenticate during HELLO when Redis is password-protected."""
+        monkeypatch.setenv("REDIS_PASSWORD", "p@ss/w:rd")
+        cfg = {
+            "redis": {
+                "host": "localhost",
+                "port": 6379,
+                "db": 0,
+            }
+        }
+        url = build_redis_url(cfg)
+        assert url.startswith("redis://default:")
+        assert "p%40ss%2Fw%3Ard" in url
+        assert url.endswith("@localhost:6379/0")
+
+    def test_rate_limit_redis_storage_reuses_redis_password(self, monkeypatch):
+        """SlowAPI must not connect to protected Redis without credentials."""
+        monkeypatch.setenv("REDIS_PASSWORD", "abc123")
+        cfg = {
+            "redis": {"host": "localhost", "port": 6379, "db": 0},
+            "rate_limiting": {"storage_uri": "redis://localhost:6379/0"},
+        }
+        url = build_rate_limit_storage_uri(cfg)
+        assert url.startswith("redis://default:")
+        assert "abc123" in url
+        assert url.endswith("@localhost:6379/0")
+
+    def test_rate_limit_storage_preserves_explicit_auth(self, monkeypatch):
+        """Do not rewrite operator-provided rate-limit Redis credentials."""
+        monkeypatch.setenv("REDIS_PASSWORD", "container-secret")
+        storage_uri = "redis://" + "alice" + ":" + "custom" + "@redis:6379/2"
+        cfg = {
+            "redis": {"host": "localhost", "port": 6379, "db": 0},
+            "rate_limiting": {"storage_uri": storage_uri},
+        }
+        assert build_rate_limit_storage_uri(cfg) == storage_uri
+
+    def test_rate_limit_storage_keeps_memory_backend(self, monkeypatch):
+        """Non-Redis rate-limit backends must not be rewritten."""
+        monkeypatch.setenv("REDIS_PASSWORD", "abc123")
+        cfg = {
+            "redis": {"host": "localhost", "port": 6379, "db": 0},
+            "rate_limiting": {"storage_uri": "memory://"},
+        }
+        assert build_rate_limit_storage_uri(cfg) == "memory://"
 
     def test_trusted_hosts_not_wildcard_when_exposed(self, effective_config):
         """A wildcard trusted_hosts on a non-loopback bind silently disables the host guard."""

@@ -57,6 +57,19 @@ class TestDockerfile:
         assert "/var/lib/crawl4ai/outputs" in dockerfile
         assert "chmod 700 /var/lib/crawl4ai/outputs" in dockerfile
 
+    def test_playwright_headless_shell_is_copied_to_runtime_cache(self, dockerfile):
+        # Playwright launches chromium_headless_shell for headless crawls. The
+        # image runs as appuser, so both Chromium artifacts must be copied out
+        # of root's install cache.
+        cache_copy = re.search(
+            r"cp -r(?P<artifacts>(?:(?!&&).)*)/home/appuser/\.cache/ms-playwright/",
+            dockerfile,
+            re.DOTALL,
+        )
+        assert cache_copy, "Dockerfile must copy Playwright artifacts into appuser's cache"
+        assert "chromium-*" in cache_copy.group("artifacts")
+        assert "chromium_headless_shell-*" in cache_copy.group("artifacts")
+
     def test_runs_as_non_root(self, dockerfile):
         assert re.search(r"^USER\s+appuser", dockerfile, re.MULTILINE)
 
@@ -65,8 +78,8 @@ class TestSupervisord:
     def test_redis_requires_password(self, supervisord):
         assert "--requirepass" in supervisord
 
-    def test_redis_bound_loopback(self, supervisord):
-        assert "--bind 127.0.0.1" in supervisord
+    def test_redis_bound_loopback_with_optional_ipv6(self, supervisord):
+        assert "--bind 127.0.0.1 -::1" in supervisord
 
     def test_gunicorn_bind_is_env_driven(self, supervisord):
         # entrypoint.sh resolves GUNICORN_BIND (loopback unless a credential).
@@ -91,7 +104,24 @@ class TestCompose:
         assert "shm_size" in compose
 
     def test_pids_limit(self, compose):
-        assert "pids_limit" in compose
+        # Parse, don't grep: a raw-text search matched the word "pids_limit"
+        # inside a comment and guarded nothing. The cap lives under
+        # deploy.resources.limits (not pids_limit) for Compose v5 compatibility.
+        import yaml
+
+        base = yaml.safe_load(compose)["x-base-config"]
+        assert "pids_limit" not in base
+        assert base["deploy"]["resources"]["limits"]["pids"] == 512
+
+    def test_read_only_runtime_tmpfs_are_appuser_owned(self, compose):
+        assert "/var/lib/redis:uid=999,gid=999,mode=0700" in compose
+        assert "/var/lib/crawl4ai/outputs:uid=999,gid=999,mode=0700" in compose
+        assert "/home/appuser/.crawl4ai:uid=999,gid=999,mode=0700" in compose
+        assert "/home/appuser/.gunicorn:uid=999,gid=999,mode=0700" in compose
+
+    def test_playwright_cache_is_not_shadowed(self, compose):
+        assert "/home/appuser/.cache\n" not in compose
+        assert "/home/appuser/.cache/url_seeder:uid=999,gid=999,mode=0700" in compose
 
 
 class TestEntrypoint:

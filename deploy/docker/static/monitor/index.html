@@ -93,6 +93,14 @@
         </h1>
 
         <div class="ml-auto flex items-center space-x-4">
+            <!-- Token bar -->
+            <div class="flex items-center space-x-2">
+                <input id="token-input" type="password" placeholder="API token"
+                       class="bg-dark border border-border rounded px-2 py-1 text-xs w-48">
+                <button id="token-save" class="px-2 py-1 bg-primary text-dark rounded text-xs hover:bg-primarydim">Set</button>
+                <button id="token-clear" class="px-2 py-1 border border-border rounded text-xs hover:bg-surface">Clear</button>
+                <span id="token-status" class="text-xs"></span>
+            </div>
             <!-- Connection Status -->
             <div class="flex items-center space-x-2">
                 <div id="ws-status" class="flex items-center space-x-1">
@@ -318,6 +326,47 @@
     </main>
 
     <script>
+        // ========== Auth ==========
+        function getToken() { return sessionStorage.getItem('crawl4ai_token') || ''; }
+
+        function authFetch(url, opts = {}) {
+            const token = getToken();
+            if (token) {
+                opts.headers = { ...opts.headers, 'Authorization': 'Bearer ' + token };
+            }
+            return fetch(url, opts);
+        }
+
+        (function initTokenBar() {
+            const input = document.getElementById('token-input');
+            const status = document.getElementById('token-status');
+            const saved = sessionStorage.getItem('crawl4ai_token');
+            if (saved) input.value = saved;
+
+            function applyToken() {
+                const val = input.value.trim();
+                if (!val) return;
+                sessionStorage.setItem('crawl4ai_token', val);
+                status.textContent = 'Token saved';
+                status.className = 'text-xs text-green-400';
+                setTimeout(() => { status.textContent = ''; }, 2000);
+                // Reconnect WebSocket with new token
+                if (websocket) { websocket.close(); }
+                wsReconnectAttempts = 0;
+                connectWebSocket();
+            }
+
+            document.getElementById('token-save').addEventListener('click', applyToken);
+            input.addEventListener('keydown', e => { if (e.key === 'Enter') applyToken(); });
+            document.getElementById('token-clear').addEventListener('click', () => {
+                sessionStorage.removeItem('crawl4ai_token');
+                input.value = '';
+                status.textContent = 'Token cleared';
+                status.className = 'text-xs text-yellow-400';
+                setTimeout(() => { status.textContent = ''; }, 2000);
+            });
+        })();
+
         // ========== State Management ==========
         let autoRefresh = true;
         let refreshInterval;
@@ -368,7 +417,9 @@
             wsReconnectAttempts++;
 
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/monitor/ws`;
+            let wsUrl = `${protocol}//${window.location.host}/monitor/ws`;
+            const wsToken = getToken();
+            if (wsToken) wsUrl += `?token=${encodeURIComponent(wsToken)}`;
 
             websocket = new WebSocket(wsUrl);
 
@@ -643,7 +694,7 @@
 
         async function fetchHealth() {
             try {
-                const res = await fetch('/monitor/health');
+                const res = await authFetch('/monitor/health');
                 const data = await res.json();
 
                 // Container metrics
@@ -691,7 +742,7 @@
         async function fetchRequests() {
             try {
                 const filter = document.getElementById('filter-requests')?.value || 'all';
-                const res = await fetch(`/monitor/requests?status=${filter}&limit=50`);
+                const res = await authFetch(`/monitor/requests?status=${filter}&limit=50`);
                 const data = await res.json();
 
                 // Active requests
@@ -735,7 +786,7 @@
 
         async function fetchBrowsers() {
             try {
-                const res = await fetch('/monitor/browsers');
+                const res = await authFetch('/monitor/browsers');
                 const data = await res.json();
 
                 document.getElementById('browser-count').textContent = data.summary.total_count;
@@ -775,7 +826,7 @@
 
         async function fetchJanitorLog() {
             try {
-                const res = await fetch('/monitor/logs/janitor?limit=100');
+                const res = await authFetch('/monitor/logs/janitor?limit=100');
                 const data = await res.json();
 
                 const logEl = document.getElementById('janitor-log');
@@ -803,7 +854,7 @@
 
         async function fetchErrors() {
             try {
-                const res = await fetch('/monitor/logs/errors?limit=100');
+                const res = await authFetch('/monitor/logs/errors?limit=100');
                 const data = await res.json();
 
                 const logEl = document.getElementById('errors-log');
@@ -830,7 +881,7 @@
 
         async function fetchEndpointStats() {
             try {
-                const res = await fetch('/monitor/endpoints/stats');
+                const res = await authFetch('/monitor/endpoints/stats');
                 const data = await res.json();
 
                 const tbody = document.getElementById('endpoints-table-body');
@@ -861,7 +912,7 @@
         async function fetchTimeline() {
             try {
                 const metric = document.getElementById('timeline-metric').value;
-                const res = await fetch(`/monitor/timeline?metric=${metric}`);
+                const res = await authFetch(`/monitor/timeline?metric=${metric}`);
                 const data = await res.json();
 
                 drawTimeline(data, metric);
@@ -968,7 +1019,7 @@
             if (!confirm(`Kill browser ${sig}?`)) return;
 
             try {
-                const res = await fetch('/monitor/actions/kill_browser', {
+                const res = await authFetch('/monitor/actions/kill_browser', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({sig})
@@ -986,7 +1037,7 @@
             if (!confirm(`Restart browser ${sig}?`)) return;
 
             try {
-                const res = await fetch('/monitor/actions/restart_browser', {
+                const res = await authFetch('/monitor/actions/restart_browser', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({sig})
@@ -1004,7 +1055,7 @@
             if (!confirm('Force cleanup all cold pool browsers?')) return;
 
             try {
-                const res = await fetch('/monitor/actions/cleanup', {method: 'POST'});
+                const res = await authFetch('/monitor/actions/cleanup', {method: 'POST'});
                 const data = await res.json();
 
                 showActionStatus(`✅ Killed ${data.killed_browsers} browsers`, true);
@@ -1018,7 +1069,7 @@
             if (!confirm('Restart permanent browser? This will briefly interrupt service.')) return;
 
             try {
-                const res = await fetch('/monitor/actions/restart_browser', {
+                const res = await authFetch('/monitor/actions/restart_browser', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({sig: 'permanent'})
@@ -1036,7 +1087,7 @@
             if (!confirm('Reset all endpoint statistics?')) return;
 
             try {
-                const res = await fetch('/monitor/stats/reset', {method: 'POST'});
+                const res = await authFetch('/monitor/stats/reset', {method: 'POST'});
                 const data = await res.json();
 
                 showActionStatus('✅ Stats reset', true);

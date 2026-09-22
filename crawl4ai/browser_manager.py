@@ -85,8 +85,10 @@ class ManagedBrowser:
             "--force-color-profile=srgb",
             "--mute-audio",
             "--disable-background-timer-throttling",
-            # Memory-saving flags: disable unused Chrome features
-            "--disable-features=OptimizationHints,MediaRouter,DialMediaRouteProvider",
+            # Memory-saving flags: disable unused Chrome features.
+            # Do not disable OptimizationHints — it SEGV_ACCERRs Chrome-for-Testing
+            # under --headless=new on macOS arm64 (issue #2239).
+            "--disable-features=MediaRouter,DialMediaRouteProvider",
             "--disable-component-update",
             "--disable-domain-reliability",
         ]
@@ -626,7 +628,15 @@ class _CDPConnectionCache:
             else:
                 from playwright.async_api import async_playwright
             pw = await async_playwright().start()
-            browser = await pw.chromium.connect_over_cdp(cdp_url)
+            try:
+                browser = await pw.chromium.connect_over_cdp(cdp_url)
+            except BaseException:
+                # Stop the driver we just started so a failed connect doesn't leak it
+                try:
+                    await pw.stop()
+                except BaseException:
+                    pass
+                raise
             cls._cache[cdp_url] = (pw, browser, 1)
             return pw, browser
 
@@ -788,6 +798,25 @@ class BrowserManager:
 
         Note: This method should be called in a separate task to avoid blocking the main event loop.
         """
+        try:
+            await self._start_impl()
+        except BaseException:
+            # Roll back partial startup (e.g. Playwright driver) since a failed __aenter__ never triggers __aexit__
+            try:
+                await self.close()
+            except BaseException:
+                pass
+            if self.playwright is not None:
+                # close() intentionally skips the driver for external-CDP configs; on failed startup we still own it
+                try:
+                    await self.playwright.stop()
+                except BaseException:
+                    pass
+                self.playwright = None
+            self.browser = None
+            raise
+
+    async def _start_impl(self):
         if self.playwright is not None:
             await self.close()
 
@@ -1075,8 +1104,10 @@ class BrowserManager:
             "--force-color-profile=srgb",
             "--mute-audio",
             "--disable-background-timer-throttling",
-            # Memory-saving flags: disable unused Chrome features
-            "--disable-features=OptimizationHints,MediaRouter,DialMediaRouteProvider",
+            # Memory-saving flags: disable unused Chrome features.
+            # Do not disable OptimizationHints — it SEGV_ACCERRs Chrome-for-Testing
+            # under --headless=new on macOS arm64 (issue #2239).
+            "--disable-features=MediaRouter,DialMediaRouteProvider",
             "--disable-component-update",
             "--disable-domain-reliability",
             # "--single-process",
@@ -1112,7 +1143,11 @@ class BrowserManager:
         
         browser_args = {"headless": self.config.headless, "args": args}
 
-        if self.config.chrome_channel:
+        # On Windows, passing channel='chromium' (the default) causes Playwright
+        # to look for a system Chrome installation instead of using the bundled
+        # ms-playwright binary.  This makes Chrome exit immediately with code 0,
+        # resulting in TargetClosedError.  Skip the default channel.
+        if self.config.chrome_channel and self.config.chrome_channel != "chromium":
             browser_args["channel"] = self.config.chrome_channel
 
         if self.config.accept_downloads:
@@ -1969,7 +2004,7 @@ class BrowserManager:
             session_ids = list(self.sessions.keys())
             for session_id in session_ids:
                 await self.kill_session(session_id)
-            for ctx in self.contexts_by_config.values():
+            for ctx in list(self.contexts_by_config.values()):
                 try:
                     await ctx.close()
                 except Exception:
@@ -1995,7 +2030,7 @@ class BrowserManager:
                     await self.kill_session(session_id)
 
                 # Close all contexts we created
-                for ctx in self.contexts_by_config.values():
+                for ctx in list(self.contexts_by_config.values()):
                     try:
                         await ctx.close()
                     except Exception:
@@ -2032,7 +2067,7 @@ class BrowserManager:
             session_ids = list(self.sessions.keys())
             for session_id in session_ids:
                 await self.kill_session(session_id)
-            for ctx in self.contexts_by_config.values():
+            for ctx in list(self.contexts_by_config.values()):
                 try:
                     await ctx.close()
                 except Exception:
@@ -2064,7 +2099,7 @@ class BrowserManager:
             await self.kill_session(session_id)
 
         # Now close all contexts we created. This reclaims memory from ephemeral contexts.
-        for ctx in self.contexts_by_config.values():
+        for ctx in list(self.contexts_by_config.values()):
             try:
                 await ctx.close()
             except Exception as e:

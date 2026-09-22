@@ -55,8 +55,9 @@ class PDFProcessorStrategy(ABC):
         pass
 
 class NaivePDFProcessorStrategy(PDFProcessorStrategy):
-    def __init__(self, image_dpi: int = 144, image_quality: int = 85, extract_images: bool = True, 
-                 save_images_locally: bool = False, image_save_dir: Optional[Path] = None, batch_size: int = 4):
+    def __init__(self, image_dpi: int = 144, image_quality: int = 85, extract_images: bool = True,
+                 save_images_locally: bool = False, image_save_dir: Optional[Path] = None, batch_size: int = 4,
+                 max_pages: Optional[int] = None):
         # Import check at initialization time
         try:
             import pypdf
@@ -70,7 +71,23 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
         self.save_images_locally = save_images_locally
         self.image_save_dir = image_save_dir
         self.batch_size = batch_size
+        # None means unbounded, which is the right default for a library caller
+        # opening a file they chose. Callers accepting untrusted PDFs (the
+        # Docker server) pass a cap so page count can't be used to burn CPU.
+        self.max_pages = max_pages
         self._temp_dir = None
+
+    def _page_limit(self, total_pages: int) -> int:
+        """Number of pages to actually process, honouring max_pages."""
+        if self.max_pages is None:
+            return total_pages
+        capped = min(total_pages, self.max_pages)
+        if capped < total_pages:
+            logger.warning(
+                f"PDF has {total_pages} pages; processing first {capped} "
+                f"(max_pages={self.max_pages})"
+            )
+        return capped
 
     def process(self, pdf_path: Path) -> PDFProcessResult:
         # Import inside method to allow dependency to be optional
@@ -101,7 +118,10 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
                         self._temp_dir = tempfile.mkdtemp(prefix='pdf_images_')
                         image_dir = Path(self._temp_dir)
 
+                page_limit = self._page_limit(len(reader.pages))
                 for page_num, page in enumerate(reader.pages):
+                    if page_num >= page_limit:
+                        break
                     self.current_page_number = page_num + 1
                     pdf_page = self._process_page(page, image_dir)
                     result.pages.append(pdf_page)
@@ -149,7 +169,7 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
             with pdf_path.open('rb') as file:
                 reader = PdfReader(file)
                 result.metadata = self._extract_metadata(pdf_path, reader)
-                total_pages = len(reader.pages)
+                total_pages = self._page_limit(len(reader.pages))
 
             # Handle image directory setup
             image_dir = None

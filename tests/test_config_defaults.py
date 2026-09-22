@@ -1,7 +1,13 @@
 """Tests for BrowserConfig.set_defaults / CrawlerRunConfig.set_defaults."""
 
+import warnings
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
+
+from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig, Provenance
+from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
 
 
 @pytest.fixture(autouse=True)
@@ -226,13 +232,57 @@ class TestDumpLoad:
         assert loaded.headless is False
 
     def test_crawler_run_config_dump_load(self):
-        CrawlerRunConfig.set_defaults(verbose=False, scan_full_page=True)
+        assert CrawlerRunConfig().body_visibility_timeout == 30000
+        CrawlerRunConfig.set_defaults(
+            verbose=False, scan_full_page=True, body_visibility_timeout=2000
+        )
         cfg = CrawlerRunConfig()
         data = cfg.dump()
         CrawlerRunConfig.reset_defaults()
         loaded = CrawlerRunConfig.load(data)
         assert loaded.verbose is False
         assert loaded.scan_full_page is True
+        assert loaded.body_visibility_timeout == 2000
+
+    @pytest.mark.parametrize("timeout", [None, 0, -1, "1000", True])
+    def test_body_visibility_timeout_must_be_positive_number(self, timeout):
+        with pytest.raises(ValueError, match="must be a positive number"):
+            CrawlerRunConfig(body_visibility_timeout=timeout)
+
+    def test_untrusted_body_visibility_timeout_is_clamped(self):
+        from crawl4ai.async_configs import Provenance
+
+        config = CrawlerRunConfig.load(
+            {"body_visibility_timeout": 500_000}, provenance=Provenance.UNTRUSTED
+        )
+        assert config.body_visibility_timeout == 60_000
+
+    @pytest.mark.asyncio
+    async def test_body_visibility_timeout_reaches_wait(self):
+        page = MagicMock()
+        page.evaluate = AsyncMock()
+        page.set_content = AsyncMock()
+        page.wait_for_selector = AsyncMock()
+        page.content = AsyncMock(return_value="<body>visible</body>")
+
+        strategy = AsyncPlaywrightCrawlerStrategy.__new__(
+            AsyncPlaywrightCrawlerStrategy
+        )
+        strategy.browser_config = SimpleNamespace(
+            use_persistent_context=False, accept_downloads=False, text_mode=True
+        )
+        strategy.browser_manager = SimpleNamespace(
+            get_page=AsyncMock(return_value=(page, MagicMock()))
+        )
+        strategy.execute_hook = AsyncMock()
+        strategy.csp_compliant_wait = AsyncMock(return_value=True)
+
+        config = CrawlerRunConfig(
+            session_id="body-timeout-test", body_visibility_timeout=1234
+        )
+        await strategy._crawl_web("raw:<body>visible</body>", config)
+
+        assert strategy.csp_compliant_wait.await_args.kwargs["timeout"] == 1234
 
     def test_to_dict_includes_user_default_values(self):
         BrowserConfig.set_defaults(headless=False)
@@ -261,3 +311,112 @@ class TestClassIsolation:
         BrowserConfig.reset_defaults()
         assert BrowserConfig.get_defaults() == {}
         assert CrawlerRunConfig.get_defaults() == {"verbose": False}
+
+
+# ── Untrusted timeout ceiling ──────────────────────────────────────────
+
+
+class TestMaxTimeoutCeiling:
+    """CRAWL4AI_MAX_TIMEOUT_MS raises (or lowers) the untrusted clamp."""
+
+    TIMEOUT_FIELDS = ("page_timeout", "wait_for_timeout", "body_visibility_timeout")
+
+    @pytest.mark.parametrize("field", TIMEOUT_FIELDS)
+    def test_defaults_to_60s_when_unset(self, monkeypatch, field):
+        monkeypatch.delenv("CRAWL4AI_MAX_TIMEOUT_MS", raising=False)
+
+        config = CrawlerRunConfig.load(
+            {field: 500_000}, provenance=Provenance.UNTRUSTED
+        )
+
+        assert getattr(config, field) == 60_000
+
+    @pytest.mark.parametrize("field", TIMEOUT_FIELDS)
+    def test_env_raises_the_ceiling(self, monkeypatch, field):
+        monkeypatch.setenv("CRAWL4AI_MAX_TIMEOUT_MS", "300000")
+
+        config = CrawlerRunConfig.load(
+            {field: 300_000}, provenance=Provenance.UNTRUSTED
+        )
+
+        assert getattr(config, field) == 300_000
+
+    def test_a_request_over_the_raised_ceiling_is_still_clamped(self, monkeypatch):
+        monkeypatch.setenv("CRAWL4AI_MAX_TIMEOUT_MS", "300000")
+
+        config = CrawlerRunConfig.load(
+            {"page_timeout": 900_000}, provenance=Provenance.UNTRUSTED
+        )
+
+        assert config.page_timeout == 300_000
+
+    def test_env_can_tighten_the_ceiling(self, monkeypatch):
+        monkeypatch.setenv("CRAWL4AI_MAX_TIMEOUT_MS", "5000")
+
+        config = CrawlerRunConfig.load(
+            {"page_timeout": 30_000}, provenance=Provenance.UNTRUSTED
+        )
+
+        assert config.page_timeout == 5_000
+
+    # A typo must not silently widen a DoS bound, so the default is kept and
+    # the operator is told rather than left to find out under load.
+    @pytest.mark.parametrize("value", ["", "abc", "0", "-1", "1e5"])
+    def test_a_non_positive_integer_keeps_the_default(self, monkeypatch, value):
+        monkeypatch.setenv("CRAWL4AI_MAX_TIMEOUT_MS", value)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            config = CrawlerRunConfig.load(
+                {"page_timeout": 500_000}, provenance=Provenance.UNTRUSTED
+            )
+
+        assert config.page_timeout == 60_000
+
+    def test_an_underscored_integer_is_accepted(self, monkeypatch):
+        # int("60_000") == 60000 in Python, so this is a valid ceiling, not a typo.
+        monkeypatch.setenv("CRAWL4AI_MAX_TIMEOUT_MS", "120_000")
+
+        config = CrawlerRunConfig.load(
+            {"page_timeout": 500_000}, provenance=Provenance.UNTRUSTED
+        )
+
+        assert config.page_timeout == 120_000
+
+    def test_malformed_timeout_falls_back_to_the_default_not_the_ceiling(
+        self, monkeypatch
+    ):
+        # The one field an untrusted caller gets for free must not inherit a
+        # raised ceiling just by being junk.
+        monkeypatch.setenv("CRAWL4AI_MAX_TIMEOUT_MS", "300000")
+
+        config = CrawlerRunConfig.load(
+            {"page_timeout": 0}, provenance=Provenance.UNTRUSTED
+        )
+
+        assert config.page_timeout == 60_000
+
+    def test_malformed_timeout_respects_a_tightened_ceiling(self, monkeypatch):
+        monkeypatch.setenv("CRAWL4AI_MAX_TIMEOUT_MS", "5000")
+
+        config = CrawlerRunConfig.load(
+            {"page_timeout": "abc"}, provenance=Provenance.UNTRUSTED
+        )
+
+        assert config.page_timeout == 5_000
+
+    @pytest.mark.parametrize("value", ["abc", "0", "-1"])
+    def test_a_bad_value_warns(self, monkeypatch, value):
+        monkeypatch.setenv("CRAWL4AI_MAX_TIMEOUT_MS", value)
+
+        with pytest.warns(UserWarning, match="CRAWL4AI_MAX_TIMEOUT_MS"):
+            CrawlerRunConfig.load(
+                {"page_timeout": 1_000}, provenance=Provenance.UNTRUSTED
+            )
+
+    def test_trusted_config_is_never_clamped(self, monkeypatch):
+        monkeypatch.delenv("CRAWL4AI_MAX_TIMEOUT_MS", raising=False)
+
+        config = CrawlerRunConfig(page_timeout=900_000)
+
+        assert config.page_timeout == 900_000

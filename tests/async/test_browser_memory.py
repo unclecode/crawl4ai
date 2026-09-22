@@ -187,8 +187,11 @@ async def test_memory_saving_flags_applied(test_server):
         assert any("max-old-space-size" in a for a in args_list), (
             "memory_saving_mode=True should add V8 heap cap"
         )
-        # Always-on flags should be present regardless
-        assert any("OptimizationHints" in a for a in args_list)
+        # Always-on flags should be present regardless.
+        # OptimizationHints must stay off the disable-list (issue #2239).
+        assert any("MediaRouter" in a for a in args_list)
+        assert any("DialMediaRouteProvider" in a for a in args_list)
+        assert not any("OptimizationHints" in a for a in args_list)
 
     async with AsyncWebCrawler(config=config_off) as crawler:
         bm = _bm(crawler)
@@ -201,7 +204,9 @@ async def test_memory_saving_flags_applied(test_server):
             "memory_saving_mode=False should NOT add V8 heap cap"
         )
         # Always-on flags should still be there
-        assert any("OptimizationHints" in a for a in args_list)
+        assert any("MediaRouter" in a for a in args_list)
+        assert any("DialMediaRouteProvider" in a for a in args_list)
+        assert not any("OptimizationHints" in a for a in args_list)
 
 
 # ===========================================================================
@@ -210,15 +215,18 @@ async def test_memory_saving_flags_applied(test_server):
 
 @pytest.mark.asyncio
 async def test_always_on_flags_present(test_server):
-    """The 3 always-on memory flags should appear in _build_browser_args
-    even with default BrowserConfig."""
+    """The always-on memory flags should appear in _build_browser_args
+    even with default BrowserConfig. OptimizationHints must not be disabled
+    (issue #2239 / Chrome-for-Testing SEGV_ACCERR under --headless=new)."""
     config = BrowserConfig(headless=True, verbose=False)
     async with AsyncWebCrawler(config=config) as crawler:
         browser_args = _bm(crawler)._build_browser_args()
         args_list = browser_args.get("args", browser_args) if isinstance(browser_args, dict) else browser_args
         assert any("disable-component-update" in a for a in args_list)
         assert any("disable-domain-reliability" in a for a in args_list)
-        assert any("OptimizationHints" in a for a in args_list)
+        assert any("MediaRouter" in a for a in args_list)
+        assert any("DialMediaRouteProvider" in a for a in args_list)
+        assert not any("OptimizationHints" in a for a in args_list)
 
 
 # ===========================================================================

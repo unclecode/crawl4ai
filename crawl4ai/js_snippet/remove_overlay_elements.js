@@ -5,6 +5,12 @@ async () => {
         return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
     };
 
+    // Never strip document structure <html>, <head>, or <body>; removing those tags empties the page.
+    const isDocumentStructure = (elem) => {
+        const tag = elem && elem.tagName;
+        return tag === "HTML" || tag === "HEAD" || tag === "BODY";
+    };
+
     // Common selectors for popups and overlays
     const commonSelectors = [
         // Close buttons first
@@ -54,6 +60,7 @@ async () => {
         // Find elements with high z-index
         const allElements = document.querySelectorAll("*");
         for (const elem of allElements) {
+            if (isDocumentStructure(elem)) continue;
             const style = window.getComputedStyle(elem);
             const zIndex = parseInt(style.zIndex);
             const position = style.position;
@@ -74,6 +81,7 @@ async () => {
         for (const selector of commonSelectors) {
             const elements = document.querySelectorAll(selector);
             elements.forEach((elem) => {
+                if (isDocumentStructure(elem)) return;
                 if (isVisible(elem)) {
                     elem.remove();
                 }
@@ -88,6 +96,7 @@ async () => {
     const removeFixedElements = () => {
         const elements = document.querySelectorAll("*");
         elements.forEach((elem) => {
+            if (isDocumentStructure(elem)) return;
             const style = window.getComputedStyle(elem);
             if ((style.position === "fixed" || style.position === "sticky") && isVisible(elem)) {
                 elem.remove();
@@ -114,7 +123,5 @@ async () => {
     document.body.style.paddingRight = "0px";
     document.body.style.overflow = "auto";
 
-    // Wait a bit for any animations to complete
     document.body.scrollIntoView(false);
-    await new Promise((resolve) => setTimeout(resolve, 50));
 };

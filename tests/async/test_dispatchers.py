@@ -1,5 +1,8 @@
-import pytest
+import asyncio
 import time
+from types import SimpleNamespace
+
+import pytest
 from crawl4ai import (
     AsyncWebCrawler,
     BrowserConfig,
@@ -62,6 +65,45 @@ class TestDispatchStrategies:
             )
             assert len(results) == len(test_urls)
             assert all(r.success for r in results)
+
+    async def test_memory_adaptive_stream_closure_cleans_up_tasks(self, run_config):
+        class BlockingCrawler:
+            async def arun(self, url, config=None, session_id=None):
+                if url == "fast":
+                    return SimpleNamespace(
+                        success=True,
+                        status_code=200,
+                        error_message="",
+                    )
+                await asyncio.Event().wait()
+
+        class TrackingDispatcher(MemoryAdaptiveDispatcher):
+            def __init__(self):
+                super().__init__(max_session_permit=3)
+                self.tasks = {}
+
+            async def crawl_url(self, url, config, task_id, retry_count=0):
+                self.tasks[url] = asyncio.current_task()
+                return await super().crawl_url(url, config, task_id, retry_count)
+
+        dispatcher = TrackingDispatcher()
+        stream = dispatcher.run_urls_stream(
+            ["fast", "blocked-1", "blocked-2", "queued"],
+            BlockingCrawler(),
+            run_config,
+        )
+
+        first = await asyncio.wait_for(stream.__anext__(), timeout=1)
+        assert first.url == "fast"
+
+        await asyncio.wait_for(stream.aclose(), timeout=1)
+
+        assert set(dispatcher.tasks) == {"fast", "blocked-1", "blocked-2"}
+        assert all(task.done() for task in dispatcher.tasks.values())
+        assert dispatcher.tasks["blocked-1"].cancelled()
+        assert dispatcher.tasks["blocked-2"].cancelled()
+        assert dispatcher.concurrent_sessions == 0
+        assert dispatcher.task_queue.empty()
 
     async def test_semaphore_basic(self, browser_config, run_config, test_urls):
         async with AsyncWebCrawler(config=browser_config) as crawler:
