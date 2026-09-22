@@ -50,27 +50,34 @@ from urllib.parse import (
 import inspect
 
 
-# Monkey patch to fix wildcard handling in urllib.robotparser
+# Monkey patch to fix wildcard handling in urllib.robotparser.
+# Python 3.14 rewrote robotparser with native wildcard, '$' and RFC 9309
+# longest-match support, and its applies_to returns a match *length* used to
+# rank rules. Patching it there returns a bool, which collapses every wildcard
+# rule to the lowest priority and breaks Allow: overrides -- so only patch the
+# older implementation, which has no wildcard support at all.
 from urllib.robotparser import RuleLine
 import re
+import sys
 
-original_applies_to = RuleLine.applies_to
+if sys.version_info < (3, 14):
+    original_applies_to = RuleLine.applies_to
 
-def patched_applies_to(self, filename):
-   # Handle wildcards in paths
-   if '*' in self.path or '%2A' in self.path or self.path in ("*", "%2A"):
-       pattern = self.path.replace('%2A', '*')
-       pattern = re.escape(pattern).replace('\\*', '.*')
-       pattern = '^' + pattern
-       if pattern.endswith('\\$'):
-           pattern = pattern[:-2] + '$'
-       try:
-           return bool(re.match(pattern, filename))
-       except re.error:
-           return original_applies_to(self, filename)
-   return original_applies_to(self, filename)
+    def patched_applies_to(self, filename):
+       # Handle wildcards in paths
+       if '*' in self.path or '%2A' in self.path or self.path in ("*", "%2A"):
+           pattern = self.path.replace('%2A', '*')
+           pattern = re.escape(pattern).replace('\\*', '.*')
+           pattern = '^' + pattern
+           if pattern.endswith('\\$'):
+               pattern = pattern[:-2] + '$'
+           try:
+               return bool(re.match(pattern, filename))
+           except re.error:
+               return original_applies_to(self, filename)
+       return original_applies_to(self, filename)
 
-RuleLine.applies_to = patched_applies_to
+    RuleLine.applies_to = patched_applies_to
 # Monkey patch ends
 
 def chunk_documents(
