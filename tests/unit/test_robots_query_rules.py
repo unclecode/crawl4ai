@@ -123,3 +123,41 @@ def test_allow_overrides_broad_disallow(path, expected, tmp_path):
     """Regression: the old unconditional patch denied /public/a.html on 3.14."""
     rules = "User-agent: *\nDisallow: /\nAllow: /public/*.html\n"
     assert _can_fetch(rules, path, tmp_path) is expected
+
+
+# A narrower Allow: competing with the bare-'?' Disallow:. On 3.14 the stdlib
+# ranks rules by match length, and rewriting '/*?' to '/*?*' makes the Disallow
+# match to end of string -- so the rewrite would beat the Allow: and deny a URL
+# robots.txt permits. Below 3.14 the first matching rule wins regardless of
+# length, so the rewrite is safe there and the Allow: still loses to nothing.
+COMPETING_RULES = "User-agent: *\nAllow: /*?q=\nDisallow: /*?\n"
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 14),
+    reason="longest-match Allow precedence only exists in the 3.14+ stdlib parser",
+)
+@pytest.mark.parametrize(
+    "path, expected",
+    [("/search?q=1", True), ("/search?x=1", False), ("/search", True)],
+)
+def test_query_allow_outranks_bare_query_disallow(path, expected, tmp_path):
+    """Regression: _preserve_bare_query must not run on 3.14.
+
+    '/*?*' matches longer than '/*?q=', so the rewrite would flip /search?q=1
+    from allowed to denied.
+    """
+    assert _can_fetch(COMPETING_RULES, path, tmp_path) is expected
+
+
+@pytest.mark.skipif(
+    sys.version_info >= (3, 14),
+    reason="pre-3.14 parsers take the first matching rule, not the longest",
+)
+@pytest.mark.parametrize(
+    "path, expected",
+    [("/search?q=1", True), ("/search?x=1", False), ("/search", True)],
+)
+def test_query_allow_still_wins_below_py314(path, expected, tmp_path):
+    """The same rules must give the same answers below 3.14, via the rewrite."""
+    assert _can_fetch(COMPETING_RULES, path, tmp_path) is expected

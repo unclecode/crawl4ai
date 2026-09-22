@@ -56,11 +56,11 @@ import inspect
 # rank rules. Patching it there returns a bool, which collapses every wildcard
 # rule to the lowest priority and breaks Allow: overrides -- so only patch the
 # older implementation, which has no wildcard support at all.
-from urllib.robotparser import RuleLine
-import re
 import sys
 
 if sys.version_info < (3, 14):
+    from urllib.robotparser import RuleLine
+
     original_applies_to = RuleLine.applies_to
 
     def patched_applies_to(self, filename):
@@ -259,8 +259,14 @@ class VersionManager:
 def _preserve_bare_query(rules_text: str) -> str:
     """Append '*' to Allow/Disallow values ending in a bare '?' (e.g. '/*?').
 
-    '/*?' and '/*?*' allow/deny exactly the same URLs; the rewrite only
-    survives parsers that would otherwise drop the trailing '?'.
+    Only correct below Python 3.14, and only called there. Those parsers drop a
+    trailing '?' when normalizing the rule path, collapsing '/*?' to '/*' and
+    blocking the whole site; they also take the first matching rule, so making a
+    rule longer cannot change which one wins.
+
+    From 3.14 the stdlib keeps the '?' and ranks rules by match length, and the
+    rewrite becomes actively wrong: '/*?*' matches to end of string, so it
+    outranks a competing 'Allow: /*?q=' that the raw '/*?' would have lost to.
     """
     fixed = []
     for raw_line in rules_text.splitlines():
@@ -379,9 +385,12 @@ class RobotsParser:
 
         # Create parser for this check
         parser = RobotFileParser()
-        # Old Pythons drop a trailing '?' from rules, so '/*?' becomes
-        # '/*' and blocks the whole site. '/*?*' matches the same URLs.
-        parser.parse(_preserve_bare_query(rules).splitlines())
+        # Below 3.14, rewrite rules ending in a bare '?' so they survive path
+        # normalization. From 3.14 the stdlib handles them, and the rewrite
+        # would skew its longest-match ranking -- see _preserve_bare_query.
+        if sys.version_info < (3, 14):
+            rules = _preserve_bare_query(rules)
+        parser.parse(rules.splitlines())
         
         # If parser can't read rules, allow access
         if not parser.mtime():
