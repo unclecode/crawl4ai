@@ -64,7 +64,7 @@ DEFAULT_CONFIG = {
         "memory_threshold_percent": 95.0,
         "rate_limiter": {"enabled": True, "base_delay": [1.0, 2.0]},
         "timeouts": {"stream_init": 30.0, "batch_process": 300.0},
-        "pool": {"max_pages": 40, "idle_ttl_sec": 300},
+        "pool": {"max_pages": 40, "idle_ttl_sec": 300, "max_pages_before_recycle": 200},
         "browser": {
             "kwargs": {"headless": True, "text_mode": True},
             "extra_args": [
