@@ -124,8 +124,93 @@ EOL
     `CRAWL4AI_UPSTREAM_PROXY` overrides the env vars. Basic auth via
     `http://user:pass@proxy:port` is supported; for NTLM/Kerberos proxies,
     front them with a local translator (e.g. `cntlm`, `px`) and point
-    `CRAWL4AI_UPSTREAM_PROXY` at it. Proxies that refuse CONNECT-to-an-IP, or
-    containers with no DNS at all, are not yet supported.
+    `CRAWL4AI_UPSTREAM_PROXY` at it. Containers with no DNS at all are not yet
+    supported.
+
+*   **Only some destinations belong to the upstream:** chaining is otherwise
+    all-or-nothing — with an upstream set, every crawl goes through it, and
+    `NO_PROXY` only subtracts exceptions from that. A deployment that has to
+    serve both routes cannot express itself that way: the internal sites need
+    the proxy, the public ones must not use it, and the public set cannot be
+    enumerated in `NO_PROXY`. Sending public crawls through the upstream anyway
+    is not merely wasteful — an upstream that authenticates or authorises per
+    destination will refuse them, and the fetch is attributed to the upstream's
+    network rather than yours.
+
+    `CRAWL4AI_UPSTREAM_PROXY_ONLY_SUFFIXES` inverts the rule for the names it
+    lists (comma-separated, same form as above): those are chained through the
+    upstream, everything else dials direct. Leave it unset — the default — and
+    behaviour is exactly as before, with every target chained.
+
+    It composes with `CRAWL4AI_UPSTREAM_PROXY_DNS_SUFFIXES` rather than
+    overriding it: a name may be handed over unresolved only if it is also
+    allowed to use the upstream, so neither list can widen what the other
+    permits. Matching is the same normalised, label-boundary comparison, a
+    wildcard entry is ignored with a warning, and an IP literal never matches a
+    suffix, so a pinned address is dialled direct. Nothing here relaxes the
+    pin: a target that is not chained is resolved and pinned exactly as it is
+    today, so the SSRF and rebinding protections apply to strictly more traffic
+    than before, never less.
+
+*   **Upstreams that must resolve the name themselves:** some upstreams front a
+    network whose hostnames do not resolve outside it, or enforce hostname ACLs
+    and so refuse CONNECT-to-an-IP. Those need the name rather than a pinned
+    address. List the suffixes to handle that way in
+    `CRAWL4AI_UPSTREAM_PROXY_DNS_SUFFIXES` (comma-separated, e.g.
+    `.corp.example.com,.internal`); matching names are sent to the upstream
+    unresolved, and the upstream then decides where the connection lands.
+
+    It is an allowlist rather than a switch, and it is a deliberate trust
+    decision: for those names you rely on the upstream instead of the built-in
+    pin. Everything outside the list — any other hostname, any IP literal, and
+    any deployment that leaves the variable unset — keeps resolve-and-pin with
+    its SSRF and rebinding protections unchanged. IP literals never qualify, so
+    listing a suffix cannot expose link-local or metadata addresses.
+
+    The same list exempts those names from the entry-point URL check, which runs
+    before the browser starts; without that they would be rejected there and
+    never reach the proxy. Use it instead of `CRAWL4AI_ALLOW_INTERNAL_URLS`,
+    which disables that check for every destination rather than for the names
+    you nominated.
+
+    Matching is on the DNS label boundary, so `.corp.example` covers
+    `wiki.corp.example` but never `corp.example.attacker.com` or
+    `notcorp.example`. Names are compared in normalised form — case-folded, root
+    dot stripped, IDNA-encoded — so the spellings of one name cannot disagree
+    with the list or with each other, and the normalised name is also the one sent
+    to the upstream, so the name that was authorised is the name on the wire. A
+    wildcard entry is ignored with a warning
+    rather than honoured: delegating every name would turn any caller-supplied
+    URL into a lookup performed by the upstream, which is the one shape this
+    must not allow.
+
+    Delegated names are reachable on ports 80 and 443 only. On the pinned path
+    the port is unconstrained but the address must be global, so a non-web port
+    still only reaches the public internet; passthrough gives up exactly that
+    address check, which leaves the port as the only thing still narrowing where
+    a listed name can land. Without it a crawl of a listed suffix could reach an
+    internal database or admin port — `:9200`, `:5432`, `:2375` — rather than a
+    web server. Set `CRAWL4AI_UPSTREAM_PROXY_DNS_PORTS` (e.g. `80,443,8443`) if
+    you front an internal site elsewhere; the list replaces the default rather
+    than extending it, and anything outside it falls back to resolve-and-pin.
+
+    **What you are trusting.** For a delegated name there is no pin, so the
+    rebinding and non-global checks do not apply to it — that is the point of
+    the mode, and it is worth being explicit about the consequence. A subdomain
+    under a listed suffix reaches whatever its DNS resolves to, including a
+    private or link-local address, because we neither resolve nor pin it. The
+    connection is still only ever handed to your configured upstream and never
+    dialed directly, so this cannot reach the crawler's own network — but it can
+    reach whatever the upstream is willing to reach. List suffixes whose DNS you
+    control, keep them as narrow as possible, and prefer an upstream that
+    enforces its own destination policy.
+
+    Note this is narrower than the escape hatch that already exists:
+    `CRAWL4AI_ALLOW_INTERNAL_URLS=true` drops the entry-point check for every
+    destination and still leaves the proxy pinning, so an operator in this
+    situation has had to reach for it anyway. The suffix list confines the same
+    relaxation to named hosts, keeps IP literals blocked, and never dials a
+    target directly.
 
 #### 4. Stopping the Container
 
