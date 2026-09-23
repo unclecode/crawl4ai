@@ -205,14 +205,20 @@ config = CrawlerRunConfig(markdown_generator=md_generator)
 
 **No query provided?** BM25 tries to glean a context from page metadata, or you can simply treat it as a scorched-earth approach that discards text with low generic score. Realistically, you want to supply a query for best results.
 
-### 5.2 PruningContentFilter
+### 5.2 PruningContentFilterLXML
 
-If you **don’t** have a specific query, or if you just want a robust “junk remover,” use `PruningContentFilter`. It analyzes text density, link density, HTML structure, and known patterns (like “nav,” “footer”) to systematically prune extraneous or repetitive sections.
+!!! warning "Use `PruningContentFilterLXML` (the old `PruningContentFilter` is deprecated)"
+    `PruningContentFilterLXML` is the lxml-based engine: **~10× faster** on large pages with
+    **identical output**. The legacy `PruningContentFilter` still works but emits a
+    `DeprecationWarning`; in an upcoming release `PruningContentFilter` will alias the lxml
+    engine and `PruningContentFilterLXML` will remain as a legacy alias.
+
+If you **don’t** have a specific query, or if you just want a robust “junk remover,” use `PruningContentFilterLXML`. It analyzes text density, link density, HTML structure, and known patterns (like “nav,” “footer”) to systematically prune extraneous or repetitive sections.
 
 ```python
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 
-prune_filter = PruningContentFilter(
+prune_filter = PruningContentFilterLXML(
     threshold=0.5,
     threshold_type="fixed",  # or "dynamic"
     min_word_threshold=50
@@ -225,7 +231,7 @@ prune_filter = PruningContentFilter(
     - `"dynamic"`: The filter adjusts threshold in a data-driven manner.  
 - **`min_word_threshold`**: Discard blocks under N words as likely too short or unhelpful.
 
-**When to Use PruningContentFilter**  
+**When to Use PruningContentFilterLXML**  
 - You want a broad cleanup without a user query.  
 - The page has lots of repeated sidebars, footers, or disclaimers that hamper text extraction.
 
@@ -320,12 +326,12 @@ When a content filter is active, the library produces two forms of markdown insi
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 
 async def main():
     config = CrawlerRunConfig(
         markdown_generator=DefaultMarkdownGenerator(
-            content_filter=PruningContentFilter(threshold=0.6),
+            content_filter=PruningContentFilterLXML(threshold=0.6),
             options={"ignore_links": True}
         )
     )
@@ -379,9 +385,9 @@ Below is a **revised section** under “Combining Filters (BM25 + Pruning)” th
 
 ## 8. Combining Filters (BM25 + Pruning) in Two Passes
 
-You might want to **prune out** noisy boilerplate first (with `PruningContentFilter`), and then **rank what’s left** against a user query (with `BM25ContentFilter`). You don’t have to crawl the page twice. Instead:
+You might want to **prune out** noisy boilerplate first (with `PruningContentFilterLXML`), and then **rank what’s left** against a user query (with `BM25ContentFilter`). You don’t have to crawl the page twice. Instead:
 
-1. **First pass**: Apply `PruningContentFilter` directly to the raw HTML from `result.html` (the crawler’s downloaded HTML).  
+1. **First pass**: Apply `PruningContentFilterLXML` directly to the raw HTML from `result.html` (the crawler’s downloaded HTML).  
 2. **Second pass**: Take the pruned HTML (or text) from step 1, and feed it into `BM25ContentFilter`, focusing on a user query.
 
 ### Two-Pass Example
@@ -389,7 +395,7 @@ You might want to **prune out** noisy boilerplate first (with `PruningContentFil
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.content_filter_strategy import PruningContentFilter, BM25ContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML, BM25ContentFilter
 from bs4 import BeautifulSoup
 
 async def main():
@@ -408,8 +414,8 @@ async def main():
         
         raw_html = result.html
         
-        # 2. First pass: PruningContentFilter on raw HTML
-        pruning_filter = PruningContentFilter(threshold=0.5, min_word_threshold=50)
+        # 2. First pass: PruningContentFilterLXML on raw HTML
+        pruning_filter = PruningContentFilterLXML(threshold=0.5, min_word_threshold=50)
         
         # filter_content returns a list of "text chunks" or cleaned HTML sections
         pruned_chunks = pruning_filter.filter_content(raw_html)
@@ -449,7 +455,7 @@ if __name__ == "__main__":
 ### What’s Happening?
 
 1. **Raw HTML**: We crawl once and store the raw HTML in `result.html`.  
-2. **PruningContentFilter**: Takes HTML + optional parameters. It extracts blocks of text or partial HTML, removing headings/sections deemed “noise.” It returns a **list of text chunks**.  
+2. **PruningContentFilterLXML**: Takes HTML + optional parameters. It extracts blocks of text or partial HTML, removing headings/sections deemed “noise.” It returns a **list of text chunks**.  
 3. **Combine or Transform**: We join these pruned chunks back into a single HTML-like string. (Alternatively, you could store them in a list for further logic—whatever suits your pipeline.)  
 4. **BM25ContentFilter**: We feed the pruned string into `BM25ContentFilter` with a user query. This second pass further narrows the content to chunks relevant to “machine learning.”
 
@@ -495,7 +501,7 @@ In this **Markdown Generation Basics** tutorial, you learned to:
 
 - Configure the **DefaultMarkdownGenerator** with HTML-to-text options.  
 - Select different HTML sources using the `content_source` parameter.  
-- Use **BM25ContentFilter** for query-specific extraction or **PruningContentFilter** for general noise removal.  
+- Use **BM25ContentFilter** for query-specific extraction or **PruningContentFilterLXML** for general noise removal.  
 - Distinguish between raw and filtered markdown (`fit_markdown`).  
 - Leverage the `MarkdownGenerationResult` object to handle different forms of output (citations, references, etc.).
 

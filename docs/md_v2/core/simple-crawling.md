@@ -33,7 +33,7 @@ The `arun()` method returns a `CrawlResult` object with several useful propertie
 ```python
 config = CrawlerRunConfig(
     markdown_generator=DefaultMarkdownGenerator(
-        content_filter=PruningContentFilter(threshold=0.6),
+        content_filter=PruningContentFilterLXML(threshold=0.6),
         options={"ignore_links": True}
     )
 )

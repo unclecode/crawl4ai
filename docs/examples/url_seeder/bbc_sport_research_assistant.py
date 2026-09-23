@@ -53,7 +53,7 @@ from crawl4ai import (
     SeedingConfig,
     AsyncLogger
 )
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 # LiteLLM for AI communication
@@ -343,7 +343,7 @@ async def crawl_selected_urls(urls: List[str], query: str, config: ResearchConfi
                 
         # Configure markdown generator with content filter
         md_generator = DefaultMarkdownGenerator(
-            content_filter=PruningContentFilter(
+            content_filter=PruningContentFilterLXML(
                 threshold=0.48,
                 threshold_type="dynamic",
                 min_word_threshold=10

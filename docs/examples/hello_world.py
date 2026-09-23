@@ -4,7 +4,7 @@ from crawl4ai import (
     BrowserConfig,
     CrawlerRunConfig,
     DefaultMarkdownGenerator,
-    PruningContentFilter,
+    PruningContentFilterLXML,
     CrawlResult
 )
 
@@ -17,7 +17,7 @@ async def main():
     async with AsyncWebCrawler(config=browser_config) as crawler:
         crawler_config = CrawlerRunConfig(
             markdown_generator=DefaultMarkdownGenerator(
-                content_filter=PruningContentFilter()
+                content_filter=PruningContentFilterLXML()
             ),
         )
         result: CrawlResult = await crawler.arun(

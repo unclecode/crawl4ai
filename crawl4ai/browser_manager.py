@@ -85,8 +85,10 @@ class ManagedBrowser:
             "--force-color-profile=srgb",
             "--mute-audio",
             "--disable-background-timer-throttling",
-            # Memory-saving flags: disable unused Chrome features
-            "--disable-features=OptimizationHints,MediaRouter,DialMediaRouteProvider",
+            # Memory-saving flags: disable unused Chrome features.
+            # Do not disable OptimizationHints — it SEGV_ACCERRs Chrome-for-Testing
+            # under --headless=new on macOS arm64 (issue #2239).
+            "--disable-features=MediaRouter,DialMediaRouteProvider",
             "--disable-component-update",
             "--disable-domain-reliability",
         ]
@@ -1102,8 +1104,10 @@ class BrowserManager:
             "--force-color-profile=srgb",
             "--mute-audio",
             "--disable-background-timer-throttling",
-            # Memory-saving flags: disable unused Chrome features
-            "--disable-features=OptimizationHints,MediaRouter,DialMediaRouteProvider",
+            # Memory-saving flags: disable unused Chrome features.
+            # Do not disable OptimizationHints — it SEGV_ACCERRs Chrome-for-Testing
+            # under --headless=new on macOS arm64 (issue #2239).
+            "--disable-features=MediaRouter,DialMediaRouteProvider",
             "--disable-component-update",
             "--disable-domain-reliability",
             # "--single-process",
