@@ -96,6 +96,14 @@ When using Crawl4AI as a Python library:
 
 All issues below are fixed in the version named. Advisories with a GHSA id are published under [Security Advisories](https://github.com/unclecode/crawl4ai/security/advisories). Full detail for every release is in [CHANGELOG.md](CHANGELOG.md); reporter credits are in [SECURITY-CREDITS.md](SECURITY-CREDITS.md).
 
+### Fixed in v0.9.4 (2026-09-23)
+
+| ID | Severity | Component | Description | Fix |
+|----|----------|-----------|-------------|-----|
+| GHSA-f77g-77vp-r96v | MEDIUM | Library + Docker API | Blind SSRF via the robots.txt fetch in `RobotsParser.can_fetch`, outside the egress controls; redirects followed, DNS re-resolved (CWE-918) | Fetch routed through the pinning egress proxy; TLS verification restored |
+| GHSA-wh5w-hmj3-vgg7 | HIGH | Library + Docker API | SSRF with response disclosure via `link_preview_config`: the URL seeder fetched every link outside the egress controls and returned the parsed `<head>` (CWE-918) | Seeder fetches routed through the pinning egress proxy; `LinkPreviewConfig` caps `max_links`, `concurrency`, `timeout` for untrusted bodies |
+| GHSA-5w5p-vcv6-mm3f | HIGH | Docker API | Untrusted-config gate bypass via `{"type": "dict"}` wrapper laundering, leaking server env vars such as LLM keys and `SECRET_KEY` (CWE-501) | Unwrapped value re-checked under the untrusted gate; `from_kwargs` carries the caller's provenance |
+
 ### Fixed in v0.9.3 (2026-08-31)
 
 | ID | Severity | Component | Description | Fix |
@@ -190,6 +198,12 @@ Secure-by-default rework of the Docker API server. The pip library is unchanged.
 | CVE-pending-2 | HIGH | Docker API | LFI via `file://` URLs | URL scheme validation added |
 
 ## Security Features
+
+### v0.9.4+
+
+- **Library egress proxy**: `crawl4ai/egress_policy.py` routes the library's own HTTP clients (URL seeder, robots.txt) through the Docker server's pinning proxy, so they get the same resolve-and-pin rule as the browser
+- **Link preview caps**: `LinkPreviewConfig` `max_links` (100), `concurrency` (10), and `timeout` (10 s) clamped for untrusted bodies
+- **Nested typed objects gated**: `{"type": "dict"}` wrappers are re-checked against `UNTRUSTED_ALLOWED_TYPES`
 
 ### v0.9.3+
 

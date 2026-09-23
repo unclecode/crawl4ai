@@ -5,6 +5,63 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.4] - 2026-09-23
+
+0.9.4 is a security release. It closes three coordinated-disclosure advisories: two SSRF paths that bypassed the Docker server's egress controls, and a trust-boundary bypass that let a non-admin API client read server environment variables. It also makes content pruning about 10x faster with the new lxml-native `PruningContentFilterLXML`, now the default, and ships the bug fixes that accumulated on `develop` since 0.9.3. There are no breaking changes. Users who self-host the Docker server should upgrade.
+
+### Security
+
+- **Blind SSRF via the robots.txt fetch (CWE-918, medium)**: `RobotsParser.can_fetch()` fetched `/robots.txt` on a bare `aiohttp` client that followed redirects and re-resolved the host, so `check_robots_txt` in an untrusted request body could make the Docker server reach internal, loopback, and cloud-metadata addresses. The fetch now goes through the server's pinning egress proxy, which checks every hop and dials the pinned IP. Credit: [arpe1618](https://github.com/arpe1618). (GHSA-f77g-77vp-r96v)
+- **SSRF with response disclosure via `link_preview_config` (CWE-918, high)**: the URL seeder fetched every link on a crawled page with its own `httpx` client, outside the egress controls, and returned each page's parsed `<head>` to the caller. The seeder's fetches now go through the same pinning egress proxy, and `LinkPreviewConfig` gets caps on `max_links`, `concurrency`, and `timeout` for untrusted bodies. Credit: Ibrahim AlJaafreh ([LinkedIn](https://www.linkedin.com/in/ibrahim-aljaafreh-glitch/)), Cystack RedTeam ([cystack.ps](https://cystack.ps)). (GHSA-wh5w-hmj3-vgg7)
+- **Untrusted-config gate bypass via dict-wrapper laundering (CWE-501, high)**: wrapping a forbidden typed object such as `LLMConfig` in `{"type": "dict", "value": {...}}` slipped it past `UNTRUSTED_ALLOWED_TYPES`, and `from_kwargs` then rebuilt it as trusted. A non-admin client could read any server environment variable, including LLM keys and `SECRET_KEY`. The unwrapped value is now re-checked under the untrusted gate, and `from_kwargs` carries the caller's provenance instead of defaulting to trusted. Credit: Adam Jordan ([adamyordan](https://github.com/adamyordan)). (GHSA-5w5p-vcv6-mm3f)
+
+The two SSRF fixes share one mechanism: the new `crawl4ai/egress_policy.py` holds a process-wide egress proxy URL for the library's own HTTP clients. The Docker server registers its existing `PinningProxy` there at boot. A plain library caller sets nothing and sees no change.
+
+All reporters are credited in `SECURITY-CREDITS.md`. GitHub Security Advisories accompany this release.
+
+### Added
+
+- `PruningContentFilterLXML`: an lxml-native pruning filter. It computes every per-node metric in one bottom-up pass instead of re-walking each subtree, so pruning is O(N) instead of super-linear. Output is byte-identical to `PruningContentFilter`. Measured pruning time: medium page 134 to 13 ms, 6000-card page 2200 to 260 ms. It is now the default for the Docker server's fit filter and the CLI pruning filter.
+- `CRAWL4AI_MAX_TIMEOUT_MS` sets the ceiling for `page_timeout`, `wait_for_timeout`, and `body_visibility_timeout` on untrusted configs. The default stays 60000 ms. (#2212, thanks @damusix; #2266)
+- Docker server: `crawler.pool.max_pages_before_recycle` (default 200) recycles a pooled browser context after it serves that many pages. A context gets slower with sustained use, and the idle janitor never fires on a busy server. Set it to 0 to disable. (#2232, issue #2231)
+
+### Deprecated
+
+- `PruningContentFilter` emits a `DeprecationWarning` on direct use. Switch to `PruningContentFilterLXML`, which takes the same arguments and gives the same output. Existing import paths keep working.
+
+### Fixed
+
+**Crawler and core**
+
+- Deep crawl: BFS no longer re-scans the whole level to match each result to its parent, and BestFirst no longer enqueues the same URL twice. De-duplication keeps the shallowest depth, so no subtree is lost. (#2265, issue #2242)
+- Tables: `rowspan` and `colspan` are expanded into a grid, and `<th>` row headers are kept instead of shifting the row left. Spans are clamped, so one cell cannot hang the parse. (#2261, issue #2258)
+- robots.txt: `Disallow: /*?` no longer blocks the whole site. (#2229, thanks @Nalhin)
+- robots.txt: the wildcard patch is skipped on Python 3.14+, where the standard library already supports wildcards and the patch broke `Allow:` precedence. (#2278)
+- Timeouts: malformed or non-positive timeout values fall back to the 60 s default instead of the configured ceiling. (#2266)
+- Chrome for Testing no longer crashes under `--headless=new` on macOS arm64. `OptimizationHints` is no longer disabled. (#2241, issue #2239, thanks @Zsanz3)
+
+**Docker server**
+
+- Playground: the Advanced Config panel is a JSON params editor. The old Python editor sent a `code` field that the untrusted boundary rejects. (#2262, issue #2260)
+- Playground: `md` and `llm` runs skip the `/config/dump` pre-flight, which failed on the legacy `code` field. (#2224, issue #2222)
+- The permanent browser is built with the egress-hardened default config, so its pool signature matches incoming requests. (#2237)
+
+**Documentation and CI**
+
+- `SECURITY.md` lists 0.9.x as supported. (#2269, thanks @nightcityblade)
+- The Discord stargazer notification no longer depends on a dead Google Apps Script step. (#2263, #2279)
+
+### Tests
+
+- `tests/unit/test_egress_policy.py` and `deploy/docker/tests/test_security_ssrf_seeder.py`: seeder and robots.txt fetches through the egress proxy.
+- `tests/unit/test_config_provenance.py`: direct, wrapped, and nested forbidden types refused under the untrusted gate.
+- `tests/async/test_content_filter_prune_lxml.py`: `PruningContentFilterLXML` output matches `PruningContentFilter`.
+- Coverage for the deep-crawl, table, robots.txt, timeout, and pool-recycle fixes.
+
+### Breaking Changes
+
+None.
+
 ## [0.9.3] - 2026-08-31
 
 0.9.3 is a security release. It closes five coordinated-disclosure advisories in the PDF processing path and the Docker Playground UI, and ships the 33 bug fixes that accumulated on `develop` since 0.9.2, most of them in the Docker server. There are no new features and no breaking changes. Users who accept untrusted URLs on the Docker server, or who open PDFs from sources they do not control, should upgrade.
