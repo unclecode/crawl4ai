@@ -103,6 +103,14 @@ def _bracket(ip: str) -> str:
     return f"[{ip}]" if ":" in ip else ip
 
 
+def _drop_connection_header(headers: bytes) -> bytes:
+    """Strip any Connection: header so the caller can set its own."""
+    return b"".join(
+        ln + b"\r\n" for ln in headers.split(b"\r\n")
+        if ln and not ln.lower().startswith(b"connection:")
+    )
+
+
 class PinningProxy:
     """Async HTTP forward-proxy that connects only to pinned, global IPs."""
 
@@ -219,6 +227,11 @@ class PinningProxy:
         # upstream proxy (which then needs no DNS lookup of its own).
         if upstream is None:
             out = f"{method} {path} HTTP/1.1\r\n".encode("latin-1")
+            # One validated request per origin connection. After this the bytes
+            # are spliced raw, and a keep-alive client would put its next
+            # request on the wire in absolute form (it still thinks it is
+            # talking to a proxy), which some origins answer with 400.
+            headers = _drop_connection_header(headers) + b"Connection: close\r\n"
         else:
             out = f"{method} http://{_bracket(pin.ip)}:{port}{path} HTTP/1.1\r\n".encode("latin-1")
             if upstream[2]:
@@ -226,10 +239,7 @@ class PinningProxy:
             # One validated request per upstream connection: only this first
             # request is pinned/rewritten, so force close to keep a reused
             # client connection from smuggling unvalidated requests upstream.
-            headers = b"".join(
-                ln + b"\r\n" for ln in headers.split(b"\r\n")
-                if ln and not ln.lower().startswith(b"connection:")
-            ) + b"Connection: close\r\n"
+            headers = _drop_connection_header(headers) + b"Connection: close\r\n"
         out += b"Host: " + sp.hostname.encode("latin-1")
         if sp.port:
             out += f":{sp.port}".encode("latin-1")

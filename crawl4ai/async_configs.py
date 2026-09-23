@@ -298,6 +298,9 @@ _MAX_SCROLL_STEPS = 1000
 _MAX_VIEWPORT = 4000
 _MAX_PDF_BYTES = 100 * 1024 * 1024
 _MAX_PDF_PAGES = 2000
+_MAX_LINK_PREVIEW_LINKS = 100      # the class default
+_MAX_LINK_PREVIEW_CONCURRENCY = 10  # the class default
+_MAX_LINK_PREVIEW_TIMEOUT_S = 10    # seconds here, not ms
 
 
 def _max_timeout_ms() -> int:
@@ -384,6 +387,18 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
         # Rasterizing every page is the most expensive thing this strategy can
         # do, and nothing about untrusted crawling needs it.
         params["extract_images"] = False
+    elif type_name == "LinkPreviewConfig":
+        # Also no field allowlist, and each link is a separate outbound fetch:
+        # unclamped, one request body can order millions of them at any
+        # concurrency it likes.
+        for f, cap in (
+            ("max_links", _MAX_LINK_PREVIEW_LINKS),
+            ("concurrency", _MAX_LINK_PREVIEW_CONCURRENCY),
+            ("timeout", _MAX_LINK_PREVIEW_TIMEOUT_S),
+        ):
+            if f in params:
+                v = params[f]
+                params[f] = cap if not isinstance(v, int) or v <= 0 else min(v, cap)
     return params
 
 
@@ -473,6 +488,21 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False):
     return str(obj)
 
 
+def _is_typed_shape(data: Any) -> bool:
+    """True for the dict shapes to_serializable_dict() emits:
+    {"type": "<ClassName>", "params": {...}} or {"type": "dict", "value": {...}}.
+
+    Plain business dicts that happen to carry a "type" key (JSON-Schema
+    fragments, JsonCss field specs like {"type": "text", "name": "..."}) have
+    neither "params" nor "value" and are not typed shapes.
+    """
+    return (
+        isinstance(data, dict)
+        and "type" in data
+        and ("params" in data or (data["type"] == "dict" and "value" in data))
+    )
+
+
 def from_serializable_dict(data: Any, provenance: "Provenance" = None) -> Any:
     """
     Recursively convert a serializable dictionary back to an object instance.
@@ -498,14 +528,23 @@ def from_serializable_dict(data: Any, provenance: "Provenance" = None) -> Any:
     # carry a "type" key (e.g. JSON-Schema fragments, JsonCss field specs like
     # {"type": "text", "name": "..."}) have neither "params" nor "value" and
     # must fall through to the raw-dict path below so they are passed as data.
-    if (
-        isinstance(data, dict)
-        and "type" in data
-        and ("params" in data or (data["type"] == "dict" and "value" in data))
-    ):
+    if _is_typed_shape(data):
         # Handle plain dictionaries
         if data["type"] == "dict" and "value" in data:
-            return {k: from_serializable_dict(v, provenance) for k, v in data["value"].items()}
+            unwrapped = {
+                k: from_serializable_dict(v, provenance) for k, v in data["value"].items()
+            }
+            # The unwrap above recurses over .items(), so data["value"] is never
+            # seen as a whole typed object and the type gate below never fires
+            # for it. Without this check an untrusted body launders a forbidden
+            # type past the gate by wrapping it:
+            #   {"type": "dict", "value": {"type": "LLMConfig", "params": {...}}}
+            if provenance == Provenance.UNTRUSTED and _is_typed_shape(unwrapped):
+                raise UntrustedConfigError(
+                    "an untrusted request may not wrap a typed object in "
+                    "{'type': 'dict', 'value': ...}"
+                )
+            return unwrapped
 
         # Security: only allow known-safe types to be deserialized.
         # Unknown types (e.g. logging.Logger serialized by older clients) are
@@ -1012,11 +1051,13 @@ class BrowserConfig:
             )
 
     @staticmethod
-    def from_kwargs(kwargs: dict) -> "BrowserConfig":
+    def from_kwargs(kwargs: dict, provenance: "Provenance" = None) -> "BrowserConfig":
         # Auto-deserialize any dict values that use the {"type": ..., "params": ...}
         # serialization format (e.g. from JSON API requests or dump()/load() roundtrips).
         kwargs = {
-            k: from_serializable_dict(v) if isinstance(v, dict) and "type" in v else v
+            k: from_serializable_dict(v, provenance)
+            if isinstance(v, dict) and "type" in v
+            else v
             for k, v in kwargs.items()
         }
         # Only pass keys present in kwargs so that __init__ defaults (and
@@ -1102,7 +1143,7 @@ class BrowserConfig:
         # so a body that sends bare kwargs (no {type,params}) cannot bypass it.
         if provenance == Provenance.UNTRUSTED and isinstance(config, dict):
             config = _enforce_untrusted("BrowserConfig", config)
-        return BrowserConfig.from_kwargs(config)
+        return BrowserConfig.from_kwargs(config, provenance)
 
     def set_nstproxy(
         self,
@@ -2143,12 +2184,14 @@ class CrawlerRunConfig():
         super().__setattr__(name, value)
 
     @staticmethod
-    def from_kwargs(kwargs: dict) -> "CrawlerRunConfig":
+    def from_kwargs(kwargs: dict, provenance: "Provenance" = None) -> "CrawlerRunConfig":
         # Auto-deserialize any dict values that use the {"type": ..., "params": ...}
         # serialization format (e.g. from JSON API requests or dump()/load() roundtrips).
         # This covers markdown_generator, extraction_strategy, content_filter, etc.
         kwargs = {
-            k: from_serializable_dict(v) if isinstance(v, dict) and "type" in v else v
+            k: from_serializable_dict(v, provenance)
+            if isinstance(v, dict) and "type" in v
+            else v
             for k, v in kwargs.items()
         }
         # Only pass keys present in kwargs so that __init__ defaults (and
@@ -2171,7 +2214,7 @@ class CrawlerRunConfig():
             return config
         if provenance == Provenance.UNTRUSTED and isinstance(config, dict):
             config = _enforce_untrusted("CrawlerRunConfig", config)
-        return CrawlerRunConfig.from_kwargs(config)
+        return CrawlerRunConfig.from_kwargs(config, provenance)
 
     def to_dict(self):
         return {
