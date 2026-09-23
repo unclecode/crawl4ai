@@ -1,5 +1,22 @@
 # Fit Markdown with Pruning & BM25
 
+!!! warning "Deprecation: `PruningContentFilter` → `PruningContentFilterLXML`"
+    The original `PruningContentFilter` (BeautifulSoup-based) is **deprecated** in favor of
+    **`PruningContentFilterLXML`**, an lxml reimplementation that is **~10× faster** on large
+    pages with **identical output**. It is already the default for the `crwl` CLI and the
+    Docker server's fit-markdown endpoint.
+
+    **Migrate** by swapping the class name (every parameter is unchanged):
+
+    ```python
+    from crawl4ai import PruningContentFilterLXML
+    prune_filter = PruningContentFilterLXML(threshold=0.48, threshold_type="dynamic")
+    ```
+
+    Instantiating the old `PruningContentFilter` now emits a `DeprecationWarning`. **Roadmap:**
+    in an upcoming release `PruningContentFilter` will become an alias for the lxml engine, and
+    `PruningContentFilterLXML` will be kept as a legacy alias.
+
 **Fit Markdown** is a specialized **filtered** version of your page’s markdown, focusing on the most relevant content. By default, Crawl4AI converts the entire HTML into a broad **raw_markdown**. With fit markdown, we apply a **content filter** algorithm (e.g., **Pruning** or **BM25**) to remove or rank low-value sections—such as repetitive sidebars, shallow text blocks, or irrelevancies—leaving a concise textual “core.”
 
 ---
@@ -17,12 +34,12 @@ In **`CrawlerRunConfig`**, you can specify a **`content_filter`** to shape how c
 
 ### 1.2 Common Filters
 
-1. **PruningContentFilter** – Scores each node by text density, link density, and tag importance, discarding those below a threshold.  
+1. **PruningContentFilterLXML** – Scores each node by text density, link density, and tag importance, discarding those below a threshold.  
 2. **BM25ContentFilter** – Focuses on textual relevance using BM25 ranking, especially useful if you have a specific user query (e.g., “machine learning” or “food nutrition”).
 
 ---
 
-## 2. PruningContentFilter
+## 2. PruningContentFilterLXML
 
 **Pruning** discards less relevant nodes based on **text density, link density, and tag importance**. It’s a heuristic-based approach—if certain sections appear too “thin” or too “spammy,” they’re pruned.
 
@@ -31,12 +48,12 @@ In **`CrawlerRunConfig`**, you can specify a **`content_filter`** to shape how c
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 async def main():
     # Step 1: Create a pruning filter
-    prune_filter = PruningContentFilter(
+    prune_filter = PruningContentFilterLXML(
         # Lower → more content retained, higher → more content pruned
         threshold=0.45,           
         # "fixed" or "dynamic"
@@ -159,7 +176,7 @@ If the content filter is **BM25**, you might see additional logic or references 
 ### 5.1 Pruning
 
 ```python
-prune_filter = PruningContentFilter(
+prune_filter = PruningContentFilterLXML(
     threshold=0.5,
     threshold_type="fixed",
     min_word_threshold=10
@@ -191,7 +208,7 @@ config = CrawlerRunConfig(
     excluded_tags=["nav", "footer", "header"],
     exclude_external_links=True,
     markdown_generator=DefaultMarkdownGenerator(
-        content_filter=PruningContentFilter(threshold=0.5)
+        content_filter=PruningContentFilterLXML(threshold=0.5)
     )
 )
 ```
@@ -235,7 +252,7 @@ class MyCustomFilter(RelevantContentFilter):
 - **AI Pipelines**: Filter out boilerplate so LLM-based extraction or summarization runs on denser text.
 
 **Key Points**:
-- **PruningContentFilter**: Great if you just want the “meatiest” text without a user query.  
+- **PruningContentFilterLXML**: Great if you just want the “meatiest” text without a user query.  
 - **BM25ContentFilter**: Perfect for query-based extraction or searching.  
 - Combine with **`excluded_tags`, `exclude_external_links`, `word_count_threshold`** to refine your final “fit” text.  
 - Fit markdown ends up in **`result.markdown.fit_markdown`**; eventually **`result.markdown.fit_markdown`** in future versions.

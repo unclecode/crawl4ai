@@ -53,6 +53,7 @@ except ImportError:
 # You might need to adjust this import based on your exact file structure
 # Import AsyncLogger for default if needed
 from .async_logger import AsyncLoggerBase, AsyncLogger
+from .egress_policy import proxy_url
 
 # Import SeedingConfig for type hints
 from typing import TYPE_CHECKING
@@ -303,7 +304,11 @@ class AsyncUrlSeeder:
     ):
         self.ttl = ttl
         self._owns_client = client is None  # Track if we created the client
-        self.client = client or httpx.AsyncClient(http2=True, timeout=20, headers={
+        # proxy=None unless an embedder installed one (the Docker server does).
+        # Every request in this class goes through self.client, so this single
+        # kwarg puts the seeder's whole fan-out -- sitemaps, robots, link heads,
+        # and each redirect hop -- behind the egress policy.
+        self.client = client or httpx.AsyncClient(http2=True, timeout=20, proxy=proxy_url(), headers={
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) +AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
         })
         self.logger = logger  # Store the logger instance
@@ -1772,7 +1777,7 @@ class AsyncUrlSeeder:
         self._log("info", "Fetching latest Common Crawl index from {url}",
                   params={"url": COLLINFO_URL}, tag="URL_SEED")
         try:
-            async with httpx.AsyncClient() as c:
+            async with httpx.AsyncClient(proxy=proxy_url()) as c:
                 j = await c.get(COLLINFO_URL, timeout=10)
                 j.raise_for_status()  # Raise an exception for bad status codes
                 idx = j.json()[0]["id"]

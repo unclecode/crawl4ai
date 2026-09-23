@@ -6,7 +6,7 @@ Note: Uses context manager for automatic cleanup of resources.
 """
 import asyncio, os
 from crawl4ai import AsyncUrlSeeder, AsyncWebCrawler, SeedingConfig, CrawlerRunConfig, AsyncLogger, DefaultMarkdownGenerator 
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -39,7 +39,7 @@ async def discover_and_crawl():
     async with AsyncWebCrawler() as crawler:
         config = CrawlerRunConfig(
             markdown_generator=DefaultMarkdownGenerator(
-                content_filter=PruningContentFilter(  # Smart filtering!
+                content_filter=PruningContentFilterLXML(  # Smart filtering!
                     threshold=0.48,  # Remove fluff
                     threshold_type="fixed",
                 ),

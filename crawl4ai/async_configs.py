@@ -133,7 +133,7 @@ ALLOWED_DESERIALIZE_TYPES = {
     "CosineStrategy", "RegexExtractionStrategy",
     # Markdown / content
     "DefaultMarkdownGenerator",
-    "PruningContentFilter", "BM25ContentFilter", "LLMContentFilter",
+    "PruningContentFilter", "PruningContentFilterLXML", "BM25ContentFilter", "LLMContentFilter",
     # Scraping
     "LXMLWebScrapingStrategy", "PDFContentScrapingStrategy",
     # Chunking
@@ -190,7 +190,7 @@ UNTRUSTED_ALLOWED_TYPES = {
     # non-LLM extraction / markdown / scraping / chunking strategies
     "JsonCssExtractionStrategy", "JsonXPathExtractionStrategy",
     "JsonLxmlExtractionStrategy", "RegexExtractionStrategy", "CosineStrategy",
-    "DefaultMarkdownGenerator", "PruningContentFilter", "BM25ContentFilter",
+    "DefaultMarkdownGenerator", "PruningContentFilter", "PruningContentFilterLXML", "BM25ContentFilter",
     "LXMLWebScrapingStrategy", "PDFContentScrapingStrategy",
     "RegexChunking",
     "DefaultTableExtraction", "NoTableExtraction",
@@ -293,11 +293,49 @@ UNTRUSTED_FIELD_ALLOWLIST = {
 }
 
 # Upper bounds applied to attacker-influenced quantities after filtering.
-_MAX_TIMEOUT_MS = 60_000
+_DEFAULT_MAX_TIMEOUT_MS = 60_000
 _MAX_SCROLL_STEPS = 1000
 _MAX_VIEWPORT = 4000
 _MAX_PDF_BYTES = 100 * 1024 * 1024
 _MAX_PDF_PAGES = 2000
+_MAX_LINK_PREVIEW_LINKS = 100      # the class default
+_MAX_LINK_PREVIEW_CONCURRENCY = 10  # the class default
+_MAX_LINK_PREVIEW_TIMEOUT_S = 10    # seconds here, not ms
+
+
+def _max_timeout_ms() -> int:
+    """Ceiling for the untrusted timeout fields, in milliseconds.
+
+    60s is the right bound for a server reachable by untrusted callers, and
+    stays the default. An operator whose deployment is not public — a crawler
+    on a private network fetching pages that legitimately take minutes — can
+    raise it with CRAWL4AI_MAX_TIMEOUT_MS, or lower it to tighten the bound.
+
+    Read per call rather than captured at import so the setting applies
+    wherever the process picked its environment up, and so a test can set it
+    without reloading the module. A value that is not a positive integer is
+    refused loudly and the default kept: a typo here would silently widen a
+    DoS bound, which is the one outcome worse than the timeout being fixed.
+    """
+    raw = os.getenv("CRAWL4AI_MAX_TIMEOUT_MS")
+
+    if raw is None or raw == "":
+        return _DEFAULT_MAX_TIMEOUT_MS
+
+    try:
+        ceiling = int(raw)
+    except ValueError:
+        ceiling = 0
+
+    if ceiling <= 0:
+        warnings.warn(
+            f"CRAWL4AI_MAX_TIMEOUT_MS={raw!r} is not a positive integer; "
+            f"keeping the {_DEFAULT_MAX_TIMEOUT_MS}ms default.",
+            stacklevel=2,
+        )
+        return _DEFAULT_MAX_TIMEOUT_MS
+
+    return ceiling
 
 
 def _filter_untrusted_fields(type_name: str, params: dict) -> dict:
@@ -318,11 +356,15 @@ def _filter_untrusted_fields(type_name: str, params: dict) -> dict:
 
 def _clamp_untrusted(type_name: str, params: dict) -> dict:
     """Clamp attacker-influenced quantities to safe upper bounds."""
+    ceiling = _max_timeout_ms()
+
     def _cap_timeout(v):
         # 0 historically meant "no timeout"; treat as the cap, never unbounded.
+        # Malformed input is the one value an attacker gets for free, so it
+        # falls back to the 60s default rather than to a raised ceiling.
         if not isinstance(v, (int, float)) or v <= 0:
-            return _MAX_TIMEOUT_MS
-        return min(int(v), _MAX_TIMEOUT_MS)
+            return min(_DEFAULT_MAX_TIMEOUT_MS, ceiling)
+        return min(int(v), ceiling)
 
     if type_name == "CrawlerRunConfig":
         for f in ("page_timeout", "wait_for_timeout", "body_visibility_timeout"):
@@ -345,6 +387,18 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
         # Rasterizing every page is the most expensive thing this strategy can
         # do, and nothing about untrusted crawling needs it.
         params["extract_images"] = False
+    elif type_name == "LinkPreviewConfig":
+        # Also no field allowlist, and each link is a separate outbound fetch:
+        # unclamped, one request body can order millions of them at any
+        # concurrency it likes.
+        for f, cap in (
+            ("max_links", _MAX_LINK_PREVIEW_LINKS),
+            ("concurrency", _MAX_LINK_PREVIEW_CONCURRENCY),
+            ("timeout", _MAX_LINK_PREVIEW_TIMEOUT_S),
+        ):
+            if f in params:
+                v = params[f]
+                params[f] = cap if not isinstance(v, int) or v <= 0 else min(v, cap)
     return params
 
 
@@ -434,6 +488,21 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False):
     return str(obj)
 
 
+def _is_typed_shape(data: Any) -> bool:
+    """True for the dict shapes to_serializable_dict() emits:
+    {"type": "<ClassName>", "params": {...}} or {"type": "dict", "value": {...}}.
+
+    Plain business dicts that happen to carry a "type" key (JSON-Schema
+    fragments, JsonCss field specs like {"type": "text", "name": "..."}) have
+    neither "params" nor "value" and are not typed shapes.
+    """
+    return (
+        isinstance(data, dict)
+        and "type" in data
+        and ("params" in data or (data["type"] == "dict" and "value" in data))
+    )
+
+
 def from_serializable_dict(data: Any, provenance: "Provenance" = None) -> Any:
     """
     Recursively convert a serializable dictionary back to an object instance.
@@ -459,14 +528,23 @@ def from_serializable_dict(data: Any, provenance: "Provenance" = None) -> Any:
     # carry a "type" key (e.g. JSON-Schema fragments, JsonCss field specs like
     # {"type": "text", "name": "..."}) have neither "params" nor "value" and
     # must fall through to the raw-dict path below so they are passed as data.
-    if (
-        isinstance(data, dict)
-        and "type" in data
-        and ("params" in data or (data["type"] == "dict" and "value" in data))
-    ):
+    if _is_typed_shape(data):
         # Handle plain dictionaries
         if data["type"] == "dict" and "value" in data:
-            return {k: from_serializable_dict(v, provenance) for k, v in data["value"].items()}
+            unwrapped = {
+                k: from_serializable_dict(v, provenance) for k, v in data["value"].items()
+            }
+            # The unwrap above recurses over .items(), so data["value"] is never
+            # seen as a whole typed object and the type gate below never fires
+            # for it. Without this check an untrusted body launders a forbidden
+            # type past the gate by wrapping it:
+            #   {"type": "dict", "value": {"type": "LLMConfig", "params": {...}}}
+            if provenance == Provenance.UNTRUSTED and _is_typed_shape(unwrapped):
+                raise UntrustedConfigError(
+                    "an untrusted request may not wrap a typed object in "
+                    "{'type': 'dict', 'value': ...}"
+                )
+            return unwrapped
 
         # Security: only allow known-safe types to be deserialized.
         # Unknown types (e.g. logging.Logger serialized by older clients) are
@@ -973,11 +1051,13 @@ class BrowserConfig:
             )
 
     @staticmethod
-    def from_kwargs(kwargs: dict) -> "BrowserConfig":
+    def from_kwargs(kwargs: dict, provenance: "Provenance" = None) -> "BrowserConfig":
         # Auto-deserialize any dict values that use the {"type": ..., "params": ...}
         # serialization format (e.g. from JSON API requests or dump()/load() roundtrips).
         kwargs = {
-            k: from_serializable_dict(v) if isinstance(v, dict) and "type" in v else v
+            k: from_serializable_dict(v, provenance)
+            if isinstance(v, dict) and "type" in v
+            else v
             for k, v in kwargs.items()
         }
         # Only pass keys present in kwargs so that __init__ defaults (and
@@ -1063,7 +1143,7 @@ class BrowserConfig:
         # so a body that sends bare kwargs (no {type,params}) cannot bypass it.
         if provenance == Provenance.UNTRUSTED and isinstance(config, dict):
             config = _enforce_untrusted("BrowserConfig", config)
-        return BrowserConfig.from_kwargs(config)
+        return BrowserConfig.from_kwargs(config, provenance)
 
     def set_nstproxy(
         self,
@@ -2104,12 +2184,14 @@ class CrawlerRunConfig():
         super().__setattr__(name, value)
 
     @staticmethod
-    def from_kwargs(kwargs: dict) -> "CrawlerRunConfig":
+    def from_kwargs(kwargs: dict, provenance: "Provenance" = None) -> "CrawlerRunConfig":
         # Auto-deserialize any dict values that use the {"type": ..., "params": ...}
         # serialization format (e.g. from JSON API requests or dump()/load() roundtrips).
         # This covers markdown_generator, extraction_strategy, content_filter, etc.
         kwargs = {
-            k: from_serializable_dict(v) if isinstance(v, dict) and "type" in v else v
+            k: from_serializable_dict(v, provenance)
+            if isinstance(v, dict) and "type" in v
+            else v
             for k, v in kwargs.items()
         }
         # Only pass keys present in kwargs so that __init__ defaults (and
@@ -2132,7 +2214,7 @@ class CrawlerRunConfig():
             return config
         if provenance == Provenance.UNTRUSTED and isinstance(config, dict):
             config = _enforce_untrusted("CrawlerRunConfig", config)
-        return CrawlerRunConfig.from_kwargs(config)
+        return CrawlerRunConfig.from_kwargs(config, provenance)
 
     def to_dict(self):
         return {
