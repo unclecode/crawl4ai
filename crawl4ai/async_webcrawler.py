@@ -638,6 +638,13 @@ class AsyncWebCrawler:
                             if _blocked:
                                 crawl_result.success = False
                                 crawl_result.error_message = f"Blocked by anti-bot protection: {_block_reason}"
+                                # the moment the hosted crawler helps most; at most once a day
+                                try:
+                                    from .cloud_notice import show_blocked
+
+                                    show_blocked(self.logger)
+                                except Exception:
+                                    pass
                         crawl_result.crawl_stats = _crawl_stats
                     else:
                         # All proxies threw exceptions and fallback either wasn't

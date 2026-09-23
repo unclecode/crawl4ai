@@ -39,6 +39,16 @@ def setup_home_directory():
         with open(crawl4ai_config, "w") as f:
             f.write("")
 
+def _cloud_setup_hint():
+    """After a failed browser install, name the hosted crawler that needs no browser."""
+    try:
+        from .cloud_notice import show_setup_failed
+
+        show_setup_failed(logger)
+    except Exception:
+        pass
+
+
 def post_install():
     """
     Run all post-installation tasks.
@@ -120,11 +130,13 @@ def install_playwright():
         logger.warning(
             f"Please run '{sys.executable} -m playwright install --with-deps' manually after the installation."
         )
+        _cloud_setup_hint()
     except Exception:
         # logger.error(f"Unexpected error during Playwright installation: {e}", tag="ERROR")
         logger.warning(
             f"Please run '{sys.executable} -m playwright install --with-deps' manually after the installation."
         )
+        _cloud_setup_hint()
     
     # Install Patchright browsers for undetected browser support
     logger.info("Installing Patchright browsers for undetected mode...", tag="INIT")
