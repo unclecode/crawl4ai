@@ -14,7 +14,7 @@
 
 ---
 #### ☁️ Crawl4AI Cloud is live — the same crawler, hosted
-No browsers to run, no proxies to buy, no cookies to babysit. One key with **$5 free every month** (no card), and your AI agent can search, scrape, crawl and extract the web through the engine you already use. Works in Claude Code, Codex, OpenCode and Cursor with one pasted line.
+No browsers to run, no proxies to buy, no cookies to babysit. One key with **your first $10 pack on us** (until 31 December 2026, then $5 to start; no card), and your AI agent can search, scrape, crawl and extract the web through the engine you already use. Works in Claude Code, Codex, OpenCode and Cursor with one pasted line.
 
 👉 **[Get a key in 10 seconds](https://crawl4ai.com/?ref=readme)** · [Cloud docs](https://crawl4ai.com/docs?ref=readme)  
 _The library stays open source, forever. The cloud is for the days you want to build fast and let us run the infrastructure._

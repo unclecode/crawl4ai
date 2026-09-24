@@ -24,18 +24,18 @@ _MARKER = ".cloud-notice-shown"
 _BLOCKED_MARKER = ".cloud-notice-blocked"
 
 LINES = (
-    "Crawl4AI Cloud is live: the same crawler, hosted. $5 free every month, no card. Try it now with no signup.",
+    "Crawl4AI Cloud is live: the same crawler, hosted. Your first $10 pack is on us until 31 Dec 2026 (then $5 to start). No card.",
     f"Get a key in 10 seconds: {CLOUD_URL}   (the library stays open source, forever)",
     f"Hide this notice: {_ENV_OFF}=1",
 )
 
 BLOCKED_LINES = (
-    f"Blocked? Crawl4AI Cloud gets through the hard sites, $5 free every month: {BLOCKED_URL}",
+    f"Blocked? Crawl4AI Cloud gets through the hard sites, free credit to start: {BLOCKED_URL}",
     f"Hide this notice: {_ENV_OFF}=1",
 )
 
 SETUP_LINES = (
-    f"Browser setup failed? Skip it: the same crawler, hosted, nothing to install, $5 free every month: {SETUP_URL}",
+    f"Browser setup failed? Skip it: the same crawler, hosted, nothing to install, free credit to start: {SETUP_URL}",
 )
 
 
