@@ -34,6 +34,19 @@ Crawl4AI uses a “provider string” (e.g., `"openai/gpt-4o"`, `"ollama/llama2.
 
 This means you **aren’t locked** into a single LLM vendor. Switch or experiment easily.
 
+### 2.1 OrcaRouter
+
+[OrcaRouter](https://www.orcarouter.ai) is an OpenAI-compatible gateway. Use the `orcarouter/` provider prefix and an `ORCAROUTER_API_KEY`:
+
+```python
+llm_config = LLMConfig(
+    provider="orcarouter/auto",
+    api_token=os.getenv("ORCAROUTER_API_KEY"),
+)
+```
+
+`base_url` defaults to `https://api.orcarouter.ai/v1`, so you can omit it. The full `orcarouter/<model>` id is preserved when calling the gateway (e.g. `orcarouter/auto`, `orcarouter/free`), and the API token is auto-resolved from `ORCAROUTER_API_KEY` when you don't pass `api_token` explicitly.
+
 ---
 
 ## 3. How LLM Extraction Works
