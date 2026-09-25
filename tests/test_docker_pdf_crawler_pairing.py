@@ -54,7 +54,12 @@ def pool_mock(api, monkeypatch):
     pooled.active_requests = 1  # release_crawler decrements this int
     mock = AsyncMock(return_value=pooled)
     monkeypatch.setattr(crawler_pool, "get_crawler", mock)
-    monkeypatch.setattr(api, "_normalize_and_validate_seeds", lambda urls: urls)
+    # Pass every seed through: these tests are about the PDF crawler pairing, so
+    # the destination check is stubbed out rather than exercised. The stub must
+    # still return a _SeedBatch (see _normalize_and_validate_seeds).
+    monkeypatch.setattr(
+        api, "_normalize_and_validate_seeds", lambda urls: api._SeedBatch(list(urls), [])
+    )
     monkeypatch.setattr(egress_broker, "enforce_egress", lambda _: None)
     monkeypatch.setattr(governor, "clamp_deep_crawl", lambda _: None)
     return mock
