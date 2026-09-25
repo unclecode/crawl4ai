@@ -37,7 +37,11 @@ async def test_stream_handler_preserves_requested_scraping_strategy(monkeypatch)
     crawler = MagicMock()
     crawler.arun_many = AsyncMock(return_value=MagicMock())
     crawler.start = AsyncMock()
-    monkeypatch.setattr(api, "_normalize_and_validate_seeds", lambda urls: urls)
+    monkeypatch.setattr(
+        api,
+        "_normalize_and_validate_seeds",
+        lambda urls: api._SeedBatch(list(urls), []),
+    )
     monkeypatch.setattr(egress_broker, "enforce_egress", lambda _: None)
     monkeypatch.setattr(governor, "clamp_deep_crawl", lambda _: None)
     monkeypatch.setattr(api, "AsyncWebCrawler", MagicMock(return_value=crawler))
