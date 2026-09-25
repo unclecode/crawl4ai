@@ -88,11 +88,11 @@ class TestConfigListLogic:
     """Verify the branching logic for single vs list configs."""
 
     def test_api_uses_config_list_when_provided(self):
-        """When crawler_configs is provided with multiple URLs, it should be used."""
+        """When crawler_configs is provided, it should be used, for one URL or many."""
         with open("deploy/docker/api.py") as f:
             source = f.read()
         # Should check crawler_configs and build a list
-        assert "if crawler_configs and len(urls) > 1:" in source
+        assert "if crawler_configs:" in source
         assert "config_list" in source
 
     def test_api_falls_back_to_single_config(self):
@@ -125,12 +125,14 @@ class TestServerEndpoint:
 class TestBackwardCompatibility:
     """Ensure existing single-config requests still work."""
 
-    def test_single_url_ignores_crawler_configs(self):
-        """With a single URL, crawler_configs should be ignored (uses arun, not arun_many)."""
+    def test_single_url_with_config_list_uses_arun_many(self):
+        """A config list goes to arun_many even for a single URL (arun takes one config).
+
+        Behavioral coverage: deploy/docker/tests/test_crawler_configs_routing.py.
+        """
         with open("deploy/docker/api.py") as f:
             source = f.read()
-        # Single URL uses arun which only takes one config
-        assert '"arun" if len(urls) == 1 else "arun_many"' in source
+        assert "use_many = len(urls) > 1 or isinstance(effective_config, list)" in source
 
     def test_no_crawler_configs_uses_single(self):
         """When crawler_configs is None, the original single config path is used."""
