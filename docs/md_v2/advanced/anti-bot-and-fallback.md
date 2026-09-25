@@ -23,6 +23,7 @@ All anti-bot retry options live on `CrawlerRunConfig`:
 |---|---|---|---|
 | `proxy_config` | `ProxyConfig`, `list[ProxyConfig]`, or `None` | `None` | Single proxy or ordered list of proxies to try. Each retry round iterates through the full list. Use `"direct"` or `ProxyConfig.DIRECT` in a list to explicitly try without a proxy. |
 | `max_retries` | `int` | `0` | Number of retry rounds when blocking is detected. `0` = no retries. |
+| `total_timeout` | `int` or `None` (ms) | `None` | Hard ceiling for the whole escalation chain below — every round and every proxy share this one budget. An attempt that would exceed it is cancelled, and a round that cannot start within it is skipped. Recommended whenever the caller has a deadline: `page_timeout` bounds only navigation and the `wait_*` family, so without `total_timeout` the worst case is unbounded. |
 | `fallback_fetch_function` | `async (str) -> str` | `None` | Async function called as last resort. Takes URL, returns raw HTML. |
 
 ## Escalation Chain
