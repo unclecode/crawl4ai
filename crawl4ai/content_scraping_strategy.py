@@ -37,6 +37,41 @@ OG_REGEX = re.compile(r"^og:")
 TWITTER_REGEX = re.compile(r"^twitter:")
 DIMENSION_REGEX = re.compile(r"(\d+)(\D*)")
 
+# <noscript> removal — see strip_noscript() below.
+NOSCRIPT_ELEMENT_REGEX = re.compile(
+    r"<noscript\b[^>]*>[\s\S]*?</noscript\s*>", re.IGNORECASE
+)
+NOSCRIPT_TAG_REGEX = re.compile(r"</?noscript\b[^>]*>", re.IGNORECASE)
+
+
+def strip_noscript(html: str) -> str:
+    """Remove ``<noscript>`` elements from raw HTML *before* it is parsed.
+
+    Why this has to happen pre-parse: ``<noscript>`` may not nest. With
+    scripting enabled its content is raw text, so a parser never sees an inner
+    ``<noscript>`` as an element and the *outer* element is left unclosed —
+    every following node is swallowed into it and dropped. A single WordPress
+    lazy-load plugin that wraps the Google Tag Manager block in a second
+    ``<noscript>`` therefore costs the entire page body:
+
+        312,628 B of rendered HTML -> 97 B of cleaned_html -> 1 B of markdown
+
+    measured on https://www.kiertopakkaus.fi/ (2026-07-30). The damage is done
+    by the time lxml returns a tree, so it cannot be repaired downstream.
+
+    Removal (rather than unwrapping) is correct because Crawl4AI renders with
+    JavaScript enabled: by definition ``<noscript>`` content is *not* what the
+    page showed, and its scripted equivalent is already in the DOM.
+
+    Two passes: well-formed elements first (a non-greedy match stops at the
+    first ``</noscript>``, which is exactly where the browser's parser ends the
+    outer element too), then any unpaired tag left over by truncated or
+    malformed markup, so an unclosed ``<noscript>`` can never swallow a body.
+    """
+    if not html or "<noscript" not in html.lower():
+        return html
+    return NOSCRIPT_TAG_REGEX.sub("", NOSCRIPT_ELEMENT_REGEX.sub("", html))
+
 
 # Function to parse srcset
 def parse_srcset(s: str) -> List[Dict]:
@@ -623,6 +658,10 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
     ) -> Dict[str, Any]:
         if not html:
             return None
+
+        # Malformed/nested <noscript> makes libxml2 swallow the rest of the
+        # document. Must be removed before parsing — see strip_noscript().
+        html = strip_noscript(html)
 
         success = True
         try:
