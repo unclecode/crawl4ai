@@ -1,4 +1,4 @@
-# 🚀🤖 Crawl4AI: Open-Source LLM-Friendly Web Crawler & Scraper
+# 🚀🤖 Crawl4AI: the open-source web crawler for LLMs and AI agents
 
 <div class = "badges" align="center">
 
@@ -55,19 +55,60 @@
   
 </div>
 
----
-#### 🚀 Crawl4AI Cloud API — Closed Beta (Launching Soon)
-Reliable, large-scale web extraction, now built to be _**drastically more cost-effective**_ than any of the existing solutions.
+Crawl4AI turns any website into clean, LLM-ready Markdown for RAG, AI agents and data pipelines. Run the open-source web crawler and scraper yourself, free forever, or use it hosted with one key: scrape, search and extract through one API, with MCP for your agent.
 
-👉 **Apply [here](https://forms.gle/E9MyPaNXACnAMaqG7) for early access**  
-_We’ll be onboarding in phases and working closely with early users.
-Limited slots._
+## Two ways to use Crawl4AI
 
----
+### 🐍 Run it yourself: open source, forever
 
-Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant community. It delivers blazing-fast, AI-ready web crawling tailored for large language models, AI agents, and data pipelines. Fully open source, flexible, and built for real-time performance, **Crawl4AI** empowers developers with unmatched speed, precision, and deployment ease.
+```bash
+pip install -U crawl4ai
+crawl4ai-setup        # installs the browser, once
+```
 
-> Enjoy using Crawl4AI? Consider **[becoming a sponsor](https://github.com/sponsors/unclecode)** to support ongoing development and community growth!
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler
+
+async def main():
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(url="https://news.ycombinator.com")
+        print(result.markdown)
+
+asyncio.run(main())
+```
+
+Docker server, CLI and every option: [Installation](core/installation.md) · [Self-hosting](core/self-hosting.md)
+
+### ☁️ Or use the cloud: no browsers, no proxies
+
+1. [![Get a key in 10 seconds](https://img.shields.io/badge/Get_a_key_in_10_seconds-%241_pass%2C_no_signup-f5a300?style=for-the-badge&labelColor=0d0d10)](https://crawl4ai.com/?ref=docs)  
+   Verify your email and your first $10 pack is on us (until 31 December 2026, then $5 to start). No card.
+2. Get any page as Markdown:
+
+   ```bash
+   curl -s https://api.crawl4ai.com/scrape \
+     -H "Authorization: Bearer $CRAWL4AI_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url": "https://news.ycombinator.com"}' | jq -r .markdown
+   ```
+
+   The same key works for `/search`, `/answer`, `/extract` and many URLs at once (`/scrape/batch`, `/scrape/jobs`). Pay as you go: [live prices](https://crawl4ai.com/docs?ref=docs#pricing).
+3. Give it to your AI agent. Claude Code shown; [Codex, Cursor and OpenCode →](https://crawl4ai.com/docs?ref=docs#mcp)
+
+   ```bash
+   claude mcp add --transport http crawl4ai https://api.crawl4ai.com/mcp \
+     --header "Authorization: Bearer $CRAWL4AI_KEY"
+   ```
+
+### Which one?
+
+| | 🐍 Library | 🐳 Your own server | ☁️ Crawl4AI Cloud |
+|---|---|---|---|
+| **Runs the browsers** | you, in your Python process | you, in Docker on your machine | we do |
+| **JS-heavy pages and bot walls** | your settings, your proxies | your settings, your proxies | handled for you, automatically |
+| **Web search** | – | – | `/search` and `/answer` |
+| **Price** | free, forever | free (your hosting) | pay as you go; your first $10 is on us |
 
 ## 🆕 AI Assistant Skill Now Available!
 
@@ -96,29 +137,6 @@ Crawl4AI now features intelligent adaptive crawling that knows when to stop! Usi
 
 [Learn more about Adaptive Crawling →](core/adaptive-crawling.md)
 
-
-## Quick Start
-
-Here's a quick example to show you how easy it is to use Crawl4AI with its asynchronous capabilities:
-
-```python
-import asyncio
-from crawl4ai import AsyncWebCrawler
-
-async def main():
-    # Create an instance of AsyncWebCrawler
-    async with AsyncWebCrawler() as crawler:
-        # Run the crawler on a URL
-        result = await crawler.arun(url="https://crawl4ai.com")
-
-        # Print the extracted content
-        print(result.markdown)
-
-# Run the async main function
-asyncio.run(main())
-```
-
----
 
 ## Video Tutorial
 
