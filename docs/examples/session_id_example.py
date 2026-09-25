@@ -4,7 +4,7 @@ from crawl4ai import (
     BrowserConfig,
     CrawlerRunConfig,
     DefaultMarkdownGenerator,
-    PruningContentFilter,
+    PruningContentFilterLXML,
     CrawlResult
 )
 

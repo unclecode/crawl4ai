@@ -69,6 +69,7 @@ from crawl4ai.content_filter_strategy import (
     BM25ContentFilter,
     LLMContentFilter
 )
+from crawl4ai.content_filter_strategy_lxml import PruningContentFilterLXML
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
 
@@ -362,7 +363,7 @@ async def handle_markdown_request(
             from llm_broker import resolve_llm
             _llm = resolve_llm(config, provider)
             content_filter = {
-                FilterType.FIT: PruningContentFilter(),
+                FilterType.FIT: PruningContentFilterLXML(),
                 FilterType.BM25: BM25ContentFilter(user_query=query or ""),
                 FilterType.LLM: LLMContentFilter(
                     llm_config=LLMConfig(

@@ -25,6 +25,7 @@ from crawl4ai import (
     JsonXPathExtractionStrategy,
     BM25ContentFilter,
     PruningContentFilter,
+    PruningContentFilterLXML,
     BrowserProfiler,
     DefaultMarkdownGenerator,
     LLMConfig,
@@ -1094,7 +1095,7 @@ def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config:
                 )
             elif filter_conf["type"] == "pruning":
                 crawler_cfg.markdown_generator = DefaultMarkdownGenerator(
-                    content_filter = PruningContentFilter(
+                    content_filter = PruningContentFilterLXML(
                         user_query=filter_conf.get("query"),
                         threshold=filter_conf.get("threshold", 0.48)
                     )

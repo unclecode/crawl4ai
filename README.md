@@ -36,9 +36,11 @@ _The library stays open source, forever. The cloud is for the days you want to b
 
 Crawl4AI turns the web into clean, LLM ready Markdown for RAG, agents, and data pipelines. Fast, controllable, battle tested by a 50k+ star community.
 
-[✨ Check out latest update v0.9.3](#-recent-updates)
+[✨ Check out latest update v0.9.4](#-recent-updates)
 
-✨ **New in v0.9.3**: Security release. Closes five coordinated-disclosure advisories: arbitrary file write, SSRF, and denial of service in the PDF processing path, plus two XSS issues in the Docker Playground. Also ships 33 bug fixes across the Docker server, crawler, and PDF handling. No new features, no breaking changes. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.3.md)
+✨ **New in v0.9.4**: Security release. Closes three coordinated-disclosure advisories: two SSRF paths (robots.txt and link preview) that bypassed the Docker server's egress controls, and a config trust-boundary bypass that leaked server environment variables. Also adds `PruningContentFilterLXML`, about 10x faster pruning, now the default. No breaking changes. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.4.md)
+
+✨ Recent v0.9.3: Security release. Closes five coordinated-disclosure advisories: arbitrary file write, SSRF, and denial of service in the PDF processing path, plus two XSS issues in the Docker Playground. Also ships 33 bug fixes across the Docker server, crawler, and PDF handling. No new features, no breaking changes. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.3.md)
 
 ✨ Recent v0.9.2: Maintenance patch release. Fixes a `MemoryAdaptiveDispatcher` task/page leak when a streaming crawl is closed, Docker Playground "Advanced Config" and Monitor WebSocket auth, Playwright headless-shell packaging, and GPU (`ENABLE_GPU=true`) Docker builds. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.2.md)
 
@@ -566,6 +568,23 @@ async def test_news_crawl():
 ## ✨ Recent Updates
 
 <details open>
+<summary><strong>Version 0.9.4 Release Highlights - Security Release and Faster Pruning</strong></summary>
+
+A security release closing three coordinated-disclosure advisories. Two are SSRF paths that did not go through the Docker server's egress rule: the robots.txt fetch behind `check_robots_txt`, and the URL seeder behind `link_preview_config`, which also returned the fetched `<head>` to the caller. Both now go through the server's pinning egress proxy. The third is a bypass of the untrusted-config gate: a `{"type": "dict"}` wrapper let a forbidden `LLMConfig` through, so a non-admin client could read server environment variables.
+
+It also adds `PruningContentFilterLXML`, an lxml-native pruning filter that is about 10x faster and gives byte-identical output. It is now the default, and `PruningContentFilter` is deprecated. Bug fixes cover deep-crawl speed, tables with `rowspan`/`colspan`, robots.txt rules, pooled browser recycling, and the Docker Playground.
+
+No breaking changes.
+
+```bash
+pip install -U crawl4ai
+```
+
+[Full v0.9.4 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.9.4.md)
+
+</details>
+
+<details>
 <summary><strong>Version 0.9.3 Release Highlights - Security Release</strong></summary>
 
 A security release closing five coordinated-disclosure advisories. Four are in the PDF processing path: an arbitrary file write through `PDFContentScrapingStrategy` image-write fields, an SSRF where the PDF download followed redirects into internal addresses, a denial of service from unbounded PDF size and page count, and an XSS from unescaped PDF text in `cleaned_html`. The fifth is a DOM-based XSS in the Docker Playground that could expose the operator's API token.
