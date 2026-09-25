@@ -723,7 +723,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 elif self.force_json_response:
                     blocks = json.loads(_strip_markdown_fences(content))
                     if isinstance(blocks, dict):
-                        # If it has only one key which calue is list then assign that to blocks, exampled: {"news": [..]}
+                        # If it has only one key which value is list then assign that to blocks, exampled: {"news": [..]}
                         if len(blocks) == 1 and isinstance(list(blocks.values())[0], list):
                             blocks = list(blocks.values())[0]
                         else:
