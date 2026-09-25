@@ -4,9 +4,16 @@ The per-URL config list (#1837) was only applied when a non-streaming request
 carried two or more URLs. With one URL the handler called arun(), which takes a
 single config, and /crawl/stream never passed the list down, so both requests
 ran with crawler_config alone and still answered HTTP 200.
+
+With the list applied, it also has to decide the crawler: a list of PDF entries
+runs on PDFCrawlerStrategy, and one crawler cannot serve a list mixing PDF and
+browser entries, so that is refused instead of failing mid-crawl.
 """
 
 import asyncio
+
+import pytest
+from fastapi import HTTPException
 
 from crawl4ai import CrawlerRunConfig
 from crawl4ai.models import CrawlResult
@@ -129,3 +136,78 @@ def test_stream_endpoint_forwards_the_list(server_module, monkeypatch):
         pass
 
     assert captured["crawler_configs"] == PER_URL
+
+
+PDF = {"type": "PDFContentScrapingStrategy", "params": {}}
+ALL_PDF = [
+    {
+        "type": "CrawlerRunConfig",
+        "params": {"url_matcher": "*.pdf", "scraping_strategy": PDF},
+    },
+]
+MIXED = ALL_PDF + [{"type": "CrawlerRunConfig", "params": {"url_matcher": "*"}}]
+
+
+class RecordingPdfCrawler(RecordingCrawler):
+    """Stands in for AsyncWebCrawler(crawler_strategy=PDFCrawlerStrategy())."""
+
+    def __init__(self, crawler_strategy=None, **kwargs):
+        super().__init__()
+        self.crawler_strategy = crawler_strategy
+
+    async def start(self):
+        return self
+
+    async def close(self):
+        return None
+
+
+def test_a_list_of_pdf_entries_runs_on_the_pdf_crawler(server_module, monkeypatch):
+    from crawl4ai.processors.pdf import PDFCrawlerStrategy
+
+    api = _install(monkeypatch, RecordingCrawler())
+    made = []
+
+    def pdf_crawler(**kwargs):
+        made.append(RecordingPdfCrawler(**kwargs))
+        return made[-1]
+
+    monkeypatch.setattr(api, "AsyncWebCrawler", pdf_crawler)
+
+    asyncio.run(
+        api.handle_crawl_request(
+            urls=["https://example.com/a.pdf"],
+            browser_config={},
+            crawler_config={},
+            config=server_module.config,
+            crawler_configs=ALL_PDF,
+        )
+    )
+
+    [crawler] = made
+    assert isinstance(crawler.crawler_strategy, PDFCrawlerStrategy)
+    [(method, urls, config)] = crawler.calls
+    assert method == "arun_many"
+    # SSRF: every per-URL PDF entry still gets the destination check.
+    assert config[0].scraping_strategy.url_validator is api.validate_url_destination
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_a_list_mixing_pdf_and_browser_entries_is_refused(
+    server_module, monkeypatch, stream
+):
+    api = _install(monkeypatch, RecordingCrawler())
+    handler = api.handle_stream_crawl_request if stream else api.handle_crawl_request
+
+    with pytest.raises(HTTPException) as refused:
+        asyncio.run(
+            handler(
+                urls=["https://example.com/a.pdf", "https://example.com/"],
+                browser_config={},
+                crawler_config={},
+                config=server_module.config,
+                crawler_configs=MIXED,
+            )
+        )
+
+    assert refused.value.status_code == 400
