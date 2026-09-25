@@ -247,7 +247,11 @@ def attach_mcp(
     class _MCPSseApp:
         async def __call__(self, scope, receive, send):
             async with sse.connect_sse(scope, receive, send) as (read_stream, write_stream):
-                await mcp.run(read_stream, write_stream, init_opts)
+                # Reorder inbound POSTs so the MCP handshake reaches the session first.
+                c2s_send, c2s_recv = anyio.create_memory_object_stream(100)
+                async with anyio.create_task_group() as tg:
+                    tg.start_soon(mcp.run, c2s_recv, write_stream, init_opts)
+                    tg.start_soon(_sse_init_gate, read_stream, c2s_send)
 
     app.routes.append(Route(f"{base}/sse", endpoint=_MCPSseApp()))
     app.routes.append(Mount(f"{base}/messages", app=sse.handle_post_message))
@@ -263,6 +267,39 @@ def attach_mcp(
 
 
 # ── helpers ────────────────────────────────────────────────────
+async def _sse_init_gate(read_stream, c2s_send, timeout: float = 2.0) -> None:
+    """Park inbound SSE messages until initialize and notifications/initialized
+    have been forwarded, then flush them in arrival order.  After timeout seconds,
+    flush regardless so a client that never completes the handshake cannot pin
+    the session.
+    """
+    def rpc_method_name(m):
+        msg = getattr(m, "message", None)          # stream may carry an Exception
+        return getattr(getattr(msg, "root", msg), "method", None)  # mcp 1.x RootModel / 2.x plain union
+
+    parked, want = [], ["initialize", "notifications/initialized"]
+    try:
+        with anyio.move_on_after(timeout) as scope:
+            async for msg in read_stream:
+                if want and rpc_method_name(msg) == want[0]:
+                    await c2s_send.send(msg)
+                    want.pop(0)
+                    if not want:
+                        break
+                else:
+                    parked.append(msg)
+        if want and not scope.cancelled_caught:
+            return  # client disconnected mid-handshake; nothing to flush
+        for msg in parked:
+            await c2s_send.send(msg)
+        async for msg in read_stream:
+            await c2s_send.send(msg)
+    except (anyio.EndOfStream, anyio.ClosedResourceError):
+        pass
+    finally:
+        with anyio.CancelScope(shield=True), suppress(Exception):
+            await c2s_send.aclose()
+
 def _route_name(path: str) -> str:
     return re.sub(r"[/{}}]", "_", path).strip("_")
 
