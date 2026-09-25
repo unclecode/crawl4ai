@@ -84,8 +84,6 @@ def fetch_image_file_size(img, base_url):
             return None
     except InvalidSchema:
         return None
-    finally:
-        return
 
 
 class ContentScrapingStrategy(ABC):
