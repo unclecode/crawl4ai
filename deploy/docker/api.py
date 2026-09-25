@@ -127,6 +127,15 @@ async def hset_with_ttl(redis, key: str, mapping: dict, config: dict):
         await redis.expire(key, ttl)
 
 
+def apply_base_config(cfg: CrawlerRunConfig, config: dict, keys=None) -> CrawlerRunConfig:
+    """Fill fields the request left unset from config.yml crawler.base_config (all of them, or just `keys`)."""
+    base = config["crawler"]["base_config"]
+    for key in keys or base:
+        if hasattr(cfg, key) and getattr(cfg, key) in (None, ""):
+            setattr(cfg, key, base[key])
+    return cfg
+
+
 async def handle_llm_qa(
     url: str,
     query: str,
@@ -157,7 +166,7 @@ async def handle_llm_qa(
         from egress_broker import enforce_egress
         enforce_egress(browser_cfg)
         crawler = await get_crawler(browser_cfg)
-        result = await crawler.arun(url)
+        result = await crawler.arun(url, config=apply_base_config(CrawlerRunConfig(), cfg, keys=("crawl_timeout",)))
         _raise_for_crawl_failure(result)
         content = result.markdown.fit_markdown or result.markdown.raw_markdown
 
@@ -267,11 +276,11 @@ async def process_llm_extraction(
         async with AsyncWebCrawler(config=worker_browser_cfg) as crawler:
             result = await crawler.arun(
                 url=url,
-                config=CrawlerRunConfig(
+                config=apply_base_config(CrawlerRunConfig(
                     extraction_strategy=llm_strategy,
                     scraping_strategy=LXMLWebScrapingStrategy(),
                     cache_mode=cache_mode
-                )
+                ), config, keys=("crawl_timeout",))
             )
 
         if not result.success:
@@ -391,11 +400,11 @@ async def handle_markdown_request(
         crawler = await get_crawler(browser_cfg)
         result = await crawler.arun(
             url=decoded_url,
-            config=CrawlerRunConfig(
+            config=apply_base_config(CrawlerRunConfig(
                 markdown_generator=md_generator,
                 scraping_strategy=LXMLWebScrapingStrategy(),
                 cache_mode=cache_mode
-            )
+            ), config, keys=("crawl_timeout",))
         )
 
         _raise_for_crawl_failure(result)
@@ -720,29 +729,19 @@ async def handle_crawl_request(
             hooks_status = _attach_declarative_hooks(crawler, hooks_config)
             logger.info(f"Hooks attachment status: {hooks_status['status']}")
         
-        base_config = config["crawler"]["base_config"]
-
         # Build the config(s) to pass to arun/arun_many
         if crawler_configs and len(urls) > 1:
             # Per-URL config list: deserialize each and apply base_config
             config_list = [CrawlerRunConfig.load(cc, provenance=Provenance.UNTRUSTED) for cc in crawler_configs]
             for cfg in config_list:
-                for key, value in base_config.items():
-                    if hasattr(cfg, key):
-                        current_value = getattr(cfg, key)
-                        if current_value is None or current_value == "":
-                            setattr(cfg, key, value)
+                apply_base_config(cfg, config)
                 # SSRF: per-URL PDF strategies need the validator wired too
                 if isinstance(cfg.scraping_strategy, PDFContentScrapingStrategy):
                     cfg.scraping_strategy.url_validator = validate_url_destination
             effective_config = config_list
         else:
             # Single config (original behavior)
-            for key, value in base_config.items():
-                if hasattr(crawler_config, key):
-                    current_value = getattr(crawler_config, key)
-                    if current_value is None or current_value == "":
-                        setattr(crawler_config, key, value)
+            apply_base_config(crawler_config, config)
             effective_config = crawler_config
 
         results = []
@@ -912,6 +911,7 @@ async def handle_stream_crawl_request(
         crawler_config = CrawlerRunConfig.load(
             crawler_config, provenance=Provenance.UNTRUSTED
         )
+        apply_base_config(crawler_config, config)
         from governor import clamp_deep_crawl
 
         clamp_deep_crawl(crawler_config)

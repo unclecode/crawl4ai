@@ -27,7 +27,7 @@ from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 from api import (
     handle_markdown_request, handle_llm_qa,
     handle_stream_crawl_request, handle_crawl_request,
-    stream_results
+    stream_results, apply_base_config
 )
 from schemas import (
     CrawlRequestWithHooks,
@@ -662,7 +662,7 @@ async def generate_html(
     Use when you need sanitized HTML structures for building schemas or further processing.
     """
     validate_url_scheme(body.url, allow_raw=True)
-    cfg = CrawlerRunConfig()
+    cfg = apply_base_config(CrawlerRunConfig(), config, keys=("crawl_timeout",))
     crawler = None
     try:
         crawler = await get_crawler(get_default_browser_config())
@@ -758,6 +758,7 @@ async def generate_screenshot(
     crawler = None
     try:
         cfg = CrawlerRunConfig(screenshot=True, screenshot_wait_for=body.screenshot_wait_for, wait_for_images=body.wait_for_images)
+        apply_base_config(cfg, config, keys=("crawl_timeout",))
         crawler = await get_crawler(get_default_browser_config())
         results = await crawler.arun(url=body.url, config=cfg)
         if not results[0].success:
@@ -798,7 +799,7 @@ async def generate_pdf(
     legacy_output_path = body.model_dump(include={"output_path"}).get("output_path")
     crawler = None
     try:
-        cfg = CrawlerRunConfig(pdf=True)
+        cfg = apply_base_config(CrawlerRunConfig(pdf=True), config, keys=("crawl_timeout",))
         crawler = await get_crawler(get_default_browser_config())
         results = await crawler.arun(url=body.url, config=cfg)
         if not results[0].success:
@@ -881,7 +882,7 @@ async def execute_js(
         raise HTTPException(400, str(e))
     crawler = None
     try:
-        cfg = CrawlerRunConfig(js_code=body.scripts)
+        cfg = apply_base_config(CrawlerRunConfig(js_code=body.scripts), config, keys=("crawl_timeout",))
         crawler = await get_crawler(get_default_browser_config())
         results = await crawler.arun(url=body.url, config=cfg)
         if not results[0].success:
