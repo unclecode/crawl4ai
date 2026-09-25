@@ -136,8 +136,6 @@ else\n\
     pip install --no-cache-dir /tmp/crawl4ai\n\
 fi' > /tmp/install.sh && chmod +x /tmp/install.sh
 
-COPY . /tmp/project/
-
 # Copy supervisor config first (might need root later, but okay for now)
 COPY deploy/docker/supervisord.conf .
 
@@ -155,6 +153,10 @@ RUN if [ "$INSTALL_TYPE" = "all" ] ; then \
             tokenizers && \
         python -m nltk.downloader punkt stopwords ; \
     fi
+
+# Copied here rather than above the dependency installs: nothing between the
+# two positions reads /tmp/project, so a source change no longer invalidates them.
+COPY . /tmp/project/
 
 RUN if [ "$INSTALL_TYPE" = "all" ] ; then \
         pip install "/tmp/project/[all]" && \
