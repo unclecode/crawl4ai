@@ -420,12 +420,17 @@ def get_container_memory_percent() -> float:
             limit_path = Path("/sys/fs/cgroup/memory/memory.limit_in_bytes")
 
         usage = int(usage_path.read_text())
-        limit = int(limit_path.read_text())
+        raw_limit = limit_path.read_text().strip()
 
         # Handle unlimited (v2: "max", v1: > 1e18)
-        if limit > 1e18:
+        if raw_limit == "max":
             import psutil
             limit = psutil.virtual_memory().total
+        else:
+            limit = int(raw_limit)
+            if limit > 1e18:
+                import psutil
+                limit = psutil.virtual_memory().total
 
         return (usage / limit) * 100
     except:
