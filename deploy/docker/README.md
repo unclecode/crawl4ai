@@ -601,6 +601,47 @@ else:
 
 ```
 
+#### Markdown with Content Filter (Pruning / BM25)
+
+To strip navigation, ads, and other clutter from the extracted page, attach a content filter to the markdown generator. The filter **must be nested inside `markdown_generator`** — a top-level `content_filter` key in `crawler_config` is silently ignored by the server (HTTP 200 with an empty `fit_markdown`), because the untrusted config loader only accepts allowlisted fields and drops unknown ones without error.
+
+```python
+import requests
+
+crawler_config_payload = {
+    "type": "CrawlerRunConfig",
+    "params": {
+        "cache_mode": "bypass",
+        "markdown_generator": {
+            "type": "DefaultMarkdownGenerator",
+            "params": {
+                "content_filter": {
+                    "type": "PruningContentFilter",
+                    "params": {"threshold": 0.45, "threshold_type": "fixed"}
+                }
+            }
+        }
+    }
+}
+
+crawl_payload = {
+    "urls": ["https://httpbin.org/html"],
+    "crawler_config": crawler_config_payload
+}
+response = requests.post("http://localhost:11235/crawl", json=crawl_payload)
+data = response.json()
+markdown = data["results"][0]["markdown"]
+# Pruned output lives in fit_markdown (fit_html for the filtered HTML);
+# raw_markdown always contains the unfiltered page.
+print(markdown["fit_markdown"])
+```
+
+**Response fields:** with a content filter active, the result `markdown` object includes `fit_markdown` / `fit_html` alongside the unfiltered `raw_markdown`. Without a filter, `fit_markdown` is empty.
+
+**BM25 filter:** swap `PruningContentFilter` for `{"type": "BM25ContentFilter", "params": {"user_query": "your query"}}` to keep only content relevant to a query.
+
+**`/md` endpoint:** for a simpler markdown-only request, `POST /md` with `filter_type` in `fit` (default), `raw`, `bm25`, or `llm` mode applies a built-in filter without tuning knobs. See `docs/examples/docker/demo_docker_api.py` (Demo 2a-2c) for more filter configurations.
+
 #### Streaming Results
 
 ```python
