@@ -872,6 +872,7 @@ class BrowserConfig:
         user_agent_generator_config (dict or None): Configuration for user agent generation if user_agent_mode is set.
                                                     Default: None.
         text_mode (bool): If True, disables images and other rich content for potentially faster load times.
+                          JavaScript still runs; set java_script_enabled=False to turn it off.
                           Default: False.
         light_mode (bool): Disables certain background features for performance gains. Default: False.
         extra_args (list): Additional command-line arguments passed to the browser.
