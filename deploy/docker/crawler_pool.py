@@ -162,9 +162,9 @@ async def init_permanent(cfg: BrowserConfig):
 async def restart_permanent(cfg: BrowserConfig):
     """Replace the permanent browser with a freshly started one.
 
-    Only the detach happens under LOCK. The close and the re-create must not:
-    ``init_permanent()`` acquires LOCK itself and ``asyncio.Lock`` is not
-    reentrant, so restarting while holding it deadlocks the pool for the life
+    Only the detach happens under LOCK. The close and the re-create must not run
+    under it: ``init_permanent()`` acquires LOCK itself and ``asyncio.Lock`` is
+    not reentrant, so restarting while holding it deadlocks the pool for the life
     of the process, and ``close()`` on a wedged browser would block every
     ``get_crawler()`` for as long as it hangs.
 
