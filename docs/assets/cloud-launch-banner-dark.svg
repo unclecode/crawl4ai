@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 200" width="960" height="200" role="img" aria-label="Crawl4AI Cloud is live. Soft launch: your first $10 is on us until 31 December 2026, no card. Get your key.">
+  <defs>
+    <clipPath id="card"><rect x="0.5" y="0.5" width="959" height="199" rx="12"/></clipPath>
+    <linearGradient id="bar" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#f5a300"/><stop offset="1" stop-color="#4ae6e5"/></linearGradient>
+  </defs>
+  <rect x="0.5" y="0.5" width="959" height="199" rx="12" fill="#0d0d10" stroke="#2b2b33"/>
+  <g clip-path="url(#card)">
+    <rect x="0" y="0" width="960" height="4" fill="url(#bar)"/>
+    <path transform="translate(748 30) scale(9.5)" fill="#4ae6e5" fill-opacity="0.07" d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/>
+  </g>
+  <g font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif">
+    <rect x="40" y="30" width="116" height="22" rx="11" fill="none" stroke="#4ae6e5" stroke-width="1.2"/>
+    <text x="98" y="45.5" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="1.6" fill="#4ae6e5">SOFT LAUNCH</text>
+    <text x="40" y="92" font-size="30" font-weight="700" fill="#f0f6fc">Crawl4AI Cloud is live.</text>
+    <text x="40" y="129" font-size="30" font-weight="700" fill="#f5a300">Your first $10 is on us.</text>
+    <text x="40" y="164" font-size="14" fill="#9198a1">Until 31 December 2026 · no card · the library stays open source, forever.</text>
+    <rect x="720" y="76" width="200" height="48" rx="8" fill="#f5a300"/>
+    <text x="820" y="106" text-anchor="middle" font-size="18" font-weight="700" fill="#0d0d10">Get your key →</text>
+  </g>
+</svg>
