@@ -647,6 +647,32 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
             await _dispose_crawler(crawler)
 
 
+def _load_crawler_configs(
+    crawler_configs: List[dict],
+    base_config: Optional[dict] = None,
+    stream: bool = False,
+) -> List[CrawlerRunConfig]:
+    """Deserialize a per-URL crawler_configs list under the untrusted gate.
+    Shared by the streaming and non-streaming crawl handlers so both apply the
+    same boundary and wire the PDF URL validator into every entry."""
+    from crawl4ai.processors.pdf import PDFContentScrapingStrategy
+
+    config_list = [CrawlerRunConfig.load(cc, provenance=Provenance.UNTRUSTED) for cc in crawler_configs]
+    for cfg in config_list:
+        for key, value in (base_config or {}).items():
+            if hasattr(cfg, key):
+                current_value = getattr(cfg, key)
+                if current_value is None or current_value == "":
+                    setattr(cfg, key, value)
+        # SSRF: per-URL PDF strategies need the validator wired too
+        if isinstance(cfg.scraping_strategy, PDFContentScrapingStrategy):
+            cfg.scraping_strategy.url_validator = validate_url_destination
+        if stream:
+            # arun_many takes the stream flag from the first config of a list.
+            cfg.stream = True
+    return config_list
+
+
 def _normalize_and_validate_seeds(urls: List[str]) -> List[str]:
     """Prefix bare hosts with https:// and SSRF-validate every seed URL's
     destination. Shared by the streaming and non-streaming crawl handlers so a
@@ -723,19 +749,9 @@ async def handle_crawl_request(
         base_config = config["crawler"]["base_config"]
 
         # Build the config(s) to pass to arun/arun_many
-        if crawler_configs and len(urls) > 1:
+        if crawler_configs:
             # Per-URL config list: deserialize each and apply base_config
-            config_list = [CrawlerRunConfig.load(cc, provenance=Provenance.UNTRUSTED) for cc in crawler_configs]
-            for cfg in config_list:
-                for key, value in base_config.items():
-                    if hasattr(cfg, key):
-                        current_value = getattr(cfg, key)
-                        if current_value is None or current_value == "":
-                            setattr(cfg, key, value)
-                # SSRF: per-URL PDF strategies need the validator wired too
-                if isinstance(cfg.scraping_strategy, PDFContentScrapingStrategy):
-                    cfg.scraping_strategy.url_validator = validate_url_destination
-            effective_config = config_list
+            effective_config = _load_crawler_configs(crawler_configs, base_config)
         else:
             # Single config (original behavior)
             for key, value in base_config.items():
@@ -746,9 +762,12 @@ async def handle_crawl_request(
             effective_config = crawler_config
 
         results = []
-        func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
+        # arun takes one config, so a per-URL list goes to arun_many even for
+        # a single URL; arun_many matches each URL against the list.
+        use_many = len(urls) > 1 or isinstance(effective_config, list)
+        func = getattr(crawler, "arun_many" if use_many else "arun")
         partial_func = partial(func,
-                                urls[0] if len(urls) == 1 else urls,
+                                urls if use_many else urls[0],
                                 config=effective_config,
                                 dispatcher=dispatcher)
         # Optional per-crawl wall-clock deadline (config limits.wall_clock_s; 0 = none).
@@ -891,7 +910,8 @@ async def handle_stream_crawl_request(
     browser_config: dict,
     crawler_config: dict,
     config: dict,
-    hooks_config: Optional[dict] = None
+    hooks_config: Optional[dict] = None,
+    crawler_configs: Optional[List[dict]] = None,
 ) -> Tuple[AsyncWebCrawler, AsyncGenerator, Optional[Dict]]:
     """Handle streaming crawl requests with optional hooks."""
     hooks_info = None
@@ -916,6 +936,9 @@ async def handle_stream_crawl_request(
 
         clamp_deep_crawl(crawler_config)
         crawler_config.stream = True
+        config_list = (
+            _load_crawler_configs(crawler_configs, stream=True) if crawler_configs else None
+        )
 
         # Deep crawl streaming supports exactly one start URL
         if crawler_config.deep_crawl_strategy is not None and len(urls) != 1:
@@ -964,7 +987,7 @@ async def handle_stream_crawl_request(
             )
             results_gen = await crawler.arun_many(
                 urls=urls,
-                config=crawler_config,
+                config=config_list or crawler_config,
                 dispatcher=dispatcher
             )
 
