@@ -127,14 +127,20 @@ class MarkdownGenerationResult(BaseModel):
     def __str__(self):
         return self.raw_markdown
     
+def _default_media():
+    return {"images": [], "videos": [], "audios": [], "tables": []}
+
+def _default_links():
+    return {"internal": [], "external": []}
+
 class CrawlResult(BaseModel):
     url: str
     html: str
     fit_html: Optional[str] = None
     success: bool
     cleaned_html: Optional[str] = None
-    media: Dict[str, List[Dict]] = {}
-    links: Dict[str, List[Dict]] = {}
+    media: Dict[str, List[Dict]] = Field(default_factory=_default_media)
+    links: Dict[str, List[Dict]] = Field(default_factory=_default_links)
     downloaded_files: Optional[List[str]] = None
     js_execution_result: Optional[Dict[str, Any]] = None
     screenshot: Optional[str] = None
