@@ -22,8 +22,8 @@ class CrawlResult(BaseModel):
     fit_html: Optional[str] = None
     success: bool
     cleaned_html: Optional[str] = None
-    media: Dict[str, List[Dict]] = {}
-    links: Dict[str, List[Dict]] = {}
+    media: Dict[str, List[Dict]] = {"images": [], "videos": [], "audios": []}
+    links: Dict[str, List[Dict]] = {"internal": [], "external": []}
     downloaded_files: Optional[List[str]] = None
     js_execution_result: Optional[Dict[str, Any]] = None
     screenshot: Optional[str] = None
