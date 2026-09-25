@@ -201,14 +201,20 @@ class TestCombined:
         assert "alice" in combined
         assert "Apr 6, 2026" in combined
 
-    def test_whitelist_does_not_override_excluded_tags(self):
-        """Nav/footer/header are removed before pruning — whitelist can't save them."""
+    def test_whitelist_overrides_excluded_tags(self):
+        """A whitelisted tag survives even when it is in excluded_tags."""
         f = PruningContentFilter(preserve_tags=["nav"])
-        result = f.filter_content(GITHUB_COMMENT_HTML)
-        combined = " ".join(result)
-        # nav is in excluded_tags and removed before pruning runs
-        # preserve_tags only affects the pruning phase
-        # This is expected — excluded_tags are structural boilerplate
+        combined = " ".join(f.filter_content(GITHUB_COMMENT_HTML))
+        assert "About" in combined
+        # non-whitelisted excluded tags are still dropped
+        assert "Copyright 2026" not in combined
+
+    def test_whitelisted_class_on_excluded_tag(self):
+        """A whitelisted class saves an excluded tag too."""
+        f = PruningContentFilter(preserve_classes=["site-footer"])
+        combined = " ".join(f.filter_content(GITHUB_COMMENT_HTML))
+        assert "Copyright 2026" in combined
+        assert "About" not in combined
 
 
 # ── _is_preserved method ─────────────────────────────────────────────────
