@@ -411,6 +411,7 @@ def verify_email_domain(email: str) -> bool:
 def get_container_memory_percent() -> float:
     """Get actual container memory usage vs limit (cgroup v1/v2 aware)."""
     try:
+        import psutil
         # Try cgroup v2 first
         usage_path = Path("/sys/fs/cgroup/memory.current")
         limit_path = Path("/sys/fs/cgroup/memory.max")
@@ -420,15 +421,19 @@ def get_container_memory_percent() -> float:
             limit_path = Path("/sys/fs/cgroup/memory/memory.limit_in_bytes")
 
         usage = int(usage_path.read_text())
-        limit = int(limit_path.read_text())
+        raw_limit = limit_path.read_text().strip()
 
-        # Handle unlimited (v2: "max", v1: > 1e18)
-        if limit > 1e18:
-            import psutil
+        if raw_limit == "max":
+            # cgroup v2: no memory limit set, fall back to host total
             limit = psutil.virtual_memory().total
+        else:
+            limit = int(raw_limit)
+            # Handle unlimited cgroup v1 (value near 2^63)
+            if limit > 1e18:
+                limit = psutil.virtual_memory().total
 
         return (usage / limit) * 100
-    except:
+    except (OSError, ValueError, ZeroDivisionError):
         # Non-container or unsupported: fallback to host
         import psutil
         return psutil.virtual_memory().percent
