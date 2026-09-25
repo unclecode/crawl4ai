@@ -807,71 +807,48 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 status_code = 200
                 response_headers = {}
 
-            # Wait for body element and visibility
-            try:
-                await page.wait_for_selector("body", state="attached", timeout=30000)
+            # Wait for body element and visibility.
+            # Skip entirely when ignore_body_visibility=True (the default) to
+            # avoid the hardcoded 30s attached wait and the visibility wait on
+            # pages where body is never visible (ng-cloak / v-cloak). See #2129.
+            # This supersedes the #2144 wasted-wait warning: with both waits
+            # skipped there is no budget-burning wait left to warn about, so the
+            # per-crawl delay that warning reported no longer exists.
+            if not config.ignore_body_visibility:
+                try:
+                    await page.wait_for_selector("body", state="attached", timeout=30000)
 
-                # Use the new check_visibility function with csp_compliant_wait
-                _visibility_wait_start = time.perf_counter()
-                is_visible = await self.csp_compliant_wait(
-                    page,
-                    """() => {
-                        const element = document.body;
-                        if (!element) return false;
-                        const style = window.getComputedStyle(element);
-                        const isVisible = style.display !== 'none' && 
-                                        style.visibility !== 'hidden' && 
-                                        style.opacity !== '0';
-                        return isVisible;
-                    }""",
-                    timeout=config.body_visibility_timeout,
-                )
-
-                _visibility_wait_ms = (
-                    time.perf_counter() - _visibility_wait_start
-                ) * 1000
-
-                # csp_compliant_wait also returns False when the evaluation itself
-                # fails (page closed, context destroyed by a redirect), which costs
-                # no time — only warn about a wait that actually burned its budget.
-                if (
-                    not is_visible
-                    and config.ignore_body_visibility
-                    and _visibility_wait_ms >= config.body_visibility_timeout * 0.9
-                ):
-                    # The wait timed out and its result is about to be discarded, so
-                    # the crawl still succeeds — just this much slower, on every crawl
-                    # of this page. force_verbose because the whole point is that the
-                    # delay is otherwise invisible, and the servers and batch jobs that
-                    # most need to see it run with verbose off (see #2144).
-                    self.logger.warning(
-                        message=(
-                            "Body never became visible after {elapsed}ms — the page may "
-                            "use ng-cloak/v-cloak. This delay is added to every crawl of "
-                            "this page; lower CrawlerRunConfig.body_visibility_timeout "
-                            "to shorten it."
-                        ),
-                        tag="WARNING",
-                        params={"elapsed": round(_visibility_wait_ms)},
-                        force_verbose=True,
+                    # Use the new check_visibility function with csp_compliant_wait
+                    is_visible = await self.csp_compliant_wait(
+                        page,
+                        """() => {
+                            const element = document.body;
+                            if (!element) return false;
+                            const style = window.getComputedStyle(element);
+                            const isVisible = style.display !== 'none' && 
+                                            style.visibility !== 'hidden' && 
+                                            style.opacity !== '0';
+                            return isVisible;
+                        }""",
+                        timeout=config.body_visibility_timeout,
                     )
 
-                if not is_visible and not config.ignore_body_visibility:
+                    if not is_visible:
+                        visibility_info = await self.check_visibility(page)
+                        raise Error(f"Body element is hidden: {visibility_info}")
+
+                except Error:
                     visibility_info = await self.check_visibility(page)
-                    raise Error(f"Body element is hidden: {visibility_info}")
 
-            except Error:
-                visibility_info = await self.check_visibility(page)
+                    if self.browser_config.verbose:
+                        self.logger.debug(
+                            message="Body visibility info: {info}",
+                            tag="DEBUG",
+                            params={"info": visibility_info},
+                        )
 
-                if self.browser_config.verbose:
-                    self.logger.debug(
-                        message="Body visibility info: {info}",
-                        tag="DEBUG",
-                        params={"info": visibility_info},
-                    )
-
-                if not config.ignore_body_visibility:
-                    raise Error(f"Body element is hidden: {visibility_info}")
+                    if not config.ignore_body_visibility:
+                        raise Error(f"Body element is hidden: {visibility_info}")
 
             # try:
             #     await page.wait_for_selector("body", state="attached", timeout=30000)
