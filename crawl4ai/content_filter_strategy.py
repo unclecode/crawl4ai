@@ -697,9 +697,11 @@ class PruningContentFilter(RelevantContentFilter):
             element.extract()
 
     def _remove_unwanted_tags(self, soup):
-        """Removes unwanted tags"""
+        """Removes unwanted tags, skipping any that match preserve_tags or preserve_classes."""
         for tag in self.excluded_tags:
             for element in soup.find_all(tag):
+                if self._is_preserved(element):
+                    continue
                 element.decompose()
 
     def _is_preserved(self, node):
@@ -724,6 +726,13 @@ class PruningContentFilter(RelevantContentFilter):
 
         # Skip pruning for preserved nodes — always keep them
         if self._is_preserved(node):
+            return
+
+        # Skip scoring/pruning entirely inside <pre>/<code> blocks where whitespace
+        # is significant — preserves whitespace-only spans (e.g. syntax-highlighter
+        # <span class="w"> </span>) that would otherwise be scored below threshold
+        # and removed, corrupting code formatting in fit_markdown.
+        if node.name in ("pre", "code"):
             return
 
         text_len = len(node.get_text(strip=True))

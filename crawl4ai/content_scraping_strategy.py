@@ -612,6 +612,52 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
         return root
 
 
+    def _balance_noscript_tags(self, html: str) -> str:
+        """
+        Balance <noscript> tags before parsing to match browser behavior.
+
+        When scripting is enabled, browsers treat <noscript> contents as raw text and
+        close the element at the first </noscript>. Lazy-load plugins sometimes create
+        nested noscript (e.g. LiteSpeed Cache + GTM), and page.content() serialization
+        drops the stray closing tag, leaving more <noscript> opens than closes.
+        lxml then parses with scripting disabled, nesting subsequent document content
+        inside the still-open <noscript> which is then removed entirely.
+
+        This pre-processor inserts </noscript> close tags so that every <noscript> open
+        is closed by the very next </noscript>, matching browser semantics.
+        """
+        NOSCRIPT_OPEN = re.compile(r"<noscript\b[^>]*>", re.IGNORECASE)
+        NOSCRIPT_CLOSE = re.compile(r"</noscript\s*>", re.IGNORECASE)
+
+        opens = [(m.start(), m.end()) for m in NOSCRIPT_OPEN.finditer(html)]
+        closes = [m.start() for m in NOSCRIPT_CLOSE.finditer(html)]
+
+        if len(opens) <= len(closes):
+            return html
+
+        close_positions = iter(closes)
+        next_close = next(close_positions, None)
+        insertions = []
+
+        for open_start, open_end in opens:
+            if next_close is not None and next_close > open_start:
+                next_close = next(close_positions, None)
+            else:
+                insertions.append(open_end)
+                next_close = next(close_positions, None)
+
+        if not insertions:
+            return html
+
+        result = []
+        last = len(html)
+        for pos in reversed(insertions):
+            result.insert(0, html[pos:last])
+            result.insert(0, "</noscript>")
+            last = pos
+        result.insert(0, html[:last])
+        return "".join(result)
+
     def _scrap(
         self,
         url: str,
@@ -626,6 +672,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
 
         success = True
         try:
+            html = self._balance_noscript_tags(html)
             doc = lhtml.document_fromstring(html)
             # Match BeautifulSoup's behavior of using body or full doc
             # body = doc.xpath('//body')[0] if doc.xpath('//body') else doc

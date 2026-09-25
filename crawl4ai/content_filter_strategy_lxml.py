@@ -134,6 +134,8 @@ class PruningContentFilterLXML(PruningContentFilter):
         min_word_threshold: int = None,
         threshold_type: str = "fixed",
         threshold: float = 0.48,
+        preserve_classes: list = None,
+        preserve_tags: list = None,
     ):
         # Mirror PruningContentFilter's explicit signature (rather than
         # *args/**kwargs) so config (de)serialization can introspect and
@@ -143,6 +145,8 @@ class PruningContentFilterLXML(PruningContentFilter):
             min_word_threshold=min_word_threshold,
             threshold_type=threshold_type,
             threshold=threshold,
+            preserve_classes=preserve_classes,
+            preserve_tags=preserve_tags,
         )
         # word count is only needed when a min-word threshold is active; skip
         # the per-fragment space counting otherwise.
@@ -151,6 +155,18 @@ class PruningContentFilterLXML(PruningContentFilter):
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
+    def _is_preserved(self, node) -> bool:
+        """Check if a node matches the preserve whitelist."""
+        if self.preserve_tags and node.tag in self.preserve_tags:
+            return True
+        if self.preserve_classes:
+            node_classes_raw = node.get("class")
+            if node_classes_raw:
+                node_classes = set(node_classes_raw.split())
+                if node_classes & self.preserve_classes:
+                    return True
+        return False
+
     def filter_content(self, html: str, min_word_threshold: int = None) -> List[str]:
         if not html or not isinstance(html, str):
             return []
@@ -169,13 +185,15 @@ class PruningContentFilterLXML(PruningContentFilter):
         # (matching BeautifulSoup's decompose semantics).
         metrics = self._compute_metrics(body)
 
-        # Now physically drop comments and unwanted tags. ``with_tail=False``
-        # keeps the text that followed them (merged into the previous sibling /
-        # parent) so the serialized output still contains it, exactly as a
-        # BeautifulSoup decompose would leave it.
+        # Now physically drop comments and unwanted tags (skipping preserved ones).
+        # ``with_tail=False`` keeps the text that followed them (merged into the
+        # previous sibling / parent) so the serialized output still contains it,
+        # exactly as a BeautifulSoup decompose would leave it.
         etree.strip_elements(body, etree.Comment, with_tail=False)
-        if self.excluded_tags:
-            etree.strip_elements(body, *self.excluded_tags, with_tail=False)
+        for tag in self.excluded_tags:
+            for el in list(body.iter(tag)):
+                if el.getparent() is not None and not self._is_preserved(el):
+                    el.drop_tree()
 
         body_metrics = metrics.get(body)
         if body_metrics is None:
@@ -194,6 +212,12 @@ class PruningContentFilterLXML(PruningContentFilter):
             node = stack.pop()
             for child in list(node):
                 if not isinstance(child.tag, str):
+                    continue
+                # Never prune inside <pre>/<code>: whitespace is significant
+                # inside code blocks (syntax-highlighter whitespace spans would
+                # otherwise be removed, corrupting formatting).
+                if child.tag in ("pre", "code") or self._is_preserved(child):
+                    stack.append(child)
                     continue
                 child_metrics = metrics.get(child)
                 if child_metrics is None or self._should_remove(child, child_metrics, metrics):
@@ -227,7 +251,8 @@ class PruningContentFilterLXML(PruningContentFilter):
         need_words = self._need_words
         excluded = self.excluded_tags
 
-        # Pre-order collection that does not descend into excluded subtrees.
+        # Pre-order collection that does not descend into excluded subtrees
+        # unless they match the preserve whitelist.
         nodes = []
         stack = [body]
         while stack:
@@ -235,7 +260,7 @@ class PruningContentFilterLXML(PruningContentFilter):
             nodes.append(el)
             for child in el:
                 ct = child.tag
-                if isinstance(ct, str) and ct not in excluded:
+                if isinstance(ct, str) and (ct not in excluded or self._is_preserved(child)):
                     stack.append(child)
 
         for el in reversed(nodes):
@@ -259,7 +284,7 @@ class PruningContentFilterLXML(PruningContentFilter):
 
             for child in el:
                 ct = child.tag
-                kept_element = isinstance(ct, str) and ct not in excluded
+                kept_element = isinstance(ct, str) and (ct not in excluded or self._is_preserved(child))
 
                 if kept_element:
                     cm = metrics[child]
