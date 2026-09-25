@@ -172,6 +172,7 @@ class AsyncWebCrawler:
         
         self.url_seeder: Optional[AsyncUrlSeeder] = None
         self._domain_mapper: Optional[DomainMapper] = None
+        self._dispatchers = []
 
     async def start(self):
         """
@@ -194,7 +195,14 @@ class AsyncWebCrawler:
         1. Clean up browser resources
         2. Close any open pages and contexts
         """
-        await self.crawler_strategy.__aexit__(None, None, None)
+        try:
+            for dispatcher in self._dispatchers:
+                cleanup = getattr(dispatcher, "cleanup", None)
+                if cleanup:
+                    await cleanup()
+        finally:
+            self._dispatchers.clear()
+            await self.crawler_strategy.__aexit__(None, None, None)
 
     async def __aenter__(self):
         return await self.start()
@@ -1066,6 +1074,9 @@ class AsyncWebCrawler:
                 ),
             )
 
+        if dispatcher not in self._dispatchers:
+            self._dispatchers.append(dispatcher)
+
         def transform_result(task_result):
             return (
                 setattr(
@@ -1108,14 +1119,23 @@ class AsyncWebCrawler:
 
         if stream:
             async def result_transformer():
+                inner_stream = dispatcher.run_urls_stream(
+                    crawler=self, urls=urls, config=config
+                )
                 try:
-                    async for task_result in dispatcher.run_urls_stream(
-                        crawler=self, urls=urls, config=config
-                    ):
+                    async for task_result in inner_stream:
                         yield transform_result(task_result)
+                except GeneratorExit:
+                    # Handle early stream breakage (e.g., break in a loop) explicitly
+                    pass
                 finally:
-                    # Auto-release session after streaming completes
-                    await maybe_release_session()
+                    try:
+                        cleanup = getattr(dispatcher, "cleanup", None)
+                        if cleanup:
+                            await cleanup()
+                    finally:
+                        # Auto-release session after streaming completes
+                        await maybe_release_session()
 
             return result_transformer()
         else:
