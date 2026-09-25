@@ -268,7 +268,6 @@ async def restart_browser(req: KillBrowserRequest):
         from crawler_pool import (HOT_POOL, COLD_POOL, LAST_USED,
                                   USAGE_COUNT, LOCK, DEFAULT_CONFIG_SIG,
                                   restart_permanent)
-        from crawl4ai import BrowserConfig
         from contextlib import suppress
 
         # Handle permanent browser restart
@@ -277,13 +276,13 @@ async def restart_browser(req: KillBrowserRequest):
             # re-create outside it. Doing any of that here, under LOCK, is what
             # used to deadlock the pool: init_permanent() takes the same
             # non-reentrant lock.
-            from utils import load_config
-            from server import _browser_extra_args
-            config = load_config()
-            await restart_permanent(BrowserConfig(
-                extra_args=_browser_extra_args(),
-                **config["crawler"]["browser"].get("kwargs", {}),
-            ))
+            #
+            # Rebuilt with the same builder startup uses. It applies the egress
+            # hardening, and the pool signature it yields is the one incoming
+            # requests are matched against; a config assembled here would give
+            # the restarted browser a signature no request carries.
+            from server import get_default_browser_config
+            await restart_permanent(get_default_browser_config())
 
             logger.info("🔄 Restarted permanent browser")
             return {"success": True, "restarted": "permanent"}
