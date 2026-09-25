@@ -1225,7 +1225,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
             if value is None:
                 break
 
-        if "transform" in field:
+        if "transform" in field and value is not None:
             value = self._apply_transform(value, field["transform"])
 
         return value if value is not None else field.get("default")
