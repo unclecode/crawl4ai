@@ -601,6 +601,8 @@ else:
 
 ```
 
+With several URLs, `results` are not in the order of `urls`: each one is appended as its page completes. Match each result to its request by its `url` field, not by position.
+
 #### Streaming Results
 
 ```python
