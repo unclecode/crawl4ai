@@ -647,6 +647,57 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
             await _dispose_crawler(crawler)
 
 
+def _load_crawler_configs(
+    crawler_configs: List[dict],
+    base_config: Optional[dict] = None,
+    stream: bool = False,
+) -> List[CrawlerRunConfig]:
+    """Deserialize a per-URL crawler_configs list under the untrusted gate.
+    Shared by the streaming and non-streaming crawl handlers so both apply the
+    same boundary and wire the PDF URL validator into every entry."""
+    from crawl4ai.processors.pdf import PDFContentScrapingStrategy
+
+    config_list = [
+        CrawlerRunConfig.load(cc, provenance=Provenance.UNTRUSTED)
+        for cc in crawler_configs
+    ]
+    for cfg in config_list:
+        for key, value in (base_config or {}).items():
+            if hasattr(cfg, key):
+                current_value = getattr(cfg, key)
+                if current_value is None or current_value == "":
+                    setattr(cfg, key, value)
+        # SSRF: per-URL PDF strategies need the validator wired too
+        if isinstance(cfg.scraping_strategy, PDFContentScrapingStrategy):
+            cfg.scraping_strategy.url_validator = validate_url_destination
+        if stream:
+            # arun_many takes the stream flag from the first config of a list.
+            cfg.stream = True
+    return config_list
+
+
+def _needs_pdf_crawler(
+    crawler_config: CrawlerRunConfig,
+    config_list: Optional[List[CrawlerRunConfig]] = None,
+) -> bool:
+    """Whether the crawl runs on PDFCrawlerStrategy. A per-URL list decides when
+    present, since it is what arun_many runs. One crawler serves every URL of a
+    request, so a list mixing PDF and browser entries is refused rather than run
+    on the wrong one."""
+    from crawl4ai.processors.pdf import PDFContentScrapingStrategy
+
+    configs = config_list or [crawler_config]
+    pdf = [
+        isinstance(cfg.scraping_strategy, PDFContentScrapingStrategy) for cfg in configs
+    ]
+    if any(pdf) and not all(pdf):
+        raise HTTPException(
+            status_code=400,
+            detail="crawler_configs cannot mix PDFContentScrapingStrategy with other scraping strategies in one request",
+        )
+    return all(pdf)
+
+
 def _normalize_and_validate_seeds(urls: List[str]) -> List[str]:
     """Prefix bare hosts with https:// and SSRF-validate every seed URL's
     destination. Shared by the streaming and non-streaming crawl handlers so a
@@ -699,42 +750,39 @@ async def handle_crawl_request(
             ) if config["crawler"]["rate_limiter"]["enabled"] else None
         )
         
+        base_config = config["crawler"]["base_config"]
+        # Per-URL config list: deserialize each and apply base_config. Loaded
+        # before a crawler is chosen, because the list decides which one runs.
+        config_list = (
+            _load_crawler_configs(crawler_configs, base_config)
+            if crawler_configs
+            else None
+        )
+
         from crawler_pool import get_crawler, release_crawler
         from crawl4ai.processors.pdf import PDFContentScrapingStrategy, PDFCrawlerStrategy
-        is_pdf_crawl = isinstance(crawler_config.scraping_strategy, PDFContentScrapingStrategy)
+        is_pdf_crawl = _needs_pdf_crawler(crawler_config, config_list)
         if is_pdf_crawl:
             if hooks_config:
                 # PDFCrawlerStrategy has no browser page, so hooks can't attach to it
                 raise HTTPException(status_code=400, detail="Hooks are not supported with PDFContentScrapingStrategy")
             # SSRF protection: vet the PDF download URL and every redirect hop
-            crawler_config.scraping_strategy.url_validator = validate_url_destination
+            if isinstance(crawler_config.scraping_strategy, PDFContentScrapingStrategy):
+                crawler_config.scraping_strategy.url_validator = validate_url_destination
             # Use PDFCrawlerStrategy when scraping PDFs, as headless Chromium can't render PDFs inline
             crawler = AsyncWebCrawler(crawler_strategy=PDFCrawlerStrategy())
             await crawler.start()
         else:
             crawler = await get_crawler(browser_config)
-        
+
         # Attach declarative hooks if provided
         hooks_status = {}
         if hooks_config:
             hooks_status = _attach_declarative_hooks(crawler, hooks_config)
             logger.info(f"Hooks attachment status: {hooks_status['status']}")
-        
-        base_config = config["crawler"]["base_config"]
 
         # Build the config(s) to pass to arun/arun_many
-        if crawler_configs and len(urls) > 1:
-            # Per-URL config list: deserialize each and apply base_config
-            config_list = [CrawlerRunConfig.load(cc, provenance=Provenance.UNTRUSTED) for cc in crawler_configs]
-            for cfg in config_list:
-                for key, value in base_config.items():
-                    if hasattr(cfg, key):
-                        current_value = getattr(cfg, key)
-                        if current_value is None or current_value == "":
-                            setattr(cfg, key, value)
-                # SSRF: per-URL PDF strategies need the validator wired too
-                if isinstance(cfg.scraping_strategy, PDFContentScrapingStrategy):
-                    cfg.scraping_strategy.url_validator = validate_url_destination
+        if config_list:
             effective_config = config_list
         else:
             # Single config (original behavior)
@@ -746,9 +794,12 @@ async def handle_crawl_request(
             effective_config = crawler_config
 
         results = []
-        func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
+        # arun takes one config, so a per-URL list goes to arun_many even for
+        # a single URL; arun_many matches each URL against the list.
+        use_many = len(urls) > 1 or isinstance(effective_config, list)
+        func = getattr(crawler, "arun_many" if use_many else "arun")
         partial_func = partial(func,
-                                urls[0] if len(urls) == 1 else urls,
+                                urls if use_many else urls[0],
                                 config=effective_config,
                                 dispatcher=dispatcher)
         # Optional per-crawl wall-clock deadline (config limits.wall_clock_s; 0 = none).
@@ -891,7 +942,8 @@ async def handle_stream_crawl_request(
     browser_config: dict,
     crawler_config: dict,
     config: dict,
-    hooks_config: Optional[dict] = None
+    hooks_config: Optional[dict] = None,
+    crawler_configs: Optional[List[dict]] = None,
 ) -> Tuple[AsyncWebCrawler, AsyncGenerator, Optional[Dict]]:
     """Handle streaming crawl requests with optional hooks."""
     hooks_info = None
@@ -916,6 +968,11 @@ async def handle_stream_crawl_request(
 
         clamp_deep_crawl(crawler_config)
         crawler_config.stream = True
+        config_list = (
+            _load_crawler_configs(crawler_configs, stream=True)
+            if crawler_configs
+            else None
+        )
 
         # Deep crawl streaming supports exactly one start URL
         if crawler_config.deep_crawl_strategy is not None and len(urls) != 1:
@@ -929,12 +986,13 @@ async def handle_stream_crawl_request(
 
         from crawler_pool import get_crawler
         from crawl4ai.processors.pdf import PDFContentScrapingStrategy, PDFCrawlerStrategy
-        if isinstance(crawler_config.scraping_strategy, PDFContentScrapingStrategy):
+        if _needs_pdf_crawler(crawler_config, config_list):
             if hooks_config:
                 # PDFCrawlerStrategy has no browser page, so hooks can't attach to it
                 raise HTTPException(status_code=400, detail="Hooks are not supported with PDFContentScrapingStrategy")
             # SSRF protection: vet the PDF download URL and every redirect hop
-            crawler_config.scraping_strategy.url_validator = validate_url_destination
+            if isinstance(crawler_config.scraping_strategy, PDFContentScrapingStrategy):
+                crawler_config.scraping_strategy.url_validator = validate_url_destination
             # Use PDFCrawlerStrategy when scraping PDFs, as headless Chromium can't render PDFs inline
             crawler = AsyncWebCrawler(crawler_strategy=PDFCrawlerStrategy())
             await crawler.start()
@@ -964,7 +1022,7 @@ async def handle_stream_crawl_request(
             )
             results_gen = await crawler.arun_many(
                 urls=urls,
-                config=crawler_config,
+                config=config_list or crawler_config,
                 dispatcher=dispatcher
             )
 
