@@ -110,7 +110,7 @@ class BrowserConfig:
     - `user_agent_mode`: Set to `"random"` for randomization (helps fight bot detection).
 
 12.⠀**`text_mode`** & **`light_mode`**
-    - `text_mode=True` disables images, possibly speeding up text-only crawls.
+    - `text_mode=True` disables images, possibly speeding up text-only crawls. JavaScript still runs; set `java_script_enabled=False` to turn it off.
     - `light_mode=True` turns off certain background features for performance.
 
 13.⠀**`avoid_ads`** & **`avoid_css`**
