@@ -1443,7 +1443,7 @@ class BrowserConfig:
    - Custom User-Agent string. If `None`, a default is used.  
    - You can also set `user_agent_mode="random"` for randomization (if you want to fight bot detection).
 9. **`text_mode`** & **`light_mode`**:
-   - `text_mode=True` disables images, possibly speeding up text-only crawls.
+   - `text_mode=True` disables images, possibly speeding up text-only crawls. JavaScript still runs; set `java_script_enabled=False` to turn it off.
    - `light_mode=True` turns off certain background features for performance.
 10. **`avoid_ads`** & **`avoid_css`**:
     - `avoid_ads=True` blocks requests to common ad and tracker domains (Google Analytics, DoubleClick, Facebook, Hotjar, etc.) at the browser context level. Reduces network overhead and memory usage.
