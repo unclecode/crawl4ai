@@ -92,7 +92,7 @@ class TestConfigListLogic:
         with open("deploy/docker/api.py") as f:
             source = f.read()
         # Should check crawler_configs and build a list
-        assert "_load_crawler_configs(crawler_configs, base_config) if crawler_configs else None" in source
+        assert "_load_crawler_configs(crawler_configs, base_config)" in source
         assert "config_list" in source
 
     def test_api_falls_back_to_single_config(self):

@@ -657,7 +657,10 @@ def _load_crawler_configs(
     same boundary and wire the PDF URL validator into every entry."""
     from crawl4ai.processors.pdf import PDFContentScrapingStrategy
 
-    config_list = [CrawlerRunConfig.load(cc, provenance=Provenance.UNTRUSTED) for cc in crawler_configs]
+    config_list = [
+        CrawlerRunConfig.load(cc, provenance=Provenance.UNTRUSTED)
+        for cc in crawler_configs
+    ]
     for cfg in config_list:
         for key, value in (base_config or {}).items():
             if hasattr(cfg, key):
@@ -684,7 +687,9 @@ def _needs_pdf_crawler(
     from crawl4ai.processors.pdf import PDFContentScrapingStrategy
 
     configs = config_list or [crawler_config]
-    pdf = [isinstance(cfg.scraping_strategy, PDFContentScrapingStrategy) for cfg in configs]
+    pdf = [
+        isinstance(cfg.scraping_strategy, PDFContentScrapingStrategy) for cfg in configs
+    ]
     if any(pdf) and not all(pdf):
         raise HTTPException(
             status_code=400,
@@ -748,7 +753,11 @@ async def handle_crawl_request(
         base_config = config["crawler"]["base_config"]
         # Per-URL config list: deserialize each and apply base_config. Loaded
         # before a crawler is chosen, because the list decides which one runs.
-        config_list = _load_crawler_configs(crawler_configs, base_config) if crawler_configs else None
+        config_list = (
+            _load_crawler_configs(crawler_configs, base_config)
+            if crawler_configs
+            else None
+        )
 
         from crawler_pool import get_crawler, release_crawler
         from crawl4ai.processors.pdf import PDFContentScrapingStrategy, PDFCrawlerStrategy
@@ -960,7 +969,9 @@ async def handle_stream_crawl_request(
         clamp_deep_crawl(crawler_config)
         crawler_config.stream = True
         config_list = (
-            _load_crawler_configs(crawler_configs, stream=True) if crawler_configs else None
+            _load_crawler_configs(crawler_configs, stream=True)
+            if crawler_configs
+            else None
         )
 
         # Deep crawl streaming supports exactly one start URL
