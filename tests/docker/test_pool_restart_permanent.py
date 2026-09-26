@@ -71,7 +71,9 @@ def pool():
     }
     fake_utils.get_container_memory_percent = lambda: 10.0
 
-    saved = {name: sys.modules.get(name) for name in ("crawl4ai", "utils", "crawler_pool")}
+    saved = {
+        name: sys.modules.get(name) for name in ("crawl4ai", "utils", "crawler_pool")
+    }
     sys.modules["crawl4ai"] = fake_crawl4ai
     sys.modules["utils"] = fake_utils
     sys.modules.pop("crawler_pool", None)
