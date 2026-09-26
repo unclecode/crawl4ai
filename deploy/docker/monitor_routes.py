@@ -282,6 +282,7 @@ async def restart_browser(req: KillBrowserRequest):
             # requests are matched against; a config assembled here would give
             # the restarted browser a signature no request carries.
             from server import get_default_browser_config
+
             await restart_permanent(get_default_browser_config())
 
             logger.info("🔄 Restarted permanent browser")

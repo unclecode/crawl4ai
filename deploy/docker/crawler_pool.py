@@ -159,6 +159,7 @@ async def init_permanent(cfg: BrowserConfig):
         LAST_USED[DEFAULT_CONFIG_SIG] = time.time()
         USAGE_COUNT[DEFAULT_CONFIG_SIG] = 0
 
+
 async def restart_permanent(cfg: BrowserConfig):
     """Replace the permanent browser with a freshly started one.
 
@@ -184,7 +185,9 @@ async def restart_permanent(cfg: BrowserConfig):
         try:
             await asyncio.wait_for(old.close(), timeout=60)
         except asyncio.TimeoutError:
-            logger.warning("Timed out closing old permanent browser; continuing restart")
+            logger.warning(
+                "Timed out closing old permanent browser; continuing restart"
+            )
         except Exception:
             pass
 
