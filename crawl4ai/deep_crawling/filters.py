@@ -164,6 +164,9 @@ class URLPatternFilter(URLFilter):
 
     def _categorize_pattern(self, pattern: str) -> int:
         """Categorize pattern for specialized handling"""
+        if not self.use_glob:
+            return self.PATTERN_TYPES["REGEX"]
+
         if not isinstance(pattern, str):
             return self.PATTERN_TYPES["PATH"]
 
@@ -186,11 +189,8 @@ class URLPatternFilter(URLFilter):
         """Add pattern to appropriate matcher"""
         if pattern_type == self.PATTERN_TYPES["REGEX"]:
             # For regex patterns, compile directly without glob translation
-            if isinstance(pattern, str) and (
-                pattern.startswith("^") or pattern.endswith("$") or "\\d" in pattern
-            ):
-                self._path_patterns.append(re.compile(pattern))
-                return
+            self._path_patterns.append(re.compile(pattern))
+            return
         elif pattern_type == self.PATTERN_TYPES["SUFFIX"]:
             self._simple_suffixes.add(pattern[2:])
         elif pattern_type == self.PATTERN_TYPES["PREFIX"]:
