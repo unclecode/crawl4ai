@@ -19,7 +19,9 @@ def test_certificate_connects_to_url_endpoint(monkeypatch, url, hostname, port):
     connect = MagicMock()
     context = MagicMock()
     # Stop after the TLS handshake: certificate parsing is independent of routing.
-    context.wrap_socket.return_value.__enter__.return_value.getpeercert.return_value = None
+    context.wrap_socket.return_value.__enter__.return_value.getpeercert.return_value = (
+        None
+    )
     monkeypatch.setattr("crawl4ai.ssl_certificate.socket.create_connection", connect)
     monkeypatch.setattr(
         "crawl4ai.ssl_certificate.ssl.create_default_context", lambda: context
