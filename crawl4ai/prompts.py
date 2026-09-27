@@ -1,12 +1,4 @@
-PROMPT_EXTRACT_BLOCKS = """Here is the URL of the webpage:
-<url>{URL}</url>
-
-And here is the cleaned HTML content of that webpage:
-<html>
-{HTML}
-</html>
-
-Your task is to break down this HTML content into semantically relevant blocks, and for each block, generate a JSON object with the following keys:
+PROMPT_EXTRACT_BLOCKS = """Your task is to break down the HTML content (provided below) into semantically relevant blocks, and for each block, generate a JSON object with the following keys:
 
 - index: an integer representing the index of the block in the content
 - content: a list of strings containing the text content of the block
@@ -46,9 +38,7 @@ Please provide your output within <blocks> tags, like this:
 }]
 </blocks>
 
-Remember, the output should be a complete, parsable JSON wrapped in <blocks> tags, with no omissions or errors. The JSON objects should semantically break down the content into relevant blocks, maintaining the original order."""
-
-PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION = """Here is the URL of the webpage:
+Here is the URL of the webpage:
 <url>{URL}</url>
 
 And here is the cleaned HTML content of that webpage:
@@ -56,7 +46,9 @@ And here is the cleaned HTML content of that webpage:
 {HTML}
 </html>
 
-Your task is to break down this HTML content into semantically relevant blocks, following the provided user's REQUEST, and for each block, generate a JSON object with the following keys:
+Remember, the output should be a complete, parsable JSON wrapped in <blocks> tags, with no omissions or errors. The JSON objects should semantically break down the content into relevant blocks, maintaining the original order."""
+
+PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION = """Your task is to break down the HTML content (provided below) into semantically relevant blocks, following the provided user's REQUEST, and for each block, generate a JSON object with the following keys:
 
 - index: an integer representing the index of the block in the content
 - content: a list of strings containing the text content of the block
@@ -103,16 +95,17 @@ Please provide your output within <blocks> tags, like this:
 
 **Make sure to follow the user instruction to extract blocks aligin with the instruction.**
 
-Remember, the output should be a complete, parsable JSON wrapped in <blocks> tags, with no omissions or errors. The JSON objects should semantically break down the content into relevant blocks, maintaining the original order."""
-
-PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION = """Here is the content from the URL:
+Here is the URL of the webpage:
 <url>{URL}</url>
 
-<url_content>
+And here is the cleaned HTML content of that webpage:
+<html>
 {HTML}
-</url_content>
+</html>
 
-The user has made the following request for what information to extract from the above content:
+Remember, the output should be a complete, parsable JSON wrapped in <blocks> tags, with no omissions or errors. The JSON objects should semantically break down the content into relevant blocks, maintaining the original order."""
+
+PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION = """The user has made the following request for what information to extract from the above content:
 
 <user_request>
 {REQUEST}
@@ -139,17 +132,17 @@ Avoid Common Mistakes:
 - Do not miss closing </blocks> tag at the end of the JSON output.
 - Do not generate the Python code show me how to do the task, this is your task to extract the information and return it in JSON format.
 
-Result
-Output the final list of JSON objects, wrapped in <blocks>...</blocks> XML tags. Make sure to close the tag properly."""
-
-PROMPT_EXTRACT_INFERRED_SCHEMA = """Here is the content from the URL:
+Here is the content from the URL:
 <url>{URL}</url>
 
 <url_content>
 {HTML}
 </url_content>
 
-Please carefully read the URL content and the user's request. Analyze the page structure and infer the most appropriate JSON schema based on the content and request.
+Result
+Output the final list of JSON objects, wrapped in <blocks>...</blocks> XML tags. Make sure to close the tag properly."""
+
+PROMPT_EXTRACT_INFERRED_SCHEMA = """Please carefully read the URL content and the user's request. Analyze the page structure and infer the most appropriate JSON schema based on the content and request.
 
 Extraction Strategy:
 1. First, determine if the page contains repetitive items (like multiple products, articles, etc.) or a single content item (like a single article or page).
@@ -197,6 +190,13 @@ Output the final list of JSON objects, wrapped in <blocks>...</blocks> XML tags.
 DO NOT ADD ANY PRE OR POST COMMENTS. JUST RETURN THE JSON OBJECTS INSIDE <blocks>...</blocks> TAGS.
 
 CRITICAL: The content inside the <blocks> tags MUST be a direct array of JSON objects (starting with '[' and ending with ']'), not a dictionary/object containing an array. For example, use <blocks>[{...}, {...}]</blocks> instead of <blocks>{"items": [{...}, {...}]}</blocks>. This is essential for proper parsing.
+
+Here is the content from the URL:
+<url>{URL}</url>
+
+<url_content>
+{HTML}
+</url_content>
 """
 
 PROMPT_FILTER_CONTENT = """Your task is to filter and convert HTML content into clean, focused markdown that's optimized for use with LLMs and information retrieval systems.
