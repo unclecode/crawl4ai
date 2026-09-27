@@ -116,12 +116,12 @@ schema = {
         {
             "name": str,      # Field name
             "selector": str,  # CSS selector
-            "type": str,     # Field type: "text", "attribute", "html", "regex"
+            "type": str,      # Field type: "text", "attribute", "html", "regex"
             "attribute": str, # For type="attribute"
-            "pattern": str,  # For type="regex"
-            "transform": str, # Optional: "lowercase", "uppercase", "strip"
+            "pattern": str,   # For type="regex"
+            "transform": str, # Optional: "lowercase", "uppercase", "strip", "int", "float", "bool"
             "default": Any,   # Default value if extraction fails
-            "source": str,   # Optional: navigate to sibling first, e.g. "+ tr"
+            "source": str,    # Optional: navigate to sibling first, e.g. "+ tr"
         }
     ]
 }
@@ -245,7 +245,7 @@ async with AsyncWebCrawler() as crawler:
         print(f"{item['label']}: {item['value']}")
 ```
 
-### CSS Extraction
+### JSON/CSS Extraction
 
 ```python
 from crawl4ai import JsonCssExtractionStrategy
@@ -265,6 +265,12 @@ schema = {
             "selector": ".price",
             "type": "text",
             "transform": "strip"
+        },
+        {
+            "name": "quantity",
+            "selector": ".quantity",
+            "type": "text",
+            "transform": "int"
         },
         {
             "name": "image",
