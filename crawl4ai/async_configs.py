@@ -3,6 +3,7 @@ import functools
 import importlib
 import os
 import warnings
+from urllib.parse import urlparse
 import requests
 from .config import (
     DEFAULT_PROVIDER,
@@ -681,13 +682,8 @@ class ProxyConfig:
     def _extract_ip_from_server(self) -> Optional[str]:
         """Extract IP address from server URL."""
         try:
-            # Simple extraction assuming http://ip:port format
-            if "://" in self.server:
-                parts = self.server.split("://")[1].split(":")
-                return parts[0]
-            else:
-                parts = self.server.split(":")
-                return parts[0]
+            server = self.server if "://" in self.server else "//" + self.server
+            return urlparse(server).hostname
         except Exception:
             return None
     
