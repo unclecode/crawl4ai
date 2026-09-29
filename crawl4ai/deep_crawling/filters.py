@@ -427,9 +427,6 @@ class DomainFilter(URLFilter):
 
     __slots__ = ("_allowed_domains", "_blocked_domains", "_domain_cache")
 
-    # Regex for fast domain extraction
-    _DOMAIN_REGEX = re.compile(r"://([^/]+)")
-
     def __init__(
         self,
         allowed_domains: Union[str, List[str]] = None,
@@ -453,8 +450,8 @@ class DomainFilter(URLFilter):
     def _normalize_domains(domains: Union[str, List[str]]) -> Set[str]:
         """Fast domain normalization"""
         if isinstance(domains, str):
-            return {domains.lower()}
-        return {d.lower() for d in domains}
+            return {domains.lower().rstrip(".")}
+        return {d.lower().rstrip(".") for d in domains}
     
     @staticmethod
     def _is_subdomain(domain: str, parent_domain: str) -> bool:
@@ -464,9 +461,11 @@ class DomainFilter(URLFilter):
     @staticmethod
     @lru_cache(maxsize=10000)
     def _extract_domain(url: str) -> str:
-        """Ultra-fast domain extraction with regex and caching"""
-        match = DomainFilter._DOMAIN_REGEX.search(url)
-        return match.group(1).lower() if match else ""
+        """Extract the hostname independently of credentials, ports and query text."""
+        try:
+            return (urlparse(url).hostname or "").lower().rstrip(".")
+        except ValueError:
+            return ""
 
     def apply(self, url: str) -> bool:
         """Optimized domain checking with early returns"""
