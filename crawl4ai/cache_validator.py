@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 from enum import Enum
 
+from .egress_policy import proxy_url
 from .utils import compute_head_fingerprint
 
 
@@ -72,9 +73,13 @@ class CacheValidator:
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create the httpx client."""
         if self._client is None:
+            # proxy=None unless an embedder installed one (the Docker server
+            # does). The URL is the caller's crawl URL, so without it this
+            # reached internal hosts directly and followed redirects into them.
             self._client = httpx.AsyncClient(
                 http2=True,
                 timeout=self.timeout,
+                proxy=proxy_url(),
                 follow_redirects=True,
                 headers={"User-Agent": self.user_agent}
             )

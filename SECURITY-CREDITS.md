@@ -25,3 +25,4 @@ We thank the following security researchers for their responsible disclosure:
 | arpe1618 | GitHub: [arpe1618](https://github.com/arpe1618) | Blind SSRF via the robots.txt fetch in RobotsParser.can_fetch bypassing the Docker egress controls (0.9.4) | 2026-09-04 |
 | Ibrahim AlJaafreh - Cystack RedTeam | [LinkedIn](https://www.linkedin.com/in/ibrahim-aljaafreh-glitch/), [cystack.ps](https://cystack.ps) | SSRF with response disclosure via link_preview_config through the URL seeder (0.9.4) | 2026-09-04 |
 | Adam Jordan | GitHub: [adamyordan](https://github.com/adamyordan) | Untrusted-config gate bypass via dict-wrapper laundering, leaking server env vars (0.9.4) | 2026-09-08 |
+| arpe1618 | GitHub: [arpe1618](https://github.com/arpe1618) | Blind SSRF via the CacheValidator freshness check bypassing the Docker egress proxy (0.9.5) | 2026-09-29 |
