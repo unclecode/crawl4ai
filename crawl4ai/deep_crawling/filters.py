@@ -364,13 +364,8 @@ class ContentTypeFilter(URLFilter):
     @lru_cache(maxsize=1000)
     def _extract_extension(url: str) -> str:
         """Extracts file extension from a URL."""
-        # Remove scheme (http://, https://) if present
-        if "://" in url:
-            url = url.split("://", 1)[-1]  # Get everything after '://'
-
-        # Remove domain (everything up to the first '/')
-        path_start = url.find("/")
-        path = url[path_start:] if path_start != -1 else ""
+        # Query parameters and fragments do not identify the resource's extension.
+        path = urlparse(url if "://" in url else "//" + url).path
 
         # Extract last filename in path
         filename = path.rsplit("/", 1)[-1] if "/" in path else ""
@@ -400,7 +395,7 @@ class ContentTypeFilter(URLFilter):
         # Pre-compute extension map for allowed types
         self._ext_map = frozenset(
             ext
-            for ext, mime in self._MIME_MAP.items()
+            for ext, mime in ext_map.items()
             if any(allowed in mime for allowed in self.allowed_types)
         )
 
