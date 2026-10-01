@@ -28,7 +28,7 @@ import aiofiles
 import aiohttp
 import chardet
 from aiohttp.client import ClientTimeout
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 from types import MappingProxyType
 import contextlib
 from functools import partial
@@ -2642,6 +2642,8 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
 
         if username and password:
             # Insert credentials into URL: http://user:pass@host:port
+            username = quote(username, safe='')
+            password = quote(password, safe='')
             if '://' in server:
                 protocol, rest = server.split('://', 1)
                 return f"{protocol}://{username}:{password}@{rest}"
