@@ -222,6 +222,10 @@ UNTRUSTED_FORBIDDEN_FIELDS = {
     "PDFContentScrapingStrategy": {
         "image_save_dir", "save_images_locally",
     },
+    # Same reason, no scalar allowlist. model_name is a HuggingFace repo id
+    # handed to from_pretrained: the caller would pick the weights the server
+    # downloads and unpickles.
+    "CosineStrategy": {"model_name"},
 }
 
 # Field names that must NEVER be set from an untrusted body on ANY allowed

@@ -47,3 +47,14 @@ def test_untrusted_bare_wait_for_is_pinned_to_css():
 def test_trusted_wait_for_unchanged():
     value = "js:() => true"
     assert _load({"wait_for": value}, Provenance.TRUSTED).wait_for == value
+
+
+# ── CosineStrategy.model_name ──────────────────────────────────────────
+
+
+def test_untrusted_cosine_model_name_refused():
+    with pytest.raises(UntrustedConfigError):
+        _load({"extraction_strategy": {
+            "type": "CosineStrategy",
+            "params": {"model_name": "attacker-org/evil-model"},
+        }})
