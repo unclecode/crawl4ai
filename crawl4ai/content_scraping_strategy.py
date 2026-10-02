@@ -564,6 +564,10 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 if parent is not None:
                     # Preserve .tail text before removing the element
                     tail = el.tail
+                    if el.text and not text_content:
+                        # A whitespace-only element separates the words around
+                        # it, so keep one space where it was.
+                        tail = " " + (tail or "")
                     if tail:
                         prev = el.getprevious()
                         if prev is not None:
