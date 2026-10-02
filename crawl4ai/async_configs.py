@@ -226,7 +226,27 @@ UNTRUSTED_FORBIDDEN_FIELDS = {
     # handed to from_pretrained: the caller would pick the weights the server
     # downloads and unpickles.
     "CosineStrategy": {"model_name"},
+    # Caller-supplied regexes. Python's re holds the GIL while it matches, so
+    # one catastrophic-backtracking pattern freezes the whole server, and the
+    # crawl deadline cannot interrupt it. The built-in patterns stay available.
+    "RegexExtractionStrategy": {"custom"},
+    "RegexChunking": {"patterns"},
 }
+
+# Extraction schemas are free-form dicts, so their "regex" field type (a
+# caller-supplied re.search pattern, same ReDoS as above) is checked by walking
+# the schema rather than by field name.
+_SCHEMA_STRATEGIES = {
+    "JsonCssExtractionStrategy", "JsonXPathExtractionStrategy", "JsonLxmlExtractionStrategy",
+}
+
+
+def _has_regex_field(node) -> bool:
+    if isinstance(node, dict):
+        return node.get("type") == "regex" or any(_has_regex_field(v) for v in node.values())
+    if isinstance(node, list):
+        return any(_has_regex_field(v) for v in node)
+    return False
 
 # Field names that must NEVER be set from an untrusted body on ANY allowed
 # type, checked regardless of per-type allowlist. This is the fail-closed
@@ -404,6 +424,12 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
         # Rasterizing every page is the most expensive thing this strategy can
         # do, and nothing about untrusted crawling needs it.
         params["extract_images"] = False
+    elif type_name in _SCHEMA_STRATEGIES:
+        if _has_regex_field(params.get("schema")):
+            raise UntrustedConfigError(
+                f"schema fields of type 'regex' are not permitted on {type_name} "
+                "from an untrusted request"
+            )
     elif type_name == "LinkPreviewConfig":
         # Also no field allowlist, and each link is a separate outbound fetch:
         # unclamped, one request body can order millions of them at any
