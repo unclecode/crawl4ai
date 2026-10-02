@@ -1099,10 +1099,14 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
                     for selector in selectors:
                         try:
+                            # Passed as an argument, never pasted into the
+                            # script: a '"' in the selector used to end the
+                            # string literal and run the rest as JavaScript.
                             content = await self.adapter.evaluate(page,
-                                f"""Array.from(document.querySelectorAll("{selector}"))
+                                """(sel) => Array.from(document.querySelectorAll(sel))
                                     .map(el => el.outerHTML)
-                                    .join('')"""
+                                    .join('')""",
+                                selector,
                             )
                             html_parts.append(content)
                         except Error as e:

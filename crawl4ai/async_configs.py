@@ -372,6 +372,19 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
                 params[f] = _cap_timeout(params[f])
         if isinstance(params.get("max_scroll_steps"), int):
             params["max_scroll_steps"] = min(params["max_scroll_steps"], _MAX_SCROLL_STEPS)
+        # smart_wait runs "js:...", function-shaped values, and any value that
+        # is not a valid selector as page JavaScript -- the js_code ban by
+        # another name. Untrusted callers get CSS selector waits only; the
+        # "css:" branch never falls back to JS.
+        wait_for = params.get("wait_for")
+        if isinstance(wait_for, str) and wait_for.strip():
+            wait_for = wait_for.strip()
+            if wait_for.startswith(("js:", "()", "function")):
+                raise UntrustedConfigError(
+                    "a JavaScript wait_for is not permitted from an untrusted request"
+                )
+            if not wait_for.startswith("css:"):
+                params["wait_for"] = "css:" + wait_for
     elif type_name == "BrowserConfig":
         for f in ("viewport_width", "viewport_height"):
             if isinstance(params.get(f), int):
