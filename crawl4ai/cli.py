@@ -1242,8 +1242,7 @@ Always return valid, properly formatted JSON."""
                 else:
                     click.echo(json.dumps(main_result.model_dump(), indent=2, ensure_ascii=ensure_ascii))
             elif output == "json":
-                print(main_result.extracted_content)
-                extracted_items = json.loads(main_result.extracted_content)
+                extracted_items = _extracted_json(result, all_results)
                 click.echo(json.dumps(extracted_items, indent=2, ensure_ascii=ensure_ascii))
 
             elif output in ["markdown", "md"]:
@@ -1271,8 +1270,12 @@ Always return valid, properly formatted JSON."""
                     else:
                         f.write(json.dumps(main_result.model_dump(), indent=2, ensure_ascii=ensure_ascii))
             elif output == "json":
+                extracted_items = _extracted_json(result, all_results)
                 with open(output_file, "w", encoding="utf-8") as f:
-                    f.write(main_result.extracted_content)
+                    if isinstance(result, list):
+                        f.write(json.dumps(extracted_items, indent=2, ensure_ascii=ensure_ascii))
+                    else:
+                        f.write(main_result.extracted_content)
             elif output in ["markdown", "md"]:
                 with open(output_file, "w", encoding="utf-8") as f:
                     if isinstance(result, list):
@@ -1294,6 +1297,29 @@ Always return valid, properly formatted JSON."""
             
     except Exception as e:
         raise click.ClickException(str(e))
+
+def _extracted_json(result, all_results):
+    """Collect extraction output for `-o json`.
+
+    Returns the parsed extracted_content for a single result, or a list of them
+    (one per page with content) for a deep crawl. Raises a UsageError when no
+    extraction strategy produced any content.
+    """
+    contents = [r.extracted_content for r in all_results if r.extracted_content]
+    if not contents:
+        raise click.UsageError(
+            "-o json outputs extraction results; configure -e/-s/-j, "
+            "or use -o all for full JSON results"
+        )
+
+    def parse(content):
+        try:
+            return json.loads(content)
+        except (TypeError, ValueError):
+            return content
+
+    items = [parse(c) for c in contents]
+    return items if isinstance(result, list) else items[0]
 
 @cli.command("examples")
 def examples_cmd():
