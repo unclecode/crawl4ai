@@ -27,3 +27,5 @@ We thank the following security researchers for their responsible disclosure:
 | Adam Jordan | GitHub: [adamyordan](https://github.com/adamyordan) | Untrusted-config gate bypass via dict-wrapper laundering, leaking server env vars (0.9.4) | 2026-09-08 |
 | arpe1618 | GitHub: [arpe1618](https://github.com/arpe1618) | Blind SSRF via the CacheValidator freshness check bypassing the Docker egress proxy (0.9.5) | 2026-09-29 |
 | Zhixi "Jace" Sun | GitHub: [manus-use](https://github.com/manus-use) | Page JavaScript injection via css_selector and wait_for, HuggingFace model choice via CosineStrategy.model_name, and ReDoS via untrusted regex patterns on the Docker server (0.9.5) | 2026-10-01 |
+| Chunyi Liu | Email report | SQL injection in the docs marketplace backend, DOM XSS in the LinkedIn graph view example, unbounded delay fields in untrusted config bodies, and Docker hardening gaps (header-name validation, DomainFilter host parsing, silent guard failures) (0.9.5) | 2026-09-21 |
+| Julian Godfrey | Email report | Chromium launched with --ignore-certificate-errors so TLS verification was off, and the Chromium sandbox opt-in had no effect (0.9.5) | 2026-10-04 |
