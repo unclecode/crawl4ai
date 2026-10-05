@@ -96,17 +96,22 @@ async def get_apps(
 ):
     """Get apps with optional filters"""
     where_clauses = []
+    params = []
     if category:
-        where_clauses.append(f"category = '{category}'")
+        where_clauses.append("category = ?")
+        params.append(category)
     if type:
-        where_clauses.append(f"type = '{type}'")
+        where_clauses.append("type = ?")
+        params.append(type)
     if featured is not None:
-        where_clauses.append(f"featured = {1 if featured else 0}")
+        where_clauses.append("featured = ?")
+        params.append(1 if featured else 0)
     if sponsored is not None:
-        where_clauses.append(f"sponsored = {1 if sponsored else 0}")
+        where_clauses.append("sponsored = ?")
+        params.append(1 if sponsored else 0)
 
     where = " AND ".join(where_clauses) if where_clauses else None
-    apps = db.get_all('apps', limit=limit, offset=offset, where=where)
+    apps = db.get_all('apps', limit=limit, offset=offset, where=where, params=params)
 
     # Parse JSON fields
     for app in apps:
@@ -118,7 +123,7 @@ async def get_apps(
 @router.get("/apps/{slug}")
 async def get_app(slug: str):
     """Get single app by slug"""
-    apps = db.get_all('apps', where=f"slug = '{slug}'", limit=1)
+    apps = db.get_all('apps', where="slug = ?", params=[slug], limit=1)
     if not apps:
         raise HTTPException(status_code=404, detail="App not found")
 
@@ -135,8 +140,9 @@ async def get_articles(
     offset: int = Query(default=0)
 ):
     """Get articles with optional category filter"""
-    where = f"category = '{category}'" if category else None
-    articles = db.get_all('articles', limit=limit, offset=offset, where=where)
+    where = "category = ?" if category else None
+    params = [category] if category else []
+    articles = db.get_all('articles', limit=limit, offset=offset, where=where, params=params)
 
     # Parse JSON fields
     for article in articles:
@@ -150,7 +156,7 @@ async def get_articles(
 @router.get("/articles/{slug}")
 async def get_article(slug: str):
     """Get single article by slug"""
-    articles = db.get_all('articles', where=f"slug = '{slug}'", limit=1)
+    articles = db.get_all('articles', where="slug = ?", params=[slug], limit=1)
     if not articles:
         raise HTTPException(status_code=404, detail="Article not found")
 
@@ -174,8 +180,9 @@ async def get_categories():
 @router.get("/sponsors")
 async def get_sponsors(active: Optional[bool] = True):
     """Get sponsors, default active only"""
-    where = f"active = {1 if active else 0}" if active is not None else None
-    sponsors = db.get_all('sponsors', where=where, limit=20)
+    where = "active = ?" if active is not None else None
+    params = [1 if active else 0] if active is not None else []
+    sponsors = db.get_all('sponsors', where=where, params=params, limit=20)
 
     # Filter by date if active
     if active:
@@ -226,6 +233,14 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if token not in tokens or tokens[token] < datetime.now():
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return token
+
+
+def validate_columns(table: str, data: Dict[str, Any]):
+    """Reject any field that isn't a real column on this table"""
+    allowed = db.schema['tables'][table]['columns'].keys()
+    unknown = [k for k in data.keys() if k not in allowed]
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Unknown field(s): {', '.join(unknown)}")
 
 
 @router.post("/admin/upload-image", dependencies=[Depends(verify_token)])
@@ -296,6 +311,7 @@ async def get_admin_stats():
 @router.post("/admin/apps", dependencies=[Depends(verify_token)])
 async def create_app(app_data: Dict[str, Any]):
     """Create new app"""
+    validate_columns('apps', app_data)
     try:
         # Handle JSON fields
         for field in ['screenshots', 'tags']:
@@ -310,11 +326,13 @@ async def create_app(app_data: Dict[str, Any]):
         db.conn.commit()
         return {"id": cursor.lastrowid, "message": "App created"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"Error creating app: {e}")
+        raise HTTPException(status_code=400, detail="Invalid request")
 
 @router.put("/admin/apps/{app_id}", dependencies=[Depends(verify_token)])
 async def update_app(app_id: int, app_data: Dict[str, Any]):
     """Update app"""
+    validate_columns('apps', app_data)
     try:
         # Handle JSON fields
         for field in ['screenshots', 'tags']:
@@ -328,7 +346,8 @@ async def update_app(app_id: int, app_data: Dict[str, Any]):
         db.conn.commit()
         return {"message": "App updated"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"Error updating app: {e}")
+        raise HTTPException(status_code=400, detail="Invalid request")
 
 @router.delete("/admin/apps/{app_id}", dependencies=[Depends(verify_token)])
 async def delete_app(app_id: int):
@@ -342,6 +361,7 @@ async def delete_app(app_id: int):
 @router.post("/admin/articles", dependencies=[Depends(verify_token)])
 async def create_article(article_data: Dict[str, Any]):
     """Create new article"""
+    validate_columns('articles', article_data)
     try:
         for field in ['related_apps', 'tags']:
             if field in article_data and isinstance(article_data[field], list):
@@ -355,11 +375,13 @@ async def create_article(article_data: Dict[str, Any]):
         db.conn.commit()
         return {"id": cursor.lastrowid, "message": "Article created"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"Error creating article: {e}")
+        raise HTTPException(status_code=400, detail="Invalid request")
 
 @router.put("/admin/articles/{article_id}", dependencies=[Depends(verify_token)])
 async def update_article(article_id: int, article_data: Dict[str, Any]):
     """Update article"""
+    validate_columns('articles', article_data)
     try:
         for field in ['related_apps', 'tags']:
             if field in article_data and isinstance(article_data[field], list):
@@ -372,7 +394,8 @@ async def update_article(article_id: int, article_data: Dict[str, Any]):
         db.conn.commit()
         return {"message": "Article updated"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"Error updating article: {e}")
+        raise HTTPException(status_code=400, detail="Invalid request")
 
 @router.delete("/admin/articles/{article_id}", dependencies=[Depends(verify_token)])
 async def delete_article(article_id: int):
@@ -386,6 +409,7 @@ async def delete_article(article_id: int):
 @router.post("/admin/categories", dependencies=[Depends(verify_token)])
 async def create_category(category_data: Dict[str, Any]):
     """Create new category"""
+    validate_columns('categories', category_data)
     try:
         category_data = dict(category_data)
         category_data['order_index'] = to_int(category_data.get('order_index'), 0)
@@ -398,11 +422,13 @@ async def create_category(category_data: Dict[str, Any]):
         db.conn.commit()
         return {"id": cursor.lastrowid, "message": "Category created"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"Error creating category: {e}")
+        raise HTTPException(status_code=400, detail="Invalid request")
 
 @router.put("/admin/categories/{cat_id}", dependencies=[Depends(verify_token)])
 async def update_category(cat_id: int, category_data: Dict[str, Any]):
     """Update category"""
+    validate_columns('categories', category_data)
     try:
         category_data = dict(category_data)
         if 'order_index' in category_data:
@@ -415,7 +441,8 @@ async def update_category(cat_id: int, category_data: Dict[str, Any]):
         db.conn.commit()
         return {"message": "Category updated"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"Error updating category: {e}")
+        raise HTTPException(status_code=400, detail="Invalid request")
 
 
 @router.delete("/admin/categories/{cat_id}", dependencies=[Depends(verify_token)])
@@ -427,12 +454,14 @@ async def delete_category(cat_id: int):
         db.conn.commit()
         return {"message": "Category deleted"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"Error deleting category: {e}")
+        raise HTTPException(status_code=400, detail="Invalid request")
 
 # Sponsors CRUD
 @router.post("/admin/sponsors", dependencies=[Depends(verify_token)])
 async def create_sponsor(sponsor_data: Dict[str, Any]):
     """Create new sponsor"""
+    validate_columns('sponsors', sponsor_data)
     try:
         cursor = db.conn.cursor()
         columns = ', '.join(sponsor_data.keys())
@@ -442,11 +471,13 @@ async def create_sponsor(sponsor_data: Dict[str, Any]):
         db.conn.commit()
         return {"id": cursor.lastrowid, "message": "Sponsor created"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"Error creating sponsor: {e}")
+        raise HTTPException(status_code=400, detail="Invalid request")
 
 @router.put("/admin/sponsors/{sponsor_id}", dependencies=[Depends(verify_token)])
 async def update_sponsor(sponsor_id: int, sponsor_data: Dict[str, Any]):
     """Update sponsor"""
+    validate_columns('sponsors', sponsor_data)
     try:
         set_clause = ', '.join([f"{k} = ?" for k in sponsor_data.keys()])
         cursor = db.conn.cursor()
@@ -455,7 +486,8 @@ async def update_sponsor(sponsor_id: int, sponsor_data: Dict[str, Any]):
         db.conn.commit()
         return {"message": "Sponsor updated"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"Error updating sponsor: {e}")
+        raise HTTPException(status_code=400, detail="Invalid request")
 
 
 @router.delete("/admin/sponsors/{sponsor_id}", dependencies=[Depends(verify_token)])
@@ -467,7 +499,8 @@ async def delete_sponsor(sponsor_id: int):
         db.conn.commit()
         return {"message": "Sponsor deleted"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"Error deleting sponsor: {e}")
+        raise HTTPException(status_code=400, detail="Invalid request")
 
 app.include_router(router)
 
