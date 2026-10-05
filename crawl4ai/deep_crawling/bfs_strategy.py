@@ -150,7 +150,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             return
 
         # If we've reached the max pages limit, don't discover new links
-        remaining_capacity = self.max_pages - self._pages_crawled
+        remaining_capacity = self.max_pages - self._pages_crawled - len(next_level)
         if remaining_capacity <= 0:
             self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping link discovery")
             return
