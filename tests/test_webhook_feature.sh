@@ -286,8 +286,10 @@ python3 /tmp/test_webhook.py &
 WEBHOOK_PID=$!
 
 # Wait for test to complete
+set +e
 wait $WEBHOOK_PID
 TEST_EXIT_CODE=$?
+set -e
 
 # Step 7: Verify results
 log_info "Step 7: Verifying test results..."
