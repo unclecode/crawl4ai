@@ -427,9 +427,6 @@ class DomainFilter(URLFilter):
 
     __slots__ = ("_allowed_domains", "_blocked_domains", "_domain_cache")
 
-    # Regex for fast domain extraction
-    _DOMAIN_REGEX = re.compile(r"://([^/]+)")
-
     def __init__(
         self,
         allowed_domains: Union[str, List[str]] = None,
@@ -450,12 +447,17 @@ class DomainFilter(URLFilter):
         )
 
     @staticmethod
-    def _normalize_domains(domains: Union[str, List[str]]) -> Set[str]:
+    def _normalize_domain(domain: str) -> str:
+        """Lowercase a domain and strip a trailing dot"""
+        return domain.lower().rstrip(".")
+
+    @classmethod
+    def _normalize_domains(cls, domains: Union[str, List[str]]) -> Set[str]:
         """Fast domain normalization"""
         if isinstance(domains, str):
-            return {domains.lower()}
-        return {d.lower() for d in domains}
-    
+            return {cls._normalize_domain(domains)}
+        return {cls._normalize_domain(d) for d in domains}
+
     @staticmethod
     def _is_subdomain(domain: str, parent_domain: str) -> bool:
         """Check if domain is a subdomain of parent_domain"""
@@ -464,9 +466,12 @@ class DomainFilter(URLFilter):
     @staticmethod
     @lru_cache(maxsize=10000)
     def _extract_domain(url: str) -> str:
-        """Ultra-fast domain extraction with regex and caching"""
-        match = DomainFilter._DOMAIN_REGEX.search(url)
-        return match.group(1).lower() if match else ""
+        """Extract the host from a URL, dropping userinfo/port and trailing dot"""
+        try:
+            host = urlparse(url).hostname
+        except ValueError:
+            return ""
+        return host.rstrip(".") if host else ""
 
     def apply(self, url: str) -> bool:
         """Optimized domain checking with early returns"""
