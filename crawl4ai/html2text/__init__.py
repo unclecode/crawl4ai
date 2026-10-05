@@ -34,6 +34,12 @@ __version__ = (2024, 2, 26)
 # Support decoded entities with UNIFIABLE.
 
 
+# A run of backslashes that is not itself escaped, followed by the pipe it would
+# otherwise escape. Matching the run is what keeps a cell's own backslash from
+# consuming the escape that gets added.
+RE_TABLE_CELL_PIPE = re.compile(r"(?<!\\)(\\*)\|")
+
+
 class HTML2Text(html.parser.HTMLParser):
     def __init__(
         self,
@@ -53,6 +59,7 @@ class HTML2Text(html.parser.HTMLParser):
         self.split_next_td = False
         self.td_count = 0
         self.table_start = False
+        self.in_table_cell = False
         self.unicode_snob = config.UNICODE_SNOB  # covered in cli
 
         self.escape_snob = config.ESCAPE_SNOB  # covered in cli
@@ -766,6 +773,10 @@ class HTML2Text(html.parser.HTMLParser):
                     self.table_start = False
                 if tag in ["td", "th"] and start:
                     self.td_count += 1
+                if tag in ["td", "th"]:
+                    self.in_table_cell = start
+                if tag == "tr" and not start:
+                    self.in_table_cell = False
 
         if tag == "pre":
             if start:
@@ -910,6 +921,24 @@ class HTML2Text(html.parser.HTMLParser):
             self.out(data)
             self.outcount += 1
 
+    def escape_table_cell_pipes(self, data: str) -> str:
+        """Escape the pipes in a table cell so the cell cannot add a column.
+
+        A GFM row is split on every unescaped pipe, so a cell holding one -- a
+        regex alternation, a shell command, a part number -- pushes the rest of
+        the row into columns the header does not have, and every row after it
+        reads one column out of step.
+
+        The run of backslashes in front of the pipe is matched, not the pipe
+        alone: ``escape_md_section`` leaves a backslash before a pipe untouched
+        (``|`` is not in ``RE_SLASH_CHARS``), so a cell holding ``a\\|b`` would
+        otherwise have its own backslash consume the escape being added.
+        """
+        if not self.in_table_cell or "|" not in data:
+            return data
+
+        return RE_TABLE_CELL_PIPE.sub(lambda match: match.group(1) * 2 + r"\|", data)
+
     def handle_data(self, data: str, entity_char: bool = False) -> None:
         if not data:
             # Data may be empty for some HTML entities. For example,
@@ -956,6 +985,7 @@ class HTML2Text(html.parser.HTMLParser):
                 escape_plus=self.escape_plus,
                 escape_dash=self.escape_dash,
             )
+        data = self.escape_table_cell_pipes(data)
         self.preceding_data = data
         self.o(data, puredata=True)
 
@@ -1184,11 +1214,11 @@ class CustomHTML2Text(HTML2Text):
 
         if self.inside_pre:
             # Output the raw content for pre blocks, including content inside code tags
-            self.o(data)  # Directly output the data as-is (preserve newlines)
+            self.o(self.escape_table_cell_pipes(data))
             return
         if self.inside_code:
             # Inline code: no newlines allowed
-            self.o(data.replace("\n", " "))
+            self.o(self.escape_table_cell_pipes(data.replace("\n", " ")))
             return
 
         # Default behavior for other tags
