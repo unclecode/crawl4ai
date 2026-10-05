@@ -83,8 +83,6 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                 raise ValueError("Missing scheme or netloc")
             if parsed.scheme not in ("http", "https"):
                 raise ValueError("Invalid scheme")
-            if "." not in parsed.netloc:
-                raise ValueError("Invalid domain")
         except Exception as e:
             self.logger.warning(f"Invalid URL: {url}, error: {e}")
             return False

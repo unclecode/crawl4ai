@@ -171,6 +171,34 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         self.memory_pressure_mode = False  # Flag to indicate when we're in memory pressure mode
         self.current_memory_percent = 0.0  # Track current memory usage
         self._high_memory_start_time: Optional[float] = None
+        self._stream_active_tasks = []
+        self._stream_memory_monitor = None
+        self._stream_cleanup_lock = asyncio.Lock()
+
+    async def cleanup(self) -> None:
+        async with self._stream_cleanup_lock:
+            for task in self._stream_active_tasks:
+                if not task.done():
+                    task.cancel()
+            if self._stream_active_tasks:
+                await asyncio.gather(*self._stream_active_tasks, return_exceptions=True)
+
+            while True:
+                try:
+                    self.task_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+
+            if self._stream_memory_monitor is not None:
+                self._stream_memory_monitor.cancel()
+                await asyncio.gather(
+                    self._stream_memory_monitor, return_exceptions=True
+                )
+                self._stream_memory_monitor = None
+
+            self._stream_active_tasks = []
+            if self.monitor:
+                self.monitor.stop()
         
     async def _memory_monitor_task(self):
         """Background task to continuously monitor memory usage and update state"""
@@ -535,9 +563,11 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
     ) -> AsyncGenerator[CrawlerTaskResult, None]:
         self.crawler = crawler
         active_tasks = []
+        self._stream_active_tasks = active_tasks
         
         # Start the memory monitor task
         memory_monitor = asyncio.create_task(self._memory_monitor_task())
+        self._stream_memory_monitor = memory_monitor
         
         if self.monitor:
             self.monitor.start()
@@ -606,6 +636,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                         
                     # Update active tasks list
                     active_tasks = list(pending)
+                    self._stream_active_tasks = active_tasks
                 else:
                     # If no active tasks but still waiting, sleep briefly
                     await asyncio.sleep(self.check_interval / 2)
@@ -614,26 +645,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                 await self._update_queue_priorities()
                 
         finally:
-            # Cancel and await every task owned by this stream before returning
-            # control to the caller. Otherwise a closed stream can leave crawls
-            # using browser pages and contexts in the background.
-            for task in active_tasks:
-                if not task.done():
-                    task.cancel()
-            if active_tasks:
-                await asyncio.gather(*active_tasks, return_exceptions=True)
-
-            # Discard URLs that were queued by this stream but never started.
-            while True:
-                try:
-                    self.task_queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    break
-
-            memory_monitor.cancel()
-            await asyncio.gather(memory_monitor, return_exceptions=True)
-            if self.monitor:
-                self.monitor.stop()
+            await self.cleanup()
                 
 
 class SemaphoreDispatcher(BaseDispatcher):
