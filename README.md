@@ -15,7 +15,7 @@
 <a href="https://crawl4ai.com/?ref=readme-banner">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/cloud-launch-banner-dark.svg">
-    <img alt="Crawl4AI Cloud is live. Soft launch: your first $10 is on us until 31 December 2026, no card. Get your key." src="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/cloud-launch-banner-light.svg" width="960">
+    <img alt="Crawl4AI Cloud is live. Soft launch: free credit to start, no card. Get your key." src="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/cloud-launch-banner-light.svg" width="960">
   </picture>
 </a>
 
@@ -49,7 +49,7 @@ Docker server, CLI and every option: [Installation](#installation) · [docs.craw
 ### ☁️ Or use the cloud: no browsers, no proxies
 
 1. [![Get a key in 10 seconds](https://img.shields.io/badge/Get_a_key_in_10_seconds-%241_pass%2C_no_signup-f5a300?style=for-the-badge&labelColor=0d0d10)](https://crawl4ai.com/?ref=readme)  
-   Verify your email and your first $10 pack is on us (until 31 December 2026, then $5 to start). No card.
+   Verify your email and free credit to start is yours. No card. Soft launch: prices can change, what you buy stays yours.
 2. Get any page as Markdown:
 
    ```bash
