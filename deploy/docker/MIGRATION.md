@@ -68,6 +68,10 @@ control):
 `base_url`, `deep_crawl_strategy`, `simulate_user`, `magic`,
 `process_in_browser`, and nested LLM config objects.
 
+`deep_crawl_strategy` can be turned back on by the operator with
+`CRAWL4AI_ALLOW_DEEP_CRAWL=true`, with server-side limits. See "Deep Crawling
+(opt-in)" in the self-hosting guide.
+
 Unknown fields are dropped; timeouts, viewport and scroll counts are clamped to
 safe maximums.
 

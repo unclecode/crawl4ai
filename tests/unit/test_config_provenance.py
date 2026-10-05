@@ -116,3 +116,55 @@ def test_plain_business_dict_with_type_key_still_passes():
         provenance=UNTRUSTED,
     )
     assert cfg.extraction_strategy.schema["baseSelector"] == ".item"
+
+
+def _deep_crawl(**params):
+    return {
+        "type": "CrawlerRunConfig",
+        "params": {"deep_crawl_strategy": {"type": "BFSDeepCrawlStrategy", "params": {"max_depth": 2, **params}}},
+    }
+
+
+def test_deep_crawl_allowed_with_opt_in(monkeypatch):
+    monkeypatch.setenv("CRAWL4AI_ALLOW_DEEP_CRAWL", "true")
+    chain = {"type": "FilterChain", "params": {"filters": [
+        {"type": "URLPatternFilter", "params": {"patterns": ["*/blog/*"]}}]}}
+    cfg = CrawlerRunConfig.load(_deep_crawl(filter_chain=chain, max_pages=50), provenance=UNTRUSTED)
+    assert type(cfg.deep_crawl_strategy).__name__ == "BFSDeepCrawlStrategy"
+    assert cfg.deep_crawl_strategy.max_pages == 50
+
+
+@pytest.mark.parametrize("pattern", ["^(a+)+$", "tag*x"])
+def test_deep_crawl_unsafe_pattern_refused(monkeypatch, pattern):
+    monkeypatch.setenv("CRAWL4AI_ALLOW_DEEP_CRAWL", "true")
+    chain = {"type": "FilterChain", "params": {"filters": [
+        {"type": "URLPatternFilter", "params": {"patterns": [pattern]}}]}}
+    with pytest.raises(UntrustedConfigError, match="URLPatternFilter"):
+        CrawlerRunConfig.load(_deep_crawl(filter_chain=chain), provenance=UNTRUSTED)
+
+
+def test_deep_crawl_resume_state_refused(monkeypatch):
+    monkeypatch.setenv("CRAWL4AI_ALLOW_DEEP_CRAWL", "true")
+    data = _deep_crawl(resume_state={"pending": [{"url": "http://169.254.169.254/", "depth": 1}]})
+    with pytest.raises(UntrustedConfigError, match="resume_state"):
+        CrawlerRunConfig.load(data, provenance=UNTRUSTED)
+
+
+def test_deep_crawl_ssl_certificate_refused(monkeypatch):
+    monkeypatch.setenv("CRAWL4AI_ALLOW_DEEP_CRAWL", "true")
+    data = _deep_crawl()
+    data["params"]["fetch_ssl_certificate"] = True
+    with pytest.raises(UntrustedConfigError, match="fetch_ssl_certificate"):
+        CrawlerRunConfig.load(data, provenance=UNTRUSTED)
+
+
+def test_url_pattern_star_led_glob_is_linear_and_unchanged():
+    import time
+    from crawl4ai.deep_crawling.filters import URLPatternFilter
+
+    f = URLPatternFilter(["*/blog/*"])
+    assert f.apply("https://x.com/blog/post")
+    assert not f.apply("https://x.com/news/post")
+    start = time.time()
+    assert not f.apply("https://x.com/" + "a" * 50000)
+    assert time.time() - start < 0.5
