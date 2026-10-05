@@ -247,7 +247,9 @@ def attach_mcp(
     class _MCPSseApp:
         async def __call__(self, scope, receive, send):
             async with sse.connect_sse(scope, receive, send) as (read_stream, write_stream):
-                await mcp.run(read_stream, write_stream, init_opts)
+                # Same init_done latch as /mcp/ws (#2233): concurrent POSTs that
+                # arrive during initialize must not reach ServerSession yet.
+                await _run_with_init_gate(mcp.run, read_stream, write_stream, init_opts)
 
     app.routes.append(Route(f"{base}/sse", endpoint=_MCPSseApp()))
     app.routes.append(Mount(f"{base}/messages", app=sse.handle_post_message))
@@ -263,6 +265,54 @@ def attach_mcp(
 
 
 # ── helpers ────────────────────────────────────────────────────
+async def _run_with_init_gate(run, read_stream, write_stream, init_opts) -> None:
+    """Hold inbound messages until the server finishes initialize.
+
+    Mirrors the WebSocket ``init_done`` gate: the first client frame
+    (``initialize``) is forwarded immediately; later frames wait until the
+    server writes its first outbound message (the initialize result).  This
+    lives in the bridge so we do not depend on fixing the upstream MCP SDK
+    race (python-sdk #423 / #2583).
+    """
+    c2s_send, c2s_recv = anyio.create_memory_object_stream(100)
+    s2c_send, s2c_recv = anyio.create_memory_object_stream(100)
+    init_done = anyio.Event()
+
+    async def srv_to_client():
+        first = True
+        try:
+            async for msg in s2c_recv:
+                await write_stream.send(msg)
+                if first:
+                    init_done.set()
+                    first = False
+        finally:
+            # make sure cleanup survives TaskGroup cancellation
+            with anyio.CancelScope(shield=True):
+                with suppress(Exception):
+                    await write_stream.aclose()
+
+    async def client_to_srv():
+        try:
+            # 1st frame is always "initialize"
+            first = await read_stream.receive()
+            await c2s_send.send(first)
+            await init_done.wait()          # block until server ready
+            async for msg in read_stream:
+                await c2s_send.send(msg)
+        except (anyio.EndOfStream, anyio.ClosedResourceError):
+            pass
+        finally:
+            with anyio.CancelScope(shield=True):
+                with suppress(Exception):
+                    await c2s_send.aclose()
+
+    async with anyio.create_task_group() as tg:
+        tg.start_soon(run, c2s_recv, s2c_send, init_opts)
+        tg.start_soon(client_to_srv)
+        tg.start_soon(srv_to_client)
+
+
 def _route_name(path: str) -> str:
     return re.sub(r"[/{}}]", "_", path).strip("_")
 
