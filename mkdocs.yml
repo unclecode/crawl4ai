@@ -113,6 +113,7 @@ extra_css:
   - assets/dmvendor.css
   - assets/feedback-overrides.css
   - assets/page_actions.css
+  - assets/cloud-banner.css
 
 extra_javascript:
   - https://www.googletagmanager.com/gtag/js?id=G-58W0K2ZQ25
@@ -126,4 +127,5 @@ extra_javascript:
   - assets/copy_code.js
   - assets/floating_ask_ai_button.js
   - assets/mobile_menu.js
+  - assets/cloud-banner.js
   - assets/page_actions.js?v=20251006

@@ -1,0 +1,67 @@
+/* The Crawl4AI Cloud announcement banner (overrides/partials/cloud-banner.html).
+   Three states set on <html data-c4b>: big · small · off. The accent is the amber of the landing
+   (#d9a441) on the docs' dark ground; the fonts and the base colours come from the site's own tokens. */
+:root{--c4b-amber:#d9a441;--c4b-ink:#1a1200;--c4b-dim:rgba(217,164,65,.14);--c4b-line:rgba(217,164,65,.5);--c4b-hair:#3f3f44;--c4b-muted:#a3abba;--c4b-faint:#8b857a;--c4b-beige:#d5cec0;--c4b-cyan:#4AE6E5;--c4b-teal:#09b5a5}
+
+/* the wrap sits in flow right under the fixed header; the main container then needs no header padding */
+.c4b-wrap{position:relative;z-index:950;margin-top:var(--header-height,65px);font-family:var(--font-stack);line-height:1.5}
+html[data-c4b="big"] .container:has(.terminal-mkdocs-main-grid),html[data-c4b="small"] .container:has(.terminal-mkdocs-main-grid){padding-top:0}
+html[data-c4b="off"] .c4b-wrap{display:none}
+/* the fixed side panel (z 900, top = the header) moves down by the banner height still on screen */
+html[data-c4b="big"] #terminal-mkdocs-side-panel,html[data-c4b="small"] #terminal-mkdocs-side-panel{top:calc(var(--header-height,65px) + var(--c4b-offset,0px))}
+.c4b-big,.c4b-small{display:none}
+html[data-c4b="big"] .c4b-big,html:not([data-c4b]) .c4b-big{display:block}
+html[data-c4b="small"] .c4b-small{display:flex}
+.c4b-wrap *{box-sizing:border-box}
+.c4b-wrap a{text-decoration:none}
+
+/* ---- big ---- */
+.c4b-big{position:relative;overflow:hidden;background:linear-gradient(180deg,#0e0d06 0%,#0a0a0b 100%);border-bottom:1px solid var(--c4b-line)}
+.c4b-big::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(900px 260px at 18% -20%,rgba(217,164,65,.18),transparent 60%),radial-gradient(600px 220px at 92% 120%,rgba(9,181,165,.14),transparent 60%)}
+.c4b-in{position:relative;max-width:1440px;margin:0 auto;padding:26px 24px 22px;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:34px;align-items:start}
+.c4b-eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--c4b-amber)}
+.c4b-tag{background:var(--c4b-amber);color:var(--c4b-ink);padding:2px 8px;font-weight:700;letter-spacing:.1em}
+/* the theme sizes every h2 and em; these win by specificity */
+.c4b-wrap h2.c4b-title{font-size:30px;line-height:1.15;font-weight:700;margin:12px 0 10px;padding:0;color:var(--font-color);text-wrap:balance}
+.c4b-wrap h2.c4b-title em{font-style:normal;font-size:inherit;font-weight:inherit;color:var(--c4b-amber)}
+.c4b-lead{color:var(--font-color);font-size:14.5px;line-height:1.55;max-width:56ch;margin:0 0 6px}
+.c4b-lead b{font-weight:700;color:var(--c4b-cyan)}
+.c4b-oss{color:var(--c4b-muted);font-size:12.5px;margin:8px 0 18px;max-width:60ch}
+.c4b-oss b{color:var(--font-color);font-weight:400}
+.c4b-cta{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.c4b-btn{font:inherit;font-size:13.5px;padding:10px 16px;border:1px solid var(--c4b-amber);background:var(--c4b-amber);color:var(--c4b-ink)!important;font-weight:700;letter-spacing:.02em;display:inline-flex;align-items:center;gap:8px}
+.c4b-btn:hover{background:#e6b45a;text-decoration:none}
+.c4b-ghost{background:transparent;color:var(--c4b-amber)!important;font-weight:400}
+.c4b-ghost:hover{background:var(--c4b-dim)}
+.c4b-meta{display:flex;gap:18px;flex-wrap:wrap;color:var(--c4b-faint);font-size:12px;margin-top:16px}
+.c4b-meta span::before{content:"✓ ";color:var(--c4b-teal)}
+.c4b-meta b{color:var(--c4b-amber);font-weight:700}
+.c4b-paste{border:1px solid var(--c4b-line);background:rgba(0,0,0,.45);box-shadow:0 0 0 1px rgba(0,0,0,.3),0 18px 40px -24px rgba(217,164,65,.4)}
+.c4b-tabs{display:flex;border-bottom:1px solid var(--c4b-hair);overflow-x:auto}
+.c4b-tabs button{font:inherit;font-size:12.5px;background:none;border:0;border-right:1px solid var(--c4b-hair);color:var(--c4b-muted);padding:9px 14px;cursor:pointer;white-space:nowrap;margin:0}
+.c4b-tabs button[aria-selected="true"]{color:var(--c4b-amber);background:var(--c4b-dim)}
+.c4b-tabs button:last-child{border-right:0}
+.c4b-code{position:relative;padding:16px 16px 14px;margin:0;border:0;background:transparent;font-size:12.5px;line-height:1.55;overflow-x:auto;color:var(--c4b-beige);white-space:pre;font-family:var(--font-stack)}
+.c4b-code .c4b-k{color:var(--c4b-amber);background:var(--c4b-dim);padding:0 3px}
+.c4b-code .c4b-cmt{color:var(--c4b-faint)}
+.c4b-copy{position:absolute;top:10px;right:10px;font:inherit;font-size:11.5px;border:1px solid var(--c4b-hair);background:#202020;color:var(--c4b-muted);padding:4px 9px;cursor:pointer;margin:0}
+.c4b-copy:hover{color:var(--font-color);border-color:var(--c4b-muted)}
+.c4b-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--c4b-hair);padding:9px 14px;font-size:12px;color:var(--c4b-muted)}
+.c4b-foot a{color:var(--c4b-cyan)}
+.c4b-x{position:absolute;top:14px;right:18px;font:inherit;font-size:20px;line-height:1;border:0;background:none;color:var(--c4b-muted);cursor:pointer;padding:4px 6px;margin:0}
+.c4b-x:hover{color:var(--font-color)}
+.c4b-hide{position:absolute;bottom:12px;right:20px;width:auto;display:flex;align-items:center;gap:7px;color:var(--c4b-faint);font-size:12px;cursor:pointer}
+.c4b-hide input{accent-color:var(--c4b-amber);margin:0;width:auto}
+
+/* ---- small: solid amber, dark ink ---- */
+.c4b-small{align-items:center;gap:14px;background:var(--c4b-amber);color:var(--c4b-ink);border-bottom:1px solid #a87a20;padding:0 24px;height:40px;font-size:13px}
+.c4b-star{color:var(--c4b-ink)}
+.c4b-t{color:var(--c4b-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c4b-t b{font-weight:700}
+.c4b-sp{flex:1}
+.c4b-go{color:var(--c4b-ink)!important;font-weight:700;white-space:nowrap;border-bottom:1px solid var(--c4b-ink)}
+.c4b-small button{font:inherit;font-size:12px;background:none;border:1px solid rgba(26,18,0,.45);color:var(--c4b-ink);padding:3px 9px;cursor:pointer;white-space:nowrap;margin:0}
+.c4b-small button:hover{background:rgba(26,18,0,.1)}
+
+@media (max-width:1100px){.c4b-in{grid-template-columns:1fr;gap:18px}.c4b-hide{position:static;width:auto;margin:10px 24px 14px}.c4b-wrap h2.c4b-title{font-size:24px}}
+@media (max-width:600px){.c4b-in{padding:20px 16px 14px}.c4b-small{height:auto;padding:8px 14px;flex-wrap:wrap;gap:8px}.c4b-t{white-space:normal}}
