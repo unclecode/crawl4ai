@@ -319,6 +319,7 @@ UNTRUSTED_FIELD_ALLOWLIST = {
 # Upper bounds applied to attacker-influenced quantities after filtering.
 _DEFAULT_MAX_TIMEOUT_MS = 60_000
 _MAX_SCROLL_STEPS = 1000
+_MAX_DELAY_SECONDS = 60  # ceiling for delay_before_return_html / mean_delay / max_range
 _MAX_VIEWPORT = 4000
 _MAX_PDF_BYTES = 100 * 1024 * 1024
 _MAX_PDF_PAGES = 2000
@@ -390,10 +391,27 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
             return min(_DEFAULT_MAX_TIMEOUT_MS, ceiling)
         return min(int(v), ceiling)
 
+    # delay_before_return_html is held with a browser page open; mean_delay and
+    # max_range seed the arun_many rate limiter. All three are seconds, not ms,
+    # so they get their own cap rather than reusing the ms timeout ceiling.
+    _delay_defaults = {
+        "delay_before_return_html": 0.1,
+        "mean_delay": 0.1,
+        "max_range": 0.3,
+    }
+
+    def _cap_delay(v, default):
+        if not isinstance(v, (int, float)) or isinstance(v, bool) or not v >= 0:  # also NaN
+            return default
+        return min(v, _MAX_DELAY_SECONDS)
+
     if type_name == "CrawlerRunConfig":
         for f in ("page_timeout", "wait_for_timeout", "body_visibility_timeout"):
             if f in params:
                 params[f] = _cap_timeout(params[f])
+        for f, default in _delay_defaults.items():
+            if f in params:
+                params[f] = _cap_delay(params[f], default)
         if isinstance(params.get("max_scroll_steps"), int):
             params["max_scroll_steps"] = min(params["max_scroll_steps"], _MAX_SCROLL_STEPS)
         # smart_wait runs "js:...", function-shaped values, and any value that
