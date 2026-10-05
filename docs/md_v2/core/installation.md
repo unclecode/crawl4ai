@@ -127,3 +127,13 @@ Some older docs mention running Crawl4AI as a local server. This approach has be
 6. **Local server** references in older docs are largely deprecated; a new solution is in progress.
 
 **Got questions?** Check [GitHub issues](https://github.com/unclecode/crawl4ai/issues) for updates or ask the community!
+
+## Version numbering
+
+Crawl4AI follows PEP 440: `MAJOR.MINOR.PATCH`, for example `0.9.4`. A pre-release carries a suffix: `dev` (unstable), `a` (alpha), `b` (beta), `rc` (release candidate).
+
+- The stable version: `pip install -U crawl4ai`
+- The latest pre-release: `pip install crawl4ai --pre`
+- One exact version: `pip install crawl4ai==0.9.4`
+
+Use the stable version in production. Pre-releases exist to test new features with real users before the final release.
