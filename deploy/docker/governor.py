@@ -19,7 +19,10 @@ integration-tested pass; gunicorn --limit-request-* covers the transport layer.
 from __future__ import annotations
 
 import json
+import logging
 import math
+
+logger = logging.getLogger("crawl4ai.security")
 
 DEFAULT_MAX_BODY_BYTES = 10 * 1024 * 1024  # 10 MiB
 DEFAULT_MAX_PAGES = 100
@@ -79,13 +82,19 @@ def clamp_deep_crawl(crawler_config, *, max_pages: int = DEFAULT_MAX_PAGES,
         try:
             dc.max_pages = max_pages
         except Exception:
-            pass
+            logger.warning(
+                "clamp_deep_crawl: could not clamp max_pages on %r; "
+                "deep crawl may run with an unbounded page budget", dc, exc_info=True
+            )
     md = getattr(dc, "max_depth", None)
     if md is None or md > max_depth:
         try:
             dc.max_depth = max_depth
         except Exception:
-            pass
+            logger.warning(
+                "clamp_deep_crawl: could not clamp max_depth on %r; "
+                "deep crawl may run with an unbounded depth budget", dc, exc_info=True
+            )
 
 
 def max_body_bytes_from_config(config: dict) -> int:
