@@ -74,7 +74,7 @@ Docker server, CLI and every option: [Installation](#installation) · [docs.craw
 | **Runs the browsers** | you, in your Python process | you, in Docker on your machine | we do |
 | **JS-heavy pages and bot walls** | your settings, your proxies | your settings, your proxies | handled for you, automatically |
 | **Web search** | – | – | `/search` and `/answer` |
-| **Price** | free, forever | free (your hosting) | pay as you go; your first $10 is on us |
+| **Price** | free, forever | free (your hosting) | pay as you go; free credit to start |
 
 <details>
   <summary>🤓 <strong>My Personal Story</strong></summary>
