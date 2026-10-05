@@ -1032,7 +1032,8 @@ async def stream_process(crawl_request: CrawlRequestWithHooks):
         browser_config=crawl_request.browser_config,
         crawler_config=crawl_request.crawler_config,
         config=config,
-        hooks_config=hooks_config
+        hooks_config=hooks_config,
+        crawler_configs=crawl_request.crawler_configs,
     )
     
     # Add hooks info to response headers if available

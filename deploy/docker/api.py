@@ -723,7 +723,7 @@ async def handle_crawl_request(
         base_config = config["crawler"]["base_config"]
 
         # Build the config(s) to pass to arun/arun_many
-        if crawler_configs and len(urls) > 1:
+        if crawler_configs:
             # Per-URL config list: deserialize each and apply base_config
             config_list = [CrawlerRunConfig.load(cc, provenance=Provenance.UNTRUSTED) for cc in crawler_configs]
             for cfg in config_list:
@@ -736,6 +736,9 @@ async def handle_crawl_request(
                 if isinstance(cfg.scraping_strategy, PDFContentScrapingStrategy):
                     cfg.scraping_strategy.url_validator = validate_url_destination
             effective_config = config_list
+            # Use arun_many even for single URL when we have per-URL configs
+            func = crawler.arun_many
+            func_args = [urls]
         else:
             # Single config (original behavior)
             for key, value in base_config.items():
@@ -744,11 +747,12 @@ async def handle_crawl_request(
                     if current_value is None or current_value == "":
                         setattr(crawler_config, key, value)
             effective_config = crawler_config
+            func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
+            func_args = [urls[0] if len(urls) == 1 else urls]
 
         results = []
-        func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
         partial_func = partial(func,
-                                urls[0] if len(urls) == 1 else urls,
+                                *func_args,
                                 config=effective_config,
                                 dispatcher=dispatcher)
         # Optional per-crawl wall-clock deadline (config limits.wall_clock_s; 0 = none).
@@ -891,7 +895,8 @@ async def handle_stream_crawl_request(
     browser_config: dict,
     crawler_config: dict,
     config: dict,
-    hooks_config: Optional[dict] = None
+    hooks_config: Optional[dict] = None,
+    crawler_configs: Optional[List[dict]] = None,
 ) -> Tuple[AsyncWebCrawler, AsyncGenerator, Optional[Dict]]:
     """Handle streaming crawl requests with optional hooks."""
     hooks_info = None
@@ -917,8 +922,36 @@ async def handle_stream_crawl_request(
         clamp_deep_crawl(crawler_config)
         crawler_config.stream = True
 
+        base_config = config["crawler"]["base_config"]
+        effective_config = crawler_config
+
+        if crawler_configs:
+            # Per-URL config list: deserialize each and apply base_config
+            config_list = [CrawlerRunConfig.load(cc, provenance=Provenance.UNTRUSTED) for cc in crawler_configs]
+            for cfg in config_list:
+                for key, value in base_config.items():
+                    if hasattr(cfg, key):
+                        current_value = getattr(cfg, key)
+                        if current_value is None or current_value == "":
+                            setattr(cfg, key, value)
+                # SSRF: per-URL PDF strategies need the validator wired too
+                if isinstance(cfg.scraping_strategy, PDFContentScrapingStrategy):
+                    cfg.scraping_strategy.url_validator = validate_url_destination
+                cfg.stream = True
+            effective_config = config_list
+        else:
+            # Single config: apply base_config
+            for key, value in base_config.items():
+                if hasattr(crawler_config, key):
+                    current_value = getattr(crawler_config, key)
+                    if current_value is None or current_value == "":
+                        setattr(crawler_config, key, value)
+
+        # Determine primary config for deep crawl checks and dispatcher setup
+        primary_cfg = effective_config[0] if isinstance(effective_config, list) else effective_config
+
         # Deep crawl streaming supports exactly one start URL
-        if crawler_config.deep_crawl_strategy is not None and len(urls) != 1:
+        if primary_cfg.deep_crawl_strategy is not None and len(urls) != 1:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
@@ -929,12 +962,13 @@ async def handle_stream_crawl_request(
 
         from crawler_pool import get_crawler
         from crawl4ai.processors.pdf import PDFContentScrapingStrategy, PDFCrawlerStrategy
-        if isinstance(crawler_config.scraping_strategy, PDFContentScrapingStrategy):
+        is_pdf_crawl = isinstance(primary_cfg.scraping_strategy, PDFContentScrapingStrategy)
+        if is_pdf_crawl:
             if hooks_config:
                 # PDFCrawlerStrategy has no browser page, so hooks can't attach to it
                 raise HTTPException(status_code=400, detail="Hooks are not supported with PDFContentScrapingStrategy")
             # SSRF protection: vet the PDF download URL and every redirect hop
-            crawler_config.scraping_strategy.url_validator = validate_url_destination
+            primary_cfg.scraping_strategy.url_validator = validate_url_destination
             # Use PDFCrawlerStrategy when scraping PDFs, as headless Chromium can't render PDFs inline
             crawler = AsyncWebCrawler(crawler_strategy=PDFCrawlerStrategy())
             await crawler.start()
@@ -949,10 +983,10 @@ async def handle_stream_crawl_request(
 
         # Deep crawl with single URL: use arun() which returns an async generator
         # mirroring the Python library's streaming behavior
-        if crawler_config.deep_crawl_strategy is not None and len(urls) == 1:
+        if primary_cfg.deep_crawl_strategy is not None and len(urls) == 1:
             results_gen = await crawler.arun(
                 urls[0],
-                config=crawler_config,
+                config=primary_cfg,
             )
         else:
             # Default multi-URL streaming via arun_many
@@ -964,7 +998,7 @@ async def handle_stream_crawl_request(
             )
             results_gen = await crawler.arun_many(
                 urls=urls,
-                config=crawler_config,
+                config=effective_config,
                 dispatcher=dispatcher
             )
 
