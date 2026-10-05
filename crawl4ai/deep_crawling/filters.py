@@ -209,7 +209,8 @@ class URLPatternFilter(URLFilter):
                         lambda m: f'({"|".join(m.group(1).split(","))})',
                         pattern,
                     )
-                pattern = fnmatch.translate(pattern)
+                # A leading * already matches any prefix; \A stops search() retrying every offset.
+                pattern = ("\\A" if pattern.startswith("*") else "") + fnmatch.translate(pattern)
             self._path_patterns.append(
                 pattern if isinstance(pattern, Pattern) else re.compile(pattern)
             )

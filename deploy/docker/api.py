@@ -640,11 +640,27 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
 
         yield json.dumps({"status": "completed"}).encode('utf-8')
         
+    except asyncio.TimeoutError:
+        yield json.dumps({"status": "error", "error": "Crawl exceeded the time limit"}).encode('utf-8')
     except asyncio.CancelledError:
         logger.warning("Client disconnected during streaming")
     finally:
         if crawler:
             await _dispose_crawler(crawler)
+
+
+async def _with_deadline(gen: AsyncGenerator, seconds: float) -> AsyncGenerator:
+    """Stop a result stream once its wall-clock budget is spent (raises TimeoutError)."""
+    loop = asyncio.get_running_loop()
+    end = loop.time() + seconds
+    try:
+        while True:
+            try:
+                yield await asyncio.wait_for(gen.__anext__(), max(end - loop.time(), 0))
+            except StopAsyncIteration:
+                return
+    finally:
+        await gen.aclose()
 
 
 def _normalize_and_validate_seeds(urls: List[str]) -> List[str]:
@@ -689,8 +705,10 @@ async def handle_crawl_request(
         crawler_config = CrawlerRunConfig.load(crawler_config, provenance=Provenance.UNTRUSTED)
         from egress_broker import enforce_egress
         enforce_egress(browser_config)
-        from governor import clamp_deep_crawl
-        clamp_deep_crawl(crawler_config)
+        from governor import clamp_deep_crawl, deep_crawl_limits
+        clamp_deep_crawl(crawler_config, **deep_crawl_limits(config))
+        if crawler_config.deep_crawl_strategy is not None and len(urls) != 1:
+            raise HTTPException(status_code=400, detail="Deep crawling supports exactly one URL per request.")
 
         dispatcher = MemoryAdaptiveDispatcher(
             memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
@@ -727,6 +745,8 @@ async def handle_crawl_request(
             # Per-URL config list: deserialize each and apply base_config
             config_list = [CrawlerRunConfig.load(cc, provenance=Provenance.UNTRUSTED) for cc in crawler_configs]
             for cfg in config_list:
+                if cfg.deep_crawl_strategy is not None:
+                    raise HTTPException(status_code=400, detail="Deep crawling supports exactly one URL per request.")
                 for key, value in base_config.items():
                     if hasattr(cfg, key):
                         current_value = getattr(cfg, key)
@@ -912,9 +932,9 @@ async def handle_stream_crawl_request(
         crawler_config = CrawlerRunConfig.load(
             crawler_config, provenance=Provenance.UNTRUSTED
         )
-        from governor import clamp_deep_crawl
+        from governor import clamp_deep_crawl, deep_crawl_limits
 
-        clamp_deep_crawl(crawler_config)
+        clamp_deep_crawl(crawler_config, **deep_crawl_limits(config))
         crawler_config.stream = True
 
         # Deep crawl streaming supports exactly one start URL
@@ -954,6 +974,9 @@ async def handle_stream_crawl_request(
                 urls[0],
                 config=crawler_config,
             )
+            from governor import wall_clock_seconds
+            if wall_clock_seconds(config) > 0:
+                results_gen = _with_deadline(results_gen, wall_clock_seconds(config))
         else:
             # Default multi-URL streaming via arun_many
             dispatcher = MemoryAdaptiveDispatcher(
