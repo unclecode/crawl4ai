@@ -673,6 +673,34 @@ class TestBFSRegressions:
         assert strategy._pages_crawled <= 3
 
     @pytest.mark.asyncio
+    async def test_link_discovery_counts_already_queued_pages(self):
+        """Parents on one level share the remaining page budget."""
+        strategy = BFSDeepCrawlStrategy(max_depth=2, max_pages=5)
+        strategy._pages_crawled = 3
+        visited = set()
+        next_level = []
+        depths = {}
+
+        for parent in ("first", "second"):
+            result = MagicMock()
+            result.links = {
+                "internal": [
+                    {"href": f"https://example.com/{parent}-{index}"}
+                    for index in range(3)
+                ]
+            }
+            await strategy.link_discovery(
+                result,
+                f"https://example.com/{parent}",
+                1,
+                visited,
+                next_level,
+                depths,
+            )
+
+        assert len(next_level) == 2
+
+    @pytest.mark.asyncio
     async def test_max_depth_limit_respected(self):
         """max_depth limit still enforced."""
         strategy = BFSDeepCrawlStrategy(max_depth=2, max_pages=100)
