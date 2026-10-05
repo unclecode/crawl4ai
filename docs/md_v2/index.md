@@ -83,7 +83,7 @@ Docker server, CLI and every option: [Installation](core/installation.md) · [Se
 ### ☁️ Or use the cloud: no browsers, no proxies
 
 1. [![Get a key in 10 seconds](https://img.shields.io/badge/Get_a_key_in_10_seconds-%241_pass%2C_no_signup-f5a300?style=for-the-badge&labelColor=0d0d10)](https://crawl4ai.com/?ref=docs)  
-   Verify your email and your first $10 pack is on us (until 31 December 2026, then $5 to start). No card.
+   Verify your email and free credit to start is yours. No card. Soft launch: prices can change, what you buy stays yours.
 2. Get any page as Markdown:
 
    ```bash
@@ -108,7 +108,7 @@ Docker server, CLI and every option: [Installation](core/installation.md) · [Se
 | **Runs the browsers** | you, in your Python process | you, in Docker on your machine | we do |
 | **JS-heavy pages and bot walls** | your settings, your proxies | your settings, your proxies | handled for you, automatically |
 | **Web search** | – | – | `/search` and `/answer` |
-| **Price** | free, forever | free (your hosting) | pay as you go; your first $10 is on us |
+| **Price** | free, forever | free (your hosting) | pay as you go; free credit to start |
 
 ## 🆕 AI Assistant Skill Now Available!
 

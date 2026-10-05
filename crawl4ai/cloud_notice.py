@@ -29,13 +29,13 @@ _ENV_OFF = "CRAWL4AI_NO_CLOUD_NOTICE"
 _MARKER = ".cloud-notice-shown"
 _BLOCKED_MARKER = ".cloud-notice-blocked"
 
-# The first day the banner stops returning daily: the launch offer ends on 31 December 2026.
+# The first day the banner stops returning daily (the soft-launch period); after it, once per version.
 DAILY_UNTIL = "2027-01-01"
 _RULE = "=" * 72
 
 LINES = (
     "Crawl4AI Cloud is live: the same crawler, hosted.",
-    "Your first $10 pack is on us until 31 Dec 2026 (then $5 to start). No card.",
+    "Free credit to start, no card. Soft launch: prices can change, what you buy stays yours.",
     f"Get a key in 10 seconds:  {CLOUD_URL}",
     f"The library stays open source, forever.   Hide this banner: {_ENV_OFF}=1",
 )
