@@ -15,7 +15,15 @@ class _FakeBM25:
 
 sys.modules.setdefault("rank_bm25", SimpleNamespace(BM25Okapi=_FakeBM25))
 
-from crawl4ai.async_url_seeder import AsyncUrlSeeder
+from crawl4ai.async_url_seeder import AsyncUrlSeeder, _parse_head
+
+
+def test_parse_head_reads_language_from_document_root():
+    info = _parse_head(
+        '<html lang="tr"><head><title>Başlık</title></head><body></body></html>'
+    )
+
+    assert info["lang"] == "tr"
 
 
 class DummyResponse:
