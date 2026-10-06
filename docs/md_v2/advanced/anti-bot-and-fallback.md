@@ -248,6 +248,35 @@ async with AsyncWebCrawler(config=browser_config) as crawler:
 
 That's up to 6 browser attempts + 1 function call before giving up.
 
+### Connecting to an External Stealth Browser over CDP
+
+`browser_mode="custom"` points crawl4ai at any browser that speaks the Chrome
+DevTools Protocol, so a site that blocks headless Chromium can be crawled through
+a browser built to pass those checks, with the rest of your crawler unchanged.
+
+For example, [nokk](https://github.com/koloss777/nokk) is an open-source headless
+engine in Rust (V8, Chrome's TLS fingerprint, no Chromium) that clears Cloudflare
+challenges by itself:
+
+```python
+import asyncio
+import nokk  # pip install nokk
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
+
+async def main():
+    with nokk.launch(auto_solve=True) as server:
+        browser = BrowserConfig(browser_mode="custom", cdp_url=server.ws_endpoint)
+        async with AsyncWebCrawler(config=browser) as crawler:
+            result = await crawler.arun("https://www.scrapingcourse.com/cloudflare-challenge")
+            print(result.markdown)
+
+asyncio.run(main())
+```
+
+On that page crawl4ai's own Chromium stops at "Blocked by anti-bot protection";
+through nokk the crawl returns the page. nokk has no rendering engine, so
+screenshots and PDFs are not available in this mode.
+
 ## Tips
 
 - **Start with `max_retries=0`** and a `fallback_fetch_function` if you just want a safety net without burning time on retries.
