@@ -60,6 +60,18 @@ def pool_mock(api, monkeypatch):
     return mock
 
 
+def test_batch_seed_validation_preserves_valid_urls(api, monkeypatch):
+    blocked, valid = "https://blocked.example/", "https://example.com/"
+    validator = MagicMock(side_effect=[api.HTTPException(400, "URL blocked"), None])
+    monkeypatch.setattr(api, "validate_url_destination", validator)
+    valid_seeds, failures = api._partition_batch_seeds([blocked, valid])
+    assert valid_seeds == [(1, valid)]
+    assert failures[0][0] == 0
+    assert failures[0][1]["url"] == blocked
+    assert failures[0][1]["success"] is False
+    assert failures[0][1]["error_message"] == "URL blocked"
+
+
 @pytest.mark.asyncio
 async def test_pdf_scraping_strategy_gets_pdf_crawler(api, pool_mock, monkeypatch):
     used = {}

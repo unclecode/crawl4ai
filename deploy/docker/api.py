@@ -657,6 +657,17 @@ def _normalize_and_validate_seeds(urls: List[str]) -> List[str]:
     return urls
 
 
+def _partition_batch_seeds(urls: List[str]):
+    valid, failures = [], []
+    for index, url in enumerate(urls):
+        try:
+            valid.append((index, _normalize_and_validate_seeds([url])[0]))
+        except HTTPException as exc:
+            failure = {"url": url, "success": False, "error_message": str(exc.detail)}
+            failures.append((index, failure))
+    return valid, failures
+
+
 async def handle_crawl_request(
     urls: List[str],
     browser_config: dict,
@@ -684,7 +695,15 @@ async def handle_crawl_request(
     peak_mem_mb = start_mem_mb
 
     try:
-        urls = _normalize_and_validate_seeds(urls)
+        batch_request = len(urls) > 1
+        valid_indexes = list(range(len(urls)))
+        seed_failures = []
+        if batch_request:
+            valid_seeds, seed_failures = _partition_batch_seeds(urls)
+            valid_indexes = [seed[0] for seed in valid_seeds]
+            urls = [seed[1] for seed in valid_seeds]
+        else:
+            urls = _normalize_and_validate_seeds(urls)
         browser_config = BrowserConfig.load(browser_config, provenance=Provenance.UNTRUSTED)
         crawler_config = CrawlerRunConfig.load(crawler_config, provenance=Provenance.UNTRUSTED)
         from egress_broker import enforce_egress
@@ -723,8 +742,9 @@ async def handle_crawl_request(
         base_config = config["crawler"]["base_config"]
 
         # Build the config(s) to pass to arun/arun_many
-        if crawler_configs and len(urls) > 1:
+        if crawler_configs and batch_request:
             # Per-URL config list: deserialize each and apply base_config
+            crawler_configs = [crawler_configs[index] for index in valid_indexes]
             config_list = [CrawlerRunConfig.load(cc, provenance=Provenance.UNTRUSTED) for cc in crawler_configs]
             for cfg in config_list:
                 for key, value in base_config.items():
@@ -746,15 +766,17 @@ async def handle_crawl_request(
             effective_config = crawler_config
 
         results = []
-        func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
+        func = getattr(crawler, "arun_many" if batch_request else "arun")
         partial_func = partial(func,
-                                urls[0] if len(urls) == 1 else urls,
+                                urls if batch_request else urls[0],
                                 config=effective_config,
                                 dispatcher=dispatcher)
         # Optional per-crawl wall-clock deadline (config limits.wall_clock_s; 0 = none).
         from governor import wall_clock_seconds
         _deadline = wall_clock_seconds(config)
-        if _deadline and _deadline > 0:
+        if not urls:
+            results = []
+        elif _deadline and _deadline > 0:
             results = await asyncio.wait_for(partial_func(), timeout=_deadline)
         else:
             results = await partial_func()
@@ -809,6 +831,11 @@ async def handle_crawl_request(
                     "success": False,
                     "error_message": str(e)
                 })
+
+        if seed_failures:
+            indexed_results = list(zip(valid_indexes, processed_results))
+            indexed_results.extend(seed_failures)
+            processed_results = [result for _, result in sorted(indexed_results)]
             
         response = {
             "success": True,
