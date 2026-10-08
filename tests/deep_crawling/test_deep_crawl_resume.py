@@ -629,6 +629,14 @@ class TestBFSRegressions:
         assert await strategy.can_process_url("https://other.com/blog/post1", 1) == False
 
     @pytest.mark.asyncio
+    async def test_single_label_hostname_is_valid(self):
+        """Single-label hostnames can reach the configured filter chain."""
+        filter_chain = FilterChain([DomainFilter(allowed_domains=["intranet"])])
+        strategy = BFSDeepCrawlStrategy(max_depth=1, filter_chain=filter_chain)
+
+        assert await strategy.can_process_url("https://intranet/docs", 1) is True
+
+    @pytest.mark.asyncio
     async def test_url_scorer_still_works(self):
         """URL scoring integration unchanged."""
         scorer = KeywordRelevanceScorer(keywords=["python", "tutorial"], weight=1.0)
