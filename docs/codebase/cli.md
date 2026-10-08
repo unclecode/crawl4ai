@@ -31,7 +31,7 @@
 | **List saved profiles** | `crwl profiles` → choose **1** | Shows name, browser type, size, last-modified. |
 | **Delete a profile** | `crwl profiles` → choose **3** → pick the profile index → confirm | Removes the folder. |
 | **Crawl with a profile (default alias)** | `crwl https://site.com/dashboard -p my-profile` | Keeps login cookies, sets `use_managed_browser=true` under the hood. |
-| **Crawl + verbose JSON output** | `crwl https://site.com -p my-profile -o json -v` | Any other `crawl` flags work the same. |
+| **Crawl + full JSON output** | `crwl https://site.com -p my-profile -o all -v` | Any other `crawl` flags work the same. |
 | **Crawl with extra browser tweaks** | `crwl https://site.com -p my-profile -b "headless=true,viewport_width=1680"` | CLI overrides go on top of the profile. |
 | **Same but via explicit sub-command** | `crwl crawl https://site.com -p my-profile` | Identical to default alias. |
 | **Use profile from inside Profile Manager** | `crwl profiles` → choose **4** → pick profile → enter URL → follow prompts | Handy when demo-ing to non-CLI folks. |

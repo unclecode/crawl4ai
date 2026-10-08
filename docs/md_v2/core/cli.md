@@ -31,8 +31,8 @@ crwl https://example.com
 # Get markdown output
 crwl https://example.com -o markdown
 
-# Verbose JSON output with cache bypass
-crwl https://example.com -o json -v --bypass-cache
+# Full crawl result as JSON with cache bypass (default output format)
+crwl https://example.com -o all -v --bypass-cache
 
 # See usage examples
 crwl --example
@@ -230,19 +230,21 @@ crwl https://example.com -f filter_bm25.yml -o markdown-fit
 
 ## Output Formats
 
-- `all` - Full crawl result including metadata
-- `json` - Extracted structured data (when using extraction)
+- `all` - Full crawl result as formatted JSON, including HTML, markdown, and metadata (default)
+- `json` - Extracted structured data only (requires an extraction strategy)
 - `markdown` / `md` - Raw markdown output
 - `markdown-fit` / `md-fit` - Filtered markdown for better readability
 
+> **Important:** `--output json` (`-o json`) outputs structured data from `result.extracted_content`. It requires an extraction strategy configured via `--json-extract` / `-j` or `--extraction-config` / `-e` (optionally with `--schema` / `-s`). If no extraction strategy is configured, `extracted_content` is not populated and running with `-o json` will fail (as `extracted_content` is `None`). To export the full crawl result in JSON format without an extraction strategy, use `--output all` (the default).
+
 ## Complete Examples
 
-1. Basic Extraction:
+1. Full Crawl Result as JSON:
 ```bash
 crwl https://example.com \
     -B browser.yml \
     -C crawler.yml \
-    -o json
+    -o all
 ```
 
 2. Structured Data Extraction:
