@@ -1119,17 +1119,17 @@ class CustomHTML2Text(HTML2Text):
                 if self.preserve_depth == 0:
                     self.current_preserved_tag = tag
                     self.preserved_content = []
-                    # Format opening tag with attributes
-                    attr_str = "".join(
-                        f' {k}="{v}"' for k, v in attrs.items() if v is not None
-                    )
-                    self.preserved_content.append(f"<{tag}{attr_str}>")
+                # Record nested preserved tags as well as the outer block.
+                attr_str = "".join(
+                    f' {k}="{v}"' for k, v in attrs.items() if v is not None
+                )
+                self.preserved_content.append(f"<{tag}{attr_str}>")
                 self.preserve_depth += 1
                 return
             else:
+                self.preserved_content.append(f"</{tag}>")
                 self.preserve_depth -= 1
                 if self.preserve_depth == 0:
-                    self.preserved_content.append(f"</{tag}>")
                     # Output the preserved HTML block with proper spacing
                     preserved_html = "".join(self.preserved_content)
                     self.o("\n" + preserved_html + "\n")
