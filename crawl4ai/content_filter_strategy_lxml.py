@@ -50,12 +50,14 @@ Two details are needed to match BeautifulSoup exactly:
 from __future__ import annotations
 
 import math
+import re
 from typing import Dict, List
 
 from lxml import etree
 from lxml import html as lhtml
 
 from .content_filter_strategy import PruningContentFilter
+from .utils import _CJK_CHAR_RE, _CJK_RANGES, count_cjk_chars
 
 # HTML void elements, taken verbatim from BeautifulSoup's LXMLTreeBuilder
 # ``empty_element_tags``. These serialize self-closed (``<br/>``) with no end
@@ -85,6 +87,57 @@ def _esc_len(s: str) -> int:
     return len(s) + (s.count("&") << 2) + 3 * (s.count("<") + s.count(">"))
 
 
+# Text with CJK characters is counted with ``utils.count_words``: one word per
+# CJK character plus one per run of other non-space characters that contains a
+# letter or digit. These patterns let that count be built up per text fragment.
+_RUN = f"[^\\s{_CJK_RANGES}]"
+_FIRST_RUN_RE = re.compile(f"{_RUN}+")
+_LAST_RUN_RE = re.compile(f"(?<!{_RUN}){_RUN}+\\Z")
+_WORD_RUN_RE = re.compile(f"(?<!{_RUN}){_RUN}*?[^\\W_{_CJK_RANGES}]{_RUN}*")
+_ALNUM_RE = re.compile(r"[^\W_]")
+
+# BeautifulSoup gives text inside these tags its own string class, which
+# ``get_text()`` of an ancestor skips (script and style are excluded tags).
+_STRING_CONTAINERS = frozenset({"template", "rt", "rp"})
+
+
+def _word_stats(s: str):
+    """``(cjk, words, head, tail, one_run)`` for a stripped, non-empty text.
+
+    ``words`` is ``count_words(s)`` as counted when CJK is present. ``head`` /
+    ``tail`` are None if ``s`` starts / ends with a CJK character, otherwise
+    whether the run of other characters there contains a letter or digit.
+    ``one_run`` means ``s`` is a single such run. Combine with ``_join``.
+    """
+    cjk = count_cjk_chars(s)
+    words = cjk + len(_WORD_RUN_RE.findall(s))
+    m = _FIRST_RUN_RE.match(s)
+    head = None if m is None else _ALNUM_RE.search(m.group()) is not None
+    if m is not None and m.end() == len(s):
+        return (cjk, words, head, head, True)
+    m = _LAST_RUN_RE.search(s)
+    tail = None if m is None else _ALNUM_RE.search(m.group()) is not None
+    return (cjk, words, head, tail, False)
+
+
+def _join(a, b):
+    """``_word_stats`` of two texts concatenated with no separator."""
+    if a is None or b is None:  # empty text
+        return b if a is None else a
+    cjk1, w1, h1, t1, one1 = a
+    cjk2, w2, h2, t2, one2 = b
+    if t1 is None or h2 is None:  # a CJK character at the seam
+        return (cjk1 + cjk2, w1 + w2, h1, t2, False)
+    run = t1 or h2  # the two edge runs merge into one
+    return (
+        cjk1 + cjk2,
+        w1 + w2 - (t1 and h2),
+        run if one1 else h1,
+        run if one2 else t2,
+        one1 and one2,
+    )
+
+
 class _NodeMetrics:
     """Cached, slotted metrics for a single element (one instance per node).
 
@@ -104,18 +157,30 @@ class _NodeMetrics:
         ``word_count`` is ``space_count + 1`` -- the original counts words by
         ``text.count(" ") + 1`` on the separator-less concatenation, and we
         reproduce that exactly.
+    words:
+        ``_word_stats`` of the text ``get_text(strip=True)`` gives (``None`` if
+        empty or not needed). When it has CJK characters, ``PruningContentFilter``
+        counts it with ``count_words`` instead of ``space_count + 1``.
     string_len:
         Length of the stripped BeautifulSoup ``.string`` for this node, or
         ``-1`` when ``.string`` would be ``None``. Used only to evaluate
         ``link_text_len`` over direct-child ``<a>`` elements.
     """
 
-    __slots__ = ("text_len", "inner_len", "space_count", "string_len")
+    __slots__ = ("text_len", "inner_len", "space_count", "words", "string_len")
 
-    def __init__(self, text_len: int, inner_len: int, space_count: int, string_len: int):
+    def __init__(
+        self,
+        text_len: int,
+        inner_len: int,
+        space_count: int,
+        string_len: int,
+        words=None,
+    ):
         self.text_len = text_len
         self.inner_len = inner_len
         self.space_count = space_count
+        self.words = words
         self.string_len = string_len
 
 
@@ -226,6 +291,14 @@ class PruningContentFilterLXML(PruningContentFilter):
         metrics: Dict[object, _NodeMetrics] = {}
         need_words = self._need_words
         excluded = self.excluded_tags
+        # Counting CJK text costs more, so only do it on pages that have some.
+        need_cjk = (
+            need_words
+            and _CJK_CHAR_RE.search(
+                etree.tostring(body, method="text", encoding="unicode")
+            )
+            is not None
+        )
 
         # Pre-order collection that does not descend into excluded subtrees.
         nodes = []
@@ -250,10 +323,12 @@ class PruningContentFilterLXML(PruningContentFilter):
                 else:
                     inner_len = 1
                 space_count = stripped.count(" ") if need_words else 0
+                words = _word_stats(stripped) if need_cjk and stripped else None
                 frag_count = 1
                 string_len = text_len  # candidate, valid only if frag_count == 1
             else:
                 text_len = inner_len = space_count = 0
+                words = None
                 frag_count = 0
                 string_len = -1
 
@@ -267,6 +342,8 @@ class PruningContentFilterLXML(PruningContentFilter):
                     inner_len += self._outer_len(child, cm.inner_len)
                     if need_words:
                         space_count += cm.space_count
+                        if need_cjk and ct not in _STRING_CONTAINERS:
+                            words = _join(words, cm.words)
                     frag_count += 1
                     string_len = cm.string_len  # recurse if this is the sole content
                 # else: comment / excluded element -> removed, contributes 0,
@@ -279,6 +356,8 @@ class PruningContentFilterLXML(PruningContentFilter):
                     inner_len += _esc_len(tail) if (st or tail.strip(_ASCII_WS)) else 1
                     if need_words:
                         space_count += st.count(" ")
+                        if need_cjk and st:
+                            words = _join(words, _word_stats(st))
                     frag_count += 1
                     string_len = len(st)  # candidate, valid only if frag_count == 1
 
@@ -287,7 +366,9 @@ class PruningContentFilterLXML(PruningContentFilter):
             if frag_count != 1:
                 string_len = -1
 
-            metrics[el] = _NodeMetrics(text_len, inner_len, space_count, string_len)
+            metrics[el] = _NodeMetrics(
+                text_len, inner_len, space_count, string_len, words
+            )
 
         return metrics
 
@@ -345,7 +426,10 @@ class PruningContentFilterLXML(PruningContentFilter):
 
     def _composite_score(self, node, m: _NodeMetrics, text_len: int, tag_len: int, link_text_len: int) -> float:
         if self.min_word_threshold:
-            word_count = m.space_count + 1
+            if m.words is not None and m.words[0]:  # has CJK: count_words(text)
+                word_count = m.words[1]
+            else:
+                word_count = m.space_count + 1
             if word_count < self.min_word_threshold:
                 return -1.0
 
