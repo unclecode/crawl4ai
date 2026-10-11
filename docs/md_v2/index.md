@@ -55,7 +55,7 @@
   
 </div>
 
-Crawl4AI turns any website into clean, LLM-ready Markdown for RAG, AI agents and data pipelines. Run the open-source web crawler and scraper yourself, free forever, or use it hosted with one key: scrape, search and extract through one API, with MCP for your agent.
+Crawl4AI turns any website into clean, LLM-ready Markdown for RAG, AI agents and data pipelines. Run the open-source web crawler and scraper yourself, free forever, or use it hosted with one key: `/scrape` a page to Markdown, `/extract` it to JSON, `/search` the web, `/serp` for Google's results page as data, `/answer` a question with sources; MCP for your agent. Free: 10 a minute, 2 at a time, 2,000 credits to start. Paid: 120 a minute, 10 at a time, from $10.
 
 ## Two ways to use Crawl4AI
 
@@ -82,7 +82,7 @@ Docker server, CLI and every option: [Installation](core/installation.md) · [Se
 
 ### ☁️ Or use the cloud: no browsers, no proxies
 
-1. [![Get a key in 10 seconds](https://img.shields.io/badge/Get_a_key_in_10_seconds-%241_pass%2C_no_signup-f5a300?style=for-the-badge&labelColor=0d0d10)](https://crawl4ai.com/?ref=docs)  
+1. [![Get a key in 10 seconds](https://img.shields.io/badge/Get_a_key_in_10_seconds-20_free_credits%2C_no_signup-f5a300?style=for-the-badge&labelColor=0d0d10)](https://crawl4ai.com/?ref=docs)  
    Verify your email and free credit to start is yours. No card. Soft launch: prices can change, what you buy stays yours.
 2. Get any page as Markdown:
 
@@ -93,7 +93,7 @@ Docker server, CLI and every option: [Installation](core/installation.md) · [Se
      -d '{"url": "https://news.ycombinator.com"}' | jq -r .markdown
    ```
 
-   The same key works for `/search`, `/answer`, `/extract` and many URLs at once (`/scrape/batch`, `/scrape/jobs`). Pay as you go: [live prices](https://crawl4ai.com/docs?ref=docs#pricing).
+   The same key works for `/extract`, `/search`, `/serp`, `/answer` and many URLs at once (`/scrape/batch`, `/scrape/jobs`). Pay as you go: [live prices](https://crawl4ai.com/docs?ref=docs#pricing).
 3. Give it to your AI agent. Claude Code shown; [Codex, Cursor and OpenCode →](https://crawl4ai.com/docs?ref=docs#mcp)
 
    ```bash
@@ -107,7 +107,7 @@ Docker server, CLI and every option: [Installation](core/installation.md) · [Se
 |---|---|---|---|
 | **Runs the browsers** | you, in your Python process | you, in Docker on your machine | we do |
 | **JS-heavy pages and bot walls** | your settings, your proxies | your settings, your proxies | handled for you, automatically |
-| **Web search** | – | – | `/search` and `/answer` |
+| **Web search** | – | – | `/search`, `/serp` and `/answer` |
 | **Price** | free, forever | free (your hosting) | pay as you go; free credit to start |
 
 ## 🆕 AI Assistant Skill Now Available!
