@@ -253,5 +253,20 @@ class TestDeepCrawlOutput:
             assert 'Content here' in result.output
 
 
+def test_json_output_without_extractor_fails_early(runner):
+    with patch("crawl4ai.cli.anyio.run") as run:
+        result = runner.invoke(cli, ["crawl", "https://example.com", "-o", "json"])
+    assert result.exit_code == 2
+    assert "-o json needs an extraction strategy" in result.output
+    run.assert_not_called()  # browser never started
+
+
+def test_json_output_with_question_is_allowed(runner):
+    with patch("crawl4ai.cli.anyio.run") as run, \
+         patch("crawl4ai.cli.setup_llm_config", return_value=("openai/gpt-4o", "x")):
+        runner.invoke(cli, ["crawl", "https://example.com", "-o", "json", "-q", "hi"])
+    run.assert_called()  # no early error
+
+
 if __name__ == '__main__':
     pytest.main(['-v', '-s', '--tb=native', __file__])

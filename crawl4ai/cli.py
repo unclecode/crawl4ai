@@ -175,7 +175,7 @@ def show_examples():
     crwl https://example.com -o markdown
 
     # Verbose JSON output with cache bypass
-    crwl https://example.com -o json -v --bypass-cache
+    crwl https://example.com -o all -v --bypass-cache
 
 2️⃣  Using Config Files:
     # Using browser and crawler configs
@@ -516,7 +516,7 @@ async def crawl_with_profile_cli(profile_path, url):
     # Ask for output format
     output_format = Prompt.ask(
         "[cyan]Output format[/cyan]",
-        choices=["all", "json", "markdown", "md", "title"],
+        choices=["all", "markdown", "md", "title"],
         default="markdown"
     )
     
@@ -1204,6 +1204,12 @@ Always return valid, properly formatted JSON."""
         else:
             ensure_ascii = config.get("JSON_ENSURE_ASCII", USER_SETTINGS["JSON_ENSURE_ASCII"]["default"])
 
+        if output == "json" and not question and crawler_cfg.extraction_strategy is None:
+            raise click.UsageError(
+                "-o json needs an extraction strategy (-j or -e). "
+                "Use -o all for the full crawl result."
+            )
+
         # Run crawler
         result : CrawlResult = anyio.run(
             run_crawler,
@@ -1242,7 +1248,6 @@ Always return valid, properly formatted JSON."""
                 else:
                     click.echo(json.dumps(main_result.model_dump(), indent=2, ensure_ascii=ensure_ascii))
             elif output == "json":
-                print(main_result.extracted_content)
                 extracted_items = json.loads(main_result.extracted_content)
                 click.echo(json.dumps(extracted_items, indent=2, ensure_ascii=ensure_ascii))
 
@@ -1292,6 +1297,8 @@ Always return valid, properly formatted JSON."""
                     else:
                         f.write(main_result.markdown.fit_markdown)
             
+    except click.ClickException:
+        raise
     except Exception as e:
         raise click.ClickException(str(e))
 
