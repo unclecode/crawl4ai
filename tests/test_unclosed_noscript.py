@@ -98,3 +98,16 @@ def test_noscript_text_in_script_style_or_comment_is_not_counted(strategy, decoy
 
     assert "Please enable JavaScript" not in result.cleaned_html
     assert "Real heading" in result.cleaned_html
+
+
+@pytest.mark.parametrize("opener", ["<!--", "<script>", "<style>"])
+def test_many_unclosed_raw_text_openers_stay_fast(opener):
+    import time
+
+    html = (opener + "a" * 42) * 20_000  # about 1 MB
+
+    start = time.time()
+    unwrap_orphaned_noscript(html)
+
+    # Quadratic matching took over a minute here; linear takes milliseconds.
+    assert time.time() - start < 2
