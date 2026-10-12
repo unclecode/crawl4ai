@@ -3137,10 +3137,13 @@ def preprocess_html_for_schema(html_content, text_threshold=100, attr_value_thre
     Returns:
         str: Preprocessed HTML content
     """
+    # Local import: content_scraping_strategy imports from this module.
+    from .content_scraping_strategy import unwrap_orphaned_noscript
+
     try:
         # Parse HTML with error recovery
         parser = etree.HTMLParser(remove_comments=True, remove_blank_text=True)
-        tree = lhtml.fromstring(html_content, parser=parser)
+        tree = lhtml.fromstring(unwrap_orphaned_noscript(html_content), parser=parser)
         
         # 1. Remove HEAD section (keep only BODY)
         head_elements = tree.xpath('//head')
