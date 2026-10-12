@@ -658,6 +658,29 @@ async def test_stream_crawl(token: str = None): # Made token optional
 # asyncio.run(test_stream_crawl())
 ```
 
+#### Per-URL Configs (`crawler_configs`)
+
+To crawl different URLs with different settings in one request, send `crawler_configs`: a list of `CrawlerRunConfig` payloads, each with a `url_matcher`. Every URL uses the first entry whose `url_matcher` matches it, and an entry without a `url_matcher` matches every URL.
+
+```python
+payload = {
+    "urls": ["https://docs.example.com/guide", "https://example.com/"],
+    "crawler_configs": [
+        {
+            "type": "CrawlerRunConfig",
+            "params": {"url_matcher": "*docs.example.com*", "css_selector": "main"},
+        },
+        # Catch-all: decides every URL the entries above did not match
+        {"type": "CrawlerRunConfig", "params": {"url_matcher": "*"}},
+    ],
+}
+```
+
+- The list is used for one URL or many, on both `/crawl` and `/crawl/stream`.
+- When a list is sent, `crawler_config` is ignored. It is not a fallback: a URL that no entry matches comes back as a failed result (`No matching configuration found for URL: ...`), so end the list with a catch-all entry (`"url_matcher": "*"`).
+- The server's `crawler.base_config` defaults from `config.yml` are applied to each entry on both endpoints.
+- A list that mixes `PDFContentScrapingStrategy` entries with other scraping strategies is refused with `400`, because one crawler serves every URL of a request.
+
 ### Asynchronous Jobs with Webhooks
 
 For long-running crawls or when you want to avoid keeping connections open, use the job queue endpoints. Instead of polling for results, configure a webhook to receive notifications when jobs complete.
