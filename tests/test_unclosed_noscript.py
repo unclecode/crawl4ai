@@ -75,3 +75,39 @@ def test_fit_html_keeps_body_nested_in_unclosed_noscript():
     fit_html = preprocess_html_for_schema(DAMAGED_CAPTURE, text_threshold=500, max_size=300_000)
 
     assert "Unstunned. Hand slaughtered. Halal certified." in fit_html
+
+
+@pytest.mark.parametrize(
+    "decoy",
+    [
+        '<script>const sample = "<noscript>";</script>',
+        "<style>/* <noscript> */</style>",
+        "<!-- <noscript> -->",
+    ],
+)
+def test_noscript_text_in_script_style_or_comment_is_not_counted(strategy, decoy):
+    html = (
+        "<html><body>"
+        f"{decoy}"
+        "<noscript>Please enable JavaScript</noscript>"
+        "<h1>Real heading</h1>"
+        "</body></html>"
+    )
+
+    result = strategy.scrap("https://example.com/", html)
+
+    assert "Please enable JavaScript" not in result.cleaned_html
+    assert "Real heading" in result.cleaned_html
+
+
+@pytest.mark.parametrize("opener", ["<!--", "<script>", "<style>"])
+def test_many_unclosed_raw_text_openers_stay_fast(opener):
+    import time
+
+    html = (opener + "a" * 42) * 20_000  # about 1 MB
+
+    start = time.time()
+    unwrap_orphaned_noscript(html)
+
+    # Quadratic matching took over a minute here; linear takes milliseconds.
+    assert time.time() - start < 2

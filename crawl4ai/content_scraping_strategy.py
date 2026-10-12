@@ -38,6 +38,10 @@ TWITTER_REGEX = re.compile(r"^twitter:")
 DIMENSION_REGEX = re.compile(r"(\d+)(\D*)")
 NOSCRIPT_OPEN_REGEX = re.compile(r"<noscript\b[^>]*>", re.IGNORECASE)
 NOSCRIPT_CLOSE_REGEX = re.compile(r"</noscript\s*>", re.IGNORECASE)
+RAW_TEXT_REGEX = re.compile(
+    r"<script\b.*?(?:</script\s*>|\Z)|<style\b.*?(?:</style\s*>|\Z)|<!--.*?(?:-->|\Z)",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 def unwrap_orphaned_noscript(html: str) -> str:
@@ -51,10 +55,14 @@ def unwrap_orphaned_noscript(html: str) -> str:
     removal below then deletes the whole page.
 
     Unbalanced tag counts identify that serialization damage, so well-formed
-    documents are returned untouched.
+    documents are returned untouched. Tags inside <script>, <style> and
+    comments are only text, so they are left out of the count. An unclosed
+    one runs to the end of the document, as in a browser, which also keeps
+    the scan linear on pages with many unclosed openers.
     """
-    opens = len(NOSCRIPT_OPEN_REGEX.findall(html))
-    closes = len(NOSCRIPT_CLOSE_REGEX.findall(html))
+    markup = RAW_TEXT_REGEX.sub("", html)
+    opens = len(NOSCRIPT_OPEN_REGEX.findall(markup))
+    closes = len(NOSCRIPT_CLOSE_REGEX.findall(markup))
     if opens <= closes:
         return html
     return NOSCRIPT_CLOSE_REGEX.sub("", NOSCRIPT_OPEN_REGEX.sub("", html))
