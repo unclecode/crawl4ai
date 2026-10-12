@@ -13,6 +13,7 @@ from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import hashlib
 import random
+import re
 import uuid
 from .js_snippet import load_js_script
 from .models import AsyncCrawlResponse
@@ -2652,6 +2653,42 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
 
         return server
 
+    # scheme://user:pass@ in any URL inside a message
+    _URL_USERINFO = re.compile(r"([A-Za-z][A-Za-z0-9+.-]*://)[^/\s@]+@")
+
+    @classmethod
+    def _redact_proxy_credentials(cls, message: str, proxy_url: Optional[str]) -> str:
+        """Mask proxy credentials in an error message before it is raised.
+
+        Some aiohttp errors quote the proxy URL (``InvalidURL`` carries all of
+        it), and the errors raised from ``_handle_http`` end up in logs and in
+        crawl results.
+        """
+        if proxy_url and "@" in proxy_url:
+            from urllib.parse import unquote
+
+            userinfo = proxy_url.split("://", 1)[-1].rsplit("@", 1)[0]
+            # The exact string first: a password with "/" or "#" in it is not
+            # matched whole by the pattern below.
+            for secret in {userinfo, unquote(userinfo)}:
+                message = message.replace(secret + "@", "***@")
+        return cls._URL_USERINFO.sub(r"\1***@", message)
+
+    @classmethod
+    def _wrap_error(cls, exc_type, prefix: str, error: BaseException, proxy_url: Optional[str]):
+        """``exc_type(f"{prefix}: {error}")`` with proxy credentials masked.
+
+        When the original message carried credentials, it is also kept out of
+        the traceback, which would otherwise print it under "During handling
+        of the above exception".
+        """
+        text = str(error)
+        safe = cls._redact_proxy_credentials(text, proxy_url)
+        wrapped = exc_type(f"{prefix}: {safe}")
+        if safe != text:
+            wrapped.__suppress_context__ = True
+        return wrapped
+
     # Content types treated as text (decoded into html field)
     _TEXT_CONTENT_TYPES: Final = frozenset({
         'text/csv', 'text/plain', 'text/tab-separated-values', 'text/xml',
@@ -2809,23 +2846,23 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
 
             except aiohttp.ServerTimeoutError as e:
                 await self.hooks['on_error'](e)
-                raise ConnectionTimeoutError(f"Request timed out: {str(e)}")
+                raise self._wrap_error(ConnectionTimeoutError, "Request timed out", e, proxy_url)
                 
             except aiohttp.ClientConnectorError as e:
                 await self.hooks['on_error'](e)
-                raise ConnectionError(f"Connection failed: {str(e)}")
+                raise self._wrap_error(ConnectionError, "Connection failed", e, proxy_url)
                 
             except aiohttp.ClientError as e:
                 await self.hooks['on_error'](e)
-                raise HTTPCrawlerError(f"HTTP client error: {str(e)}")
+                raise self._wrap_error(HTTPCrawlerError, "HTTP client error", e, proxy_url)
             
             except asyncio.exceptions.TimeoutError as e:
                 await self.hooks['on_error'](e)
-                raise ConnectionTimeoutError(f"Request timed out: {str(e)}")
+                raise self._wrap_error(ConnectionTimeoutError, "Request timed out", e, proxy_url)
             
             except Exception as e:
                 await self.hooks['on_error'](e)
-                raise HTTPCrawlerError(f"HTTP request failed: {str(e)}")
+                raise self._wrap_error(HTTPCrawlerError, "HTTP request failed", e, proxy_url)
 
     async def crawl(
         self, 
