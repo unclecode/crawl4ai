@@ -16,3 +16,12 @@ def test_proxy_url_roundtrips_credentials(password):
     assert url.port == 8080
     assert url.user == "us:er"
     assert url.password == password
+
+
+def test_encoded_proxy_string_is_sent_once_encoded():
+    strategy = AsyncHTTPCrawlerStrategy()
+    config = ProxyConfig.from_string("http://user:p%40ss@host:8080")
+    assert config.password == "p@ss"
+    url = URL(strategy._format_proxy_url(config))
+    assert url.user == "user"
+    assert url.password == "p@ss"

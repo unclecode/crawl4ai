@@ -3,6 +3,7 @@ import functools
 import importlib
 import os
 import warnings
+from urllib.parse import unquote
 import requests
 from .config import (
     DEFAULT_PROVIDER,
@@ -711,8 +712,8 @@ class ProxyConfig:
                 username, password = credentials.split(":", 1)
                 return ProxyConfig(
                     server=f"{protocol}://{server_part}",
-                    username=username,
-                    password=password,
+                    username=unquote(username),
+                    password=unquote(password),
                 )
         # URL without credentials (keep scheme)
         if "://" in s and "@" not in s:
