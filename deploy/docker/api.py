@@ -23,7 +23,8 @@ from crawl4ai import (
     BrowserConfig,
     MemoryAdaptiveDispatcher,
     RateLimiter, 
-    LLMConfig
+    LLMConfig,
+    CrawlResult,
 )
 from crawl4ai.async_configs import Provenance, UntrustedConfigError
 from hook_registry import build_declarative_hooks, HookValidationError
@@ -647,14 +648,26 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
             await _dispose_crawler(crawler)
 
 
-def _normalize_and_validate_seeds(urls: List[str]) -> List[str]:
+def _normalize_and_validate_seeds(urls: List[str]) -> Tuple[List[str], List[CrawlResult]]:
     """Prefix bare hosts with https:// and SSRF-validate every seed URL's
     destination. Shared by the streaming and non-streaming crawl handlers so a
-    new entry point cannot silently skip the destination check."""
+    new entry point cannot silently skip the destination check.
+
+    Returns (allowed, refused): a refused seed becomes a failed CrawlResult so
+    one bad seed does not sink the batch. If no seed is allowed, the first
+    refusal is raised (400), as before."""
     urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
+    allowed, refused, first_error = [], [], None
     for url in urls:
-        validate_url_destination(url)
-    return urls
+        try:
+            validate_url_destination(url)
+            allowed.append(url)
+        except HTTPException as e:
+            first_error = first_error or e
+            refused.append(CrawlResult(url=url, html="", success=False, error_message=e.detail))
+    if first_error and not allowed:
+        raise first_error
+    return allowed, refused
 
 
 async def handle_crawl_request(
@@ -684,7 +697,7 @@ async def handle_crawl_request(
     peak_mem_mb = start_mem_mb
 
     try:
-        urls = _normalize_and_validate_seeds(urls)
+        urls, refused = _normalize_and_validate_seeds(urls)
         browser_config = BrowserConfig.load(browser_config, provenance=Provenance.UNTRUSTED)
         crawler_config = CrawlerRunConfig.load(crawler_config, provenance=Provenance.UNTRUSTED)
         from egress_broker import enforce_egress
@@ -762,6 +775,7 @@ async def handle_crawl_request(
         # Ensure results is always a list
         if not isinstance(results, list):
             results = [results]
+        results = refused + results
 
         end_mem_mb = _get_memory_mb() # <--- Get memory after
         end_time = time.time()
@@ -886,6 +900,12 @@ async def handle_crawl_request(
             else:
                 await release_crawler(crawler)
 
+async def _prepend_results(first: List[CrawlResult], results_gen: AsyncGenerator) -> AsyncGenerator:
+    for result in first:
+        yield result
+    async for result in results_gen:
+        yield result
+
 async def handle_stream_crawl_request(
     urls: List[str],
     browser_config: dict,
@@ -900,7 +920,7 @@ async def handle_stream_crawl_request(
         # SSRF guard: validate every seed URL's destination before fetching,
         # mirroring handle_crawl_request. The streaming path previously skipped
         # this, leaving /crawl/stream (and /crawl with stream=true) unguarded.
-        urls = _normalize_and_validate_seeds(urls)
+        urls, refused = _normalize_and_validate_seeds(urls)
         browser_config = BrowserConfig.load(
             browser_config, provenance=Provenance.UNTRUSTED
         )
@@ -918,12 +938,12 @@ async def handle_stream_crawl_request(
         crawler_config.stream = True
 
         # Deep crawl streaming supports exactly one start URL
-        if crawler_config.deep_crawl_strategy is not None and len(urls) != 1:
+        if crawler_config.deep_crawl_strategy is not None and len(urls) + len(refused) != 1:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
                     "Deep crawling with stream currently supports exactly one URL per request. "
-                    f"Received {len(urls)} URLs."
+                    f"Received {len(urls) + len(refused)} URLs."
                 ),
             )
 
@@ -967,6 +987,9 @@ async def handle_stream_crawl_request(
                 config=crawler_config,
                 dispatcher=dispatcher
             )
+
+        if refused:
+            results_gen = _prepend_results(refused, results_gen)
 
         return crawler, results_gen, hooks_info
 
