@@ -989,7 +989,9 @@ async def handle_stream_crawl_request(
         clamp_deep_crawl(crawler_config)
         crawler_config.stream = True
         config_list = (
-            _load_crawler_configs(crawler_configs, stream=True)
+            _load_crawler_configs(
+                crawler_configs, config["crawler"]["base_config"], stream=True
+            )
             if crawler_configs
             else None
         )

@@ -116,6 +116,46 @@ def test_stream_passes_the_config_list(server_module, monkeypatch):
     assert all(c.stream for c in config)
 
 
+@pytest.mark.parametrize("stream", [False, True])
+def test_base_config_fills_the_list_on_both_paths(server_module, monkeypatch, stream):
+    """/crawl and /crawl/stream give the list the same server defaults."""
+    crawler = RecordingCrawler()
+    api = _install(monkeypatch, crawler)
+    config = {
+        **server_module.config,
+        "crawler": {
+            **server_module.config["crawler"],
+            "base_config": {"css_selector": "main"},
+        },
+    }
+    handler = api.handle_stream_crawl_request if stream else api.handle_crawl_request
+
+    asyncio.run(
+        handler(
+            urls=["https://example.com/", "https://example.org/"],
+            browser_config={},
+            crawler_config={},
+            config=config,
+            crawler_configs=[
+                {
+                    "type": "CrawlerRunConfig",
+                    "params": {"url_matcher": "*example.com*"},
+                },
+                {
+                    "type": "CrawlerRunConfig",
+                    "params": {"url_matcher": "*", "css_selector": "#own"},
+                },
+            ],
+        )
+    )
+
+    [(method, urls, configs)] = crawler.calls
+    assert method == "arun_many"
+    # An entry that leaves the field unset gets base_config's value; one that
+    # sets it keeps its own.
+    assert [c.css_selector for c in configs] == ["main", "#own"]
+
+
 def test_stream_endpoint_forwards_the_list(server_module, monkeypatch):
     captured = {}
 
