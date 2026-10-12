@@ -232,6 +232,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             # current_level holds tuples: (url, parent_url)
             current_level: List[Tuple[str, Optional[str]]] = [(start_url, None)]
             depths: Dict[str, int] = {start_url: 0}
+            self._pages_crawled = 0
 
         results: List[CrawlResult] = []
 
@@ -329,6 +330,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             visited: Set[str] = set()
             current_level: List[Tuple[str, Optional[str]]] = [(start_url, None)]
             depths: Dict[str, int] = {start_url: 0}
+            self._pages_crawled = 0
 
         while current_level and not self._cancel_event.is_set():
             # Check external cancellation callback before processing this level
