@@ -252,6 +252,47 @@ class TestDeepCrawlOutput:
             assert '# Single Page' in result.output
             assert 'Content here' in result.output
 
+    def _json_results(self, contents):
+        results = []
+        for i, content in enumerate(contents):
+            r = CrawlResult(url=f"https://example.com/{i}", html="<html></html>", success=True)
+            r.extracted_content = content
+            results.append(r)
+        return results
+
+    def test_json_output_without_extraction_is_usage_error(self, runner, tmp_path):
+        """-o json with no extraction strategy should fail clearly, not crash on None"""
+        for ret in (self._json_results([None])[0], self._json_results([None, None])):
+            for extra in ([], ['-O', str(tmp_path / "out.json")]):
+                with patch('crawl4ai.cli.anyio.run', return_value=ret):
+                    result = runner.invoke(cli, ['crawl', 'https://example.com', '-o', 'json'] + extra)
+                assert result.exit_code != 0
+                assert 'configure -e/-s/-j' in result.output
+                assert 'write() argument' not in result.output
+
+    def test_deep_crawl_json_output_includes_all_pages(self, runner, tmp_path):
+        """-o json on a deep crawl returns a list of every page's extracted content"""
+        results = self._json_results(['[{"title": "a"}]', '[{"title": "b"}]'])
+        output_file = tmp_path / "out.json"
+        with patch('crawl4ai.cli.anyio.run', return_value=results):
+            stdout = runner.invoke(cli, ['crawl', 'https://example.com', '--deep-crawl', 'bfs', '-o', 'json'])
+            to_file = runner.invoke(cli, ['crawl', 'https://example.com', '--deep-crawl', 'bfs',
+                                          '-o', 'json', '-O', str(output_file)])
+        expected = [[{"title": "a"}], [{"title": "b"}]]
+        assert stdout.exit_code == 0, stdout.output
+        assert json.loads(stdout.output) == expected
+        assert to_file.exit_code == 0, to_file.output
+        assert json.loads(output_file.read_text()) == expected
+
+    def test_single_crawl_json_output_unchanged(self, runner, tmp_path):
+        single = self._json_results(['[{"title": "a"}]'])[0]
+        output_file = tmp_path / "out.json"
+        with patch('crawl4ai.cli.anyio.run', return_value=single):
+            stdout = runner.invoke(cli, ['crawl', 'https://example.com', '-o', 'json'])
+            to_file = runner.invoke(cli, ['crawl', 'https://example.com', '-o', 'json', '-O', str(output_file)])
+        assert json.loads(stdout.output) == [{"title": "a"}]
+        assert json.loads(output_file.read_text()) == [{"title": "a"}]
+
 
 if __name__ == '__main__':
     pytest.main(['-v', '-s', '--tb=native', __file__])
