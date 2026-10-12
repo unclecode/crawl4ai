@@ -67,3 +67,11 @@ def test_unwrap_removes_tags_but_keeps_contents():
 
     assert "noscript" not in unwrapped
     assert "<h1>Unstunned. Hand slaughtered. Halal certified.</h1>" in unwrapped
+
+
+def test_fit_html_keeps_body_nested_in_unclosed_noscript():
+    from crawl4ai.utils import preprocess_html_for_schema
+
+    fit_html = preprocess_html_for_schema(DAMAGED_CAPTURE, text_threshold=500, max_size=300_000)
+
+    assert "Unstunned. Hand slaughtered. Halal certified." in fit_html
