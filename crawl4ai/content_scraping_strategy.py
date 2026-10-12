@@ -36,6 +36,28 @@ import copy
 OG_REGEX = re.compile(r"^og:")
 TWITTER_REGEX = re.compile(r"^twitter:")
 DIMENSION_REGEX = re.compile(r"(\d+)(\D*)")
+NOSCRIPT_OPEN_REGEX = re.compile(r"<noscript\b[^>]*>", re.IGNORECASE)
+NOSCRIPT_CLOSE_REGEX = re.compile(r"</noscript\s*>", re.IGNORECASE)
+
+
+def unwrap_orphaned_noscript(html: str) -> str:
+    """Drop <noscript> tags, keeping their contents, when one is left unclosed.
+
+    Pages that nest <noscript> (lazy-load plugins commonly wrap Google Tag
+    Manager's own noscript) lose a closing tag when a scripting-enabled browser
+    serializes them: the browser ends the element at the first </noscript> and
+    discards the stray one. lxml parses with scripting disabled, so it nests the
+    rest of the document inside the still-open element, and the noscript
+    removal below then deletes the whole page.
+
+    Unbalanced tag counts identify that serialization damage, so well-formed
+    documents are returned untouched.
+    """
+    opens = len(NOSCRIPT_OPEN_REGEX.findall(html))
+    closes = len(NOSCRIPT_CLOSE_REGEX.findall(html))
+    if opens <= closes:
+        return html
+    return NOSCRIPT_CLOSE_REGEX.sub("", NOSCRIPT_OPEN_REGEX.sub("", html))
 
 
 # Function to parse srcset
@@ -626,7 +648,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
 
         success = True
         try:
-            doc = lhtml.document_fromstring(html)
+            doc = lhtml.document_fromstring(unwrap_orphaned_noscript(html))
             # Match BeautifulSoup's behavior of using body or full doc
             # body = doc.xpath('//body')[0] if doc.xpath('//body') else doc
             body = doc
