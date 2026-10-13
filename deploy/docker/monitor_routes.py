@@ -272,10 +272,10 @@ async def restart_browser(req: KillBrowserRequest):
 
         # Handle permanent browser restart
         if req.sig == "permanent" or (DEFAULT_CONFIG_SIG and DEFAULT_CONFIG_SIG.startswith(req.sig)):
-            # restart_permanent() does the detach under LOCK and the close and
-            # re-create outside it. Doing any of that here, under LOCK, is what
-            # used to deadlock the pool: init_permanent() takes the same
-            # non-reentrant lock.
+            # restart_permanent() starts the replacement, swaps it in under LOCK
+            # and retires the old browser outside it. Doing any of that here,
+            # under LOCK, is what used to deadlock the pool: init_permanent()
+            # takes the same non-reentrant lock.
             #
             # Rebuilt with the same builder startup uses. It applies the egress
             # hardening, and the pool signature it yields is the one incoming

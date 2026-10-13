@@ -9,6 +9,10 @@ Regression coverage for the permanent-browser restart, which used to call
 init_permanent() while holding the pool LOCK. asyncio.Lock is not reentrant,
 so that deadlocked the pool for the life of the process: every later
 get_crawler() blocked forever while /health kept answering OK.
+
+The restart starts the replacement first, swaps it in under LOCK, then drains
+and closes the old browser, so PERMANENT is never None and a failed start
+leaves the old browser serving.
 """
 
 import asyncio
@@ -37,25 +41,58 @@ class FakeBrowserConfig:
         return dict(self.kwargs)
 
 
+class FakeDriver:
+    """Stands in for the Playwright driver that owns a browser's processes."""
+
+    def __init__(self):
+        self.stopped = False
+
+    async def stop(self):
+        self.stopped = True
+
+
 class FakeCrawler:
-    """Records start/close so a test can assert what happened to a browser."""
+    """Records start/close so a test can assert what happened to a browser.
+
+    ``next_start_*`` are consumed by the next crawler the pool creates. The
+    ``close_*`` knobs are set on an existing instance, e.g. ``pool.PERMANENT``.
+    """
 
     instances = []
+    next_start_error = None  # raised by the next start()
+    next_start_gate = None  # asyncio.Event the next start() waits on
 
     def __init__(self, config=None, thread_safe=False):
         self.config = config
         self.started = False
         self.closed = False
         self.close_gate = None  # set to an asyncio.Event to hang close()
+        self.close_error = None  # set to an exception close() raises
+        self.start_error = FakeCrawler.next_start_error
+        self.start_gate = FakeCrawler.next_start_gate
+        FakeCrawler.next_start_error = FakeCrawler.next_start_gate = None
+        self.driver = FakeDriver()
+        self.crawler_strategy = types.SimpleNamespace(
+            browser_manager=types.SimpleNamespace(playwright=self.driver)
+        )
         FakeCrawler.instances.append(self)
 
     async def start(self):
+        if self.start_gate is not None:
+            await self.start_gate.wait()
+        if self.start_error is not None:
+            raise self.start_error
         self.started = True
 
     async def close(self):
         if self.close_gate is not None:
             await self.close_gate.wait()
+        if self.close_error is not None:
+            # Like BrowserManager.close(): the driver is only stopped after
+            # browser.close() succeeds, so a failing close leaves it running.
+            raise self.close_error
         self.closed = True
+        self.driver.stopped = True
 
 
 @pytest.fixture
@@ -80,6 +117,7 @@ def pool():
     sys.path.insert(0, str(DOCKER_DIR))
 
     FakeCrawler.instances = []
+    FakeCrawler.next_start_error = FakeCrawler.next_start_gate = None
     try:
         yield importlib.import_module("crawler_pool")
     finally:
@@ -127,22 +165,154 @@ async def test_restart_permanent_leaves_the_pool_usable(pool):
 async def test_a_hanging_close_does_not_block_the_pool(pool):
     """A browser that will not close must not take the whole server with it.
 
-    The restart itself waits on the close, but it holds no lock while it does,
-    so unrelated requests keep being served.
+    The old browser is retired outside LOCK, after the swap, so requests are
+    served by the replacement while the old one is still closing.
     """
     cfg = FakeBrowserConfig(headless=True)
     await pool.init_permanent(cfg)
-    pool.PERMANENT.close_gate = asyncio.Event()  # close() will never return
+    old = pool.PERMANENT
+    old.close_gate = asyncio.Event()  # close() will never return
 
     restart = asyncio.create_task(pool.restart_permanent(cfg))
-    await asyncio.sleep(0)  # let it reach the close
+    await asyncio.sleep(0.1)  # swapped in, now stuck retiring the old browser
 
+    crawler = await asyncio.wait_for(pool.get_crawler(cfg), timeout=5)
+    assert crawler is pool.PERMANENT and crawler is not old
     other = FakeBrowserConfig(headless=True, text_mode=True)
-    crawler = await asyncio.wait_for(pool.get_crawler(other), timeout=5)
-    assert crawler.started
+    assert (await asyncio.wait_for(pool.get_crawler(other), timeout=5)).started
 
     restart.cancel()
     await asyncio.gather(restart, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_default_request_during_a_slow_restart_creates_no_duplicate(pool):
+    """PERMANENT stays set while the replacement starts, so a default-config
+    request is served by the old browser and nothing lands in the cold pool."""
+    cfg = FakeBrowserConfig(headless=True)
+    await pool.init_permanent(cfg)
+    old = pool.PERMANENT
+
+    FakeCrawler.next_start_gate = asyncio.Event()
+    gate = FakeCrawler.next_start_gate
+    restart = asyncio.create_task(pool.restart_permanent(cfg))
+    await asyncio.sleep(0.1)  # the new browser is starting, not yet swapped in
+
+    served = await asyncio.wait_for(pool.get_crawler(cfg), timeout=5)
+    assert served is old
+    assert not pool.COLD_POOL and not pool.HOT_POOL
+
+    gate.set()
+    await pool.release_crawler(served)
+    await asyncio.wait_for(restart, timeout=5)
+    assert pool.PERMANENT is not old
+    assert not pool.COLD_POOL and not pool.HOT_POOL
+
+
+@pytest.mark.asyncio
+async def test_failed_start_leaves_the_old_browser_serving(pool):
+    cfg = FakeBrowserConfig(headless=True)
+    await pool.init_permanent(cfg)
+    old = pool.PERMANENT
+
+    FakeCrawler.next_start_error = RuntimeError("chromium is not executable")
+    with pytest.raises(RuntimeError):
+        await asyncio.wait_for(pool.restart_permanent(cfg), timeout=5)
+
+    failed = FakeCrawler.instances[-1]
+    assert pool.PERMANENT is old and old.started and not old.closed
+    assert failed is not old and not failed.started
+    assert failed.closed, "the browser that failed to start must be torn down"
+    assert await pool.get_crawler(cfg) is old
+
+
+@pytest.mark.asyncio
+async def test_restart_cancelled_while_starting_tears_the_new_browser_down(pool):
+    cfg = FakeBrowserConfig(headless=True)
+    await pool.init_permanent(cfg)
+    old = pool.PERMANENT
+
+    FakeCrawler.next_start_gate = asyncio.Event()  # start() never finishes
+    restart = asyncio.create_task(pool.restart_permanent(cfg))
+    await asyncio.sleep(0.1)
+    restart.cancel()
+    await asyncio.gather(restart, return_exceptions=True)
+
+    assert pool.PERMANENT is old and not old.closed
+    assert FakeCrawler.instances[-1].closed
+
+
+@pytest.mark.asyncio
+async def test_failed_start_at_startup_leaves_no_half_built_permanent(pool):
+    """init_permanent() used to assign PERMANENT before start(), and arun()
+    starts a crawler that is not ready, so a failed start left a global every
+    concurrent request could start again."""
+    cfg = FakeBrowserConfig(headless=True)
+
+    FakeCrawler.next_start_error = RuntimeError("chromium is not executable")
+    with pytest.raises(RuntimeError):
+        await pool.init_permanent(cfg)
+
+    assert pool.PERMANENT is None
+    assert FakeCrawler.instances[-1].closed
+
+
+@pytest.mark.asyncio
+async def test_restart_waits_for_requests_on_the_old_browser(pool):
+    cfg = FakeBrowserConfig(headless=True)
+    await pool.init_permanent(cfg)
+    old = await pool.get_crawler(cfg)  # a request now holds the old browser
+    assert old.active_requests == 1
+
+    restart = asyncio.create_task(pool.restart_permanent(cfg))
+    await asyncio.sleep(0.5)
+    assert pool.PERMANENT is not old, "new requests already go to the new browser"
+    assert not old.closed, "the old browser must not be closed under a request"
+
+    await pool.release_crawler(old)
+    await asyncio.wait_for(restart, timeout=5)
+    assert old.closed
+
+
+@pytest.mark.asyncio
+async def test_failing_close_still_stops_the_old_browsers_driver(pool, caplog):
+    cfg = FakeBrowserConfig(headless=True)
+    await pool.init_permanent(cfg)
+    old = pool.PERMANENT
+    old.close_error = RuntimeError("browser.close() failed")
+
+    with caplog.at_level("WARNING"):
+        await asyncio.wait_for(pool.restart_permanent(cfg), timeout=5)
+
+    assert old.driver.stopped, "Chromium would otherwise outlive the restart"
+    assert not pool.PERMANENT.driver.stopped, "the new browser is untouched"
+    assert "browser.close() failed" in caplog.text, "the failure is logged"
+
+
+@pytest.mark.asyncio
+async def test_hanging_close_is_bounded_and_still_stops_the_driver(pool):
+    cfg = FakeBrowserConfig(headless=True)
+    await pool.init_permanent(cfg)
+    old = pool.PERMANENT
+    old.close_gate = asyncio.Event()
+
+    with pytest.raises(asyncio.TimeoutError):
+        await pool._retire_browser(old, drain_timeout=0, close_timeout=0.2)
+
+    assert old.driver.stopped
+
+
+@pytest.mark.asyncio
+async def test_concurrent_restarts_retire_every_replaced_browser(pool):
+    cfg = FakeBrowserConfig(headless=True)
+    await pool.init_permanent(cfg)
+
+    await asyncio.wait_for(
+        asyncio.gather(*(pool.restart_permanent(cfg) for _ in range(3))), timeout=5
+    )
+
+    live = [c for c in FakeCrawler.instances if c.started and not c.closed]
+    assert live == [pool.PERMANENT], "exactly one browser is left running"
 
 
 @pytest.mark.asyncio

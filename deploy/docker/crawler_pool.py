@@ -146,6 +146,12 @@ async def release_crawler(crawler: AsyncWebCrawler):
         if hasattr(crawler, 'active_requests'):
             crawler.active_requests = max(0, crawler.active_requests - 1)
 
+async def _discard_browser(crawler: AsyncWebCrawler, timeout: float = 30):
+    """Best-effort teardown of a browser that never entered the pool."""
+    with suppress(Exception):
+        await asyncio.wait_for(crawler.close(), timeout=timeout)
+
+
 async def init_permanent(cfg: BrowserConfig):
     """Initialize permanent default browser."""
     global PERMANENT, DEFAULT_CONFIG_SIG
@@ -154,44 +160,98 @@ async def init_permanent(cfg: BrowserConfig):
             return
         DEFAULT_CONFIG_SIG = _sig(_apply_pool_defaults(cfg))
         logger.info("🔥 Creating permanent default browser")
-        PERMANENT = AsyncWebCrawler(config=cfg, thread_safe=False)
-        await PERMANENT.start()
+        crawler = AsyncWebCrawler(config=cfg, thread_safe=False)
+        try:
+            await crawler.start()
+        except BaseException:
+            await _discard_browser(crawler)
+            raise
+        # Published only once it is running. arun() starts a crawler that is
+        # not ready, so a PERMANENT assigned before start() succeeded could be
+        # started again by every concurrent request, each launching a browser
+        # nothing tracks.
+        PERMANENT = crawler
         LAST_USED[DEFAULT_CONFIG_SIG] = time.time()
         USAGE_COUNT[DEFAULT_CONFIG_SIG] = 0
 
 
-async def restart_permanent(cfg: BrowserConfig):
-    """Replace the permanent browser with a freshly started one.
+async def _retire_browser(
+    crawler: AsyncWebCrawler, drain_timeout: float = 30, close_timeout: float = 60
+):
+    """Let requests already running on a detached browser finish, then close it.
 
-    Only the detach happens under LOCK. The close and the re-create must not run
-    under it: ``init_permanent()`` acquires LOCK itself and ``asyncio.Lock`` is
-    not reentrant, so restarting while holding it deadlocks the pool for the life
-    of the process, and ``close()`` on a wedged browser would block every
-    ``get_crawler()`` for as long as it hangs.
-
-    Clearing the global is what lets ``init_permanent()`` past its
-    "already initialized" guard. Between the detach and the re-create a
-    request carrying the default config falls through to the normal pool
-    path and creates a cold-pool browser; the janitor reaps it once idle.
-
-    The old browser's close is bounded, so a wedged browser cannot hang the
-    restart request itself.
+    ``BrowserManager.close()`` stops its Playwright driver only after
+    ``browser.close()`` succeeds, so a close that raises or hangs leaves Chromium
+    and its driver running. In that case the driver is stopped directly: on exit
+    it kills every browser process it launched. Each browser has its own driver
+    (``BrowserManager.start()``), so this cannot touch the browser that replaced
+    this one.
     """
-    global PERMANENT
-    async with LOCK:
-        old, PERMANENT = PERMANENT, None
+    deadline = time.monotonic() + drain_timeout
+    while getattr(crawler, "active_requests", 0) > 0 and time.monotonic() < deadline:
+        await asyncio.sleep(0.2)
+    try:
+        await asyncio.wait_for(crawler.close(), timeout=close_timeout)
+    except BaseException:
+        manager = getattr(
+            getattr(crawler, "crawler_strategy", None), "browser_manager", None
+        )
+        driver = getattr(manager, "playwright", None)
+        # A cached CDP connection shares its driver with other managers.
+        if driver is not None and not getattr(manager, "_using_cached_cdp", False):
+            with suppress(Exception):
+                await asyncio.wait_for(driver.stop(), timeout=10)
+        raise
 
-    if old:
+
+async def restart_permanent(cfg: BrowserConfig):
+    """Replace the permanent browser: start the new one, swap it in, retire the old.
+
+    The new browser is started first, outside LOCK, and only swapped in under
+    LOCK once it is running. So:
+
+    - ``PERMANENT`` is never ``None`` while the server is up. A default-config
+      request during the restart is served by the old browser, and cannot create
+      a second default-signature browser in the cold pool that the janitor would
+      never see as idle.
+    - If the new browser fails to start, or the restart is cancelled while it
+      starts, it is torn down and the old browser keeps serving.
+    - Nothing is awaited under LOCK but the swap itself. ``init_permanent()``
+      acquires LOCK and ``asyncio.Lock`` is not reentrant, so restarting while
+      holding it deadlocks the pool for the life of the process, and a
+      ``close()`` on a wedged browser would block every ``get_crawler()``.
+
+    The old browser is retired after the swap (see ``_retire_browser``) and the
+    retire is shielded, so a cancelled request cannot abort it halfway and orphan
+    the old Chromium. The cost is that two browsers run together for a short
+    time, which is a memory peak. The restart request itself can take up to the
+    drain timeout plus the close timeout when requests are still running.
+    """
+    global PERMANENT, DEFAULT_CONFIG_SIG
+    sig = _sig(_apply_pool_defaults(cfg))
+
+    new = AsyncWebCrawler(config=cfg, thread_safe=False)
+    swapped = False
+    try:
+        await new.start()
+        async with LOCK:
+            old, PERMANENT, DEFAULT_CONFIG_SIG = PERMANENT, new, sig
+            LAST_USED[sig] = time.time()
+            USAGE_COUNT.setdefault(sig, 0)
+            swapped = True
+    finally:
+        # CancelledError is not an Exception, so only a finally also covers a
+        # restart that is cancelled while the new browser is starting.
+        if not swapped:
+            await _discard_browser(new)
+
+    if old is not None:
         try:
-            await asyncio.wait_for(old.close(), timeout=60)
+            await asyncio.shield(_retire_browser(old))
         except asyncio.TimeoutError:
-            logger.warning(
-                "Timed out closing old permanent browser; continuing restart"
-            )
-        except Exception:
-            pass
-
-    await init_permanent(cfg)
+            logger.warning("Timed out closing the old permanent browser")
+        except Exception as e:
+            logger.warning(f"Error closing the old permanent browser: {e}")
 
 
 async def close_all():
