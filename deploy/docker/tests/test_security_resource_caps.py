@@ -49,6 +49,34 @@ class TestDeepCrawlClamp:
         clamp_deep_crawl(cfg)  # must not raise
         assert cfg.deep_crawl_strategy is None
 
+    def test_nan_limits_clamped(self):
+        from governor import clamp_deep_crawl
+        from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
+        from crawl4ai import CrawlerRunConfig
+        nan = float("nan")
+        cfg = CrawlerRunConfig(deep_crawl_strategy=BFSDeepCrawlStrategy(max_depth=nan, max_pages=nan))
+        clamp_deep_crawl(cfg)
+        assert (cfg.deep_crawl_strategy.max_pages, cfg.deep_crawl_strategy.max_depth) == (100, 5)
+
+    def test_url_length_guard_added_even_without_filter_chain(self):
+        from governor import URLLengthFilter, clamp_deep_crawl
+        from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
+        from crawl4ai import CrawlerRunConfig
+        cfg = CrawlerRunConfig(deep_crawl_strategy=BFSDeepCrawlStrategy(max_depth=1, filter_chain=None))
+        clamp_deep_crawl(cfg)
+        guard = cfg.deep_crawl_strategy.filter_chain.filters[0]
+        assert isinstance(guard, URLLengthFilter)
+        assert not guard.apply("https://a.com/" + "x" * 3000)
+        assert guard.apply("https://a.com/blog/post")
+
+    def test_zero_max_pages_means_no_limit(self):
+        from governor import clamp_deep_crawl
+        from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
+        from crawl4ai import CrawlerRunConfig
+        cfg = CrawlerRunConfig(deep_crawl_strategy=BFSDeepCrawlStrategy(max_depth=2))
+        clamp_deep_crawl(cfg, max_pages=0)
+        assert cfg.deep_crawl_strategy.max_pages == float("inf")
+
 
 class TestUntrustedDeepCrawlStillForbidden:
     def test_request_cannot_set_deep_crawl(self):

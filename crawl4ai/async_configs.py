@@ -199,6 +199,14 @@ UNTRUSTED_ALLOWED_TYPES = {
     "CacheMode", "MatchMode", "DisplayMode",
 }
 
+# Allowed only with CRAWL4AI_ALLOW_DEEP_CRAWL=true; SEOFilter/ContentRelevanceFilter excluded (unguarded httpx fetch).
+UNTRUSTED_DEEP_CRAWL_TYPES = {
+    "BFSDeepCrawlStrategy", "DFSDeepCrawlStrategy", "BestFirstCrawlingStrategy",
+    "FilterChain", "URLPatternFilter", "DomainFilter", "ContentTypeFilter",
+    "KeywordRelevanceScorer", "CompositeScorer", "DomainAuthorityScorer",
+    "FreshnessScorer", "PathDepthScorer",
+}
+
 # Fields that must NEVER come from an untrusted body. Presence => 400 (loud), so
 # a client smuggling these gets an explicit error rather than a silent drop.
 UNTRUSTED_FORBIDDEN_FIELDS = {
@@ -222,6 +230,11 @@ UNTRUSTED_FORBIDDEN_FIELDS = {
     # image bytes base64-inline in the response, no disk write.
     "PDFContentScrapingStrategy": {
         "image_save_dir", "save_images_locally",
+    },
+    # resume_state.pending would queue URLs that skip seed validation.
+    **{
+        name: {"resume_state", "logger", "on_state_change", "should_cancel"}
+        for name in ("BFSDeepCrawlStrategy", "DFSDeepCrawlStrategy", "BestFirstCrawlingStrategy")
     },
 }
 
@@ -302,6 +315,9 @@ _MAX_PDF_PAGES = 2000
 _MAX_LINK_PREVIEW_LINKS = 100      # the class default
 _MAX_LINK_PREVIEW_CONCURRENCY = 10  # the class default
 _MAX_LINK_PREVIEW_TIMEOUT_S = 10    # seconds here, not ms
+_MAX_DEEP_CRAWL_LIST = 100          # patterns, keywords, filters, scorers per object
+_MAX_DEEP_CRAWL_OBJECTS = 20        # filters and scorers in one strategy
+_MAX_DEEP_CRAWL_ITEMS = 200         # list and dict items (patterns, keywords, ...) in one strategy
 
 
 def _max_timeout_ms() -> int:
@@ -339,10 +355,28 @@ def _max_timeout_ms() -> int:
     return ceiling
 
 
+def _deep_crawl_allowed() -> bool:
+    """Operator opt-in for deep crawling from untrusted requests."""
+    return os.getenv("CRAWL4AI_ALLOW_DEEP_CRAWL", "false").lower() == "true"
+
+
+def _all_nodes(node):
+    """Yield every value in a request tree. An object's params dict is entered but not yielded."""
+    yield node
+    if _is_typed_shape(node) and isinstance(node.get("params"), dict):
+        node = node["params"]
+    children = node.values() if isinstance(node, dict) else node if isinstance(node, list) else []
+    for child in children:
+        yield from _all_nodes(child)
+
+
 def _filter_untrusted_fields(type_name: str, params: dict) -> dict:
     """Drop non-allowlisted fields and raise on forbidden (power) fields."""
     forbidden = UNTRUSTED_FORBIDDEN_FIELDS.get(type_name, set())
     allowlist = UNTRUSTED_FIELD_ALLOWLIST.get(type_name)  # None => keep all non-forbidden
+    if type_name == "CrawlerRunConfig" and _deep_crawl_allowed():
+        forbidden = forbidden - {"deep_crawl_strategy"}
+        allowlist = allowlist | {"deep_crawl_strategy"}
     out = {}
     for key, value in params.items():
         if key in UNTRUSTED_GLOBAL_FORBIDDEN_FIELDS or key in forbidden:
@@ -352,6 +386,47 @@ def _filter_untrusted_fields(type_name: str, params: dict) -> dict:
         if allowlist is not None and key not in allowlist:
             continue  # silently drop unknown/unsafe fields (forward-compatible)
         out[key] = value
+    if type_name in UNTRUSTED_DEEP_CRAWL_TYPES and any(
+        isinstance(v, list) and len(v) > _MAX_DEEP_CRAWL_LIST for v in out.values()
+    ):
+        raise UntrustedConfigError(
+            f"{type_name} list parameters are limited to {_MAX_DEEP_CRAWL_LIST} items"
+        )
+    if type_name in ("BFSDeepCrawlStrategy", "DFSDeepCrawlStrategy", "BestFirstCrawlingStrategy"):
+        # Filters and scorers run synchronously on the event loop for every discovered link.
+        nodes = [n for value in out.values() for n in _all_nodes(value)]
+        filters_and_scorers = sum(1 for n in nodes if isinstance(n, dict) and n.get("type") in UNTRUSTED_DEEP_CRAWL_TYPES)
+        list_items = sum(len(n) for n in nodes if isinstance(n, (list, dict)) and not _is_typed_shape(n))
+        if filters_and_scorers > _MAX_DEEP_CRAWL_OBJECTS or list_items > _MAX_DEEP_CRAWL_ITEMS:
+            raise UntrustedConfigError(
+                f"{type_name} is limited to {_MAX_DEEP_CRAWL_OBJECTS} filters and scorers "
+                f"and {_MAX_DEEP_CRAWL_ITEMS} list items in total"
+            )
+    if type_name == "URLPatternFilter":
+        # Regex and *.domain:// patterns compile unescaped, and globs not led by * search in
+        # quadratic time; allow only *-led globs, /prefix/* and *.ext.
+        patterns = out.get("patterns")
+        patterns = [patterns] if isinstance(patterns, str) else patterns
+        if not isinstance(patterns, list) or not all(
+            isinstance(p, str)
+            and not (p.startswith("^") or p.endswith("$") or "\\d" in p or "**" in p)
+            and not ("://" in p and p.startswith("*."))
+            and (p.startswith("*") or (p.count("*") == 1 and p.endswith("/*")))
+            for p in patterns
+        ):
+            raise UntrustedConfigError(
+                "URLPatternFilter accepts only globs that start with '*' or end with a "
+                "single '/*' from an untrusted request"
+            )
+    if type_name == "CompositeScorer" and any(
+        isinstance(s, dict) and s.get("type") == "CompositeScorer" for s in out.get("scorers") or []
+    ):
+        raise UntrustedConfigError("CompositeScorer cannot be nested from an untrusted request")
+    if type_name == "CrawlerRunConfig" and out.get("deep_crawl_strategy") and out.get("fetch_ssl_certificate"):
+        # The certificate fetch dials each discovered link directly, outside the egress proxy.
+        raise UntrustedConfigError(
+            "fetch_ssl_certificate cannot be combined with deep_crawl_strategy from an untrusted request"
+        )
     return out
 
 
@@ -556,7 +631,11 @@ def from_serializable_dict(data: Any, provenance: "Provenance" = None) -> Any:
 
         # Untrusted bodies may only construct the strict subset of types and
         # may not set forbidden power-fields.
-        if provenance == Provenance.UNTRUSTED and type_name not in UNTRUSTED_ALLOWED_TYPES:
+        if (
+            provenance == Provenance.UNTRUSTED
+            and type_name not in UNTRUSTED_ALLOWED_TYPES
+            and not (type_name in UNTRUSTED_DEEP_CRAWL_TYPES and _deep_crawl_allowed())
+        ):
             raise UntrustedConfigError(
                 f"type '{type_name}' may not be constructed from an untrusted request"
             )
