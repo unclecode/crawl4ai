@@ -27,7 +27,10 @@ BROWSER_DISABLE_OPTIONS = [
     "--disable-component-extensions-with-background-pages",
     "--disable-default-apps",
     "--disable-extensions",
-    "--disable-features=TranslateUI",
+    # "TranslateUI" is not a feature name in current Chromium - the literal is
+    # absent from the shipped binary, so the switch matched nothing and the
+    # translate UI was never actually disabled. The feature is "Translate".
+    "--disable-features=Translate",
     "--disable-hang-monitor",
     "--disable-ipc-flooding-protection",
     "--disable-popup-blocking",
@@ -39,6 +42,53 @@ BROWSER_DISABLE_OPTIONS = [
     "--password-store=basic",
     "--use-mock-keychain",
 ]
+
+# Chromium switches whose value is a comma-separated feature list. Chrome parses
+# them last-wins: given the switch twice it keeps the last value and silently
+# drops every earlier one, whole. Any code path that appends one of these rather
+# than merging into the existing value therefore throws away what was declared
+# before it, with no warning and no way to notice from the options object.
+_FEATURE_LIST_SWITCHES = ("--disable-features=", "--enable-features=")
+
+
+def merge_feature_switches(flags: List[str]) -> List[str]:
+    """Collapse repeated ``--disable-features`` / ``--enable-features`` switches.
+
+    Each switch is emitted once, at the position of its first occurrence, so the
+    surrounding flag order is untouched. Feature names keep first-seen order and
+    are de-duplicated.
+
+    >>> merge_feature_switches(
+    ...     ["--a", "--disable-features=X,Y", "--b", "--disable-features=Y,Z"]
+    ... )
+    ['--a', '--disable-features=X,Y,Z', '--b']
+    """
+    merged: Dict[str, List[str]] = {}
+    for flag in flags:
+        for switch in _FEATURE_LIST_SWITCHES:
+            if flag.startswith(switch):
+                names = merged.setdefault(switch, [])
+                for name in flag[len(switch) :].split(","):
+                    name = name.strip()
+                    if name and name not in names:
+                        names.append(name)
+                break
+
+    if not merged:
+        return list(flags)
+
+    out: List[str] = []
+    emitted = set()
+    for flag in flags:
+        for switch in _FEATURE_LIST_SWITCHES:
+            if flag.startswith(switch):
+                if switch not in emitted:
+                    emitted.add(switch)
+                    out.append(switch + ",".join(merged[switch]))
+                break
+        else:
+            out.append(flag)
+    return out
 
 
 class ManagedBrowser:
@@ -123,8 +173,9 @@ class ManagedBrowser:
             flags.append(f"--proxy-server={config.proxy}")
         elif config.proxy_config:
             flags.append(f"--proxy-server={config.proxy_config.server}")
-        # dedupe
-        return list(dict.fromkeys(flags))
+        # dedupe, then fold the feature lists together so a later
+        # --disable-features does not discard an earlier one
+        return merge_feature_switches(list(dict.fromkeys(flags)))
 
     browser_type: str
     user_data_dir: str
@@ -867,7 +918,8 @@ class BrowserManager:
 
             launch_kwargs = {
                 "headless": self.config.headless,
-                "args": list(dict.fromkeys(cli_args)),  # dedupe
+                # dedupe, then merge the feature lists
+                "args": merge_feature_switches(list(dict.fromkeys(cli_args))),
                 "viewport": {
                     "width": self.config.viewport_width,
                     "height": self.config.viewport_height,
@@ -1138,9 +1190,10 @@ class BrowserManager:
         if self.config.extra_args:
             args.extend(self.config.extra_args)
 
-        # Deduplicate args
-        args = list(dict.fromkeys(args))
-        
+        # Deduplicate args, then merge the feature lists so a later
+        # --disable-features does not discard an earlier one
+        args = merge_feature_switches(list(dict.fromkeys(args)))
+
         browser_args = {"headless": self.config.headless, "args": args}
 
         # On Windows, passing channel='chromium' (the default) causes Playwright

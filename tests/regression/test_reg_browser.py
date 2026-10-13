@@ -176,6 +176,80 @@ def test_disable_features_omits_optimization_hints():
                 )
 
 
+def _feature_switches(args):
+    """The --disable-features switches in `args`, in order."""
+    return [a for a in args if a.startswith("--disable-features=")]
+
+
+def _feature_names(args):
+    """Only the names Chrome actually applies: the value of the last switch."""
+    switches = _feature_switches(args)
+    if not switches:
+        return []
+    return [n for n in switches[-1].split("=", 1)[1].split(",") if n]
+
+
+def test_merge_feature_switches_folds_repeats():
+    """Chrome parses --disable-features last-wins: given the switch twice it
+    keeps the last value and silently drops the earlier one whole. Collapse
+    repeats into one switch, in place, so nothing declared is lost."""
+    from crawl4ai.browser_manager import merge_feature_switches
+
+    merged = merge_feature_switches(
+        ["--a", "--disable-features=X,Y", "--b", "--disable-features=Y,Z", "--c"]
+    )
+    # one switch, at the position of the first occurrence, order otherwise intact
+    assert merged == ["--a", "--disable-features=X,Y,Z", "--b", "--c"]
+
+    # --enable-features is parsed the same way and is folded separately
+    merged = merge_feature_switches(
+        ["--enable-features=A", "--disable-features=X", "--enable-features=B"]
+    )
+    assert merged == ["--enable-features=A,B", "--disable-features=X"]
+
+    # nothing to fold: the list is returned unchanged
+    assert merge_feature_switches(["--a", "--b"]) == ["--a", "--b"]
+
+
+def test_build_browser_flags_emits_one_feature_switch():
+    """ManagedBrowser.build_browser_flags must not emit --disable-features
+    twice. light_mode appends BROWSER_DISABLE_OPTIONS, whose own entry used to
+    land after the default one and take the browser with it."""
+    from crawl4ai.browser_manager import ManagedBrowser
+
+    for light_mode in (False, True):
+        config = BrowserConfig(headless=True, light_mode=light_mode)
+        flags = ManagedBrowser.build_browser_flags(config)
+        assert (
+            len(_feature_switches(flags)) == 1
+        ), f"light_mode={light_mode}: {_feature_switches(flags)}"
+        # the defaults survive light_mode instead of being displaced by it.
+        # OptimizationHints is deliberately not among them - #2239 removed it
+        # from the default list, and the test above pins that removal.
+        names = _feature_names(flags)
+        for expected in ("MediaRouter", "DialMediaRouteProvider"):
+            assert expected in names, f"light_mode={light_mode} lost {expected}"
+
+
+def test_extra_args_feature_switch_merges_with_defaults():
+    """A user --disable-features passed through extra_args used to be appended
+    after the default switch, so Chrome applied the user's names and none of
+    crawl4ai's. Both must survive."""
+    from crawl4ai.browser_manager import BrowserManager
+
+    config = BrowserConfig(
+        headless=True,
+        extra_args=["--disable-features=CalculateNativeWinOcclusion"],
+    )
+    args = BrowserManager(browser_config=config)._build_browser_args()["args"]
+
+    assert len(_feature_switches(args)) == 1, _feature_switches(args)
+    names = _feature_names(args)
+    assert "CalculateNativeWinOcclusion" in names, "user's own name dropped"
+    for expected in ("MediaRouter", "DialMediaRouteProvider"):
+        assert expected in names, f"default {expected} displaced by extra_args"
+
+
 # ---------------------------------------------------------------------------
 # Viewport configuration
 # ---------------------------------------------------------------------------
