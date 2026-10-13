@@ -1942,7 +1942,8 @@ class CrawlerRunConfig():
         self.fetch_ssl_certificate = fetch_ssl_certificate
 
         # Caching Parameters
-        self.cache_mode = cache_mode
+        # Accept "enabled" etc. from CLI -c and YAML/JSON config files
+        self.cache_mode = CacheMode(cache_mode.lower()) if isinstance(cache_mode, str) else cache_mode
         self.session_id = session_id
         self.bypass_cache = bypass_cache
         self.disable_cache = disable_cache
