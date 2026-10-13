@@ -1339,10 +1339,10 @@ the project root, or export it in your shell.
 Rules the server applies:
 
 - **One start URL** per request, and not inside `crawler_configs`.
-- `max_pages` and `max_depth` are clamped to `limits.max_pages` and `limits.max_depth` in `config.yml` (default 100 and 5). The crawl stops after `limits.wall_clock_s`, also on `/crawl/stream`.
+- `max_pages` and `max_depth` are clamped to `limits.max_pages` and `limits.max_depth` in `config.yml` (default 100 and 5; `max_pages: 0` means no limit). The crawl stops after `limits.wall_clock_s`, also on `/crawl/stream`.
 - **Allowed types:** `BFSDeepCrawlStrategy`, `DFSDeepCrawlStrategy`, `BestFirstCrawlingStrategy`; `FilterChain` with `URLPatternFilter`, `DomainFilter`, `ContentTypeFilter`; scorers `KeywordRelevanceScorer`, `CompositeScorer`, `DomainAuthorityScorer`, `FreshnessScorer`, `PathDepthScorer`. `SEOFilter` and `ContentRelevanceFilter` are refused (they fetch pages outside the egress controls).
 - `URLPatternFilter` accepts globs that start with `*` (`*/blog/*`), `/prefix/*` or `*.ext`. Regex patterns are refused.
-- `resume_state` is refused, and so is `fetch_ssl_certificate` together with a deep crawl. Lists (patterns, keywords, filters, scorers) are limited to 100 items. Discovered links longer than 2048 characters are skipped.
+- `resume_state` is refused, and so is `fetch_ssl_certificate` together with a deep crawl. Lists (patterns, keywords, filters, scorers) are limited to 100 items. One strategy may have at most 20 filters and scorers and 200 list items in total, and a `CompositeScorer` cannot contain another `CompositeScorer`. Discovered links longer than 2048 characters are skipped.
 
 Turn the flag on only when you accept that one request can fetch many pages.
 

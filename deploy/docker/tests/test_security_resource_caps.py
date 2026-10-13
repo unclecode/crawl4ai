@@ -69,6 +69,14 @@ class TestDeepCrawlClamp:
         assert not guard.apply("https://a.com/" + "x" * 3000)
         assert guard.apply("https://a.com/blog/post")
 
+    def test_zero_max_pages_means_no_limit(self):
+        from governor import clamp_deep_crawl
+        from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
+        from crawl4ai import CrawlerRunConfig
+        cfg = CrawlerRunConfig(deep_crawl_strategy=BFSDeepCrawlStrategy(max_depth=2))
+        clamp_deep_crawl(cfg, max_pages=0)
+        assert cfg.deep_crawl_strategy.max_pages == float("inf")
+
 
 class TestUntrustedDeepCrawlStillForbidden:
     def test_request_cannot_set_deep_crawl(self):

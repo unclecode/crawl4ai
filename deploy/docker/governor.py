@@ -90,7 +90,8 @@ def clamp_deep_crawl(crawler_config, *, max_pages: int = DEFAULT_MAX_PAGES,
         return
     # NaN fails every comparison, so test for "inside the range", not "above the cap".
     mp = getattr(dc, "max_pages", None)
-    if not isinstance(mp, (int, float)) or not 0 <= mp <= max_pages:
+    # max_pages=0 means no limit, like the other limits in config.yml.
+    if max_pages and (not isinstance(mp, (int, float)) or not 0 <= mp <= max_pages):
         try:
             dc.max_pages = max_pages
         except Exception:

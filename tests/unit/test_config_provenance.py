@@ -158,6 +158,33 @@ def test_deep_crawl_ssl_certificate_refused(monkeypatch):
         CrawlerRunConfig.load(data, provenance=UNTRUSTED)
 
 
+def _pattern_chain(*sizes):
+    return {"type": "FilterChain", "params": {"filters": [
+        {"type": "URLPatternFilter", "params": {"patterns": [f"*/p{i}/*" for i in range(n)]}}
+        for n in sizes]}}
+
+
+@pytest.mark.parametrize("strategy, match", [
+    ({"filter_chain": _pattern_chain(101)}, "limited to 100 items"),
+    ({"filter_chain": _pattern_chain(*(1,) * 20)}, "in total"),
+    ({"filter_chain": _pattern_chain(100, 100, 1)}, "in total"),
+    ({"url_scorer": {"type": "KeywordRelevanceScorer", "params": {
+        "keywords": {"type": "dict", "value": {f"k{i}": 1 for i in range(201)}}}}}, "in total"),
+])
+def test_deep_crawl_size_budget_refused(monkeypatch, strategy, match):
+    monkeypatch.setenv("CRAWL4AI_ALLOW_DEEP_CRAWL", "true")
+    with pytest.raises(UntrustedConfigError, match=match):
+        CrawlerRunConfig.load(_deep_crawl(**strategy), provenance=UNTRUSTED)
+
+
+def test_deep_crawl_nested_composite_scorer_refused(monkeypatch):
+    monkeypatch.setenv("CRAWL4AI_ALLOW_DEEP_CRAWL", "true")
+    inner = {"type": "CompositeScorer", "params": {"scorers": [{"type": "PathDepthScorer", "params": {}}]}}
+    data = _deep_crawl(url_scorer={"type": "CompositeScorer", "params": {"scorers": [inner]}})
+    with pytest.raises(UntrustedConfigError, match="nested"):
+        CrawlerRunConfig.load(data, provenance=UNTRUSTED)
+
+
 def test_url_pattern_star_led_glob_is_linear_and_unchanged():
     import time
     from crawl4ai.deep_crawling.filters import URLPatternFilter
