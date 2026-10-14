@@ -100,12 +100,12 @@ All issues below are fixed in the version named. Advisories with a GHSA id are p
 
 | ID | Severity | Component | Description | Fix |
 |----|----------|-----------|-------------|-----|
-| GHSA-PENDING-1 | MEDIUM | Library + Docker API | Blind SSRF via the cache freshness check in `CacheValidator.validate`, outside the egress proxy (CWE-918) | Fetch routed through the pinning egress proxy |
-| GHSA-PENDING-2 | MEDIUM | Docker API | Page JavaScript injection via untrusted `css_selector` and `wait_for` (CWE-95) | `css_selector` passed to `evaluate()` as an argument; JavaScript `wait_for` refused for untrusted bodies |
-| GHSA-PENDING-3 | HIGH | Docker API | Untrusted `CosineStrategy.model_name` picks the HuggingFace model the server loads; code execution with PyTorch < 2.6 (CWE-502) | `model_name` refused from untrusted bodies |
-| GHSA-PENDING-4 | MEDIUM | Docker API | ReDoS via caller-supplied regex patterns freezes the server (CWE-1333) | `RegexExtractionStrategy.custom`, `RegexChunking.patterns`, and schema `regex` fields refused from untrusted bodies |
-| GHSA-PENDING-5 | MEDIUM | Docker API | Unbounded `delay_before_return_html`, `mean_delay`, `max_range` in untrusted bodies (CWE-770) | Capped at 60 seconds |
-| GHSA-PENDING-6 | MEDIUM | Library + Docker API | Chromium launched with `--ignore-certificate-errors`, so TLS verification was off; sandbox opt-in ignored (CWE-295) | Flag removed; insecure mode only from `ignore_https_errors`; `CRAWL4AI_CHROMIUM_SANDBOX` reaches every browser |
+| GHSA-w4xc-px5p-c32w | MEDIUM | Library + Docker API | Blind SSRF via the cache freshness check in `CacheValidator.validate`, outside the egress proxy (CWE-918) | Fetch routed through the pinning egress proxy |
+| GHSA-qj46-wp7m-rgj8 | MEDIUM | Docker API | Page JavaScript injection via untrusted `css_selector` and `wait_for` (CWE-95) | `css_selector` passed to `evaluate()` as an argument; JavaScript `wait_for` refused for untrusted bodies |
+| GHSA-f856-7xp9-w3cc | HIGH | Docker API | Untrusted `CosineStrategy.model_name` picks the HuggingFace model the server loads; code execution with PyTorch < 2.6 (CWE-502) | `model_name` refused from untrusted bodies |
+| GHSA-j843-8p47-rhxp | MEDIUM | Docker API | ReDoS via caller-supplied regex patterns freezes the server (CWE-1333) | `RegexExtractionStrategy.custom`, `RegexChunking.patterns`, and schema `regex` fields refused from untrusted bodies |
+| GHSA-rhjm-7hj7-75fx | MEDIUM | Docker API | Unbounded `delay_before_return_html`, `mean_delay`, `max_range` in untrusted bodies (CWE-770) | Capped at 60 seconds |
+| GHSA-j2qh-f73r-mg3q | MEDIUM | Library + Docker API | Chromium launched with `--ignore-certificate-errors`, so TLS verification was off; sandbox opt-in ignored (CWE-295) | Flag removed; insecure mode only from `ignore_https_errors`; `CRAWL4AI_CHROMIUM_SANDBOX` reaches every browser |
 
 ### Fixed in v0.9.4 (2026-09-23)
 

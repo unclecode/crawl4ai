@@ -25,13 +25,13 @@ If you self-host the Docker server, upgrade.
 
 ### Blind SSRF via the cache freshness check
 
-**GHSA-PENDING-1, CWE-918, medium.** Credit: [arpe1618](https://github.com/arpe1618).
+**GHSA-w4xc-px5p-c32w, CWE-918, medium.** Credit: [arpe1618](https://github.com/arpe1618).
 
 `check_cache_freshness` is allowed in an untrusted body. `CacheValidator` built its own `httpx` client without the egress proxy, so a client could make the server send HEAD and GET requests to internal addresses, directly or through a redirect. This is the same root cause as the robots.txt and seeder fixes in 0.9.4: one more library HTTP client without `proxy=proxy_url()`. It now uses the proxy. A plain library caller sees no change.
 
 ### Page JavaScript injection via css_selector and wait_for
 
-**GHSA-PENDING-2, CWE-95, medium.** Credit: Zhixi "Jace" Sun ([manus-use](https://github.com/manus-use)).
+**GHSA-qj46-wp7m-rgj8, CWE-95, medium.** Credit: Zhixi "Jace" Sun ([manus-use](https://github.com/manus-use)).
 
 Untrusted bodies may not send `js_code`. But two allowed fields reached the same `page.evaluate()` sink:
 
@@ -42,7 +42,7 @@ Untrusted bodies may not send `js_code`. But two allowed fields reached the same
 
 ### Caller-chosen HuggingFace model in CosineStrategy
 
-**GHSA-PENDING-3, CWE-502, high.** Credit: Zhixi "Jace" Sun ([manus-use](https://github.com/manus-use)).
+**GHSA-f856-7xp9-w3cc, CWE-502, high.** Credit: Zhixi "Jace" Sun ([manus-use](https://github.com/manus-use)).
 
 `CosineStrategy` is allowed in an untrusted body, and its `model_name` was not filtered. The server passed it to `from_pretrained()`, so a client chose which repository the server downloaded and loaded. With PyTorch older than 2.6, a crafted pickle weight file runs code in the server process. With current PyTorch the code does not run, but the client still controls what the server downloads and keeps in memory.
 
@@ -50,19 +50,19 @@ Untrusted bodies may not send `js_code`. But two allowed fields reached the same
 
 ### ReDoS via caller-supplied regexes
 
-**GHSA-PENDING-4, CWE-1333, medium.** Credit: Zhixi "Jace" Sun ([manus-use](https://github.com/manus-use)).
+**GHSA-j843-8p47-rhxp, CWE-1333, medium.** Credit: Zhixi "Jace" Sun ([manus-use](https://github.com/manus-use)).
 
 `RegexExtractionStrategy.custom`, `RegexChunking.patterns`, and `"type": "regex"` fields in extraction schemas took a pattern from the caller. Python's `re` holds the GIL while it matches, so one catastrophic-backtracking pattern froze the whole server, and the crawl deadline could not interrupt it. These fields are now refused from untrusted bodies. The built-in patterns stay available.
 
 ### Unbounded delay fields
 
-**GHSA-PENDING-5, CWE-770, medium.** Credit: Chunyi Liu.
+**GHSA-rhjm-7hj7-75fx, CWE-770, medium.** Credit: Chunyi Liu.
 
 `delay_before_return_html`, `mean_delay`, and `max_range` are allowed in untrusted bodies, but had no ceiling. One request could hold a browser page open, or stall the `arun_many` rate limiter, for as long as it liked. They are now capped at 60 seconds. Negative, NaN, and non-numeric values fall back to the field default.
 
 ### Chromium launched with certificate checks off
 
-**GHSA-PENDING-6, CWE-295, medium.** Credit: Julian Godfrey.
+**GHSA-j2qh-f73r-mg3q, CWE-295, medium.** Credit: Julian Godfrey.
 
 Both default Chromium launch flag lists carried `--ignore-certificate-errors`. That flag turns TLS verification off for the whole browser, so `ignore_https_errors=False`, and the Docker server's TLS-on default, had no effect.
 
