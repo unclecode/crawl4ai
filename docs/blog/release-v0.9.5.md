@@ -56,7 +56,7 @@ Untrusted bodies may not send `js_code`. But two allowed fields reached the same
 
 ### Unbounded delay fields
 
-**GHSA-rhjm-7hj7-75fx, CWE-770, medium.** Credit: Chunyi Liu.
+**GHSA-rhjm-7hj7-75fx, CWE-770, medium.** Credit: Chunyi Liu ([liuchunyi-buaa](https://github.com/liuchunyi-buaa)).
 
 `delay_before_return_html`, `mean_delay`, and `max_range` are allowed in untrusted bodies, but had no ceiling. One request could hold a browser page open, or stall the `arun_many` rate limiter, for as long as it liked. They are now capped at 60 seconds. Negative, NaN, and non-numeric values fall back to the field default.
 
@@ -72,7 +72,7 @@ Also in this fix: `CRAWL4AI_CHROMIUM_SANDBOX=true` now reaches every browser, in
 
 ### Hardening
 
-These came with the reports above but did not need an advisory. Credit: Chunyi Liu.
+These came with the reports above but did not need an advisory. Credit: Chunyi Liu ([liuchunyi-buaa](https://github.com/liuchunyi-buaa)).
 
 - `DomainFilter` reads the real host, so `https://user@evil.com/`, `https://evil.com:443/`, and `https://evil.com./` no longer slip past `blocked_domains`.
 - Webhook header names and artifact ids use `fullmatch`, so a trailing newline no longer passes.
@@ -134,7 +134,7 @@ docker pull unclecode/crawl4ai:0.9.5
 
 ## Acknowledgments
 
-Thank you to [arpe1618](https://github.com/arpe1618), Zhixi "Jace" Sun ([manus-use](https://github.com/manus-use)), Chunyi Liu, and Julian Godfrey for reporting these issues privately and giving us time to fix them before disclosure. All reporters are listed in [SECURITY-CREDITS.md](https://github.com/unclecode/crawl4ai/blob/main/SECURITY-CREDITS.md).
+Thank you to [arpe1618](https://github.com/arpe1618), Zhixi "Jace" Sun ([manus-use](https://github.com/manus-use)), Chunyi Liu ([liuchunyi-buaa](https://github.com/liuchunyi-buaa)), and Julian Godfrey for reporting these issues privately and giving us time to fix them before disclosure. All reporters are listed in [SECURITY-CREDITS.md](https://github.com/unclecode/crawl4ai/blob/main/SECURITY-CREDITS.md).
 
 Thanks to the community contributors behind this release: @SohamKukreti (#2340, #2362, #2273), @drakeo338 (#2339, #2329), @talelboussetta (#2290, #2289), @tommypacker (#2284), @Kylinny (#2320), @Artechie0806 (#2317), @omarbounawarapy (#2327), @alkaz-nodemaven (#2361), and @ege-arhan (#2335).
 
