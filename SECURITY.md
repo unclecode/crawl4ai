@@ -96,6 +96,17 @@ When using Crawl4AI as a Python library:
 
 All issues below are fixed in the version named. Advisories with a GHSA id are published under [Security Advisories](https://github.com/unclecode/crawl4ai/security/advisories). Full detail for every release is in [CHANGELOG.md](CHANGELOG.md); reporter credits are in [SECURITY-CREDITS.md](SECURITY-CREDITS.md).
 
+### Fixed in v0.9.5 (2026-10-14)
+
+| ID | Severity | Component | Description | Fix |
+|----|----------|-----------|-------------|-----|
+| GHSA-PENDING-1 | MEDIUM | Library + Docker API | Blind SSRF via the cache freshness check in `CacheValidator.validate`, outside the egress proxy (CWE-918) | Fetch routed through the pinning egress proxy |
+| GHSA-PENDING-2 | MEDIUM | Docker API | Page JavaScript injection via untrusted `css_selector` and `wait_for` (CWE-95) | `css_selector` passed to `evaluate()` as an argument; JavaScript `wait_for` refused for untrusted bodies |
+| GHSA-PENDING-3 | HIGH | Docker API | Untrusted `CosineStrategy.model_name` picks the HuggingFace model the server loads; code execution with PyTorch < 2.6 (CWE-502) | `model_name` refused from untrusted bodies |
+| GHSA-PENDING-4 | MEDIUM | Docker API | ReDoS via caller-supplied regex patterns freezes the server (CWE-1333) | `RegexExtractionStrategy.custom`, `RegexChunking.patterns`, and schema `regex` fields refused from untrusted bodies |
+| GHSA-PENDING-5 | MEDIUM | Docker API | Unbounded `delay_before_return_html`, `mean_delay`, `max_range` in untrusted bodies (CWE-770) | Capped at 60 seconds |
+| GHSA-PENDING-6 | MEDIUM | Library + Docker API | Chromium launched with `--ignore-certificate-errors`, so TLS verification was off; sandbox opt-in ignored (CWE-295) | Flag removed; insecure mode only from `ignore_https_errors`; `CRAWL4AI_CHROMIUM_SANDBOX` reaches every browser |
+
 ### Fixed in v0.9.4 (2026-09-23)
 
 | ID | Severity | Component | Description | Fix |
@@ -198,6 +209,14 @@ Secure-by-default rework of the Docker API server. The pip library is unchanged.
 | CVE-pending-2 | HIGH | Docker API | LFI via `file://` URLs | URL scheme validation added |
 
 ## Security Features
+
+### v0.9.5+
+
+- **Cache freshness check through the egress proxy**: `CacheValidator` uses the same pinning proxy as the seeder and robots.txt
+- **More untrusted fields refused**: JavaScript `wait_for`, `CosineStrategy.model_name`, and caller-supplied regexes
+- **Delay caps**: `delay_before_return_html`, `mean_delay`, and `max_range` capped at 60 seconds for untrusted bodies
+- **TLS verification on in Chromium**: `--ignore-certificate-errors` no longer in the default launch flags
+- **Fail-closed egress pinning**: a crawl that cannot be pinned to the egress proxy is refused
 
 ### v0.9.4+
 
