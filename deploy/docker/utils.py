@@ -72,8 +72,6 @@ DEFAULT_CONFIG = {
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
                 "--disable-software-rasterizer",
-                "--allow-insecure-localhost",
-                "--ignore-certificate-errors",
             ],
         },
     },

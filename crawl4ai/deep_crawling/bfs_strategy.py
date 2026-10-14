@@ -150,7 +150,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             return
 
         # If we've reached the max pages limit, don't discover new links
-        remaining_capacity = self.max_pages - self._pages_crawled
+        remaining_capacity = self.max_pages - self._pages_crawled - len(next_level)
         if remaining_capacity <= 0:
             self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping link discovery")
             return
@@ -232,6 +232,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             # current_level holds tuples: (url, parent_url)
             current_level: List[Tuple[str, Optional[str]]] = [(start_url, None)]
             depths: Dict[str, int] = {start_url: 0}
+            self._pages_crawled = 0
 
         results: List[CrawlResult] = []
 
@@ -247,6 +248,12 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 break
 
             next_level: List[Tuple[str, Optional[str]]] = []
+            # Siblings in a level queue links before the level's own pages are all
+            # counted, so cap the level to the budget left before fetching it.
+            # max_pages defaults to infinity, which is not a valid slice index.
+            remaining = self.max_pages - self._pages_crawled
+            if remaining < len(current_level):
+                current_level = current_level[:max(int(remaining), 0)]
             urls = [url for url, _ in current_level]
             # reversed() keeps first-parent-wins if a resumed level repeats a URL
             parents = dict(reversed(current_level))
@@ -329,6 +336,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             visited: Set[str] = set()
             current_level: List[Tuple[str, Optional[str]]] = [(start_url, None)]
             depths: Dict[str, int] = {start_url: 0}
+            self._pages_crawled = 0
 
         while current_level and not self._cancel_event.is_set():
             # Check external cancellation callback before processing this level
@@ -337,6 +345,15 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 break
 
             next_level: List[Tuple[str, Optional[str]]] = []
+            # Siblings in a level queue links before the level's own pages are all
+            # counted, so cap the level to the budget left before fetching it.
+            # max_pages defaults to infinity, which is not a valid slice index.
+            remaining = self.max_pages - self._pages_crawled
+            if remaining < len(current_level):
+                current_level = current_level[:max(int(remaining), 0)]
+            if not current_level:
+                self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping crawl")
+                break
             urls = [url for url, _ in current_level]
             # reversed() keeps first-parent-wins if a resumed level repeats a URL
             parents = dict(reversed(current_level))

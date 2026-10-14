@@ -23,7 +23,8 @@ from egress_proxy import PinningProxy
 
 from crawl4ai import egress_policy
 from crawl4ai.async_url_seeder import AsyncUrlSeeder
-from crawl4ai.utils import RobotsParser
+from crawl4ai.cache_validator import CacheValidationResult, CacheValidator
+from crawl4ai.utils import RobotsParser, compute_head_fingerprint
 
 pytestmark = pytest.mark.posture
 
@@ -231,3 +232,79 @@ class TestRobotsEgress:
             await proxy.stop()
             await prunner.cleanup()
             await irunner.cleanup()
+
+
+@pytest.mark.asyncio
+class TestCacheValidatorEgress:
+    """check_cache_freshness is untrusted-allowlisted, so validate() fetches the
+    caller's crawl URL: HEAD with the stored validators, then a streamed GET."""
+
+    async def test_validator_direct_loopback_is_blocked(self):
+        hits = []
+
+        async def internal(req):
+            hits.append(req.path)
+            return web.Response(text=INTERNAL_PAGE, content_type="text/html")
+
+        runner, port = await _serve(internal)
+        proxy = await _start_proxy()
+        try:
+            async with CacheValidator(timeout=5) as v:
+                await v.validate(
+                    f"http://127.0.0.1:{port}/", stored_etag='"x"',
+                    stored_head_fingerprint="abc",
+                )
+            assert hits == [], "the internal service was reached"
+        finally:
+            await proxy.stop()
+            await runner.cleanup()
+
+    async def test_validator_redirect_into_internal_is_blocked(self, monkeypatch):
+        hits = []
+
+        async def internal(req):
+            hits.append(req.path)
+            return web.Response(text=INTERNAL_PAGE, content_type="text/html")
+
+        irunner, iport = await _serve(internal)
+
+        async def public(req):
+            raise web.HTTPFound(f"http://127.0.0.1:{iport}/secret")
+
+        prunner, pport = await _serve(public)
+        _treat_port_as_public(monkeypatch, pport)
+
+        proxy = await _start_proxy()
+        try:
+            async with CacheValidator(timeout=5) as v:
+                await v.validate(
+                    f"http://127.0.0.1:{pport}/page", stored_etag='"x"',
+                    stored_head_fingerprint="abc",
+                )
+            assert hits == [], "the redirect reached the internal service"
+        finally:
+            await proxy.stop()
+            await prunner.cleanup()
+            await irunner.cleanup()
+
+    async def test_validator_public_host_still_works(self, monkeypatch):
+        """The fix must not simply block everything."""
+        page = '<html><head><title>PUBLIC-OK</title></head><body>x</body></html>'
+
+        async def public(req):
+            return web.Response(text=page, content_type="text/html")
+
+        runner, port = await _serve(public)
+        _treat_port_as_public(monkeypatch, port)
+
+        proxy = await _start_proxy()
+        try:
+            async with CacheValidator(timeout=5) as v:
+                r = await v.validate(
+                    f"http://127.0.0.1:{port}/page",
+                    stored_head_fingerprint=compute_head_fingerprint(page),
+                )
+            assert r.status == CacheValidationResult.FRESH
+        finally:
+            await proxy.stop()
+            await runner.cleanup()

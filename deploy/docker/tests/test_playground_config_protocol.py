@@ -90,7 +90,11 @@ class TestTemplatesSurviveTheUntrustedGate(unittest.TestCase):
                 obj = CONFIG_CLASSES[name].load(
                     {"type": name, "params": params}, provenance=Provenance.UNTRUSTED
                 )
-                applied = {key: getattr(obj, key) for key in params}
+                # Enum fields (cache_mode) come back as the enum; compare by value.
+                applied = {
+                    key: getattr(getattr(obj, key), "value", getattr(obj, key))
+                    for key in params
+                }
                 self.assertEqual(applied, params)
 
     def test_stream_reaches_the_shape_should_use_stream_reads(self):

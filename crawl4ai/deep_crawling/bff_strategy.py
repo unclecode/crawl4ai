@@ -235,6 +235,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             await queue.put((-initial_score, 0, start_url, None))
             visited: Set[str] = set()
             depths: Dict[str, int] = {start_url: 0}
+            self._pages_crawled = 0
             # Initialize shadow list if callback is set
             if self._on_state_change:
                 self._queue_shadow = [(-initial_score, 0, start_url, None)]

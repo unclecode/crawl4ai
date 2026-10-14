@@ -77,14 +77,16 @@ class DatabaseManager:
 
         self.conn.commit()
 
-    def get_all(self, table: str, limit: int = 100, offset: int = 0, where: str = None) -> List[Dict]:
+    def get_all(self, table: str, limit: int = 100, offset: int = 0, where: str = None, params: List = None) -> List[Dict]:
         cursor = self.conn.cursor()
         query = f"SELECT * FROM {table}"
+        query_params = list(params) if params else []
         if where:
             query += f" WHERE {where}"
-        query += f" LIMIT {limit} OFFSET {offset}"
+        query += " LIMIT ? OFFSET ?"
+        query_params += [limit, offset]
 
-        cursor.execute(query)
+        cursor.execute(query, query_params)
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
 

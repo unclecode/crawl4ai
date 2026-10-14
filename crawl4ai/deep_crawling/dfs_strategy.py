@@ -60,6 +60,7 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
             stack: List[Tuple[str, Optional[str], int]] = [(start_url, None, 0)]
             depths: Dict[str, int] = {start_url: 0}
             results: List[CrawlResult] = []
+            self._pages_crawled = 0
             self._reset_seen(start_url)
 
         while stack and not self._cancel_event.is_set():
@@ -169,6 +170,7 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
             visited: Set[str] = set()
             stack: List[Tuple[str, Optional[str], int]] = [(start_url, None, 0)]
             depths: Dict[str, int] = {start_url: 0}
+            self._pages_crawled = 0
             self._reset_seen(start_url)
 
         while stack and not self._cancel_event.is_set():

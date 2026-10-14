@@ -72,7 +72,7 @@ class SetHeadersParams(BaseModel):
         if len(v) > _MAX_HEADERS:
             raise ValueError(f"too many headers (max {_MAX_HEADERS})")
         for name, value in v.items():
-            if not _HEADER_NAME_RE.match(name):
+            if not _HEADER_NAME_RE.fullmatch(name):
                 raise ValueError(f"invalid header name {name!r}")
             if any(c in value for c in "\r\n\x00"):
                 raise ValueError(f"control characters in value for header {name!r}")

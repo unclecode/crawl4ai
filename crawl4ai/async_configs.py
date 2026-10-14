@@ -3,6 +3,7 @@ import functools
 import importlib
 import os
 import warnings
+from urllib.parse import unquote
 import requests
 from .config import (
     DEFAULT_PROVIDER,
@@ -198,6 +199,14 @@ UNTRUSTED_ALLOWED_TYPES = {
     "CacheMode", "MatchMode", "DisplayMode",
 }
 
+# Allowed only with CRAWL4AI_ALLOW_DEEP_CRAWL=true; SEOFilter/ContentRelevanceFilter excluded (unguarded httpx fetch).
+UNTRUSTED_DEEP_CRAWL_TYPES = {
+    "BFSDeepCrawlStrategy", "DFSDeepCrawlStrategy", "BestFirstCrawlingStrategy",
+    "FilterChain", "URLPatternFilter", "DomainFilter", "ContentTypeFilter",
+    "KeywordRelevanceScorer", "CompositeScorer", "DomainAuthorityScorer",
+    "FreshnessScorer", "PathDepthScorer",
+}
+
 # Fields that must NEVER come from an untrusted body. Presence => 400 (loud), so
 # a client smuggling these gets an explicit error rather than a silent drop.
 UNTRUSTED_FORBIDDEN_FIELDS = {
@@ -222,7 +231,36 @@ UNTRUSTED_FORBIDDEN_FIELDS = {
     "PDFContentScrapingStrategy": {
         "image_save_dir", "save_images_locally",
     },
+    # resume_state.pending would queue URLs that skip seed validation.
+    **{
+        name: {"resume_state", "logger", "on_state_change", "should_cancel"}
+        for name in ("BFSDeepCrawlStrategy", "DFSDeepCrawlStrategy", "BestFirstCrawlingStrategy")
+    },
+    # Same reason, no scalar allowlist. model_name is a HuggingFace repo id
+    # handed to from_pretrained: the caller would pick the weights the server
+    # downloads and unpickles.
+    "CosineStrategy": {"model_name"},
+    # Caller-supplied regexes. Python's re holds the GIL while it matches, so
+    # one catastrophic-backtracking pattern freezes the whole server, and the
+    # crawl deadline cannot interrupt it. The built-in patterns stay available.
+    "RegexExtractionStrategy": {"custom"},
+    "RegexChunking": {"patterns"},
 }
+
+# Extraction schemas are free-form dicts, so their "regex" field type (a
+# caller-supplied re.search pattern, same ReDoS as above) is checked by walking
+# the schema rather than by field name.
+_SCHEMA_STRATEGIES = {
+    "JsonCssExtractionStrategy", "JsonXPathExtractionStrategy", "JsonLxmlExtractionStrategy",
+}
+
+
+def _has_regex_field(node) -> bool:
+    if isinstance(node, dict):
+        return node.get("type") == "regex" or any(_has_regex_field(v) for v in node.values())
+    if isinstance(node, list):
+        return any(_has_regex_field(v) for v in node)
+    return False
 
 # Field names that must NEVER be set from an untrusted body on ANY allowed
 # type, checked regardless of per-type allowlist. This is the fail-closed
@@ -295,12 +333,16 @@ UNTRUSTED_FIELD_ALLOWLIST = {
 # Upper bounds applied to attacker-influenced quantities after filtering.
 _DEFAULT_MAX_TIMEOUT_MS = 60_000
 _MAX_SCROLL_STEPS = 1000
+_MAX_DELAY_SECONDS = 60  # ceiling for delay_before_return_html / mean_delay / max_range
 _MAX_VIEWPORT = 4000
 _MAX_PDF_BYTES = 100 * 1024 * 1024
 _MAX_PDF_PAGES = 2000
 _MAX_LINK_PREVIEW_LINKS = 100      # the class default
 _MAX_LINK_PREVIEW_CONCURRENCY = 10  # the class default
 _MAX_LINK_PREVIEW_TIMEOUT_S = 10    # seconds here, not ms
+_MAX_DEEP_CRAWL_LIST = 100          # patterns, keywords, filters, scorers per object
+_MAX_DEEP_CRAWL_OBJECTS = 20        # filters and scorers in one strategy
+_MAX_DEEP_CRAWL_ITEMS = 200         # list and dict items (patterns, keywords, ...) in one strategy
 
 
 def _max_timeout_ms() -> int:
@@ -338,10 +380,28 @@ def _max_timeout_ms() -> int:
     return ceiling
 
 
+def _deep_crawl_allowed() -> bool:
+    """Operator opt-in for deep crawling from untrusted requests."""
+    return os.getenv("CRAWL4AI_ALLOW_DEEP_CRAWL", "false").lower() == "true"
+
+
+def _all_nodes(node):
+    """Yield every value in a request tree. An object's params dict is entered but not yielded."""
+    yield node
+    if _is_typed_shape(node) and isinstance(node.get("params"), dict):
+        node = node["params"]
+    children = node.values() if isinstance(node, dict) else node if isinstance(node, list) else []
+    for child in children:
+        yield from _all_nodes(child)
+
+
 def _filter_untrusted_fields(type_name: str, params: dict) -> dict:
     """Drop non-allowlisted fields and raise on forbidden (power) fields."""
     forbidden = UNTRUSTED_FORBIDDEN_FIELDS.get(type_name, set())
     allowlist = UNTRUSTED_FIELD_ALLOWLIST.get(type_name)  # None => keep all non-forbidden
+    if type_name == "CrawlerRunConfig" and _deep_crawl_allowed():
+        forbidden = forbidden - {"deep_crawl_strategy"}
+        allowlist = allowlist | {"deep_crawl_strategy"}
     out = {}
     for key, value in params.items():
         if key in UNTRUSTED_GLOBAL_FORBIDDEN_FIELDS or key in forbidden:
@@ -351,6 +411,51 @@ def _filter_untrusted_fields(type_name: str, params: dict) -> dict:
         if allowlist is not None and key not in allowlist:
             continue  # silently drop unknown/unsafe fields (forward-compatible)
         out[key] = value
+    if type_name in UNTRUSTED_DEEP_CRAWL_TYPES and any(
+        isinstance(v, list) and len(v) > _MAX_DEEP_CRAWL_LIST for v in out.values()
+    ):
+        raise UntrustedConfigError(
+            f"{type_name} list parameters are limited to {_MAX_DEEP_CRAWL_LIST} items"
+        )
+    if type_name in ("BFSDeepCrawlStrategy", "DFSDeepCrawlStrategy", "BestFirstCrawlingStrategy"):
+        # Filters and scorers run synchronously on the event loop for every discovered link.
+        nodes = [n for value in out.values() for n in _all_nodes(value)]
+        filters_and_scorers = sum(1 for n in nodes if isinstance(n, dict) and n.get("type") in UNTRUSTED_DEEP_CRAWL_TYPES)
+        list_items = sum(len(n) for n in nodes if isinstance(n, (list, dict)) and not _is_typed_shape(n))
+        if filters_and_scorers > _MAX_DEEP_CRAWL_OBJECTS or list_items > _MAX_DEEP_CRAWL_ITEMS:
+            raise UntrustedConfigError(
+                f"{type_name} is limited to {_MAX_DEEP_CRAWL_OBJECTS} filters and scorers "
+                f"and {_MAX_DEEP_CRAWL_ITEMS} list items in total"
+            )
+    if type_name == "URLPatternFilter":
+        # Regex and *.domain:// patterns compile unescaped, and globs not led by * search in
+        # quadratic time; allow only *-led globs, /prefix/* and *.ext.
+        patterns = out.get("patterns")
+        patterns = [patterns] if isinstance(patterns, str) else patterns
+        if not isinstance(patterns, list) or not all(
+            isinstance(p, str)
+            and not (p.startswith("^") or p.endswith("$") or "\\d" in p or "**" in p)
+            and not ("://" in p and p.startswith("*."))
+            and (p.startswith("*") or (p.count("*") == 1 and p.endswith("/*")))
+            for p in patterns
+        ):
+            raise UntrustedConfigError(
+                "URLPatternFilter accepts only globs that start with '*' or end with a "
+                "single '/*' from an untrusted request"
+            )
+    if type_name == "CompositeScorer" and any(
+        isinstance(s, dict) and s.get("type") == "CompositeScorer" for s in out.get("scorers") or []
+    ):
+        raise UntrustedConfigError("CompositeScorer cannot be nested from an untrusted request")
+    if type_name == "CrawlerRunConfig" and out.get("deep_crawl_strategy") and out.get("fetch_ssl_certificate"):
+        # The certificate fetch dials each discovered link directly, outside the egress proxy.
+        raise UntrustedConfigError(
+            "fetch_ssl_certificate cannot be combined with deep_crawl_strategy from an untrusted request"
+        )
+    cache_mode = out.get("cache_mode") if type_name == "CrawlerRunConfig" else None
+    if isinstance(cache_mode, str) and cache_mode.lower() not in {m.value for m in CacheMode}:
+        # CrawlerRunConfig raises ValueError on it, which would surface as a 500.
+        raise UntrustedConfigError(f"invalid cache_mode: {cache_mode!r}")
     return out
 
 
@@ -366,12 +471,42 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
             return min(_DEFAULT_MAX_TIMEOUT_MS, ceiling)
         return min(int(v), ceiling)
 
+    # delay_before_return_html is held with a browser page open; mean_delay and
+    # max_range seed the arun_many rate limiter. All three are seconds, not ms,
+    # so they get their own cap rather than reusing the ms timeout ceiling.
+    _delay_defaults = {
+        "delay_before_return_html": 0.1,
+        "mean_delay": 0.1,
+        "max_range": 0.3,
+    }
+
+    def _cap_delay(v, default):
+        if not isinstance(v, (int, float)) or isinstance(v, bool) or not v >= 0:  # also NaN
+            return default
+        return min(v, _MAX_DELAY_SECONDS)
+
     if type_name == "CrawlerRunConfig":
         for f in ("page_timeout", "wait_for_timeout", "body_visibility_timeout"):
             if f in params:
                 params[f] = _cap_timeout(params[f])
+        for f, default in _delay_defaults.items():
+            if f in params:
+                params[f] = _cap_delay(params[f], default)
         if isinstance(params.get("max_scroll_steps"), int):
             params["max_scroll_steps"] = min(params["max_scroll_steps"], _MAX_SCROLL_STEPS)
+        # smart_wait runs "js:...", function-shaped values, and any value that
+        # is not a valid selector as page JavaScript -- the js_code ban by
+        # another name. Untrusted callers get CSS selector waits only; the
+        # "css:" branch never falls back to JS.
+        wait_for = params.get("wait_for")
+        if isinstance(wait_for, str) and wait_for.strip():
+            wait_for = wait_for.strip()
+            if wait_for.startswith(("js:", "()", "function")):
+                raise UntrustedConfigError(
+                    "a JavaScript wait_for is not permitted from an untrusted request"
+                )
+            if not wait_for.startswith("css:"):
+                params["wait_for"] = "css:" + wait_for
     elif type_name == "BrowserConfig":
         for f in ("viewport_width", "viewport_height"):
             if isinstance(params.get(f), int):
@@ -387,6 +522,12 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
         # Rasterizing every page is the most expensive thing this strategy can
         # do, and nothing about untrusted crawling needs it.
         params["extract_images"] = False
+    elif type_name in _SCHEMA_STRATEGIES:
+        if _has_regex_field(params.get("schema")):
+            raise UntrustedConfigError(
+                f"schema fields of type 'regex' are not permitted on {type_name} "
+                "from an untrusted request"
+            )
     elif type_name == "LinkPreviewConfig":
         # Also no field allowlist, and each link is a separate outbound fetch:
         # unclamped, one request body can order millions of them at any
@@ -555,7 +696,11 @@ def from_serializable_dict(data: Any, provenance: "Provenance" = None) -> Any:
 
         # Untrusted bodies may only construct the strict subset of types and
         # may not set forbidden power-fields.
-        if provenance == Provenance.UNTRUSTED and type_name not in UNTRUSTED_ALLOWED_TYPES:
+        if (
+            provenance == Provenance.UNTRUSTED
+            and type_name not in UNTRUSTED_ALLOWED_TYPES
+            and not (type_name in UNTRUSTED_DEEP_CRAWL_TYPES and _deep_crawl_allowed())
+        ):
             raise UntrustedConfigError(
                 f"type '{type_name}' may not be constructed from an untrusted request"
             )
@@ -711,8 +856,8 @@ class ProxyConfig:
                 username, password = credentials.split(":", 1)
                 return ProxyConfig(
                     server=f"{protocol}://{server_part}",
-                    username=username,
-                    password=password,
+                    username=unquote(username),
+                    password=unquote(password),
                 )
         # URL without credentials (keep scheme)
         if "://" in s and "@" not in s:
@@ -1862,7 +2007,8 @@ class CrawlerRunConfig():
         self.fetch_ssl_certificate = fetch_ssl_certificate
 
         # Caching Parameters
-        self.cache_mode = cache_mode
+        # Accept "enabled" etc. from CLI -c and YAML/JSON config files
+        self.cache_mode = CacheMode(cache_mode.lower()) if isinstance(cache_mode, str) else cache_mode
         self.session_id = session_id
         self.bypass_cache = bypass_cache
         self.disable_cache = disable_cache

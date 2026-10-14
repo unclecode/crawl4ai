@@ -5,6 +5,70 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.5] - 2026-10-14
+
+0.9.5 is a security release. It closes six coordinated-disclosure advisories in the Docker server's handling of untrusted request bodies: one more SSRF path outside the egress proxy, page JavaScript injection through `css_selector` and `wait_for`, a caller-chosen HuggingFace model in `CosineStrategy`, ReDoS through caller-supplied regexes, unbounded delay fields, and Chromium launched with certificate checks off. It also adds opt-in deep crawling on the Docker server and ships the bug fixes that landed on `develop` since 0.9.4. Users who self-host the Docker server should upgrade.
+
+### Security
+
+- **Blind SSRF via the cache freshness check (CWE-918, medium)**: `CacheValidator.validate()` sent its HEAD and GET requests on its own HTTP client, outside the Docker server's pinning egress proxy. It now goes through the proxy like the seeder and robots.txt fetches fixed in 0.9.4. Credit: [arpe1618](https://github.com/arpe1618). (GHSA-w4xc-px5p-c32w)
+- **Page JavaScript injection via `css_selector` and `wait_for` (CWE-95, medium)**: `css_selector` was pasted into a JavaScript string, and `wait_for` could run as page script, so an untrusted body could run JavaScript in the crawl page even though `js_code` is refused. `css_selector` is now passed to `evaluate()` as an argument, which also makes selectors with quotes work. For untrusted bodies, JavaScript `wait_for` values are refused and a bare value is treated as a CSS selector. Credit: Zhixi "Jace" Sun ([manus-use](https://github.com/manus-use)). (GHSA-qj46-wp7m-rgj8)
+- **Caller-chosen model in `CosineStrategy` (CWE-502, high)**: an untrusted body could set `CosineStrategy.model_name`, so the server downloaded and loaded any HuggingFace repository. With PyTorch older than 2.6 a crafted pickle weight file runs code in the server. `model_name` is now refused from untrusted bodies. The default image does not install PyTorch and is not affected. Credit: Zhixi "Jace" Sun ([manus-use](https://github.com/manus-use)). (GHSA-f856-7xp9-w3cc)
+- **ReDoS via caller-supplied regexes (CWE-1333, medium)**: `RegexExtractionStrategy.custom`, `RegexChunking.patterns`, and `"type": "regex"` fields in extraction schemas let a client send a catastrophic-backtracking pattern. Python's `re` holds the GIL while it matches, so one request froze the whole server. These fields are now refused from untrusted bodies. The built-in patterns stay available. Credit: Zhixi "Jace" Sun ([manus-use](https://github.com/manus-use)). (GHSA-j843-8p47-rhxp)
+- **Unbounded delay fields (CWE-770, medium)**: `delay_before_return_html`, `mean_delay`, and `max_range` were allowed in untrusted bodies with no upper bound, so one request could hold a browser page or stall the rate limiter. They are now capped at 60 seconds, and negative, NaN, and non-numeric values fall back to the default. Credit: Chunyi Liu ([liuchunyi-buaa](https://github.com/liuchunyi-buaa)). (GHSA-rhjm-7hj7-75fx)
+- **Chromium launched with certificate checks off (CWE-295, medium)**: both default launch flag lists carried `--ignore-certificate-errors`, so `ignore_https_errors=False` and the Docker server's TLS-on default had no effect. The flag is gone; insecure mode now comes only from `ignore_https_errors`. `CRAWL4AI_CHROMIUM_SANDBOX=true` now reaches every browser, including ones built from a request body. Credit: Julian Godfrey. (GHSA-j2qh-f73r-mg3q)
+
+Hardening, no advisory (credit: Chunyi Liu, [liuchunyi-buaa](https://github.com/liuchunyi-buaa)):
+
+- `DomainFilter` parses the real host with `urlparse()`, so userinfo, a port, or a trailing dot no longer slips past `blocked_domains`.
+- Webhook header names and artifact ids are checked with `fullmatch`, so a trailing newline no longer passes.
+- `enforce_egress` refuses the crawl with `EgressBlocked` when it cannot pin the browser to the egress proxy, instead of running unpinned. `clamp_deep_crawl` logs a warning when it cannot clamp.
+- Documentation examples: the marketplace backend (`docs/md_v2/marketplace/backend/`) uses bound SQL parameters and returns a generic error, and the LinkedIn graph view example escapes crawled data.
+
+All reporters are credited in `SECURITY-CREDITS.md`. GitHub Security Advisories accompany this release.
+
+### Added
+
+- Docker server: opt-in deep crawling. With `CRAWL4AI_ALLOW_DEEP_CRAWL=true`, requests may set `deep_crawl_strategy` with BFS, DFS, or BestFirst, safe filter and scorer types, and glob-only URL patterns. Page and depth budgets come from `limits.max_pages` and `limits.max_depth` in `config.yml`, a strategy is limited to 20 filters and scorers, and streamed deep crawls get a deadline. Off by default. (#2340, issue #2308, thanks @SohamKukreti)
+- A short Crawl4AI Cloud notice at `crawl4ai-setup`, at first run, and when a crawl is blocked. `CRAWL4AI_NO_CLOUD_NOTICE=1` turns it off.
+
+### Fixed
+
+**Crawler and core**
+
+- Deep crawl: BFS counts URLs already queued for the next level against `max_pages`, so `max_pages=50` no longer fetches hundreds of pages. (#2339, issue #2338, thanks @drakeo338)
+- Deep crawl: a reused strategy resets its page budget on a fresh run. (#2317, issue #2309, thanks @Artechie0806)
+- Scraping: page content nested in an unclosed `<noscript>` is kept in `cleaned_html` and `fit_html`. (#2284, thanks @tommypacker; #2360, #2363, issue #2293)
+- Scraping: a space is kept where a whitespace-only element is removed, so words no longer run together. (#2329, issue #2328, thanks @drakeo338)
+- `CrawlResult.links` and `.media` default to the scraped shape (`internal`, `external`, `images`, ...) on failed results. (#2289, issue #2286, thanks @talelboussetta)
+- PDF: markdown is deterministic with `batch_size > 1`. (#2320, issue #2319, thanks @Kylinny)
+- HTTP crawler: proxy credentials with `#`, `/`, `?`, or `%` work, and `ProxyConfig.from_string` decodes percent-encoded credentials. (#2327, issue #2326, thanks @omarbounawarapy)
+- HTTP crawler: proxy credentials no longer appear in error messages. (#2361, thanks @alkaz-nodemaven)
+
+**CLI**
+
+- `crwl -c cache_mode=...` is honored instead of always bypassing the cache. (#2366, issue #2365)
+- `crwl -o json` without an extraction strategy fails early with a clear message instead of crashing after the crawl. (#2362, #2335, issue #2334, thanks @SohamKukreti and @ege-arhan)
+
+**Docker server**
+
+- `crawler_configs` applies to single-URL and streaming requests, and a per-URL config list decides the PDF crawler. (#2290, issue #2287, thanks @talelboussetta)
+- A seed that fails the destination check is returned as a failed result instead of failing the whole batch with 400. (#2359, issue #2288)
+- An invalid `cache_mode` string returns 400 instead of 500.
+- MCP over SSE: `initialize` is processed before early `tools/call` requests, so fan-out clients no longer get -32602 on connect. (#2273, issue #2233, thanks @SohamKukreti)
+
+### Tests
+
+- `tests/unit/test_egress_policy.py` and `deploy/docker/tests/test_security_ssrf_seeder.py`: the cache freshness check goes through the egress proxy.
+- `tests/unit/test_untrusted_field_sinks.py` and `tests/browser/test_css_selector_injection.py`: `css_selector`, `wait_for`, `model_name`, regex, and delay fields under the untrusted gate.
+- `tests/unit/test_browser_tls_sandbox_flags.py`: launch flags with and without `ignore_https_errors` and the sandbox opt-in.
+- `tests/unit/test_domain_filter_host.py`, `deploy/docker/tests/test_security_hardening_2026_10.py`, `docs/md_v2/marketplace/backend/test_sql_injection.py`: the hardening fixes.
+- Coverage for the deep-crawl, noscript, proxy, CLI, and Docker fixes.
+
+### Breaking Changes
+
+None for library users. On the Docker server, untrusted request bodies that set `CosineStrategy.model_name`, `RegexExtractionStrategy.custom`, `RegexChunking.patterns`, a `"type": "regex"` schema field, or a JavaScript `wait_for` are now refused with 400.
+
 ## [0.9.4] - 2026-09-23
 
 0.9.4 is a security release. It closes three coordinated-disclosure advisories: two SSRF paths that bypassed the Docker server's egress controls, and a trust-boundary bypass that let a non-admin API client read server environment variables. It also makes content pruning about 10x faster with the new lxml-native `PruningContentFilterLXML`, now the default, and ships the bug fixes that accumulated on `develop` since 0.9.3. There are no breaking changes. Users who self-host the Docker server should upgrade.
