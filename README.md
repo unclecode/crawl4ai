@@ -15,13 +15,13 @@
 <a href="https://crawl4ai.com/?ref=readme-banner">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/cloud-launch-banner-dark.svg">
-    <img alt="Crawl4AI Cloud is live. Soft launch: your first $10 is on us until 31 December 2026, no card. Get your key." src="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/cloud-launch-banner-light.svg" width="960">
+    <img alt="Crawl4AI Cloud is live. Soft launch: free credit to start, no card. Get your key." src="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/cloud-launch-banner-light.svg" width="960">
   </picture>
 </a>
 
 </div>
 
-Crawl4AI turns any website into clean, LLM-ready Markdown for RAG, AI agents and data pipelines. Run the open-source web crawler and scraper yourself, free forever, or use it hosted with one key: scrape, search and extract through one API, with MCP for your agent.
+Crawl4AI turns any website into clean, LLM-ready Markdown for RAG, AI agents and data pipelines. Run the open-source web crawler and scraper yourself, free forever, or use it hosted with one key: `/scrape` a page to Markdown, `/extract` it to JSON, `/search` the web, `/serp` for Google's results page as data, `/answer` a question with sources; MCP for your agent. Free: 10 a minute, 2 at a time, 2,000 credits to start. Paid: 120 a minute, 10 at a time, from $10.
 
 ## Two ways to use Crawl4AI
 
@@ -48,8 +48,8 @@ Docker server, CLI and every option: [Installation](#installation) · [docs.craw
 
 ### ☁️ Or use the cloud: no browsers, no proxies
 
-1. [![Get a key in 10 seconds](https://img.shields.io/badge/Get_a_key_in_10_seconds-%241_pass%2C_no_signup-f5a300?style=for-the-badge&labelColor=0d0d10)](https://crawl4ai.com/?ref=readme)  
-   Verify your email and your first $10 pack is on us (until 31 December 2026, then $5 to start). No card.
+1. [![Get a key in 10 seconds](https://img.shields.io/badge/Get_a_key_in_10_seconds-20_free_credits%2C_no_signup-f5a300?style=for-the-badge&labelColor=0d0d10)](https://crawl4ai.com/?ref=readme)  
+   Verify your email and free credit to start is yours. No card. Soft launch: prices can change, what you buy stays yours.
 2. Get any page as Markdown:
 
    ```bash
@@ -59,7 +59,7 @@ Docker server, CLI and every option: [Installation](#installation) · [docs.craw
      -d '{"url": "https://news.ycombinator.com"}' | jq -r .markdown
    ```
 
-   The same key works for `/search`, `/answer`, `/extract` and many URLs at once (`/scrape/batch`, `/scrape/jobs`). Pay as you go: [live prices](https://crawl4ai.com/docs?ref=readme#pricing).
+   The same key works for `/extract`, `/search`, `/serp`, `/answer` and many URLs at once (`/scrape/batch`, `/scrape/jobs`). Pay as you go: [live prices](https://crawl4ai.com/docs?ref=readme#pricing).
 3. Give it to your AI agent. Claude Code shown; [Codex, Cursor and OpenCode →](https://crawl4ai.com/docs?ref=readme#mcp)
 
    ```bash
@@ -73,8 +73,8 @@ Docker server, CLI and every option: [Installation](#installation) · [docs.craw
 |---|---|---|---|
 | **Runs the browsers** | you, in your Python process | you, in Docker on your machine | we do |
 | **JS-heavy pages and bot walls** | your settings, your proxies | your settings, your proxies | handled for you, automatically |
-| **Web search** | – | – | `/search` and `/answer` |
-| **Price** | free, forever | free (your hosting) | pay as you go; your first $10 is on us |
+| **Web search** | – | – | `/search`, `/serp` and `/answer` |
+| **Price** | free, forever | free (your hosting) | pay as you go; free credit to start |
 
 <details>
   <summary>🤓 <strong>My Personal Story</strong></summary>
@@ -168,6 +168,7 @@ That platform is live now: [Crawl4AI Cloud](https://crawl4ai.com/?ref=readme).
 <summary>☁️ <strong>What the cloud adds</strong></summary>
 
 - 🔍 **Web search API**: `GET /search`, browser-free, ranked and cleaned. [Docs →](https://crawl4ai.com/docs?ref=readme#search)
+- 📊 **SERP API**: `GET /serp`, Google's results page as data: true ranks, every block, localised to a place. Beta. [Docs →](https://crawl4ai.com/docs?ref=readme#serp)
 - 💬 **Answers**: `GET /answer` gives a direct answer to a question (experimental). [Docs →](https://crawl4ai.com/docs?ref=readme#answer)
 - 🧪 **Extraction without your own LLM key**: `POST /extract`. [Docs →](https://crawl4ai.com/docs?ref=readme#extract)
 - 🧗 **JS-heavy pages and bot walls**: handled automatically; you never pick an engine. [Docs →](https://crawl4ai.com/docs?ref=readme#scrape)
