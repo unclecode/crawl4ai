@@ -102,6 +102,8 @@ EXECUTE_JS_ENABLED = os.environ.get("CRAWL4AI_EXECUTE_JS_ENABLED", "false").lowe
 # an unprivileged user namespace (unprivileged_userns_clone=1) or a seccomp
 # profile, set CRAWL4AI_CHROMIUM_SANDBOX=true to drop --no-sandbox and run the
 # renderer sandboxed. Verify Chromium still starts after flipping it.
+# crawl4ai.browser_manager reads the same variable at launch, so the sandbox
+# also applies to browsers built from a request body, not only this config.
 CHROMIUM_SANDBOX = os.environ.get("CRAWL4AI_CHROMIUM_SANDBOX", "false").lower() == "true"
 
 # Warn loudly if API token is not set (all endpoints unauthenticated)

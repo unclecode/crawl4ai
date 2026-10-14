@@ -236,7 +236,31 @@ UNTRUSTED_FORBIDDEN_FIELDS = {
         name: {"resume_state", "logger", "on_state_change", "should_cancel"}
         for name in ("BFSDeepCrawlStrategy", "DFSDeepCrawlStrategy", "BestFirstCrawlingStrategy")
     },
+    # Same reason, no scalar allowlist. model_name is a HuggingFace repo id
+    # handed to from_pretrained: the caller would pick the weights the server
+    # downloads and unpickles.
+    "CosineStrategy": {"model_name"},
+    # Caller-supplied regexes. Python's re holds the GIL while it matches, so
+    # one catastrophic-backtracking pattern freezes the whole server, and the
+    # crawl deadline cannot interrupt it. The built-in patterns stay available.
+    "RegexExtractionStrategy": {"custom"},
+    "RegexChunking": {"patterns"},
 }
+
+# Extraction schemas are free-form dicts, so their "regex" field type (a
+# caller-supplied re.search pattern, same ReDoS as above) is checked by walking
+# the schema rather than by field name.
+_SCHEMA_STRATEGIES = {
+    "JsonCssExtractionStrategy", "JsonXPathExtractionStrategy", "JsonLxmlExtractionStrategy",
+}
+
+
+def _has_regex_field(node) -> bool:
+    if isinstance(node, dict):
+        return node.get("type") == "regex" or any(_has_regex_field(v) for v in node.values())
+    if isinstance(node, list):
+        return any(_has_regex_field(v) for v in node)
+    return False
 
 # Field names that must NEVER be set from an untrusted body on ANY allowed
 # type, checked regardless of per-type allowlist. This is the fail-closed
@@ -309,6 +333,7 @@ UNTRUSTED_FIELD_ALLOWLIST = {
 # Upper bounds applied to attacker-influenced quantities after filtering.
 _DEFAULT_MAX_TIMEOUT_MS = 60_000
 _MAX_SCROLL_STEPS = 1000
+_MAX_DELAY_SECONDS = 60  # ceiling for delay_before_return_html / mean_delay / max_range
 _MAX_VIEWPORT = 4000
 _MAX_PDF_BYTES = 100 * 1024 * 1024
 _MAX_PDF_PAGES = 2000
@@ -446,12 +471,42 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
             return min(_DEFAULT_MAX_TIMEOUT_MS, ceiling)
         return min(int(v), ceiling)
 
+    # delay_before_return_html is held with a browser page open; mean_delay and
+    # max_range seed the arun_many rate limiter. All three are seconds, not ms,
+    # so they get their own cap rather than reusing the ms timeout ceiling.
+    _delay_defaults = {
+        "delay_before_return_html": 0.1,
+        "mean_delay": 0.1,
+        "max_range": 0.3,
+    }
+
+    def _cap_delay(v, default):
+        if not isinstance(v, (int, float)) or isinstance(v, bool) or not v >= 0:  # also NaN
+            return default
+        return min(v, _MAX_DELAY_SECONDS)
+
     if type_name == "CrawlerRunConfig":
         for f in ("page_timeout", "wait_for_timeout", "body_visibility_timeout"):
             if f in params:
                 params[f] = _cap_timeout(params[f])
+        for f, default in _delay_defaults.items():
+            if f in params:
+                params[f] = _cap_delay(params[f], default)
         if isinstance(params.get("max_scroll_steps"), int):
             params["max_scroll_steps"] = min(params["max_scroll_steps"], _MAX_SCROLL_STEPS)
+        # smart_wait runs "js:...", function-shaped values, and any value that
+        # is not a valid selector as page JavaScript -- the js_code ban by
+        # another name. Untrusted callers get CSS selector waits only; the
+        # "css:" branch never falls back to JS.
+        wait_for = params.get("wait_for")
+        if isinstance(wait_for, str) and wait_for.strip():
+            wait_for = wait_for.strip()
+            if wait_for.startswith(("js:", "()", "function")):
+                raise UntrustedConfigError(
+                    "a JavaScript wait_for is not permitted from an untrusted request"
+                )
+            if not wait_for.startswith("css:"):
+                params["wait_for"] = "css:" + wait_for
     elif type_name == "BrowserConfig":
         for f in ("viewport_width", "viewport_height"):
             if isinstance(params.get(f), int):
@@ -467,6 +522,12 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
         # Rasterizing every page is the most expensive thing this strategy can
         # do, and nothing about untrusted crawling needs it.
         params["extract_images"] = False
+    elif type_name in _SCHEMA_STRATEGIES:
+        if _has_regex_field(params.get("schema")):
+            raise UntrustedConfigError(
+                f"schema fields of type 'regex' are not permitted on {type_name} "
+                "from an untrusted request"
+            )
     elif type_name == "LinkPreviewConfig":
         # Also no field allowlist, and each link is a separate outbound fetch:
         # unclamped, one request body can order millions of them at any

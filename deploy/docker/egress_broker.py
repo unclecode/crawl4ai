@@ -25,11 +25,14 @@ leaks a resolved internal IP, hostname, or traceback (the old DNS oracle).
 from __future__ import annotations
 
 import ipaddress
+import logging
 import os
 import socket
 from dataclasses import dataclass
 from typing import List, Optional
 from urllib.parse import urlparse
+
+logger = logging.getLogger("crawl4ai.security")
 
 # Operator escape hatch for trusted internal deployments (off by default).
 ALLOW_INTERNAL = os.environ.get("CRAWL4AI_ALLOW_INTERNAL_URLS", "false").lower() == "true"
@@ -200,7 +203,16 @@ def enforce_egress(browser_config) -> None:
             from crawl4ai import ProxyConfig
             browser_config.proxy_config = ProxyConfig(server=_EGRESS_PROXY_URL)
         except Exception:
-            pass
+            # Fail closed: a browser_config that can't be pinned must not be
+            # allowed to crawl unpinned (that reopens DNS rebinding). Every
+            # caller of enforce_egress either runs inside a try/except that
+            # turns this into a clean 4xx/5xx response, or (app startup) is
+            # meant to abort loudly rather than serve traffic unprotected.
+            logger.error(
+                "enforce_egress: failed to set the egress pinning proxy; "
+                "refusing to crawl unpinned", exc_info=True
+            )
+            raise EgressBlocked("egress pinning unavailable")
     args = getattr(browser_config, "extra_args", None)
     if args:
         browser_config.extra_args = [

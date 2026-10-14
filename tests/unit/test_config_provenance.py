@@ -96,6 +96,60 @@ def test_trusted_top_level_kwargs_still_deserialize(monkeypatch):
     assert cfg.extraction_strategy.llm_config.api_token == "tok-123"
 
 
+def test_untrusted_delay_fields_are_capped():
+    """delay_before_return_html / mean_delay / max_range are seconds held on a
+    live browser page or used as a rate-limiter base delay. Unclamped, an
+    untrusted body can hold a page (or a whole arun_many batch) open forever."""
+    cfg = CrawlerRunConfig.load(
+        {
+            "type": "CrawlerRunConfig",
+            "params": {
+                "delay_before_return_html": 1e9,
+                "mean_delay": 1e9,
+                "max_range": 1e9,
+            },
+        },
+        provenance=UNTRUSTED,
+    )
+    assert cfg.delay_before_return_html <= 60
+    assert cfg.mean_delay <= 60
+    assert cfg.max_range <= 60
+
+
+def test_untrusted_delay_fields_negative_or_non_numeric_fall_back_to_default():
+    cfg = CrawlerRunConfig.load(
+        {
+            "type": "CrawlerRunConfig",
+            "params": {
+                "delay_before_return_html": -5,
+                "mean_delay": "not-a-number",
+                "max_range": None,
+            },
+        },
+        provenance=UNTRUSTED,
+    )
+    assert cfg.delay_before_return_html == 0.1
+    assert cfg.mean_delay == 0.1
+    assert cfg.max_range == 0.3
+
+
+def test_trusted_delay_fields_are_not_clamped():
+    """TRUSTED (SDK) callers keep the old behavior: no cap applied."""
+    cfg = CrawlerRunConfig.load(
+        {
+            "type": "CrawlerRunConfig",
+            "params": {
+                "delay_before_return_html": 1e9,
+                "mean_delay": 1e9,
+                "max_range": 1e9,
+            },
+        }
+    )
+    assert cfg.delay_before_return_html == 1e9
+    assert cfg.mean_delay == 1e9
+    assert cfg.max_range == 1e9
+
+
 def test_plain_business_dict_with_type_key_still_passes():
     """A JsonCss schema carries "type" keys but is data, not a typed object."""
     schema = {
