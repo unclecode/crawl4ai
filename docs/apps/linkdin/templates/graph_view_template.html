@@ -9,6 +9,7 @@
     <!-- our tiny OpenAI wrapper -->
     <script src="ai.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/split.js/1.6.5/split.min.js"></script>
     <link href="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
@@ -250,6 +251,32 @@
 
 
     <script>
+        // Escapes untrusted crawler/uploaded data before it is interpolated into innerHTML,
+        // including inside quoted attributes (crawled fields are never safe HTML).
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[ch]));
+        }
+
+        // Untrusted URLs (profile_url, avatar_url, person id) must not be assigned
+        // to href/src as-is: entity escaping does not block a `javascript:` (or
+        // other non-http) scheme reaching setAttribute. Only allow http(s) or
+        // scheme-relative URLs through; anything else falls back to '#'.
+        function safeUrl(value, fallback = '#') {
+            const raw = String(value ?? '').trim();
+            if (!raw) return fallback;
+            try {
+                const parsed = new URL(raw, 'https://example.com/');
+                if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+                    return escapeHtml(raw);
+                }
+            } catch (e) {
+                // Malformed URL - fall through to fallback.
+            }
+            return fallback;
+        }
+
         // Check localStorage first, otherwise fetch default data
         let data;
         // Toast notification function
@@ -499,16 +526,16 @@
                 li.className = 'p-3 rounded bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 transition-colors'
                 li.innerHTML = `
                         <div class="flex justify-between items-start mb-1">
-                            <h3 class="font-semibold text-blue-400 cursor-pointer">${n.name}</h3>
-                            <span class="px-2 py-0.5 bg-neutral-700 rounded-full text-xs">${n.industry || 'N/A'}</span>
+                            <h3 class="font-semibold text-blue-400 cursor-pointer">${escapeHtml(n.name)}</h3>
+                            <span class="px-2 py-0.5 bg-neutral-700 rounded-full text-xs">${escapeHtml(n.industry || 'N/A')}</span>
                         </div>
-                        <p class="text-xs text-neutral-300 mb-2">${n.about || 'No description available'}</p>
+                        <p class="text-xs text-neutral-300 mb-2">${escapeHtml(n.about || 'No description available')}</p>
                         <div class="flex justify-between items-center text-xs">
                             <div class="flex items-center">
                                 <i class="fa fa-users mr-1 text-neutral-400"></i>
-                                <span>${n.followers?.toLocaleString() || '0'} followers</span>
+                                <span>${escapeHtml(n.followers?.toLocaleString() || '0')} followers</span>
                             </div>
-                            <a href="https://www.linkedin.com${n.handle}" target="_blank" class="text-emerald-400 hover:text-emerald-300">
+                            <a href="https://www.linkedin.com${escapeHtml(n.handle || '')}" target="_blank" class="text-emerald-400 hover:text-emerald-300">
                                 <i class="fab fa-linkedin mr-1"></i>View on LinkedIn
                             </a>
                         </div>
@@ -593,7 +620,7 @@
                 pane.innerHTML = `
   <div class="p-4 border-b border-neutral-700 bg-neutral-800">
     <div class="flex justify-between items-center">
-      <h2 class="font-semibold text-lg text-blue-400">${companyName}</h2>
+      <h2 class="font-semibold text-lg text-blue-400">${escapeHtml(companyName)}</h2>
       <span class="px-2 py-1 bg-neutral-700 rounded-full text-xs">${employeeCount} employees</span>
     </div>
   </div>
@@ -607,12 +634,12 @@
        ${decisionMakers.map(n => `
          <li class="p-2 rounded bg-neutral-700 hover:bg-neutral-600 transition-colors flex justify-between items-center">
            <div>
-             <div class="font-medium">${n.name}</div>
-             <div class="text-xs text-neutral-300">${n.title}</div>
+             <div class="font-medium">${escapeHtml(n.name)}</div>
+             <div class="text-xs text-neutral-300">${escapeHtml(n.title)}</div>
            </div>
            <div class="flex items-center gap-2">
              <span class="text-xs px-2 py-0.5 rounded-full" style="background-color:${colorForScore(n.decision_score)}">${(n.decision_score * 100).toFixed(0)}%</span>
-             <a href="${n.profile_url}" target="_blank" class="text-emerald-400 hover:text-emerald-300 text-xs">
+             <a href="${safeUrl(n.profile_url)}" target="_blank" class="text-emerald-400 hover:text-emerald-300 text-xs">
                <i class="fab fa-linkedin"></i>
              </a>
            </div>
@@ -721,41 +748,41 @@
                 box.innerHTML = `
                     <div class="bg-neutral-800 rounded-lg p-4">
                       <div class="flex items-start space-x-3">
-                        <img src="${p.avatar_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(p.name)}" 
+                        <img src="${safeUrl(p.avatar_url, 'https://ui-avatars.com/api/?name=' + encodeURIComponent(p.name))}"
                              class="h-16 w-16 rounded-full object-cover border-2 border-neutral-700"/>
                         <div class="flex-1">
                           <div class="flex justify-between items-start">
                             <div>
-                              <div class="font-semibold text-lg">${p.name}</div>
-                              <div class="text-neutral-300 text-sm">${p.title || 'Employee'}</div>
+                              <div class="font-semibold text-lg">${escapeHtml(p.name)}</div>
+                              <div class="text-neutral-300 text-sm">${escapeHtml(p.title || 'Employee')}</div>
                             </div>
-                            <span class="px-2 py-1 rounded-full text-sm font-medium" 
+                            <span class="px-2 py-1 rounded-full text-sm font-medium"
                                   style="background-color:${scoreColor}">
                               ${scorePercentage}% influence
                             </span>
                           </div>
-                          
+
                           <div class="mt-3 grid grid-cols-2 gap-2 text-xs text-neutral-300">
                             <div class="flex items-center">
                               <i class="fas fa-sitemap w-5 text-neutral-500"></i>
-                              <span class="ml-1">${p.dept || 'Department not specified'}</span>
+                              <span class="ml-1">${escapeHtml(p.dept || 'Department not specified')}</span>
                             </div>
                             <div class="flex items-center">
                               <i class="fas fa-calendar-alt w-5 text-neutral-500"></i>
-                              <span class="ml-1">${p.yoe_current || '?'} years at company</span>
+                              <span class="ml-1">${escapeHtml(p.yoe_current || '?')} years at company</span>
                             </div>
                             <div class="flex items-center">
                               <i class="fas fa-briefcase w-5 text-neutral-500"></i>
-                              <span class="ml-1">${p.title_level || 'Level not specified'}</span>
+                              <span class="ml-1">${escapeHtml(p.title_level || 'Level not specified')}</span>
                             </div>
                             <div class="flex items-center">
                               <i class="fas fa-user-friends w-5 text-neutral-500"></i>
-                              <span class="ml-1">${p.connection_count || '?'} connections</span>
+                              <span class="ml-1">${escapeHtml(p.connection_count || '?')} connections</span>
                             </div>
                           </div>
-                          
+
                           <div class="mt-3 flex justify-end">
-                            <a href="${p.id}" target="_blank" 
+                            <a href="${safeUrl(p.id)}" target="_blank"
                                class="bg-emerald-800 hover:bg-emerald-700 text-emerald-100 px-3 py-1 rounded text-xs flex items-center transition-colors">
                               <i class="fab fa-linkedin mr-1"></i> View on LinkedIn
                             </a>
@@ -841,7 +868,7 @@
                 let el = chatBody.lastElementChild
                 if (streaming && el && el.dataset.sender === sender) {
                     // Just append raw text for streaming mode
-                    el.lastChild.innerHTML += text.replace(/\n/g, "<br>")
+                    el.lastChild.innerHTML += escapeHtml(text).replace(/\n/g, "<br>")
                 } else {
                     el = document.createElement('div')
                     el.className = 'chat-message'
@@ -856,8 +883,9 @@
                     const contentEl = document.createElement('div')
                     contentEl.className = 'ml-1 mt-1'
 
-                    // Apply markdown parsing
-                    contentEl.innerHTML = marked.parse(text)
+                    // Apply markdown parsing, then sanitize (model output can carry
+                    // HTML injected via prompt injection from crawled page content)
+                    contentEl.innerHTML = DOMPurify.sanitize(marked.parse(text))
 
                     // Style markdown elements
                     const style = document.createElement('style')
@@ -1115,13 +1143,13 @@
                     const graphInfoContent = document.getElementById('graphInfoContent');
 
                     graphInfoContent.innerHTML = `
-                            <div class="font-semibold text-neutral-200">${node.name}</div>
-                            <div class="text-neutral-400">${node.industry || 'Industry: N/A'}</div>
+                            <div class="font-semibold text-neutral-200">${escapeHtml(node.name)}</div>
+                            <div class="text-neutral-400">${escapeHtml(node.industry || 'Industry: N/A')}</div>
                             <div class="flex items-center mt-1">
                                 <i class="fas fa-users mr-1 text-blue-400"></i>
-                                <span>${node.followers?.toLocaleString() || '0'} followers</span>
+                                <span>${escapeHtml(node.followers?.toLocaleString() || '0')} followers</span>
                             </div>
-                            <div class="mt-1">${node.about || ''}</div>
+                            <div class="mt-1">${escapeHtml(node.about || '')}</div>
                         `;
 
                     graphInfo.classList.remove('hidden');
