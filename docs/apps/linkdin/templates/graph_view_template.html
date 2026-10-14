@@ -9,6 +9,7 @@
     <!-- our tiny OpenAI wrapper -->
     <script src="ai.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.15/dist/purify.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/split.js/1.6.5/split.min.js"></script>
     <link href="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
@@ -346,6 +347,31 @@
         function initializeGraph(data) {
             window.companyGraphData = data          // expose globally
 
+            function makeElement(tag, className = '', text = null) {
+                const element = document.createElement(tag)
+                if (className) element.className = className
+                if (text !== null) element.textContent = String(text)
+                return element
+            }
+
+            function safeHttpUrl(value, fallback = null) {
+                const raw = String(value ?? '').trim()
+                if (!raw) return fallback
+                try {
+                    const url = new URL(raw, window.location.href)
+                    return ['http:', 'https:'].includes(url.protocol) ? url.href : fallback
+                } catch {
+                    return fallback
+                }
+            }
+
+            function appendTextWithBreaks(element, text) {
+                String(text).split('\n').forEach((line, index) => {
+                    if (index) element.appendChild(document.createElement('br'))
+                    element.appendChild(document.createTextNode(line))
+                })
+            }
+
             // lazy-load people.jsonl once so chat can reference raw rows
             let peopleRows = null
             async function getPeopleRows() {
@@ -497,22 +523,31 @@
             data.nodes.forEach(n => {
                 const li = document.createElement('li')
                 li.className = 'p-3 rounded bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 transition-colors'
-                li.innerHTML = `
-                        <div class="flex justify-between items-start mb-1">
-                            <h3 class="font-semibold text-blue-400 cursor-pointer">${n.name}</h3>
-                            <span class="px-2 py-0.5 bg-neutral-700 rounded-full text-xs">${n.industry || 'N/A'}</span>
-                        </div>
-                        <p class="text-xs text-neutral-300 mb-2">${n.about || 'No description available'}</p>
-                        <div class="flex justify-between items-center text-xs">
-                            <div class="flex items-center">
-                                <i class="fa fa-users mr-1 text-neutral-400"></i>
-                                <span>${n.followers?.toLocaleString() || '0'} followers</span>
-                            </div>
-                            <a href="https://www.linkedin.com${n.handle}" target="_blank" class="text-emerald-400 hover:text-emerald-300">
-                                <i class="fab fa-linkedin mr-1"></i>View on LinkedIn
-                            </a>
-                        </div>
-                    `
+
+                const heading = makeElement('div', 'flex justify-between items-start mb-1')
+                heading.append(
+                    makeElement('h3', 'font-semibold text-blue-400 cursor-pointer', n.name),
+                    makeElement('span', 'px-2 py-0.5 bg-neutral-700 rounded-full text-xs', n.industry || 'N/A')
+                )
+
+                const footer = makeElement('div', 'flex justify-between items-center text-xs')
+                const followers = makeElement('div', 'flex items-center')
+                followers.append(
+                    makeElement('i', 'fa fa-users mr-1 text-neutral-400'),
+                    makeElement('span', '', `${n.followers?.toLocaleString() || '0'} followers`)
+                )
+
+                const linkedIn = makeElement('a', 'text-emerald-400 hover:text-emerald-300')
+                linkedIn.target = '_blank'
+                linkedIn.href = safeHttpUrl(`https://www.linkedin.com${n.handle || ''}`, 'https://www.linkedin.com')
+                linkedIn.append(makeElement('i', 'fab fa-linkedin mr-1'), 'View on LinkedIn')
+                footer.append(followers, linkedIn)
+
+                li.append(
+                    heading,
+                    makeElement('p', 'text-xs text-neutral-300 mb-2', n.about || 'No description available'),
+                    footer
+                )
                 // Make the entire card clickable for better UX
                 li.style.cursor = 'pointer'
                 li.onclick = (e) => {
@@ -590,44 +625,76 @@
                 const employeeCount = chart.nodes.length;
                 const decisionMakers = chart.nodes.filter(n => n.decision_score >= 0.5);
 
-                pane.innerHTML = `
-  <div class="p-4 border-b border-neutral-700 bg-neutral-800">
-    <div class="flex justify-between items-center">
-      <h2 class="font-semibold text-lg text-blue-400">${companyName}</h2>
-      <span class="px-2 py-1 bg-neutral-700 rounded-full text-xs">${employeeCount} employees</span>
-    </div>
-  </div>
-  <div id="orgNet" style="height:320px" class="border-b border-neutral-700"></div>
-  <div class="p-4 bg-neutral-800">
-     <div class="flex justify-between items-center mb-3">
-       <h3 class="font-semibold">Decision Makers</h3>
-       <span class="px-2 py-0.5 bg-emerald-700 text-emerald-100 rounded-full text-xs">${decisionMakers.length} key people</span>
-     </div>
-     <ul class="text-sm space-y-2 max-h-60 overflow-y-auto pr-1 mb-4">
-       ${decisionMakers.map(n => `
-         <li class="p-2 rounded bg-neutral-700 hover:bg-neutral-600 transition-colors flex justify-between items-center">
-           <div>
-             <div class="font-medium">${n.name}</div>
-             <div class="text-xs text-neutral-300">${n.title}</div>
-           </div>
-           <div class="flex items-center gap-2">
-             <span class="text-xs px-2 py-0.5 rounded-full" style="background-color:${colorForScore(n.decision_score)}">${(n.decision_score * 100).toFixed(0)}%</span>
-             <a href="${n.profile_url}" target="_blank" class="text-emerald-400 hover:text-emerald-300 text-xs">
-               <i class="fab fa-linkedin"></i>
-             </a>
-           </div>
-         </li>`).join('')}
-     </ul>
-     <div class="mt-4 text-xs border-t border-neutral-700 pt-3">
-       <div class="font-semibold mb-2">Influence Scale</div>
-       <div class="h-2 w-full rounded-full mb-1" style="background: linear-gradient(to right, rgb(255,0,100), rgb(0,255,100))"></div>
-       <div class="flex justify-between text-xs text-neutral-400">
-         <span>Low influence (0%)</span>
-         <span>High influence (100%)</span>
-       </div>
-     </div>
-  </div>
-  <div id="personPane" class="p-4 border-t border-neutral-700 text-sm bg-neutral-900 hidden"></div>`
+                pane.replaceChildren()
+
+                const header = makeElement('div', 'p-4 border-b border-neutral-700 bg-neutral-800')
+                const headerRow = makeElement('div', 'flex justify-between items-center')
+                headerRow.append(
+                    makeElement('h2', 'font-semibold text-lg text-blue-400', companyName),
+                    makeElement('span', 'px-2 py-1 bg-neutral-700 rounded-full text-xs', `${employeeCount} employees`)
+                )
+                header.appendChild(headerRow)
+
+                const orgNetwork = makeElement('div', 'border-b border-neutral-700')
+                orgNetwork.id = 'orgNet'
+                orgNetwork.style.height = '320px'
+
+                const details = makeElement('div', 'p-4 bg-neutral-800')
+                const detailsHeader = makeElement('div', 'flex justify-between items-center mb-3')
+                detailsHeader.append(
+                    makeElement('h3', 'font-semibold', 'Decision Makers'),
+                    makeElement(
+                        'span',
+                        'px-2 py-0.5 bg-emerald-700 text-emerald-100 rounded-full text-xs',
+                        `${decisionMakers.length} key people`
+                    )
+                )
+
+                const decisionList = makeElement('ul', 'text-sm space-y-2 max-h-60 overflow-y-auto pr-1 mb-4')
+                decisionMakers.forEach(person => {
+                    const item = makeElement(
+                        'li',
+                        'p-2 rounded bg-neutral-700 hover:bg-neutral-600 transition-colors flex justify-between items-center'
+                    )
+                    const identity = makeElement('div')
+                    identity.append(
+                        makeElement('div', 'font-medium', person.name),
+                        makeElement('div', 'text-xs text-neutral-300', person.title)
+                    )
+
+                    const actions = makeElement('div', 'flex items-center gap-2')
+                    const score = makeElement(
+                        'span',
+                        'text-xs px-2 py-0.5 rounded-full',
+                        `${(person.decision_score * 100).toFixed(0)}%`
+                    )
+                    score.style.backgroundColor = colorForScore(person.decision_score)
+
+                    const profile = makeElement('a', 'text-emerald-400 hover:text-emerald-300 text-xs')
+                    profile.target = '_blank'
+                    const profileUrl = safeHttpUrl(person.profile_url)
+                    if (profileUrl) profile.href = profileUrl
+                    profile.appendChild(makeElement('i', 'fab fa-linkedin'))
+
+                    actions.append(score, profile)
+                    item.append(identity, actions)
+                    decisionList.appendChild(item)
+                })
+
+                const scale = makeElement('div', 'mt-4 text-xs border-t border-neutral-700 pt-3')
+                const scaleBar = makeElement('div', 'h-2 w-full rounded-full mb-1')
+                scaleBar.style.background = 'linear-gradient(to right, rgb(255,0,100), rgb(0,255,100))'
+                const scaleLabels = makeElement('div', 'flex justify-between text-xs text-neutral-400')
+                scaleLabels.append(
+                    makeElement('span', '', 'Low influence (0%)'),
+                    makeElement('span', '', 'High influence (100%)')
+                )
+                scale.append(makeElement('div', 'font-semibold mb-2', 'Influence Scale'), scaleBar, scaleLabels)
+                details.append(detailsHeader, decisionList, scale)
+
+                const personPane = makeElement('div', 'p-4 border-t border-neutral-700 text-sm bg-neutral-900 hidden')
+                personPane.id = 'personPane'
+                pane.append(header, orgNetwork, details, personPane)
 
                 const n = new vis.DataSet(chart.nodes.map(p => ({
                     id: p.id,
@@ -718,51 +785,58 @@
                 const scoreColor = colorForScore(p.decision_score || 0)
                 const scorePercentage = (p.decision_score * 100).toFixed(1)
 
-                box.innerHTML = `
-                    <div class="bg-neutral-800 rounded-lg p-4">
-                      <div class="flex items-start space-x-3">
-                        <img src="${p.avatar_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(p.name)}" 
-                             class="h-16 w-16 rounded-full object-cover border-2 border-neutral-700"/>
-                        <div class="flex-1">
-                          <div class="flex justify-between items-start">
-                            <div>
-                              <div class="font-semibold text-lg">${p.name}</div>
-                              <div class="text-neutral-300 text-sm">${p.title || 'Employee'}</div>
-                            </div>
-                            <span class="px-2 py-1 rounded-full text-sm font-medium" 
-                                  style="background-color:${scoreColor}">
-                              ${scorePercentage}% influence
-                            </span>
-                          </div>
-                          
-                          <div class="mt-3 grid grid-cols-2 gap-2 text-xs text-neutral-300">
-                            <div class="flex items-center">
-                              <i class="fas fa-sitemap w-5 text-neutral-500"></i>
-                              <span class="ml-1">${p.dept || 'Department not specified'}</span>
-                            </div>
-                            <div class="flex items-center">
-                              <i class="fas fa-calendar-alt w-5 text-neutral-500"></i>
-                              <span class="ml-1">${p.yoe_current || '?'} years at company</span>
-                            </div>
-                            <div class="flex items-center">
-                              <i class="fas fa-briefcase w-5 text-neutral-500"></i>
-                              <span class="ml-1">${p.title_level || 'Level not specified'}</span>
-                            </div>
-                            <div class="flex items-center">
-                              <i class="fas fa-user-friends w-5 text-neutral-500"></i>
-                              <span class="ml-1">${p.connection_count || '?'} connections</span>
-                            </div>
-                          </div>
-                          
-                          <div class="mt-3 flex justify-end">
-                            <a href="${p.id}" target="_blank" 
-                               class="bg-emerald-800 hover:bg-emerald-700 text-emerald-100 px-3 py-1 rounded text-xs flex items-center transition-colors">
-                              <i class="fab fa-linkedin mr-1"></i> View on LinkedIn
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-                    </div>`
+                box.replaceChildren()
+
+                const card = makeElement('div', 'bg-neutral-800 rounded-lg p-4')
+                const cardRow = makeElement('div', 'flex items-start space-x-3')
+                const avatar = makeElement('img', 'h-16 w-16 rounded-full object-cover border-2 border-neutral-700')
+                const avatarFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}`
+                avatar.src = safeHttpUrl(p.avatar_url, avatarFallback)
+
+                const content = makeElement('div', 'flex-1')
+                const summary = makeElement('div', 'flex justify-between items-start')
+                const identity = makeElement('div')
+                identity.append(
+                    makeElement('div', 'font-semibold text-lg', p.name),
+                    makeElement('div', 'text-neutral-300 text-sm', p.title || 'Employee')
+                )
+                const score = makeElement(
+                    'span',
+                    'px-2 py-1 rounded-full text-sm font-medium',
+                    `${scorePercentage}% influence`
+                )
+                score.style.backgroundColor = scoreColor
+                summary.append(identity, score)
+
+                const facts = makeElement('div', 'mt-3 grid grid-cols-2 gap-2 text-xs text-neutral-300')
+                const addFact = (iconClass, value) => {
+                    const fact = makeElement('div', 'flex items-center')
+                    fact.append(
+                        makeElement('i', `${iconClass} w-5 text-neutral-500`),
+                        makeElement('span', 'ml-1', value)
+                    )
+                    facts.appendChild(fact)
+                }
+                addFact('fas fa-sitemap', p.dept || 'Department not specified')
+                addFact('fas fa-calendar-alt', `${p.yoe_current || '?'} years at company`)
+                addFact('fas fa-briefcase', p.title_level || 'Level not specified')
+                addFact('fas fa-user-friends', `${p.connection_count || '?'} connections`)
+
+                const linkRow = makeElement('div', 'mt-3 flex justify-end')
+                const profile = makeElement(
+                    'a',
+                    'bg-emerald-800 hover:bg-emerald-700 text-emerald-100 px-3 py-1 rounded text-xs flex items-center transition-colors'
+                )
+                profile.target = '_blank'
+                const profileUrl = safeHttpUrl(p.id)
+                if (profileUrl) profile.href = profileUrl
+                profile.append(makeElement('i', 'fab fa-linkedin mr-1'), ' View on LinkedIn')
+                linkRow.appendChild(profile)
+
+                content.append(summary, facts, linkRow)
+                cardRow.append(avatar, content)
+                card.appendChild(cardRow)
+                box.appendChild(card)
             }
 
             // ───── Chat drawer logic ─────
@@ -840,8 +914,7 @@
             function appendMsg(sender, text, streaming = false) {
                 let el = chatBody.lastElementChild
                 if (streaming && el && el.dataset.sender === sender) {
-                    // Just append raw text for streaming mode
-                    el.lastChild.innerHTML += text.replace(/\n/g, "<br>")
+                    appendTextWithBreaks(el.lastChild, text)
                 } else {
                     el = document.createElement('div')
                     el.className = 'chat-message'
@@ -856,8 +929,8 @@
                     const contentEl = document.createElement('div')
                     contentEl.className = 'ml-1 mt-1'
 
-                    // Apply markdown parsing
-                    contentEl.innerHTML = marked.parse(text)
+                    // Keep markdown formatting while removing executable markup.
+                    contentEl.innerHTML = DOMPurify.sanitize(marked.parse(text))
 
                     // Style markdown elements
                     const style = document.createElement('style')
@@ -1114,15 +1187,17 @@
                     const graphInfo = document.getElementById('graphInfo');
                     const graphInfoContent = document.getElementById('graphInfoContent');
 
-                    graphInfoContent.innerHTML = `
-                            <div class="font-semibold text-neutral-200">${node.name}</div>
-                            <div class="text-neutral-400">${node.industry || 'Industry: N/A'}</div>
-                            <div class="flex items-center mt-1">
-                                <i class="fas fa-users mr-1 text-blue-400"></i>
-                                <span>${node.followers?.toLocaleString() || '0'} followers</span>
-                            </div>
-                            <div class="mt-1">${node.about || ''}</div>
-                        `;
+                    const followers = makeElement('div', 'flex items-center mt-1')
+                    followers.append(
+                        makeElement('i', 'fas fa-users mr-1 text-blue-400'),
+                        makeElement('span', '', `${node.followers?.toLocaleString() || '0'} followers`)
+                    )
+                    graphInfoContent.replaceChildren(
+                        makeElement('div', 'font-semibold text-neutral-200', node.name),
+                        makeElement('div', 'text-neutral-400', node.industry || 'Industry: N/A'),
+                        followers,
+                        makeElement('div', 'mt-1', node.about || '')
+                    )
 
                     graphInfo.classList.remove('hidden');
                 }
