@@ -268,5 +268,23 @@ def test_json_output_with_question_is_allowed(runner):
     run.assert_called()  # no early error
 
 
+def _crawler_cfg(runner, *args):
+    with patch("crawl4ai.cli.anyio.run") as run:
+        runner.invoke(cli, ["crawl", "https://example.com", "-o", "md", *args])
+    return run.call_args.args[3]
+
+
+def test_cache_bypassed_by_default(runner):
+    from crawl4ai import CacheMode
+    assert _crawler_cfg(runner).cache_mode == CacheMode.BYPASS
+
+
+def test_crawler_param_cache_mode_is_honored(runner):
+    # #2365: -c cache_mode=enabled was overridden and kept as a plain string
+    from crawl4ai import CacheMode
+    assert _crawler_cfg(runner, "-c", "cache_mode=enabled").cache_mode == CacheMode.ENABLED
+    assert _crawler_cfg(runner, "-c", "cache_mode=enabled", "-bc").cache_mode == CacheMode.BYPASS
+
+
 if __name__ == '__main__':
     pytest.main(['-v', '-s', '--tb=native', __file__])
