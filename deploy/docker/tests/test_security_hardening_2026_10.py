@@ -53,7 +53,9 @@ class _RaisingDeepCrawl:
     max_depth = None
 
     def __setattr__(self, name, value):
-        raise RuntimeError("cannot set attribute")
+        if name in ("max_pages", "max_depth"):
+            raise RuntimeError("cannot set attribute")
+        object.__setattr__(self, name, value)
 
 
 class _RaisingConfig:
