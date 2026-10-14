@@ -195,3 +195,17 @@ def test_url_pattern_star_led_glob_is_linear_and_unchanged():
     start = time.time()
     assert not f.apply("https://x.com/" + "a" * 50000)
     assert time.time() - start < 0.5
+
+
+def test_cache_mode_string_is_converted_and_invalid_one_refused():
+    from crawl4ai import CacheMode
+
+    cfg = CrawlerRunConfig.load(
+        {"type": "CrawlerRunConfig", "params": {"cache_mode": "Enabled"}}, provenance=UNTRUSTED
+    )
+    assert cfg.cache_mode == CacheMode.ENABLED
+    # A bad value must be a 400 (UntrustedConfigError), not a ValueError (500).
+    with pytest.raises(UntrustedConfigError, match="cache_mode"):
+        CrawlerRunConfig.load(
+            {"type": "CrawlerRunConfig", "params": {"cache_mode": "nope"}}, provenance=UNTRUSTED
+        )

@@ -427,6 +427,10 @@ def _filter_untrusted_fields(type_name: str, params: dict) -> dict:
         raise UntrustedConfigError(
             "fetch_ssl_certificate cannot be combined with deep_crawl_strategy from an untrusted request"
         )
+    cache_mode = out.get("cache_mode") if type_name == "CrawlerRunConfig" else None
+    if isinstance(cache_mode, str) and cache_mode.lower() not in {m.value for m in CacheMode}:
+        # CrawlerRunConfig raises ValueError on it, which would surface as a 500.
+        raise UntrustedConfigError(f"invalid cache_mode: {cache_mode!r}")
     return out
 
 
