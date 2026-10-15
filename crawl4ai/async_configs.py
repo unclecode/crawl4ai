@@ -1036,6 +1036,11 @@ class BrowserConfig:
                           domains. Default: False.
         avoid_css (bool): If True, blocks loading of CSS files (css, less, scss, sass) to
                           reduce resource usage and speed up crawling. Default: False.
+        chromium_sandbox (Optional[bool]): If True, enables Chromium's native sandbox protections and
+                                         omits --no-sandbox from launch arguments. Requires host/container
+                                         support (e.g. user namespaces or an appropriate seccomp profile).
+                                         If None (default), checks CRAWL4AI_CHROMIUM_SANDBOX environment
+                                         variable (defaults to False). Default: None.
     """
 
     def __init__(
@@ -1089,6 +1094,7 @@ class BrowserConfig:
         init_scripts: List[str] = None,
         memory_saving_mode: bool = False,
         max_pages_before_recycle: int = 0,
+        chromium_sandbox: Optional[bool] = None,
     ):
         
         self.browser_type = browser_type
@@ -1156,6 +1162,7 @@ class BrowserConfig:
         self.init_scripts = init_scripts if init_scripts is not None else []
         self.memory_saving_mode = memory_saving_mode
         self.max_pages_before_recycle = max_pages_before_recycle
+        self.chromium_sandbox = chromium_sandbox
 
         fa_user_agenr_generator = ValidUAGenerator()
         if self.user_agent_mode == "random":
@@ -1253,6 +1260,7 @@ class BrowserConfig:
             "init_scripts": self.init_scripts,
             "memory_saving_mode": self.memory_saving_mode,
             "max_pages_before_recycle": self.max_pages_before_recycle,
+            "chromium_sandbox": self.chromium_sandbox,
         }
 
 

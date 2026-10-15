@@ -76,6 +76,50 @@ def test_sandbox_requested_by_env(monkeypatch):
     assert "--no-sandbox" not in ManagedBrowser.build_browser_flags(bc)
 
 
+def test_sandbox_requested_by_config(monkeypatch):
+    monkeypatch.delenv("CRAWL4AI_CHROMIUM_SANDBOX", raising=False)
+    bc = BrowserConfig(headless=True, chromium_sandbox=True, extra_args=["--no-sandbox", "--disable-gpu"])
+    launch = BrowserManager(browser_config=bc)._build_browser_args()
+    assert "--no-sandbox" not in launch["args"]
+    assert "--disable-gpu" in launch["args"]
+    assert launch["chromium_sandbox"] is True
+    assert "--no-sandbox" not in ManagedBrowser.build_browser_flags(bc)
+
+
+def test_sandbox_explicit_false_overrides_env(monkeypatch):
+    monkeypatch.setenv("CRAWL4AI_CHROMIUM_SANDBOX", "true")
+    bc = BrowserConfig(headless=True, chromium_sandbox=False, extra_args=["--disable-gpu"])
+    launch = BrowserManager(browser_config=bc)._build_browser_args()
+    assert "--no-sandbox" in launch["args"]
+    assert not launch.get("chromium_sandbox")
+    assert "--no-sandbox" in ManagedBrowser.build_browser_flags(bc)
+
+
+def test_sandbox_config_serialization_and_clone():
+    bc = BrowserConfig(headless=True, chromium_sandbox=True)
+    dumped = bc.to_dict()
+    assert dumped["chromium_sandbox"] is True
+
+    cloned = bc.clone()
+    assert cloned.chromium_sandbox is True
+
+    overridden = bc.clone(chromium_sandbox=False)
+    assert overridden.chromium_sandbox is False
+
+
+def test_sandbox_untrusted_load_ignored(monkeypatch):
+    from crawl4ai.async_configs import Provenance
+
+    monkeypatch.delenv("CRAWL4AI_CHROMIUM_SANDBOX", raising=False)
+    loaded = BrowserConfig.load(
+        {"type": "BrowserConfig", "params": {"chromium_sandbox": True, "headless": True}},
+        provenance=Provenance.UNTRUSTED,
+    )
+    assert loaded.chromium_sandbox is None
+    # Default without env remains unsandboxed
+    assert "--no-sandbox" in BrowserManager(browser_config=loaded)._build_browser_args()["args"]
+
+
 # ── end to end: self-signed HTTPS origin ───────────────────────────────
 
 

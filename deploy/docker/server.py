@@ -134,6 +134,7 @@ def get_default_browser_config() -> BrowserConfig:
     DNS-rebinding / redirect-to-internal protection as /crawl, rather than
     relying on each handler to remember it."""
     bc = BrowserConfig(
+        chromium_sandbox=CHROMIUM_SANDBOX,
         extra_args=_browser_extra_args(),
         **config["crawler"]["browser"].get("kwargs", {}),
     )

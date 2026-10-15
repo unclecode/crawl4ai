@@ -41,16 +41,21 @@ BROWSER_DISABLE_OPTIONS = [
 ]
 
 
-def chromium_sandbox_requested() -> bool:
-    """True when the operator opts into the Chromium sandbox
-    (CRAWL4AI_CHROMIUM_SANDBOX=true). The default keeps --no-sandbox because
-    Chromium cannot start sandboxed in a container without user namespaces."""
+def chromium_sandbox_requested(config: Optional[BrowserConfig] = None) -> bool:
+    """True when the Chromium sandbox is requested either explicitly via
+    BrowserConfig.chromium_sandbox or via the CRAWL4AI_CHROMIUM_SANDBOX=true
+    environment variable. The default keeps --no-sandbox because Chromium
+    cannot start sandboxed in a container without user namespaces."""
+    if config is not None:
+        explicit = getattr(config, "chromium_sandbox", None)
+        if explicit is not None:
+            return bool(explicit)
     return os.environ.get("CRAWL4AI_CHROMIUM_SANDBOX", "false").lower() == "true"
 
 
-def apply_sandbox_policy(args: List[str]) -> List[str]:
+def apply_sandbox_policy(args: List[str], config: Optional[BrowserConfig] = None) -> List[str]:
     """Drop --no-sandbox, also from extra_args, when the sandbox is requested."""
-    if chromium_sandbox_requested():
+    if chromium_sandbox_requested(config):
         return [a for a in args if a != "--no-sandbox"]
     return args
 
@@ -136,7 +141,7 @@ class ManagedBrowser:
         elif config.proxy_config:
             flags.append(f"--proxy-server={config.proxy_config.server}")
         # dedupe
-        return apply_sandbox_policy(list(dict.fromkeys(flags)))
+        return apply_sandbox_policy(list(dict.fromkeys(flags)), config=config)
 
     browser_type: str
     user_data_dir: str
@@ -209,7 +214,7 @@ class ManagedBrowser:
         
         if self.browser_config.extra_args:
             args.extend(self.browser_config.extra_args)
-            args = apply_sandbox_policy(args)
+            args = apply_sandbox_policy(args, config=self.browser_config)
             
 
         # ── make sure no old Chromium instance is owning the same port/profile ──
@@ -884,7 +889,7 @@ class BrowserManager:
 
             launch_kwargs = {
                 "headless": self.config.headless,
-                "args": apply_sandbox_policy(list(dict.fromkeys(cli_args))),  # dedupe
+                "args": apply_sandbox_policy(list(dict.fromkeys(cli_args)), config=self.config),  # dedupe
                 "viewport": {
                     "width": self.config.viewport_width,
                     "height": self.config.viewport_height,
@@ -893,7 +898,7 @@ class BrowserManager:
                 "ignore_https_errors": self.config.ignore_https_errors,
                 "accept_downloads": self.config.accept_downloads,
             }
-            if chromium_sandbox_requested():
+            if chromium_sandbox_requested(self.config):
                 launch_kwargs["chromium_sandbox"] = True
 
             if self.config.proxy_config:
@@ -1156,11 +1161,11 @@ class BrowserManager:
             args.extend(self.config.extra_args)
 
         # Deduplicate args
-        args = apply_sandbox_policy(list(dict.fromkeys(args)))
+        args = apply_sandbox_policy(list(dict.fromkeys(args)), config=self.config)
         
         browser_args = {"headless": self.config.headless, "args": args}
         # Playwright adds --no-sandbox itself unless chromium_sandbox is True.
-        if chromium_sandbox_requested():
+        if chromium_sandbox_requested(self.config):
             browser_args["chromium_sandbox"] = True
 
         # On Windows, passing channel='chromium' (the default) causes Playwright
