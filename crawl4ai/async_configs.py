@@ -2427,6 +2427,7 @@ class CrawlerRunConfig():
             "screenshot": self.screenshot,
             "screenshot_wait_for": self.screenshot_wait_for,
             "screenshot_height_threshold": self.screenshot_height_threshold,
+            "force_viewport_screenshot": self.force_viewport_screenshot,
             "pdf": self.pdf,
             "capture_mhtml": self.capture_mhtml,
             "image_description_min_word_threshold": self.image_description_min_word_threshold,
