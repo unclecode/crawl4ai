@@ -1166,8 +1166,12 @@ class BrowserManager:
         # On Windows, passing channel='chromium' (the default) causes Playwright
         # to look for a system Chrome installation instead of using the bundled
         # ms-playwright binary.  This makes Chrome exit immediately with code 0,
-        # resulting in TargetClosedError.  Skip the default channel.
-        if self.config.chrome_channel and self.config.chrome_channel != "chromium":
+        # resulting in TargetClosedError.  Skip the default channel there only:
+        # elsewhere, dropping it launches chrome-headless-shell instead of the
+        # full Chromium, which behaves differently (e.g. no HTTPS upgrade).
+        if self.config.chrome_channel and (
+            self.config.chrome_channel != "chromium" or sys.platform != "win32"
+        ):
             browser_args["channel"] = self.config.chrome_channel
 
         if self.config.accept_downloads:
