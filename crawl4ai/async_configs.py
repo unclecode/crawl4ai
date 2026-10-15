@@ -323,6 +323,8 @@ _MAX_DELAY_SECONDS = 60  # ceiling for delay_before_return_html / mean_delay / m
 _MAX_VIEWPORT = 4000
 _MAX_PDF_BYTES = 100 * 1024 * 1024
 _MAX_PDF_PAGES = 2000
+_MAX_PDF_BATCH_SIZE = 4  # the class default; one thread per batch slot
+_MAX_PDF_REDIRECTS = 5   # the class default
 _MAX_LINK_PREVIEW_LINKS = 100      # the class default
 _MAX_LINK_PREVIEW_CONCURRENCY = 10  # the class default
 _MAX_LINK_PREVIEW_TIMEOUT_S = 10    # seconds here, not ms
@@ -439,6 +441,14 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
                 v = params[f]
                 # <=0 or non-int would read as "no limit"; pin to the cap.
                 params[f] = cap if not isinstance(v, int) or v <= 0 else min(v, cap)
+        # batch_size is the page pool's thread count; max_redirects is how many
+        # real requests one URL may trigger. Malformed values get the cap.
+        for f, cap, floor in (("batch_size", _MAX_PDF_BATCH_SIZE, 1),
+                              ("max_redirects", _MAX_PDF_REDIRECTS, 0)):
+            if f in params:
+                v = params[f]
+                ok = isinstance(v, int) and not isinstance(v, bool) and v >= floor
+                params[f] = min(v, cap) if ok else cap
         # Rasterizing every page is the most expensive thing this strategy can
         # do, and nothing about untrusted crawling needs it.
         params["extract_images"] = False

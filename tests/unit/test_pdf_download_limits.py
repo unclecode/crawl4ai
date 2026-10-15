@@ -407,3 +407,21 @@ def test_untrusted_body_cannot_enable_image_extraction():
     out = _clamp_untrusted("PDFContentScrapingStrategy", {"extract_images": True})
 
     assert out["extract_images"] is False
+
+
+@pytest.mark.parametrize(
+    "sent, expected_batch, expected_redirects",
+    [
+        ({"batch_size": 2000, "max_redirects": 10**6}, 4, 5),
+        ({"batch_size": 0, "max_redirects": -1}, 4, 5),
+        ({"batch_size": "many", "max_redirects": None}, 4, 5),
+        ({"batch_size": True, "max_redirects": 2.5}, 4, 5),
+        ({"batch_size": 2, "max_redirects": 0}, 2, 0),
+    ],
+)
+def test_untrusted_body_cannot_raise_pdf_threads_or_redirects(sent, expected_batch, expected_redirects):
+    from crawl4ai.async_configs import _clamp_untrusted
+
+    out = _clamp_untrusted("PDFContentScrapingStrategy", dict(sent))
+    assert out["batch_size"] == expected_batch
+    assert out["max_redirects"] == expected_redirects
