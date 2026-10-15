@@ -3,8 +3,10 @@ import asyncio
 from dataclasses import asdict
 from crawl4ai.async_logger import AsyncLogger
 from crawl4ai.async_crawler_strategy import AsyncCrawlerStrategy
-from crawl4ai.models import AsyncCrawlResponse, ScrapingResult 
+from urllib.parse import urljoin
+from crawl4ai.models import AsyncCrawlResponse, Link, Links, ScrapingResult
 from crawl4ai.content_scraping_strategy import ContentScrapingStrategy
+from crawl4ai.utils import get_base_domain, is_external_url
 from .processor import NaivePDFProcessorStrategy  # Assuming your current PDF code is in pdf_processor.py
 
 # Default resource bounds for remote PDF fetches. These cap what an untrusted
@@ -158,28 +160,20 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
         </html>
         """
             
-            # Accumulate media and links with page numbers
+            # Accumulate media with page numbers
             media = {"images": []}
-            links = {"urls": []}
             
             for page in result.pages:
                 # Add page number to each image
                 for img in page.images:
                     img["page"] = page.page_number
                     media["images"].append(img)
-                
-                # Add page number to each link
-                for link in page.links:
-                    links["urls"].append({
-                        "url": link,
-                        "page": page.page_number
-                    })
 
             return ScrapingResult(
                 cleaned_html=cleaned_html,
                 success=True,
                 media=media,
-                links=links,
+                links=self._build_links(url, result.pages),
                 metadata=asdict(result.metadata)
             )
         finally:
@@ -192,6 +186,38 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
                 except Exception as e:
                     if self.logger:
                         self.logger.warning(f"Failed to cleanup temp file {pdf_path}: {e}")
+
+    @staticmethod
+    def _build_links(url: str, pages) -> Links:
+        """Turn the URI annotations of every page into ``Links``.
+
+        ``Links`` only has ``internal`` and ``external`` lists of ``Link``
+        items, so the links are sorted against the PDF's own domain the way
+        the HTML scraper does it. A local PDF has no domain, so all of its
+        absolute links are external. A target that appears on several pages
+        is reported once, at its first occurrence.
+        """
+        is_remote = url.startswith(("http://", "https://"))
+        base_domain = get_base_domain(url) if is_remote else ""
+        internal = {}
+        external = {}
+
+        for page in pages:
+            for raw_href in page.links:
+                href = str(raw_href).strip()
+                if not href:
+                    continue
+                if is_remote:
+                    href = urljoin(url, href)
+                if href in internal or href in external:
+                    continue
+
+                if base_domain and not is_external_url(href, base_domain):
+                    internal[href] = Link(href=href, base_domain=base_domain)
+                else:
+                    external[href] = Link(href=href, base_domain=get_base_domain(href))
+
+        return Links(internal=list(internal.values()), external=list(external.values()))
 
     async def ascrap(self, url: str, html: str, **kwargs) -> ScrapingResult:
         # For simple cases, you can use the sync version
