@@ -247,12 +247,12 @@ The `SeedingConfig` object is your control panel. Here's everything you can conf
 | `extract_head` | bool | False | Extract metadata from page `<head>` |
 | `live_check` | bool | False | Verify URLs are accessible |
 | `max_urls` | int | -1 | Maximum URLs to return (-1 = unlimited) |
-| `concurrency` | int | 10 | Parallel workers for fetching |
+| `concurrency` | int | 1000 | Parallel workers for fetching |
 | `hits_per_sec` | int | 5 | Rate limit for requests |
 | `force` | bool | False | Bypass cache, fetch fresh data |
 | `verbose` | bool | False | Show detailed progress |
 | `query` | str | None | Search query for BM25 scoring |
-| `scoring_method` | str | None | Scoring method (currently "bm25") |
+| `scoring_method` | str | "bm25" | Scoring method (currently "bm25") |
 | `score_threshold` | float | None | Minimum score to include URL |
 | `filter_nonsense_urls` | bool | True | Filter out utility URLs (robots.txt, etc.) |
 | `cache_ttl_hours` | int | 24 | Hours before sitemap cache expires (0 = no TTL) |
