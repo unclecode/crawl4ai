@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup, Tag
 from typing import List, Tuple, Dict, Optional
 from rank_bm25 import BM25Okapi
 from collections import deque
-from bs4 import NavigableString, Comment
+from bs4 import NavigableString, Comment, CData
 
 from .utils import (
     clean_tokens,
@@ -241,8 +241,13 @@ class RelevantContentFilter(ABC):
                 continue
 
             if isinstance(element, NavigableString):
-                if str(element).strip():
-                    current_text.append(str(element).strip())
+                # Skip non-text nodes that subclass NavigableString
+                if isinstance(element, (Comment, CData)):
+                    continue
+                # Preserve each text node's original whitespace so the
+                # boundary between adjacent nodes survives; normalization
+                # happens once on the fully assembled chunk downstream
+                current_text.append(str(element))
                 continue
 
             # Pre-allocate children to avoid multiple list operations
@@ -348,8 +353,13 @@ class RelevantContentFilter(ABC):
 
         def render_tag(elem):
             if not isinstance(elem, Tag):
+                # Skip non-text nodes that subclass NavigableString
+                if isinstance(elem, (Comment, CData)):
+                    return
+                # Preserve the text node's original whitespace so word
+                # boundaries between adjacent nodes survive serialization
                 if isinstance(elem, str):
-                    builder.append(elem.strip())
+                    builder.append(elem)
                 return
 
             if elem.name in unwanted_tags:
