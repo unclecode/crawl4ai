@@ -7,7 +7,7 @@ name = "Crawl4AI"
 dynamic = ["version"]
 description = "🚀🤖 Crawl4AI: Open-source LLM Friendly Web Crawler & scraper"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.15"
 license = "Apache-2.0"
 authors = [
     {name = "Unclecode", email = "unclecode@kidocode.com"}
