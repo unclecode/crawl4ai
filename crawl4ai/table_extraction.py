@@ -6,6 +6,7 @@ The strategy pattern allows for flexible table extraction methods while maintain
 """
 
 from abc import ABC, abstractmethod
+from itertools import groupby
 from typing import Dict, List, Optional, Any, Union, Tuple
 from lxml import etree
 import re
@@ -215,7 +216,7 @@ class DefaultTableExtraction(TableExtractionStrategy):
 
     @classmethod
     def _build_grid(cls, rows: List[etree.Element]) -> List[List[str]]:
-        """Lay <tr> cells into a rectangular grid, honouring colspan/rowspan.
+        """Lay one row group's <tr> cells into a grid, honouring spans.
 
         Each cell writes its text into every slot of the rectangle it spans,
         including slots in later rows, so a row only has to fill the slots the
@@ -224,10 +225,13 @@ class DefaultTableExtraction(TableExtractionStrategy):
         """
         grid: List[List[str]] = [[] for _ in rows]
 
-        def span(value, limit: int) -> int:
+        def span(value, limit: int, zero_means_remaining: bool = False) -> int:
             """Read a span attribute the way a browser does: junk counts as 1."""
             try:
-                return min(max(int(value), 1), limit)
+                value = int(value)
+                if value == 0 and zero_means_remaining:
+                    return limit
+                return min(max(value, 1), limit)
             except (TypeError, ValueError):
                 return 1
 
@@ -248,7 +252,9 @@ class DefaultTableExtraction(TableExtractionStrategy):
                 # is what browsers apply; a rowspan cannot reach past the last
                 # row, which is a tighter bound than the standard's 65534.
                 colspan = span(cell.get("colspan"), cls.COLSPAN_LIMIT)
-                rowspan = span(cell.get("rowspan"), len(grid) - r)
+                rowspan = span(
+                    cell.get("rowspan"), len(grid) - r, zero_means_remaining=True
+                )
                 for dr in range(rowspan):
                     for dc in range(colspan):
                         put(r + dr, c + dc, text)
@@ -304,7 +310,10 @@ class DefaultTableExtraction(TableExtractionStrategy):
         # data row and must stay.
         if implicit_header_row is not None and not implicit_header_row.xpath("./td"):
             body_rows = body_rows[1:]
-        rows = self._build_grid(body_rows)
+        rows = []
+        # Row spans, including zero, cannot extend into another row group.
+        for _, group in groupby(body_rows, key=lambda row: row.getparent()):
+            rows.extend(self._build_grid(list(group)))
         
         # Align rows with headers
         max_columns = len(headers) if headers else (
