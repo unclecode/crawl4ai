@@ -372,6 +372,7 @@ Below are the key interaction-related parameters in `CrawlerRunConfig`. For a fu
 - **`cache_mode`**: Whether to read/write from the cache or bypass.
 - **`flatten_shadow_dom`**: Flatten Shadow DOM content into the light DOM before capture.
 - **`process_iframes`**: Inline iframe content into the main document.
+- **`follow_frames`**: Auto-follow single full-viewport `<frameset>` redirects (enabled by default).
 - **`remove_overlay_elements`**: Remove certain popups automatically.
 - **`remove_consent_popups`**: Remove GDPR/cookie consent popups from known CMP providers (OneTrust, Cookiebot, Didomi, etc.).
 - **`simulate_user`, `override_navigator`, `magic`**: Anti-bot or "human-like" interactions.
