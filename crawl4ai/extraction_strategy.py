@@ -2025,7 +2025,9 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
         return element.select(selector)
 
     def _get_element_text(self, element) -> str:
-        return element.get_text(strip=True)
+        # ``separator=" "`` preserves spaces around inline children;
+        # without it, ``<span>foo <b>bar</b> baz</span>`` → ``foobarbaz``.
+        return element.get_text(separator=" ", strip=True)
 
     def _get_element_html(self, element) -> str:
         return str(element)
