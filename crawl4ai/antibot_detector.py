@@ -188,6 +188,34 @@ def _structural_integrity_check(html: str) -> Tuple[bool, str]:
     return False, ""
 
 
+def effective_status(
+    status_code: Optional[int],
+    redirected_status_code: Optional[int] = None,
+) -> Optional[int]:
+    """
+    The status code that actually produced the HTML we are holding.
+
+    `AsyncCrawlResponse.status_code` / `CrawlResult.status_code` deliberately
+    carry the **first** hop of a redirect chain (a 3xx), while the body always
+    comes from the **last** hop; the final status is kept separately as
+    `redirected_status_code`.  Block detection must be given the last hop —
+    otherwise a site that redirects apex -> www and then serves a 403 block
+    page is judged on its 301, no status rule fires, and the block page is
+    returned as successful content.
+
+    `redirected_status_code` is None on non-HTTP paths (raw:, file://,
+    js_only), so fall back to `status_code` there.
+
+    Args:
+        status_code: First hop of the redirect chain (or the only response).
+        redirected_status_code: Final hop, when the request was redirected.
+
+    Returns:
+        The status code to judge the response body by.
+    """
+    return redirected_status_code or status_code
+
+
 def is_blocked(
     status_code: Optional[int],
     html: str,
