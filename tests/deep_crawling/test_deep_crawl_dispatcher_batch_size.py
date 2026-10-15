@@ -156,6 +156,37 @@ class TestBatchSizeBehavior:
         batch_sizes = [len(b) for b in recorder["batches"]]
         assert batch_sizes == [10, 2]
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "batch_size,expected",
+        [(5, [5, 5, 2]), (None, [10, 2])],
+    )
+    async def test_final_round_capped_by_max_pages_remaining(
+        self, batch_size, expected
+    ):
+        """Regression for #2381: with more URLs queued than max_pages allows,
+        the last round must be capped by the remaining page budget instead of
+        fetching a full batch and discarding the overflow."""
+        resume_state = {
+            "visited": [],
+            "depths": {},
+            "pages_crawled": 0,
+            "queue_items": make_queue_items(30),
+        }
+        kwargs = {} if batch_size is None else {"batch_size": batch_size}
+        strategy = BestFirstCrawlingStrategy(
+            max_depth=1, max_pages=12, resume_state=resume_state, **kwargs
+        )
+        recorder = {}
+        mock_crawler = create_mock_crawler_capturing(recorder)
+        mock_config = create_mock_config(stream=True)
+
+        await strategy._arun_batch("https://example.com", mock_crawler, mock_config)
+
+        batch_sizes = [len(b) for b in recorder["batches"]]
+        assert batch_sizes == expected
+        assert sum(batch_sizes) == 12
+
 
 class TestDispatcherDefaultOmitted:
     """Regression: arun_many() must NOT be called with `dispatcher=` when the

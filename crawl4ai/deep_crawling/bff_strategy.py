@@ -10,7 +10,13 @@ from .filters import FilterChain
 from .scorers import URLScorer
 from . import DeepCrawlStrategy
 
-from ..types import AsyncWebCrawler, BaseDispatcher, CrawlerRunConfig, CrawlResult, RunManyReturn
+from ..types import (
+    AsyncWebCrawler,
+    BaseDispatcher,
+    CrawlerRunConfig,
+    CrawlResult,
+    RunManyReturn,
+)
 from ..utils import normalize_url_for_deep_crawl
 
 from math import inf as infinity
@@ -267,8 +273,9 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                 break
 
             batch: List[Tuple[float, int, str, Optional[str]]] = []
-            # Retrieve up to self.batch_size items from the priority queue.
-            for _ in range(self.batch_size):
+            # Retrieve up to effective_batch_size items from the priority queue,
+            # so the final round never fetches past the max_pages budget.
+            for _ in range(effective_batch_size):
                 if queue.empty():
                     break
                 item = await queue.get()
