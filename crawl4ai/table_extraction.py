@@ -213,6 +213,14 @@ class DefaultTableExtraction(TableExtractionStrategy):
     # HTML Standard caps colspan at 1000; browsers clamp to the same value.
     COLSPAN_LIMIT = 1000
 
+    @staticmethod
+    def _parse_span(value: Optional[str], limit: int) -> int:
+        """Normalize a cell span before allocating header or body grid slots."""
+        try:
+            return min(max(int(value), 1), limit)
+        except (TypeError, ValueError):
+            return 1
+
     @classmethod
     def _build_grid(cls, rows: List[etree.Element]) -> List[List[str]]:
         """Lay <tr> cells into a rectangular grid, honouring colspan/rowspan.
@@ -223,13 +231,6 @@ class DefaultTableExtraction(TableExtractionStrategy):
         short row cannot leave a stale span behind (see issue #2258).
         """
         grid: List[List[str]] = [[] for _ in rows]
-
-        def span(value, limit: int) -> int:
-            """Read a span attribute the way a browser does: junk counts as 1."""
-            try:
-                return min(max(int(value), 1), limit)
-            except (TypeError, ValueError):
-                return 1
 
         def put(r: int, c: int, text: str) -> None:
             row = grid[r]
@@ -247,8 +248,8 @@ class DefaultTableExtraction(TableExtractionStrategy):
                 # is a product. COLSPAN_LIMIT is the HTML Standard's cap, which
                 # is what browsers apply; a rowspan cannot reach past the last
                 # row, which is a tighter bound than the standard's 65534.
-                colspan = span(cell.get("colspan"), cls.COLSPAN_LIMIT)
-                rowspan = span(cell.get("rowspan"), len(grid) - r)
+                colspan = cls._parse_span(cell.get("colspan"), cls.COLSPAN_LIMIT)
+                rowspan = cls._parse_span(cell.get("rowspan"), len(grid) - r)
                 for dr in range(rowspan):
                     for dc in range(colspan):
                         put(r + dr, c + dc, text)
@@ -284,7 +285,7 @@ class DefaultTableExtraction(TableExtractionStrategy):
             header_cells = thead_rows[0].xpath(".//th")
             for cell in header_cells:
                 text = cell.text_content().strip()
-                colspan = int(cell.get("colspan", 1))
+                colspan = self._parse_span(cell.get("colspan"), self.COLSPAN_LIMIT)
                 headers.extend([text] * colspan)
         else:
             # Check first row for headers
@@ -293,7 +294,7 @@ class DefaultTableExtraction(TableExtractionStrategy):
                 implicit_header_row = first_row[0]
                 for cell in implicit_header_row.xpath(".//th|.//td"):
                     text = cell.text_content().strip()
-                    colspan = int(cell.get("colspan", 1))
+                    colspan = self._parse_span(cell.get("colspan"), self.COLSPAN_LIMIT)
                     headers.extend([text] * colspan)
         
         # Extract rows, laying each cell into a grid so colspan/rowspan land in
