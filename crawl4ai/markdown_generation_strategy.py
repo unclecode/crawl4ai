@@ -5,10 +5,18 @@ from .html2text import CustomHTML2Text
 # from .types import RelevantContentFilter
 from .content_filter_strategy import RelevantContentFilter
 import re
+from bisect import bisect_right
 from urllib.parse import urljoin
 
 # Pre-compile the regex pattern
 LINK_PATTERN = re.compile(r'!?\[((?:[^\[\]]|\[(?:[^\[\]]|\[[^\]]*\])*\])*)\]\(((?:[^()\s]|\([^()]*\))*)(?:\s+"([^"]*)")?\)')
+# Fenced code blocks (an unclosed fence runs to the end) and inline code spans.
+# Text like `handlers[0](event)` inside them is code, not a markdown link.
+CODE_PATTERN = re.compile(
+    r"^ {0,3}(?P<fence>`{3,}|~{3,})[^\n]*\n.*?(?:^ {0,3}(?P=fence)[ \t]*$|\Z)"
+    r"|(?P<ticks>`+)(?!`)[^\n]*?(?<!`)(?P=ticks)(?!`)",
+    re.MULTILINE | re.DOTALL,
+)
 
 
 def fast_urljoin(base: str, url: str) -> str:
@@ -106,7 +114,21 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
         last_end = 0
         counter = 1
 
-        for match in LINK_PATTERN.finditer(markdown):
+        # Links that start inside a code block or inline code span are code
+        code_spans = [m.span() for m in CODE_PATTERN.finditer(markdown)]
+        code_starts = [start for start, _ in code_spans]
+        pos = 0
+
+        while True:
+            match = LINK_PATTERN.search(markdown, pos)
+            if not match:
+                break
+            i = bisect_right(code_starts, match.start()) - 1
+            if i >= 0 and match.start() < code_spans[i][1]:
+                pos = code_spans[i][1]
+                continue
+            pos = match.end()
+
             parts.append(markdown[last_end : match.start()])
             text, url, title = match.groups()
 
