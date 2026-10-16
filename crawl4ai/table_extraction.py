@@ -272,8 +272,8 @@ class DefaultTableExtraction(TableExtractionStrategy):
                 - metadata: Additional metadata about the table
         """
         # Extract caption and summary
-        caption = table.xpath(".//caption/text()")
-        caption = caption[0].strip() if caption else ""
+        caption = table.xpath("./caption")
+        caption = "".join(caption[0].itertext()).strip() if caption else ""
         summary = table.get("summary", "").strip()
         
         # Extract headers with colspan handling
