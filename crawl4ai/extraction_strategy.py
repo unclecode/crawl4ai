@@ -2025,6 +2025,10 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
         return element.select(selector)
 
     def _get_element_text(self, element) -> str:
+        if isinstance(element, list) and all(
+            isinstance(token, str) for token in element
+        ):
+            return " ".join(element)
         return element.get_text(strip=True)
 
     def _get_element_html(self, element) -> str:
