@@ -1428,8 +1428,9 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
             return result
 
         # Analyze field coverage
-        all_fields = schema.get("fields", [])
-        field_names = [f["name"] for f in all_fields]
+        all_fields = schema.get("baseFields", []) + schema.get("fields", [])
+        # Both groups contribute to the same output item; count each final key once.
+        field_names = list(dict.fromkeys(f["name"] for f in all_fields))
         result["total_fields"] = len(field_names)
 
         for fname in field_names:
@@ -1469,7 +1470,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
 
         # Check for missing expected fields (strict mode)
         if expected_fields:
-            schema_field_names = {f["name"] for f in schema.get("fields", [])}
+            schema_field_names = set(field_names)
             missing = [f for f in expected_fields if f not in schema_field_names]
             if missing:
                 result["issues"].append(
@@ -1479,7 +1480,6 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         # Success criteria
         if expected_fields:
             # Strict: all expected fields must exist in schema AND be populated
-            schema_field_names = {f["name"] for f in schema.get("fields", [])}
             populated_names = {
                 fd["name"] for fd in result["field_details"] if fd["populated_count"] > 0
             }
