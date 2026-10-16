@@ -377,9 +377,8 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                     "src": elem.get("src"),
                     "alt": elem.get("alt"),
                     "type": media_type,
-                    "description": self.find_closest_parent_with_useful_text(
-                        elem, **kwargs
-                    ),
+                    "desc": self.find_closest_parent_with_useful_text(elem, **kwargs)
+                    or "",
                 }
                 media[f"{media_type}s"].append(media_info)
 
