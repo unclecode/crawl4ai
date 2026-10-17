@@ -1,6 +1,7 @@
 """
 Test Suite: configurable `batch_size` (BestFirstCrawlingStrategy) and
-`dispatcher` (BFSDeepCrawlStrategy, BestFirstCrawlingStrategy) parameters.
+`dispatcher` (BFSDeepCrawlStrategy, DFSDeepCrawlStrategy,
+BestFirstCrawlingStrategy) parameters.
 
 Covers:
 1. `batch_size` defaults to the previous hardcoded value (10) and, when
@@ -8,14 +9,18 @@ Covers:
    queue per round.
 2. `dispatcher` defaults to None and is NOT forwarded to arun_many() in that
    case, so the call shape is unchanged for existing callers/test doubles.
-3. `dispatcher`, when explicitly set, is forwarded to arun_many() for both
-   BFSDeepCrawlStrategy and BestFirstCrawlingStrategy.
+3. `dispatcher`, when explicitly set, is forwarded to arun_many() for
+   BFSDeepCrawlStrategy, DFSDeepCrawlStrategy and BestFirstCrawlingStrategy.
 """
 
 import pytest
 from unittest.mock import MagicMock
 
-from crawl4ai.deep_crawling import BFSDeepCrawlStrategy, BestFirstCrawlingStrategy
+from crawl4ai.deep_crawling import (
+    BFSDeepCrawlStrategy,
+    BestFirstCrawlingStrategy,
+    DFSDeepCrawlStrategy,
+)
 
 
 def create_mock_config(stream=False):
@@ -220,6 +225,32 @@ class TestDispatcherDefaultOmitted:
         assert len(results) > 0
 
     @pytest.mark.asyncio
+    async def test_dfs_batch_mode_works_with_old_signature_mock(self):
+        strategy = DFSDeepCrawlStrategy(max_depth=1, max_pages=5)
+        mock_crawler = create_mock_crawler_old_signature()
+        mock_config = create_mock_config(stream=False)
+
+        results = await strategy._arun_batch(
+            "https://example.com", mock_crawler, mock_config
+        )
+        assert isinstance(results, list)
+        assert len(results) > 0
+
+    @pytest.mark.asyncio
+    async def test_dfs_stream_mode_works_with_old_signature_mock(self):
+        strategy = DFSDeepCrawlStrategy(max_depth=1, max_pages=5)
+        mock_crawler = create_mock_crawler_old_signature()
+        mock_config = create_mock_config(stream=True)
+
+        results = [
+            r
+            async for r in strategy._arun_stream(
+                "https://example.com", mock_crawler, mock_config
+            )
+        ]
+        assert len(results) > 0
+
+    @pytest.mark.asyncio
     async def test_best_first_works_with_old_signature_mock(self):
         strategy = BestFirstCrawlingStrategy(max_depth=1, max_pages=5)
         mock_crawler = create_mock_crawler_old_signature()
@@ -256,6 +287,43 @@ class TestDispatcherForwarded:
     async def test_bfs_stream_mode_forwards_dispatcher(self):
         sentinel_dispatcher = object()
         strategy = BFSDeepCrawlStrategy(
+            max_depth=1, max_pages=5, dispatcher=sentinel_dispatcher
+        )
+        recorder = {}
+        mock_crawler = create_mock_crawler_capturing(recorder)
+        mock_config = create_mock_config(stream=True)
+
+        results = [
+            r
+            async for r in strategy._arun_stream(
+                "https://example.com", mock_crawler, mock_config
+            )
+        ]
+        assert len(results) > 0
+        assert recorder["dispatcher_calls"]
+        assert all(d is sentinel_dispatcher for d in recorder["dispatcher_calls"])
+
+    @pytest.mark.asyncio
+    async def test_dfs_batch_mode_forwards_dispatcher(self):
+        """DFS inherits `dispatcher` from BFS but has its own crawl loops, so
+        it must forward the dispatcher itself."""
+        sentinel_dispatcher = object()
+        strategy = DFSDeepCrawlStrategy(
+            max_depth=1, max_pages=5, dispatcher=sentinel_dispatcher
+        )
+        recorder = {}
+        mock_crawler = create_mock_crawler_capturing(recorder)
+        mock_config = create_mock_config(stream=False)
+
+        await strategy._arun_batch("https://example.com", mock_crawler, mock_config)
+
+        assert recorder["dispatcher_calls"]
+        assert all(d is sentinel_dispatcher for d in recorder["dispatcher_calls"])
+
+    @pytest.mark.asyncio
+    async def test_dfs_stream_mode_forwards_dispatcher(self):
+        sentinel_dispatcher = object()
+        strategy = DFSDeepCrawlStrategy(
             max_depth=1, max_pages=5, dispatcher=sentinel_dispatcher
         )
         recorder = {}
