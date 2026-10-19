@@ -31,3 +31,4 @@ We thank the following security researchers for their responsible disclosure:
 | Julian Godfrey | Email report | Chromium launched with --ignore-certificate-errors so TLS verification was off, and the Chromium sandbox opt-in had no effect (0.9.5) | 2026-10-04 |
 | Siyang Wu | GitHub: [LeoWSY-hashblue](https://github.com/LeoWSY-hashblue) | Unclamped PDFContentScrapingStrategy batch_size and max_redirects in untrusted config bodies, and ReDoS via untrusted regex patterns (independent report) | 2026-10-06 |
 | Zachariah Mithani | GitHub: [zachariah-mithani](https://github.com/zachariah-mithani) | SSRF via URL userinfo in the TLS certificate fetch (fetch_ssl_certificate) bypassing the Docker egress check | 2026-10-15 |
+| arpe1618 | GitHub: [arpe1618](https://github.com/arpe1618) | Browser context (cookies, storage, service workers) shared between API callers on the Docker server (0.9.6) | 2026-10-19 |

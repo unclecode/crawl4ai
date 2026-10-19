@@ -433,6 +433,12 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
         for f in ("viewport_width", "viewport_height"):
             if isinstance(params.get(f), int):
                 params[f] = max(1, min(params[f], _MAX_VIEWPORT))
+        # Every other mode is a managed browser, whose shared default context
+        # would put callers' cookies and storage in one place.
+        if "browser_mode" in params and params["browser_mode"] != "dedicated":
+            raise UntrustedConfigError(
+                "browser_mode other than 'dedicated' is not permitted from an untrusted request"
+            )
     elif type_name == "PDFContentScrapingStrategy":
         # This class has no field allowlist, so without clamping a body could
         # simply raise its own caps back to unbounded and re-open the DoS.

@@ -16,6 +16,16 @@ from .config import DOWNLOAD_PAGE_TIMEOUT
 from .async_configs import BrowserConfig, CrawlerRunConfig
 from .utils import get_chromium_path
 import warnings
+from contextvars import ContextVar
+
+
+# Who the current crawl belongs to. A server that runs crawls for several
+# callers sets this per request (the Docker server sets the caller's JWT sub),
+# and pooled contexts are then never shared between two values. Unset (None),
+# the plain-library case, keeps the old behaviour: one context per config.
+browser_context_partition: ContextVar[Optional[str]] = ContextVar(
+    "crawl4ai_browser_context_partition", default=None
+)
 
 
 BROWSER_DISABLE_OPTIONS = [
@@ -1484,6 +1494,10 @@ class BrowserManager:
         # Browser version — bumped on recycle to force new browser instance
         sig_dict["_browser_version"] = self._browser_version
 
+        # Cookies, storage, service workers and the HTTP cache live in the
+        # context, so two callers must never share one.
+        sig_dict["_partition"] = browser_context_partition.get()
+
         signature_json = json.dumps(sig_dict, sort_keys=True, default=str)
         return hashlib.sha256(signature_json.encode("utf-8")).hexdigest()
 
@@ -1615,7 +1629,8 @@ class BrowserManager:
             # Uses the same caching mechanism as non-CDP mode: cache context by config signature,
             # but always create a new page. This prevents navigation conflicts while allowing
             # context reuse for multiple URLs with the same config (e.g., batch/deep crawls).
-            if self.config.create_isolated_context:
+            # A partitioned crawl never uses the shared default_context below.
+            if self.config.create_isolated_context or browser_context_partition.get() is not None:
                 config_signature = self._make_config_signature(crawlerRunConfig)
                 to_close = None
 
