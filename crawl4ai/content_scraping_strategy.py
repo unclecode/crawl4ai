@@ -823,11 +823,14 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 except Exception:
                     pass
 
-            # Remove script and style tags
+            # Remove style/link/meta/noscript tags, but keep the text that follows
+            # them: lxml stores that text as the element's .tail, and remove()
+            # discards the tail along with the element (see issue #2416).
+            # drop_tree() moves the tail onto the previous sibling or the parent.
             for tag in ["style", "link", "meta", "noscript"]:
                 for element in body.xpath(f".//{tag}"):
                     if element.getparent() is not None:
-                        element.getparent().remove(element)
+                        element.drop_tree()
                         
             # Handle script separately
             for element in body.xpath(f".//script"):
