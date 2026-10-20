@@ -2044,7 +2044,7 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
         kwargs = {}
         if classes:
             kwargs["class_"] = lambda c, _cls=classes: c and all(
-                cl in c for cl in _cls
+                cl in c.split() for cl in _cls
             )
         return element.find_next_sibling(tag, **kwargs)
 
