@@ -2054,9 +2054,9 @@ class JsonLxmlExtractionStrategy(JsonElementExtractionStrategy):
         super().__init__(schema, **kwargs)
         self._selector_cache = {}
         self._xpath_cache = {}
-        self._result_cache = {}
         
         # Control selector optimization strategy
+        # Retain the legacy option; element results are no longer cached.
         self.use_caching = kwargs.get("use_caching", True)
         self.optimize_common_patterns = kwargs.get("optimize_common_patterns", True)
         
@@ -2124,17 +2124,8 @@ class JsonLxmlExtractionStrategy(JsonElementExtractionStrategy):
             
             # Create the wrapper function that implements the selection strategy
             def selector_func(element, context_sensitive=True):
-                cache_key = None
-                
-                # Use result caching if enabled
-                if self.use_caching:
-                    # Create a cache key based on element and selector
-                    element_id = element.get('id', '') or str(hash(element))
-                    cache_key = f"{element_id}::{selector_str}"
-                    
-                    if cache_key in self._result_cache:
-                        return self._result_cache[cache_key]
-                
+                # Cache compiled selectors, not matches: this strategy can be
+                # reused across documents and concurrent extraction calls.
                 results = []
                 try:
                     # Strategy 1: Direct CSS selector application (fastest)
@@ -2166,10 +2157,6 @@ class JsonLxmlExtractionStrategy(JsonElementExtractionStrategy):
                                     tag_name = tag_match.group(1)
                                     results = element.xpath(f".//{tag_name}")
                     
-                    # Cache results if caching is enabled
-                    if self.use_caching and cache_key:
-                        self._result_cache[cache_key] = results
-                        
                 except Exception as e:
                     if self.verbose:
                         print(f"Error applying selector '{selector_str}': {e}")
@@ -2328,11 +2315,6 @@ class JsonLxmlExtractionStrategy(JsonElementExtractionStrategy):
         xpath += "[1]"
         results = element.xpath(xpath)
         return results[0] if results else None
-
-    def _clear_caches(self):
-        """Clear caches to free memory"""
-        if self.use_caching:
-            self._result_cache.clear()
 
 class JsonLxmlExtractionStrategy_naive(JsonElementExtractionStrategy):
     def __init__(self, schema: Dict[str, Any], **kwargs):
