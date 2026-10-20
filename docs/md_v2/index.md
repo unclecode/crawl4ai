@@ -55,7 +55,7 @@
   
 </div>
 
-Crawl4AI turns any website into clean, LLM-ready Markdown for RAG, AI agents and data pipelines. Run the open-source web crawler and scraper yourself, free forever, or use it hosted with one key: `/scrape` a page to Markdown, `/extract` it to JSON, `/search` the web, `/serp` for Google's results page as data, `/answer` a question with sources; MCP for your agent. Free: 10 a minute, 2 at a time, 1,000 credits every month. Plans: 120 a minute, 10 at a time, from $10 a month.
+Crawl4AI turns any website into clean, LLM-ready Markdown for RAG, AI agents and data pipelines. Run the open-source web crawler and scraper yourself, free forever, or use it hosted with one key: `/scrape` a page to Markdown, `/extract` it to JSON, `/search` the web, `/serp` for Google's results page as data, `/answer` a question with sources; MCP for your agent. Free: 1,000 credits every month, 10 a minute, 2 at a time. Paid: 120 a minute, 10 at a time, from $10 a month.
 
 ## Two ways to use Crawl4AI
 
@@ -83,7 +83,7 @@ Docker server, CLI and every option: [Installation](core/installation.md) · [Se
 ### ☁️ Or use the cloud: no browsers, no proxies
 
 1. [![Get a key in 10 seconds](https://img.shields.io/badge/Get_a_key_in_10_seconds-20_free_credits%2C_no_signup-f5a300?style=for-the-badge&labelColor=0d0d10)](https://crawl4ai.com/?ref=docs)  
-   Verify your email and 1,000 free credits are yours every month. No card. Soft launch: prices can change, what you buy stays yours.
+   Verify your email and 1,000 free credits are yours every month. No card.
 2. Get any page as Markdown:
 
    ```bash
@@ -108,7 +108,7 @@ Docker server, CLI and every option: [Installation](core/installation.md) · [Se
 | **Runs the browsers** | you, in your Python process | you, in Docker on your machine | we do |
 | **JS-heavy pages and bot walls** | your settings, your proxies | your settings, your proxies | handled for you, automatically |
 | **Web search** | – | – | `/search`, `/serp` and `/answer` |
-| **Price** | free, forever | free (your hosting) | 1,000 free credits every month; plans from $10 a month |
+| **Price** | free, forever | free (your hosting) | 1,000 free credits a month; plans from $10 |
 
 ## 🆕 AI Assistant Skill Now Available!
 

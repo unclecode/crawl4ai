@@ -13,6 +13,15 @@
 > answer with *connection reset* even though the container reports healthy.
 > Every quickstart below therefore starts by setting a token.
 
+!!! tip "Don't want to run the server?"
+    [Crawl4AI Cloud](https://crawl4ai.com/?ref=docs-selfhost) is the same engine, hosted: no Docker, no browsers, one key over HTTPS. Self-hosting stays fully supported. 1,000 free credits every month, no card. [Get a key →](https://crawl4ai.com/?ref=docs-selfhost)
+
+    ```bash
+    curl -X POST https://api.crawl4ai.com/scrape \
+      -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
+      -d '{"url": "https://example.com", "format": "md"}'
+    ```
+
 **Take Control of Your Web Crawling Infrastructure**
 
 Self-hosting Crawl4AI gives you complete control over your web crawling and data extraction pipeline. Unlike cloud-based solutions, you own your data, infrastructure, and destiny.

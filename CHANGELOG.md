@@ -5,6 +5,18 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `crawl4ai-setup` no longer points to Crawl4AI Cloud when the browser install fails. It retries the browser without `--with-deps` (which needs root on Linux), prints the exact command for the system libraries, and exits with code 1 instead of printing "completed". The cloud banner at the end shows only after a successful setup.
+- `crawl4ai-doctor` exits with code 1 when its test crawl fails, counts a blocked page as a failure, and shows no cloud banner.
+- The cloud banner and the blocked line state the current free offer: 1,000 free credits every month.
+
+### Crawl4AI Cloud
+
+- Requests with `proxy: isp` and a country (for example UK pricing pages) no longer fail with "no-proxy-exit" after the address set is renewed. Thanks to [Summone](https://summone.co.uk) for the report.
+
 ## [0.9.5] - 2026-10-14
 
 0.9.5 is a security release. It closes six coordinated-disclosure advisories in the Docker server's handling of untrusted request bodies: one more SSRF path outside the egress proxy, page JavaScript injection through `css_selector` and `wait_for`, a caller-chosen HuggingFace model in `CosineStrategy`, ReDoS through caller-supplied regexes, unbounded delay fields, and Chromium launched with certificate checks off. It also adds opt-in deep crawling on the Docker server and ships the bug fixes that landed on `develop` since 0.9.4. Users who self-host the Docker server should upgrade.
