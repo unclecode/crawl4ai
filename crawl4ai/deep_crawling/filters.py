@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Pattern, Set, Union
+from typing import List, Optional, Pattern, Set, Union
 from urllib.parse import urlparse
 from array import array
 import re
@@ -262,6 +262,12 @@ class ContentTypeFilter(URLFilter):
 
     __slots__ = ("allowed_types", "_ext_map", "_check_extension")
 
+    # Constructor arguments, read back by to_serializable_dict() so the object
+    # survives CrawlerRunConfig.dump()/load().
+    @property
+    def check_extension(self) -> bool:
+        return self._check_extension
+
     # Fast extension to mime type mapping
     _MIME_MAP = {
         # Text Formats
@@ -427,6 +433,18 @@ class DomainFilter(URLFilter):
     """Optimized domain filter with fast lookups and caching"""
 
     __slots__ = ("_allowed_domains", "_blocked_domains", "_domain_cache")
+
+    # Constructor arguments, read back by to_serializable_dict() so the object
+    # survives CrawlerRunConfig.dump()/load().
+    @property
+    def allowed_domains(self) -> Optional[List[str]]:
+        if self._allowed_domains is None:
+            return None
+        return sorted(self._allowed_domains)
+
+    @property
+    def blocked_domains(self) -> Optional[List[str]]:
+        return sorted(self._blocked_domains) or None
 
     def __init__(
         self,
