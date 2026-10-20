@@ -31,6 +31,67 @@ from concurrent.futures import ThreadPoolExecutor
 from .async_logger import AsyncLogger, LogLevel, LogColor
 
 
+# Phrasing elements carry inline meaning within a block. Their text density is
+# not useful on its own: nested tags can make a short span look like noise even
+# when the containing paragraph is retained.
+_PRUNING_INLINE_TAGS = frozenset(
+    {
+        "a",
+        "abbr",
+        "audio",
+        "b",
+        "bdi",
+        "bdo",
+        "br",
+        "button",
+        "canvas",
+        "cite",
+        "code",
+        "data",
+        "datalist",
+        "del",
+        "dfn",
+        "em",
+        "embed",
+        "i",
+        "iframe",
+        "img",
+        "input",
+        "ins",
+        "kbd",
+        "label",
+        "map",
+        "mark",
+        "math",
+        "meter",
+        "noscript",
+        "object",
+        "output",
+        "picture",
+        "progress",
+        "q",
+        "ruby",
+        "s",
+        "samp",
+        "script",
+        "select",
+        "slot",
+        "small",
+        "span",
+        "strong",
+        "sub",
+        "sup",
+        "svg",
+        "textarea",
+        "time",
+        "u",
+        "var",
+        "video",
+        "wbr",
+    }
+)
+
+
 class RelevantContentFilter(ABC):
     """Abstract base class for content filtering strategies"""
 
@@ -724,6 +785,15 @@ class PruningContentFilter(RelevantContentFilter):
 
         # Skip pruning for preserved nodes — always keep them
         if self._is_preserved(node):
+            return
+
+        # Inline nodes inherit the keep/remove decision of their containing
+        # block. Scoring a short nested span or link independently can remove
+        # words from a paragraph that otherwise passes the filter.
+        if node.name in _PRUNING_INLINE_TAGS:
+            children = [child for child in node.children if hasattr(child, "name")]
+            for child in children:
+                self._prune_tree(child)
             return
 
         text_len = len(node.get_text(strip=True))

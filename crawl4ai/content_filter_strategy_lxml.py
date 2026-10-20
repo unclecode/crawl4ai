@@ -55,7 +55,7 @@ from typing import Dict, List
 from lxml import etree
 from lxml import html as lhtml
 
-from .content_filter_strategy import PruningContentFilter
+from .content_filter_strategy import PruningContentFilter, _PRUNING_INLINE_TAGS
 
 # HTML void elements, taken verbatim from BeautifulSoup's LXMLTreeBuilder
 # ``empty_element_tags``. These serialize self-closed (``<br/>``) with no end
@@ -312,7 +312,12 @@ class PruningContentFilterLXML(PruningContentFilter):
     # ------------------------------------------------------------------ #
     # Scoring (top-down pass)
     # ------------------------------------------------------------------ #
-    def _should_remove(self, node, m: _NodeMetrics, metrics: Dict[object, _NodeMetrics]) -> bool:
+    def _should_remove(
+        self, node, m: _NodeMetrics, metrics: Dict[object, _NodeMetrics]
+    ) -> bool:
+        if node.tag in _PRUNING_INLINE_TAGS:
+            return False
+
         text_len = m.text_len
         tag_len = m.inner_len
 
