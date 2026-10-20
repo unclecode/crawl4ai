@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `crawl4ai-setup` no longer points to Crawl4AI Cloud when the browser install fails. It retries the browser without `--with-deps` (which needs root on Linux), prints the exact command for the system libraries, and exits with code 1 instead of printing "completed". The cloud banner at the end shows only after a successful setup.
+- `crawl4ai-doctor` exits with code 1 when its test crawl fails, counts a blocked page as a failure, and shows no cloud banner.
+- The cloud banner and the blocked line state the current free offer: 1,000 free credits every month.
+
 ### Crawl4AI Cloud
 
 - Requests with `proxy: isp` and a country (for example UK pricing pages) no longer fail with "no-proxy-exit" after the address set is renewed. Thanks to [Summone](https://summone.co.uk) for the report.

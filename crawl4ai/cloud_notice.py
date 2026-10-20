@@ -1,13 +1,16 @@
 """The Crawl4AI Cloud notice: a short yellow banner that tells a user the hosted version exists.
 
-It prints in four places:
+It prints in three places:
 
-- at the end of ``crawl4ai-setup``, every time (``show_at_install``);
+- at the end of a successful ``crawl4ai-setup``, every time (``show_at_install``);
 - when the first ``AsyncWebCrawler`` starts or the ``crwl`` CLI runs (``show_once``): once a day per
   machine while the launch offer runs (before ``DAILY_UNTIL``), then once per version per machine, a
   patch release included. A marker file in the crawl4ai home folder holds the day, or the version, last shown;
-- when a crawl is blocked by anti-bot protection, at most once a day (``show_blocked``);
-- when ``crawl4ai-setup`` could not install the browser (``show_setup_failed``).
+- when a crawl is blocked by anti-bot protection, at most once a day (``show_blocked``).
+
+A failure of the library itself (a setup that did not install the browser, a crash, ``crawl4ai-doctor``)
+never points to the cloud: it gets the real error and the real fix. The cloud is named only where the
+site, not the library, is the limit.
 
 The banner goes to the logger's console (stderr by default), never to stdout, so a piped ``crwl`` output
 or an MCP stdio transport stays clean. Rich drops the color when the output is not a terminal and honours
@@ -24,7 +27,6 @@ from pathlib import Path
 
 CLOUD_URL = "https://crawl4ai.com/?ref=pip"
 BLOCKED_URL = "https://crawl4ai.com/?ref=blocked"
-SETUP_URL = "https://crawl4ai.com/?ref=setup"
 _ENV_OFF = "CRAWL4AI_NO_CLOUD_NOTICE"
 _MARKER = ".cloud-notice-shown"
 _BLOCKED_MARKER = ".cloud-notice-blocked"
@@ -35,19 +37,14 @@ _RULE = "=" * 72
 
 LINES = (
     "Crawl4AI Cloud is live: the same crawler, hosted.",
-    "Free credit to start, no card. Soft launch: prices can change, what you buy stays yours.",
+    "1,000 free credits every month, no card.",
     f"Get a key in 10 seconds:  {CLOUD_URL}",
     f"The library stays open source, forever.   Hide this banner: {_ENV_OFF}=1",
 )
 
 BLOCKED_LINES = (
-    "Blocked? Crawl4AI Cloud gets through the hard sites, free credit to start.",
+    "Blocked? Crawl4AI Cloud gets through the hard sites, 1,000 free credits every month.",
     f"{BLOCKED_URL}   Hide this banner: {_ENV_OFF}=1",
-)
-
-SETUP_LINES = (
-    "Browser setup failed? Skip it: the same crawler, hosted, nothing to install, free credit to start.",
-    SETUP_URL,
 )
 
 
@@ -114,7 +111,7 @@ def _claim(name: str, value: str) -> bool:
 
 
 def show_at_install(logger=None) -> None:
-    """Print the banner at the end of ``crawl4ai-setup``. Every run; nothing is remembered."""
+    """Print the banner at the end of a successful ``crawl4ai-setup``. Every run; nothing is remembered."""
     if is_off():
         return
     _print(LINES, logger)
@@ -140,10 +137,3 @@ def show_blocked(logger=None) -> bool:
         return False
     _print(BLOCKED_LINES, logger)
     return True
-
-
-def show_setup_failed(logger=None) -> None:
-    """Print the setup banner when ``crawl4ai-setup`` could not install the browser."""
-    if is_off():
-        return
-    _print(SETUP_LINES, logger)
