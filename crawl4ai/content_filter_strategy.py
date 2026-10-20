@@ -16,6 +16,8 @@ from .utils import (
     get_home_folder,
     extract_xml_data,
     merge_chunks,
+    count_words,
+    count_cjk_chars,
 )
 from .types import LLMConfig
 from .config import DEFAULT_PROVIDER, OVERLAP_RATE, WORD_TOKEN_RATE
@@ -266,7 +268,7 @@ class RelevantContentFilter(ABC):
 
         if min_word_threshold:
             chunks = [
-                chunk for chunk in chunks if len(chunk[1].split()) >= min_word_threshold
+                chunk for chunk in chunks if count_words(chunk[1]) >= min_word_threshold
             ]
 
         return chunks
@@ -300,7 +302,7 @@ class RelevantContentFilter(ABC):
                 if element.name in self.included_tags:
                     if not self.is_excluded(element):
                         text = fast_text(element)
-                        word_count = len(text.split())
+                        word_count = count_words(text)
 
                         # Headers pass through with adjusted minimum
                         if element.name in self.header_tags:
@@ -773,7 +775,12 @@ class PruningContentFilter(RelevantContentFilter):
         if self.min_word_threshold:
             # Get raw text from metrics node - avoid extra processing
             text = metrics["node"].get_text(strip=True)
-            word_count = text.count(" ") + 1
+            if count_cjk_chars(text):
+                # No spaces separate CJK words: use the same count as the
+                # other word thresholds
+                word_count = count_words(text)
+            else:
+                word_count = text.count(" ") + 1
             if word_count < self.min_word_threshold:
                 return -1.0  # Guaranteed removal
         score = 0.0
