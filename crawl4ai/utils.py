@@ -2392,7 +2392,7 @@ def normalize_url_for_deep_crawl(href, base_url, preserve_https=False, original_
     query = parsed.query
     if query:
         # Parse query parameters
-        params = parse_qs(query)
+        params = parse_qs(query, keep_blank_values=True)
         
         # Remove tracking parameters (example - customize as needed)
         tracking_params = ['utm_source', 'utm_medium', 'utm_campaign', 'ref', 'fbclid']
