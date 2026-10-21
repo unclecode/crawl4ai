@@ -7393,11 +7393,8 @@ content_type_scorer = ContentTypeScorer(
     weight=0.9
 )
 
-# Freshness scoring
-freshness_scorer = FreshnessScorer(
-    weight=0.7,
-    current_year=2024
-)
+# Freshness scoring (current_year defaults to this year; pass it to score against another year)
+freshness_scorer = FreshnessScorer(weight=0.7)
 
 # Domain authority scoring
 domain_scorer = DomainAuthorityScorer(
@@ -7434,7 +7431,7 @@ composite_scorer = CompositeScorer(
         KeywordRelevanceScorer(["python", "tutorial"], weight=1.5),
         PathDepthScorer(optimal_depth=3, weight=1.0),
         ContentTypeScorer({"html": 1.0, "pdf": 0.8}, weight=1.2),
-        FreshnessScorer(weight=0.8, current_year=2024),
+        FreshnessScorer(weight=0.8),
         DomainAuthorityScorer({
             "python.org": 1.0,
             "github.com": 0.9
