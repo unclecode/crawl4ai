@@ -658,12 +658,20 @@ class _CDPConnectionCache:
             return pw, browser
 
     @classmethod
-    async def release(cls, cdp_url: str):
-        """Decrement ref count; close connection when last user releases."""
+    async def release(cls, cdp_url: str, browser=None):
+        """Decrement ref count; close connection when last user releases.
+
+        Pass the browser the caller acquired: if acquire() already replaced it
+        as stale, the cached entry belongs to newer users and must not be
+        touched (acquire() stopped the stale driver already).
+        """
         async with cls._get_lock():
             if cdp_url not in cls._cache:
                 return
-            pw, browser, count = cls._cache[cdp_url]
+            pw, cached, count = cls._cache[cdp_url]
+            if browser is not None and cached is not browser:
+                return
+            browser = cached
             if count <= 1:
                 try:
                     await browser.close()
@@ -2033,7 +2041,7 @@ class BrowserManager:
             self._context_refcounts.clear()
             self._context_last_used.clear()
             self._page_to_sig.clear()
-            await _CDPConnectionCache.release(self.config.cdp_url)
+            await _CDPConnectionCache.release(self.config.cdp_url, self.browser)
             self.browser = None
             self.playwright = None
             self._using_cached_cdp = False
