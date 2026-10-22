@@ -273,3 +273,88 @@ class TestQuickExtractLinksEdgeCases:
 
         # Both should be extracted and normalized
         assert len(result["internal"]) >= 1
+
+
+class TestPrefetchPreserveHttps:
+    """preserve_https_for_internal_links must apply to prefetch links too."""
+
+    HTML = '''
+    <html>
+        <body>
+            <a href="http://example.com/docs">Docs</a>
+            <a href="/about">About</a>
+        </body>
+    </html>
+    '''
+
+    async def _links(self, prefetch, preserve_https):
+        from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+
+        config = CrawlerRunConfig(
+            prefetch=prefetch,
+            preserve_https_for_internal_links=preserve_https,
+        )
+        crawler = AsyncWebCrawler(verbose=False)
+        result = await crawler.aprocess_html(
+            url="https://example.com/",
+            html=self.HTML,
+            extracted_content=None,
+            config=config,
+            screenshot_data=None,
+            pdf_data=None,
+            verbose=False,
+            original_scheme="https",  # arun() passes the requested URL's scheme
+        )
+        return [link["href"] for link in result.links["internal"]]
+
+    @pytest.mark.asyncio
+    async def test_prefetch_upgrades_same_host_http_links(self):
+        """An https page's http:// same-host link is upgraded in prefetch, as in the normal path."""
+        normal = await self._links(prefetch=False, preserve_https=True)
+        prefetch = await self._links(prefetch=True, preserve_https=True)
+
+        assert prefetch == normal
+        assert "https://example.com/docs" in prefetch
+
+    @pytest.mark.asyncio
+    async def test_prefetch_keeps_http_when_option_off(self):
+        """Without the option, prefetch keeps the http:// link as written."""
+        prefetch = await self._links(prefetch=True, preserve_https=False)
+
+        assert "http://example.com/docs" in prefetch
+
+    @pytest.mark.asyncio
+    async def test_prefetch_base_href_on_other_host_not_upgraded(self):
+        """A <base> pointing at another host must not upgrade its links to https."""
+        from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+
+        html = '''
+        <html>
+            <head><base href="http://other.com/"></head>
+            <body><a href="chapter">Chapter</a></body>
+        </html>
+        '''
+        config = CrawlerRunConfig(prefetch=True, preserve_https_for_internal_links=True)
+        result = await AsyncWebCrawler(verbose=False).aprocess_html(
+            url="https://example.com/", html=html, extracted_content=None,
+            config=config, screenshot_data=None, pdf_data=None, verbose=False,
+            original_scheme="https",
+        )
+        hrefs = [link["href"] for link in result.links["external"]]
+
+        assert hrefs == ["http://other.com/chapter"]
+
+    @pytest.mark.asyncio
+    async def test_prefetch_upgrades_after_https_to_http_redirect(self):
+        """Links from a page redirected to http:// are upgraded back to https://."""
+        from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+
+        config = CrawlerRunConfig(prefetch=True, preserve_https_for_internal_links=True)
+        result = await AsyncWebCrawler(verbose=False).aprocess_html(
+            url="https://example.com/", html=self.HTML, extracted_content=None,
+            config=config, screenshot_data=None, pdf_data=None, verbose=False,
+            original_scheme="https", redirected_url="http://example.com/",
+        )
+        hrefs = [link["href"] for link in result.links["internal"]]
+
+        assert hrefs == ["https://example.com/docs", "https://example.com/about"]
