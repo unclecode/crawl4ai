@@ -236,7 +236,11 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
                     filtered_html = "\n".join(
                         "<div>{}</div>".format(s) for s in filtered_html
                     )
-                    fit_markdown = h.handle(filtered_html)
+                    # Isolate parser state while keeping the effective document base URL.
+                    fit_converter = CustomHTML2Text(baseurl=h.baseurl)
+                    fit_converter.update_params(**default_options)
+                    fit_converter.baseurl = h.baseurl
+                    fit_markdown = fit_converter.handle(filtered_html)
                 except Exception as e:
                     fit_markdown = f"Error generating fit markdown: {str(e)}"
                     filtered_html = ""
