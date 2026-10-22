@@ -5,6 +5,7 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 
 from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy_lxml import PruningContentFilterLXML
 
 
 @pytest.fixture
@@ -63,7 +64,34 @@ def mixed_content_html():
     """
 
 
+@pytest.fixture
+def nested_inline_html():
+    return """<html><body><article>
+    <p>After the Meiji Restoration, the imperial capital in Kyoto was moved to Edo, and the city was renamed Tokyo
+    (<abbr title="literal translation">lit.</abbr> <span class="gloss-quot">'</span><span class="gloss-text">
+    <a href="/wiki/Capital_of_Japan">Eastern Capital</a></span><span class="gloss-quot">'</span>).
+    The city was greatly damaged by the 1923 earthquake and rebuilt in the following decades.</p>
+    <p>Tokyo (<span title="Japanese-language text"><span lang="ja">東京</span></span>) is the capital of Japan
+    and one of the most populous cities in the world, with a population of about fourteen million.</p>
+    </article></body></html>"""
+
+
 class TestPruningContentFilter:
+    @pytest.mark.parametrize(
+        "filter_class",
+        [PruningContentFilter, PruningContentFilterLXML],
+        ids=["bs4", "lxml"],
+    )
+    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
+    def test_pruning_preserves_nested_inline_content_in_kept_paragraphs(
+        self, nested_inline_html, filter_class
+    ):
+        contents = filter_class().filter_content(nested_inline_html)
+        actual = " ".join(contents)
+
+        assert "Eastern Capital" in actual
+        assert "東京" in actual
+
     def test_basic_pruning(self, basic_html):
         """Test basic content pruning functionality"""
         filter = PruningContentFilter(min_word_threshold=5)
