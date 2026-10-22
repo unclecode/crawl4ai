@@ -461,5 +461,6 @@ If you’re ready for more, check out:
 - **Hooks & Auth**: Learn how to run custom JavaScript or handle logins with cookies, local storage, etc.  
 - **Deployment**: Explore ephemeral testing in Docker or plan for the upcoming stable Docker release.  
 - **Browser Management**: Delve into user simulation, stealth modes, and concurrency best practices.  
+- **Code Examples**: Browse practical examples, including a community AG2 (formerly AutoGen) integration snippet.  
 
 Crawl4AI is a powerful, flexible tool. Enjoy building out your scrapers, data pipelines, or AI-driven extraction flows. Happy crawling!
