@@ -10,7 +10,6 @@
 - [Using the API](#using-the-api)
   - [Playground Interface](#playground-interface)
   - [Python SDK](#python-sdk)
-  - [Understanding Request Schema](#understanding-request-schema)
   - [REST API Examples](#rest-api-examples)
   - [Asynchronous Jobs with Webhooks](#asynchronous-jobs-with-webhooks)
 - [Additional API Endpoints](#additional-api-endpoints)
@@ -18,7 +17,6 @@
   - [Screenshot Endpoint](#screenshot-endpoint)
   - [PDF Export Endpoint](#pdf-export-endpoint)
   - [JavaScript Execution Endpoint](#javascript-execution-endpoint)
-  - [Library Context Endpoint](#library-context-endpoint)
 - [MCP (Model Context Protocol) Support](#mcp-model-context-protocol-support)
   - [What is MCP?](#what-is-mcp)
   - [Connecting via MCP](#connecting-via-mcp)
@@ -27,12 +25,8 @@
   - [Testing MCP Connections](#testing-mcp-connections)
   - [MCP Schemas](#mcp-schemas)
 - [Metrics & Monitoring](#metrics--monitoring)
-- [Deployment Scenarios](#deployment-scenarios)
-- [Complete Examples](#complete-examples)
 - [Server Configuration](#server-configuration)
   - [Understanding config.yml](#understanding-configyml)
-  - [JWT Authentication](#jwt-authentication)
-  - [Configuration Tips and Best Practices](#configuration-tips-and-best-practices)
   - [Customizing Your Configuration](#customizing-your-configuration)
   - [Configuration Recommendations](#configuration-recommendations)
 - [Getting Help](#getting-help)
@@ -41,7 +35,7 @@
 ## Prerequisites
 
 Before we dive in, make sure you have:
-- Docker installed and running (version 20.10.0 or higher), including `docker compose` (usually bundled with Docker Desktop).
+- Docker installed and running (version 20.10.0 or higher), including `docker compose` 2.24 or newer (usually bundled with Docker Desktop).
 - `git` for cloning the repository.
 - At least 4GB of RAM available for the container (more recommended for heavy use).
 - Python 3.10+ (if using the Python SDK).
@@ -53,17 +47,25 @@ Before we dive in, make sure you have:
 
 We offer several ways to get the Crawl4AI server running. The quickest way is to use our pre-built Docker Hub images.
 
+> 🔐 **An API token is required.** Since 0.9, the server listens on the network only when `CRAWL4AI_API_TOKEN` is set. Without it, the container reports healthy, but requests from your machine get `Connection reset by peer`. Create a token once, and send it as `Authorization: Bearer <token>` with every request except `GET /health`:
+>
+> ```bash
+> export CRAWL4AI_API_TOKEN="$(openssl rand -hex 32)"
+> ```
+>
+> Pass it with its value (`-e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN"`). See [MIGRATION.md](./MIGRATION.md) for all changes since 0.8.
+
 ### Option 1: Using Pre-built Docker Hub Images (Recommended)
 
 Pull and run images directly from Docker Hub without building locally.
 
 #### 1. Pull the Image
 
-Our latest stable release is `0.9.2`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
+Our latest stable release is `0.9.5`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
 
 ```bash
-# Pull the latest stable version (0.9.2)
-docker pull unclecode/crawl4ai:0.8.6
+# Pull the latest stable version (0.9.5)
+docker pull unclecode/crawl4ai:0.9.5
 
 # Or use the latest tag
 docker pull unclecode/crawl4ai:latest
@@ -87,7 +89,7 @@ ANTHROPIC_API_KEY=your-anthropic-key
 # GROQ_API_KEY=your-groq-key
 # TOGETHER_API_KEY=your-together-key
 # MISTRAL_API_KEY=your-mistral-key
-# GEMINI_API_TOKEN=your-gemini-token
+# GEMINI_API_KEY=your-gemini-key
 EOL
 ```
 > 🔑 **Note**: Keep your API keys secure! Never commit `.llm.env` to version control.
@@ -100,7 +102,8 @@ EOL
       -p 11235:11235 \
       --name crawl4ai \
       --shm-size=1g \
-      unclecode/crawl4ai:0.8.6
+      -e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN" \
+      unclecode/crawl4ai:0.9.5
     ```
 
 *   **With LLM support:**
@@ -111,10 +114,11 @@ EOL
       --name crawl4ai \
       --env-file .llm.env \
       --shm-size=1g \
-      unclecode/crawl4ai:0.8.6
+      -e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN" \
+      unclecode/crawl4ai:0.9.5
     ```
 
-> The server will be available at `http://localhost:11235`. Visit `/playground` to access the interactive testing interface.
+> The server will be available at `http://localhost:11235`. Visit `/playground` to access the interactive testing interface, and paste your token into its **API token** box (top right).
 
 *   **Behind a corporate proxy:** if the host reaches the internet only through
     an HTTP proxy, set the standard `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY`
@@ -136,10 +140,8 @@ docker stop crawl4ai && docker rm crawl4ai
 #### Docker Hub Versioning Explained
 
 *   **Image Name:** `unclecode/crawl4ai`
-*   **Tag Format:** `LIBRARY_VERSION[-SUFFIX]` (e.g., `0.7.0-r1`)
-    *   `LIBRARY_VERSION`: The semantic version of the core `crawl4ai` Python library
-    *   `SUFFIX`: Optional tag for release candidates (``) and revisions (`r1`)
-*   **`latest` Tag:** Points to the most recent stable version
+*   **Tag Format:** `LIBRARY_VERSION` (e.g., `0.9.5`), the semantic version of the core `crawl4ai` Python library
+*   **`latest` Tag:** Points to the most recent stable version (`0.9` and `0` point to the newest release in that line)
 *   **Multi-Architecture Support:** All images support both `linux/amd64` and `linux/arm64` architectures through a single tag
 
 ### Option 2: Using Docker Compose
@@ -155,6 +157,8 @@ cd crawl4ai
 
 #### 2. Environment Setup (API Keys)
 
+Export the API token in the same shell (`export CRAWL4AI_API_TOKEN="$(openssl rand -hex 32)"`), or put the line `CRAWL4AI_API_TOKEN=...` in a `.env` file in the project root. The compose file passes it into the container. Do not put it in `.llm.env`: the compose file overwrites that value.
+
 If you plan to use LLMs, copy the example environment file and add your API keys. This file should be in the **project root directory**.
 
 ```bash
@@ -168,18 +172,19 @@ cp deploy/docker/.llm.env.example .llm.env
 
 The Docker setup now supports flexible LLM provider configuration through three methods:
 
-1. **Environment Variable** (Highest Priority): Set `LLM_PROVIDER` to override the default
+1. **Environment Variable** (Highest Priority): Set `LLM_PROVIDER` in your `.llm.env` file to override the default
    ```bash
-   export LLM_PROVIDER="anthropic/claude-3-opus"
-   # Or in your .llm.env file:
-   # LLM_PROVIDER=anthropic/claude-3-opus
+   # In your .llm.env file:
+   LLM_PROVIDER=anthropic/claude-3-opus
    ```
 
-2. **API Request Parameter**: Specify provider per request
+2. **API Request Parameter**: Specify provider per request (on `/md`, `/llm` and `/llm/job`). It must be in the same family as the default provider (e.g. `openai/...`). Otherwise `/md` and `/llm` return `400 LLM provider not allowed`, and an `/llm/job` fails with the same error.
    ```json
    {
      "url": "https://example.com",
-     "provider": "groq/mixtral-8x7b"
+     "f": "llm",
+     "q": "Summarize this page",
+     "provider": "openai/gpt-4o"
    }
    ```
 
@@ -193,9 +198,9 @@ The `docker-compose.yml` file in the project root provides a simplified approach
 
 *   **Run Pre-built Image from Docker Hub:**
     ```bash
-    # Pulls and runs the release candidate from Docker Hub
+    # Pulls and runs a version from Docker Hub (default: latest)
     # Automatically selects the correct architecture
-    IMAGE=unclecode/crawl4ai:0.8.6 docker compose up -d
+    TAG=0.9.5 docker compose up -d
     ```
 
 *   **Build and Run Locally:**
@@ -235,6 +240,8 @@ Follow steps 1 and 2 from the Docker Compose section above (clone repo, `cd craw
 
 Use `docker buildx` to build the image. Crawl4AI now uses buildx to handle multi-architecture builds automatically.
 
+> ⚠️ The build copies the whole project folder, and the repository has no `.dockerignore`. A `.llm.env` in the project root therefore ends up inside the image (`/tmp/project/.llm.env`) with your API keys. Add a `.dockerignore` with the line `.llm.env` before you build, and never push an image that contains it.
+
 ```bash
 # Make sure you are in the 'crawl4ai' root directory
 # Build for the current architecture and load it into Docker
@@ -258,6 +265,7 @@ docker buildx build \
       -p 11235:11235 \
       --name crawl4ai-standalone \
       --shm-size=1g \
+      -e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN" \
       crawl4ai-local:latest
     ```
 
@@ -269,6 +277,7 @@ docker buildx build \
       --name crawl4ai-standalone \
       --env-file .llm.env \
       --shm-size=1g \
+      -e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN" \
       crawl4ai-local:latest
     ```
 
@@ -303,7 +312,8 @@ You can add Crawl4AI as an MCP tool provider in Claude Code with a simple comman
 
 ```bash
 # Add the Crawl4AI server as an MCP provider
-claude mcp add --transport sse c4ai-sse http://localhost:11235/mcp/sse
+claude mcp add --transport sse c4ai-sse http://localhost:11235/mcp/sse \
+  --header "Authorization: Bearer $CRAWL4AI_API_TOKEN"
 
 # List all MCP providers to verify it was added
 claude mcp list
@@ -325,16 +335,11 @@ When connected via MCP, the following tools are available:
 
 ### Testing MCP Connections
 
-You can test the MCP WebSocket connection using the test file included in the repository:
-
-```bash
-# From the repository root
-python tests/mcp/test_mcp_socket.py
-```
+`claude mcp list` (above) connects to the server and shows `✔ Connected` when the URL and token are correct.
 
 ### MCP Schemas
 
-Access the MCP tool schemas at `http://localhost:11235/mcp/schema` for detailed information on each tool's parameters and capabilities.
+Access the MCP tool schemas at `http://localhost:11235/mcp/schema` (needs the token) for detailed information on each tool's parameters and capabilities.
 
 ---
 
@@ -367,13 +372,13 @@ Captures a full-page PNG screenshot of the specified URL.
 ```json
 {
   "url": "https://example.com",
-  "screenshot_wait_for": 2,
-  "output_path": "/path/to/save/screenshot.png"
+  "screenshot_wait_for": 2
 }
 ```
 
 - `screenshot_wait_for`: Optional delay in seconds before capture (default: 2)
-- `output_path`: Optional path to save the screenshot (recommended)
+
+The response has the image as base64 in `screenshot`, plus an `artifact_id`. Download the file with `GET /artifacts/{artifact_id}` (needs the token; kept for 1 hour). `output_path` was removed in 0.9: it is ignored and no file is written.
 
 ### PDF Export Endpoint
 
@@ -385,12 +390,11 @@ Generates a PDF document of the specified URL.
 
 ```json
 {
-  "url": "https://example.com",
-  "output_path": "/path/to/save/document.pdf"
+  "url": "https://example.com"
 }
 ```
 
-- `output_path`: Optional path to save the PDF (recommended)
+The response has the PDF as base64 in `pdf`, plus an `artifact_id` to download it with `GET /artifacts/{artifact_id}`, as for screenshots.
 
 ### JavaScript Execution Endpoint
 
@@ -398,7 +402,7 @@ Generates a PDF document of the specified URL.
 POST /execute_js
 ```
 
-Executes JavaScript snippets on the specified URL and returns the full crawl result.
+Executes JavaScript snippets on the specified URL and returns the full crawl result. This endpoint is off by default: start the container with `-e CRAWL4AI_EXECUTE_JS_ENABLED=true`, or it returns 403.
 
 ```json
 {
@@ -448,7 +452,6 @@ docker buildx build \
     *   `all`: Full features including `torch` and `transformers` for advanced extraction strategies (e.g., CosineStrategy, certain LLM filters). Significantly larger image. Ensure you need these extras.
 2.  **Platform Considerations**
     *   Use `buildx` for building multi-architecture images, especially for pushing to registries.
-    *   Use `docker compose` profiles (`local-amd64`, `local-arm64`) for easy platform-specific local builds.
 3.  **Performance Optimization**
     *   The image automatically includes platform-specific optimizations (OpenMP for AMD64, OpenBLAS for ARM64).
 
@@ -475,28 +478,26 @@ Install the SDK: `pip install crawl4ai`
 ```python
 import asyncio
 from crawl4ai.docker_client import Crawl4aiDockerClient
-from crawl4ai import BrowserConfig, CrawlerRunConfig, CacheMode # Assuming you have crawl4ai installed
+import os
+from crawl4ai import CrawlerRunConfig, CacheMode # Assuming you have crawl4ai installed
 
 async def main():
     # Point to the correct server port
     async with Crawl4aiDockerClient(base_url="http://localhost:11235", verbose=True) as client:
-        # If JWT is enabled on the server, authenticate first:
-        # await client.authenticate("user@example.com") # See Server Configuration section
+        # Send the API token with every request
+        # (client.authenticate() does not work with the 0.9 server)
+        client._token = os.environ["CRAWL4AI_API_TOKEN"]
 
         # Example Non-streaming crawl
         print("--- Running Non-Streaming Crawl ---")
         results = await client.crawl(
             ["https://httpbin.org/html"],
-            browser_config=BrowserConfig(headless=True), # Use library classes for config aid
+            # Do not pass browser_config=BrowserConfig(...): the server refuses
+            # the default headers it sends (400). The server's own browser settings apply.
             crawler_config=CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
         )
-        if results: # client.crawl returns None on failure
-          print(f"Non-streaming results success: {results.success}")
-          if results.success:
-              for result in results: # Iterate through the CrawlResultContainer
-                  print(f"URL: {result.url}, Success: {result.success}")
-        else:
-            print("Non-streaming crawl failed.")
+        # One URL returns one CrawlResult; a failed request raises RequestError
+        print(f"URL: {results.url}, Success: {results.success}")
 
 
         # Example Streaming crawl
@@ -504,8 +505,7 @@ async def main():
         stream_config = CrawlerRunConfig(stream=True, cache_mode=CacheMode.BYPASS)
         try:
             async for result in await client.crawl( # client.crawl returns an async generator for streaming
-                ["https://httpbin.org/html", "https://httpbin.org/links/5/0"],
-                browser_config=BrowserConfig(headless=True),
+                ["https://httpbin.org/html", "https://example.com"],
                 crawler_config=stream_config
             ):
                 print(f"Streamed result: URL: {result.url}, Success: {result.success}")
@@ -522,18 +522,13 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-*(SDK parameters like timeout, verify_ssl etc. remain the same)*
-
 ### Second Approach: Direct API Calls
 
 Crucially, when sending configurations directly via JSON, they **must** follow the `{"type": "ClassName", "params": {...}}` structure for any non-primitive value (like config objects or strategies). Dictionaries must be wrapped as `{"type": "dict", "value": {...}}`.
 
-*(Keep the detailed explanation of Configuration Structure, Basic Pattern, Simple vs Complex, Strategy Pattern, Complex Nested Example, Quick Grammar Overview, Important Rules, Pro Tip)*
+Request bodies take declarative options only. Fields such as `js_code`, `proxy_config`, `cookies`, `headers`, `extra_args` and `user_data_dir` are refused with HTTP 400 (see [MIGRATION.md](./MIGRATION.md) for the full list).
 
-#### More Examples *(Ensure Schema example uses type/value wrapper)*
-
-**Advanced Crawler Configuration**
-*(Keep example, ensure cache_mode uses valid enum value like "bypass")*
+#### More Examples
 
 **Extraction Strategy**
 ```json
@@ -561,7 +556,6 @@ Crucially, when sending configurations directly via JSON, they **must** follow t
 }
 ```
 
-**LLM Extraction Strategy** *(Keep example, ensure schema uses type/value wrapper)*
 #### Deep Crawling (opt-in)
 
 Deep crawling over the API is **disabled by default**: a request with
@@ -621,11 +615,12 @@ Turn the flag on only when you accept that one request can fetch many pages.
 
 ### REST API Examples
 
-Update URLs to use port `11235`.
+The examples read the token from the `CRAWL4AI_API_TOKEN` environment variable.
 
 #### Simple Crawl
 
 ```python
+import os
 import requests
 
 # Configuration objects converted to the required JSON structure
@@ -645,7 +640,7 @@ crawl_payload = {
 }
 response = requests.post(
     "http://localhost:11235/crawl", # Updated port
-    # headers={"Authorization": f"Bearer {token}"},  # If JWT is enabled
+    headers={"Authorization": f"Bearer {os.environ['CRAWL4AI_API_TOKEN']}"},
     json=crawl_payload
 )
 print(f"Status Code: {response.status_code}")
@@ -660,6 +655,7 @@ else:
 
 ```python
 import json
+import os
 import httpx # Use httpx for async streaming example
 
 async def test_stream_crawl(token: str = None): # Made token optional
@@ -668,7 +664,7 @@ async def test_stream_crawl(token: str = None): # Made token optional
     payload = {
         "urls": [
             "https://httpbin.org/html",
-            "https://httpbin.org/links/5/0",
+            "https://example.com",
         ],
         "browser_config": {
             "type": "BrowserConfig",
@@ -680,9 +676,7 @@ async def test_stream_crawl(token: str = None): # Made token optional
         }
     }
 
-    headers = {}
-    # if token:
-    #    headers = {"Authorization": f"Bearer {token}"} # If JWT is enabled
+    headers = {"Authorization": f"Bearer {os.environ['CRAWL4AI_API_TOKEN']}"}
 
     try:
         async with httpx.AsyncClient() as client:
@@ -719,11 +713,11 @@ To crawl different URLs with different settings in one request, send `crawler_co
 
 ```python
 payload = {
-    "urls": ["https://docs.example.com/guide", "https://example.com/"],
+    "urls": ["https://docs.crawl4ai.com/core/quickstart/", "https://example.com/"],
     "crawler_configs": [
         {
             "type": "CrawlerRunConfig",
-            "params": {"url_matcher": "*docs.example.com*", "css_selector": "main"},
+            "params": {"url_matcher": "*docs.crawl4ai.com*", "css_selector": "main"},
         },
         # Catch-all: decides every URL the entries above did not match
         {"type": "CrawlerRunConfig", "params": {"url_matcher": "*"}},
@@ -760,6 +754,7 @@ For long-running crawls or when you want to avoid keeping connections open, use 
 ```bash
 # Submit a crawl job with webhook notification
 curl -X POST http://localhost:11235/crawl/job \
+  -H "Authorization: Bearer $CRAWL4AI_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "urls": ["https://example.com"],
@@ -771,6 +766,8 @@ curl -X POST http://localhost:11235/crawl/job \
 
 # Response: {"task_id": "crawl_a1b2c3d4"}
 ```
+
+The `webhook_url` must resolve to a public IP address; private and internal addresses return `400 URL blocked`.
 
 **Your webhook receives:**
 ```json
@@ -785,7 +782,8 @@ curl -X POST http://localhost:11235/crawl/job \
 
 Then fetch the results:
 ```bash
-curl http://localhost:11235/crawl/job/crawl_a1b2c3d4
+curl http://localhost:11235/crawl/job/crawl_a1b2c3d4 \
+  -H "Authorization: Bearer $CRAWL4AI_API_TOKEN"
 ```
 
 #### Include Data in Webhook
@@ -794,6 +792,7 @@ Set `webhook_data_in_payload: true` to receive the full crawl results directly i
 
 ```bash
 curl -X POST http://localhost:11235/crawl/job \
+  -H "Authorization: Bearer $CRAWL4AI_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "urls": ["https://example.com"],
@@ -813,10 +812,10 @@ curl -X POST http://localhost:11235/crawl/job \
   "timestamp": "2025-10-21T10:30:00.000000+00:00",
   "urls": ["https://example.com"],
   "data": {
-    "markdown": "...",
-    "html": "...",
-    "links": {...},
-    "metadata": {...}
+    "success": true,
+    "results": [
+      {"url": "https://example.com/", "markdown": {...}, "html": "...", "links": {...}, "metadata": {...}}
+    ]
   }
 }
 ```
@@ -864,12 +863,14 @@ If you prefer polling instead of webhooks, just omit `webhook_config`:
 ```bash
 # Submit job
 curl -X POST http://localhost:11235/crawl/job \
+  -H "Authorization: Bearer $CRAWL4AI_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"urls": ["https://example.com"]}'
 # Response: {"task_id": "crawl_xyz"}
 
 # Poll for status
-curl http://localhost:11235/crawl/job/crawl_xyz
+curl http://localhost:11235/crawl/job/crawl_xyz \
+  -H "Authorization: Bearer $CRAWL4AI_API_TOKEN"
 ```
 
 The response includes `status` field: `"processing"`, `"completed"`, or `"failed"`.
@@ -881,6 +882,7 @@ The same webhook system works for LLM extraction jobs via `/llm/job`:
 ```bash
 # Submit LLM extraction job with webhook
 curl -X POST http://localhost:11235/llm/job \
+  -H "Authorization: Bearer $CRAWL4AI_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://example.com/article",
@@ -907,11 +909,14 @@ curl -X POST http://localhost:11235/llm/job \
   "timestamp": "2025-10-22T12:30:00.000000+00:00",
   "urls": ["https://example.com/article"],
   "data": {
-    "extracted_content": {
-      "title": "Understanding Web Scraping",
-      "author": "John Doe",
-      "main_points": ["Point 1", "Point 2", "Point 3"]
-    }
+    "extracted_content": [
+      {
+        "title": "Understanding Web Scraping",
+        "author": "John Doe",
+        "main_points": ["Point 1", "Point 2", "Point 3"],
+        "error": false
+      }
+    ]
   }
 }
 ```
@@ -941,10 +946,6 @@ curl http://localhost:11235/health
 
 ---
 
-*(Deployment Scenarios and Complete Examples sections remain the same, maybe update links if examples moved)*
-
----
-
 ## Server Configuration
 
 The server's behavior can be customized through the `config.yml` file.
@@ -959,9 +960,9 @@ Here's a detailed breakdown of the configuration options (using defaults from `d
 # Application Configuration
 app:
   title: "Crawl4AI API"
-  version: "1.0.0" # Consider setting this to match library version, e.g., "0.5.1"
-  host: "0.0.0.0"
-  port: 8020 # NOTE: This port is used ONLY when running server.py directly. Gunicorn overrides this (see supervisord.conf).
+  version: "1.0.0"
+  host: "127.0.0.1" # In Docker, the entrypoint binds all interfaces only when CRAWL4AI_API_TOKEN is set
+  port: 11235
   reload: False # Default set to False - suitable for production
   timeout_keep_alive: 300
 
@@ -987,8 +988,9 @@ rate_limiting:
 
 # Security Configuration
 security:
-  enabled: false # Master toggle for security features
+  enabled: true # Master toggle for security features
   jwt_enabled: false # Enable JWT authentication (requires security.enabled=true)
+  api_token: "" # Static token; usually set with the CRAWL4AI_API_TOKEN env var
   https_redirect: false # Force HTTPS (requires security.enabled=true)
   trusted_hosts: ["*"] # Allowed hosts (use specific domains in production)
   headers: # Security headers (applied if security.enabled=true)
@@ -1020,10 +1022,6 @@ observability:
     endpoint: "/health"
 ```
 
-*(JWT Authentication section remains the same, just note the default port is now 11235 for requests)*
-
-*(Configuration Tips and Best Practices remain the same)*
-
 ### Customizing Your Configuration
 
 You can override the default `config.yml`.
@@ -1031,7 +1029,7 @@ You can override the default `config.yml`.
 #### Method 1: Modify Before Build
 
 1.  Edit the `deploy/docker/config.yml` file in your local repository clone.
-2.  Build the image using `docker buildx` or `docker compose --profile local-... up --build`. The modified file will be copied into the image.
+2.  Build the image using `docker buildx` or `docker compose up --build`. The modified file will be copied into the image.
 
 #### Method 2: Runtime Mount (Recommended for Custom Deploys)
 
@@ -1043,6 +1041,7 @@ You can override the default `config.yml`.
         # Assumes my-custom-config.yml is in the current directory
         docker run -d -p 11235:11235 \
           --name crawl4ai-custom-config \
+          -e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN" \
           --env-file .llm.env \
           --shm-size=1g \
           -v $(pwd)/my-custom-config.yml:/app/config.yml \
@@ -1052,15 +1051,12 @@ You can override the default `config.yml`.
     *   **Using `docker-compose.yml`:** Add a `volumes` section to the service definition:
         ```yaml
         services:
-          crawl4ai-hub-amd64: # Or your chosen service
-            image: unclecode/crawl4ai:latest
-            profiles: ["hub-amd64"]
+          crawl4ai:
+            image: ${IMAGE:-unclecode/crawl4ai:${TAG:-latest}}
             <<: *base-config
             volumes:
               # Mount local custom config over the default one in the container
               - ./my-custom-config.yml:/app/config.yml
-              # Keep the shared memory volume from base-config
-              - /dev/shm:/dev/shm
         ```
         *(Note: Ensure `my-custom-config.yml` is in the same directory as `docker-compose.yml`)*
 
@@ -1095,7 +1091,7 @@ We're here to help you succeed with Crawl4AI! Here's how to get support:
 
 - 📖 Check our [full documentation](https://docs.crawl4ai.com)
 - 🐛 Found a bug? [Open an issue](https://github.com/unclecode/crawl4ai/issues)
-- 💬 Join our [Discord community](https://discord.gg/crawl4ai)
+- 💬 Join our [Discord community](https://discord.gg/jP8KfhDhyN)
 - ⭐ Star us on GitHub to show support!
 
 ## Summary
