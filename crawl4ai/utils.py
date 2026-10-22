@@ -2303,7 +2303,7 @@ def normalize_url(
         # Only preserve HTTPS for same-domain links (not protocol-relative URLs)
         # Protocol-relative URLs (//example.com) should follow the base URL's scheme
         if (parsed_full.scheme == 'http' and 
-            parsed_full.netloc == parsed_base.netloc and
+            parsed_full.netloc.lower() == parsed_base.netloc.lower() and
             not href.strip().startswith('//')):
             full_url = full_url.replace('http://', 'https://', 1)
 
@@ -2375,7 +2375,7 @@ def normalize_url_for_deep_crawl(href, base_url, preserve_https=False, original_
         # Only preserve HTTPS for same-domain links (not protocol-relative URLs)
         # Protocol-relative URLs (//example.com) should follow the base URL's scheme
         if (parsed_full.scheme == 'http' and 
-            parsed_full.netloc == parsed_base.netloc and
+            parsed_full.netloc.lower() == parsed_base.netloc.lower() and
             not href.strip().startswith('//')):
             full_url = full_url.replace('http://', 'https://', 1)
     
@@ -2433,7 +2433,7 @@ def efficient_normalize_url_for_deep_crawl(href, base_url, preserve_https=False,
         # Only preserve HTTPS for same-domain links (not protocol-relative URLs)
         # Protocol-relative URLs (//example.com) should follow the base URL's scheme
         if (parsed_full.scheme == 'http' and 
-            parsed_full.netloc == parsed_base.netloc and
+            parsed_full.netloc.lower() == parsed_base.netloc.lower() and
             not href.strip().startswith('//')):
             full_url = full_url.replace('http://', 'https://', 1)
     

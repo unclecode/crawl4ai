@@ -384,3 +384,25 @@ class TestBaseHrefPreserveHttps:
         hrefs = [link["href"] for link in links]
 
         assert hrefs == ["http://other.com/chapter"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("prefetch", [False, True])
+    async def test_same_host_base_href_different_case_still_upgraded(self, prefetch):
+        """Host case in <base href> does not change whether a link is same-host."""
+        from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+
+        html = '''
+        <html>
+            <head><base href="http://EXAMPLE.COM/"></head>
+            <body><a href="chapter">Chapter</a></body>
+        </html>
+        '''
+        config = CrawlerRunConfig(prefetch=prefetch, preserve_https_for_internal_links=True)
+        result = await AsyncWebCrawler(verbose=False).aprocess_html(
+            url="https://example.com/", html=html, extracted_content=None,
+            config=config, screenshot_data=None, pdf_data=None, verbose=False,
+            original_scheme="https",
+        )
+        hrefs = [link["href"] for link in result.links["internal"]]
+
+        assert hrefs == ["https://example.com/chapter"]
