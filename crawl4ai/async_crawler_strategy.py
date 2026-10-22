@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import codecs
 import time
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Any, List, Union
@@ -2617,8 +2618,10 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
             raise FileNotFoundError(f"Local file not found: {path}")
             
         chunks = []
+        decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         async for chunk in self._stream_file(path):
-            chunks.append(chunk.tobytes().decode('utf-8', errors='replace'))
+            chunks.append(decoder.decode(chunk.tobytes()))
+        chunks.append(decoder.decode(b"", final=True))
             
         return AsyncCrawlResponse(
             html=''.join(chunks),
