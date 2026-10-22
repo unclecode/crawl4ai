@@ -161,6 +161,7 @@ class CrawlResult(BaseModel):
     network_requests: Optional[List[Dict[str, Any]]] = None
     console_messages: Optional[List[Dict[str, Any]]] = None
     tables: List[Dict] = Field(default_factory=list)  # NEW – [{headers,rows,caption,summary}]
+    source_receipt: Optional[Dict[str, Any]] = None
     # Cache validation metadata (Smart Cache)
     head_fingerprint: Optional[str] = None
     cached_at: Optional[float] = None

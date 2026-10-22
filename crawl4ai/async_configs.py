@@ -1968,6 +1968,7 @@ class CrawlerRunConfig():
         # Anti-Bot Retry Parameters
         max_retries: int = 0,
         fallback_fetch_function: Optional[Callable[[str], Awaitable[str]]] = None,
+        source_receipt: bool = False,
     ):
         # TODO: Planning to set properties dynamically based on the __init__ signature
         self.url = url
@@ -2008,6 +2009,7 @@ class CrawlerRunConfig():
 
         # Caching Parameters
         # Accept "enabled" etc. from CLI -c and YAML/JSON config files
+        self.source_receipt = source_receipt
         self.cache_mode = CacheMode(cache_mode.lower()) if isinstance(cache_mode, str) else cache_mode
         self.session_id = session_id
         self.bypass_cache = bypass_cache
@@ -2392,6 +2394,7 @@ class CrawlerRunConfig():
             "timezone_id": self.timezone_id,
             "geolocation": self.geolocation,
             "fetch_ssl_certificate": self.fetch_ssl_certificate,
+            "source_receipt": self.source_receipt,
             "cache_mode": self.cache_mode,
             "session_id": self.session_id,
             "bypass_cache": self.bypass_cache,
