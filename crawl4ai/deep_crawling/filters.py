@@ -192,7 +192,7 @@ class URLPatternFilter(URLFilter):
                 self._path_patterns.append(re.compile(pattern))
                 return
         elif pattern_type == self.PATTERN_TYPES["SUFFIX"]:
-            self._simple_suffixes.add(pattern[2:])
+            self._simple_suffixes.add(pattern[1:])
         elif pattern_type == self.PATTERN_TYPES["PREFIX"]:
             self._simple_prefixes.add(pattern[:-2])
         elif pattern_type == self.PATTERN_TYPES["DOMAIN"]:
@@ -221,7 +221,7 @@ class URLPatternFilter(URLFilter):
 
         # Quick suffix check (*.html)
         if self._simple_suffixes:
-            if url_path.split("/")[-1].split(".")[-1] in self._simple_suffixes:
+            if url_path.endswith(tuple(self._simple_suffixes)):
                 result = True
                 self._update_stats(result)
                 return not result if self._reverse else result
