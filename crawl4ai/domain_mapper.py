@@ -964,7 +964,7 @@ class DomainMapper:
                 continue
 
             # Strip trailing slash for dedup (keep in output)
-            key = normalized.rstrip("/").lower()
+            key = normalized.rstrip("/")
 
             if key in seen:
                 # Merge source
