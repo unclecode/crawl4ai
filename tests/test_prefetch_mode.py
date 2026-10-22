@@ -358,3 +358,29 @@ class TestPrefetchPreserveHttps:
         hrefs = [link["href"] for link in result.links["internal"]]
 
         assert hrefs == ["https://example.com/docs", "https://example.com/about"]
+
+
+class TestBaseHrefPreserveHttps:
+    """A <base href> on another host must not be treated as the page's host, in either path."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("prefetch", [False, True])
+    async def test_base_href_on_other_host_not_upgraded(self, prefetch):
+        from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+
+        html = '''
+        <html>
+            <head><base href="http://other.com/"></head>
+            <body><a href="chapter">Chapter</a></body>
+        </html>
+        '''
+        config = CrawlerRunConfig(prefetch=prefetch, preserve_https_for_internal_links=True)
+        result = await AsyncWebCrawler(verbose=False).aprocess_html(
+            url="https://example.com/", html=html, extracted_content=None,
+            config=config, screenshot_data=None, pdf_data=None, verbose=False,
+            original_scheme="https",
+        )
+        links = result.links["external"]
+        hrefs = [link["href"] for link in links]
+
+        assert hrefs == ["http://other.com/chapter"]
