@@ -77,20 +77,16 @@ def nested_inline_html():
 
 
 class TestPruningContentFilter:
+    @pytest.mark.parametrize(
+        "filter_class",
+        [PruningContentFilter, PruningContentFilterLXML],
+        ids=["bs4", "lxml"],
+    )
     @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_pruning_preserves_nested_inline_content_in_kept_paragraphs(
-        self, nested_inline_html
+        self, nested_inline_html, filter_class
     ):
-        contents = PruningContentFilter().filter_content(nested_inline_html)
-        actual = " ".join(contents)
-
-        assert "Eastern Capital" in actual
-        assert "東京" in actual
-
-    def test_lxml_pruning_preserves_nested_inline_content_in_kept_paragraphs(
-        self, nested_inline_html
-    ):
-        contents = PruningContentFilterLXML().filter_content(nested_inline_html)
+        contents = filter_class().filter_content(nested_inline_html)
         actual = " ".join(contents)
 
         assert "Eastern Capital" in actual
