@@ -124,7 +124,6 @@ class ManagedBrowser:
                 "--blink-settings=imagesEnabled=false",
                 "--disable-remote-fonts",
                 "--disable-images",
-                "--disable-javascript",
                 "--disable-software-rasterizer",
                 "--disable-dev-shm-usage",
             ])
@@ -1154,7 +1153,6 @@ class BrowserManager:
                     "--blink-settings=imagesEnabled=false",
                     "--disable-remote-fonts",
                     "--disable-images",
-                    "--disable-javascript",
                     "--disable-software-rasterizer",
                     "--disable-dev-shm-usage",
                 ]
