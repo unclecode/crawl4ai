@@ -8,7 +8,7 @@ app:
   host: "127.0.0.1"
   port: 11235
   reload: False
-  workers: 1
+  workers: 1  # NOTE: Not read. Gunicorn runs with a fixed --workers 1 (see supervisord.conf).
   timeout_keep_alive: 300
 
 # Default LLM Configuration
