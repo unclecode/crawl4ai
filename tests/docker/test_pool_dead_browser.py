@@ -7,6 +7,8 @@ routed to it failed with "Target page, context or browser has been closed".
 The real-browser tests kill Chromium with SIGKILL, the way the OOM killer does.
 """
 import asyncio
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import os
 import signal
 import sys
@@ -25,7 +27,26 @@ sys.path.insert(0, str(ROOT / "deploy" / "docker"))
 
 pool = pytest.importorskip("crawler_pool", reason="docker server deps not installed")
 
-HTML = "raw://<html><body><h1>alive</h1></body></html>"
+
+class _Page(BaseHTTPRequestHandler):
+    def do_GET(self):
+        # Enough text that the anti-bot check does not call it an empty page.
+        text = "<p>This page is served by the test to prove the browser works.</p>" * 40
+        body = f"<html><body><h1>alive</h1>{text}</body></html>".encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+# A real page, so a crawl goes through the browser (raw:// HTML skips it).
+_server = ThreadingHTTPServer(("127.0.0.1", 0), _Page)
+threading.Thread(target=_server.serve_forever, daemon=True).start()
+PAGE_URL = f"http://127.0.0.1:{_server.server_port}/"
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -65,7 +86,7 @@ async def _wait_dead(crawler, timeout=5.0):
 
 
 async def _crawl_ok(crawler):
-    result = await crawler.arun(HTML, config=CrawlerRunConfig())
+    result = await crawler.arun(PAGE_URL, config=CrawlerRunConfig())
     assert result.success, result.error_message
     assert "alive" in result.html
 
@@ -241,3 +262,42 @@ async def test_janitor_replaces_dead_browsers_without_a_request():
     dead_perm.close.assert_awaited()
     dead_hot.close.assert_awaited()
     pool.PERMANENT = None
+
+
+@pytest.mark.asyncio
+async def test_relaunch_on_shared_cdp_connection_survives_old_close():
+    """The old crawler's background close must not kill the relaunched one
+    when both share one cached CDP connection (cache_cdp_connection=True)."""
+    import socket
+    from playwright.async_api import async_playwright
+    from crawl4ai.browser_manager import _CDPConnectionCache
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    async with async_playwright() as p:
+        remote = await p.chromium.launch(
+            headless=True, args=[f"--remote-debugging-port={port}"])
+        # A fresh config per call, like real requests: start() mutates the
+        # config it was given (use_managed_browser), which changes its sig.
+        def cfg():
+            return BrowserConfig(headless=True, cdp_url=f"http://127.0.0.1:{port}",
+                                 cache_cdp_connection=True)
+        try:
+            await pool.init_permanent(cfg())
+            old = pool.PERMANENT
+            await old.crawler_strategy.browser_manager.browser.close()  # drop link
+            assert not pool._is_alive(old)
+
+            new = await pool.get_crawler(cfg())
+            assert new is pool.PERMANENT
+            await asyncio.gather(*pool._CLOSING)  # let the old close finish
+
+            assert new is not old and pool._is_alive(new)
+            await _crawl_ok(new)
+            await pool.release_crawler(new)
+        finally:
+            await pool.close_all()
+            pool.PERMANENT = None
+            await _CDPConnectionCache.close_all()
+            await remote.close()
