@@ -987,10 +987,18 @@ class EmbeddingStrategy(CrawlStrategy):
 
     async def calculate_confidence(self, state: CrawlState) -> float:
         """Coverage-based learning score (0–1)."""
+        # Calculate saturation and consistency from text statistics
+        saturation = self._calculate_saturation(state)
+        state.metrics['saturation'] = saturation
+        consistency = self._calculate_consistency(state)
+        state.metrics['consistency'] = consistency
+
         # Guard clauses
         if state.kb_embeddings is None or state.query_embeddings is None:
+            state.metrics['learning_score'] = 0.0
             return 0.0
         if len(state.kb_embeddings) == 0 or len(state.query_embeddings) == 0:
+            state.metrics['learning_score'] = 0.0
             return 0.0
 
         # Prepare L2-normalised arrays
@@ -999,8 +1007,11 @@ class EmbeddingStrategy(CrawlStrategy):
         Q /= np.linalg.norm(Q, axis=1, keepdims=True) + 1e-8
         D /= np.linalg.norm(D, axis=1, keepdims=True) + 1e-8
 
+        # Similarity matrix between queries and knowledge base
+        sim_matrix = Q @ D.T
+
         # Best cosine per query
-        best = (Q @ D.T).max(axis=1)
+        best = sim_matrix.max(axis=1)
 
         # Mean similarity or hit-rate above tau
         tau = getattr(self.config, 'coverage_tau', None)
@@ -1008,8 +1019,17 @@ class EmbeddingStrategy(CrawlStrategy):
 
         # Store quick metrics
         state.metrics['coverage_score'] = score
+        state.metrics['coverage'] = score
+        state.metrics['learning_score'] = score
         state.metrics['avg_best_similarity'] = float(best.mean())
         state.metrics['median_best_similarity'] = float(np.median(best))
+
+        # Distance and neighborhood metrics
+        min_distances = 1.0 - best
+        state.metrics['avg_min_distance'] = float(np.mean(min_distances))
+        state.metrics['avg_close_neighbors'] = float(np.mean(np.sum(sim_matrix > 0.7, axis=1)))
+        state.metrics['avg_very_close_neighbors'] = float(np.mean(np.sum(sim_matrix > 0.8, axis=1)))
+        state.metrics['total_kb_docs'] = len(state.kb_embeddings)
 
         return score
 
@@ -1230,11 +1250,102 @@ class EmbeddingStrategy(CrawlStrategy):
             
         return confidence
     
+    def _tokenize(self, text: str) -> List[str]:
+        """Simple tokenization for statistics tracking"""
+        text = re.sub(r'[^\w\s]', ' ', text)
+        tokens = text.split()
+        return [t for t in tokens if len(t) > 2]
+
+    def _get_document_terms(self, crawl_result: CrawlResult) -> List[str]:
+        """Extract terms from a crawl result"""
+        content = ""
+        if hasattr(crawl_result, 'markdown') and crawl_result.markdown:
+            if hasattr(crawl_result.markdown, 'raw_markdown'):
+                content = crawl_result.markdown.raw_markdown or ""
+            else:
+                content = str(crawl_result.markdown)
+        elif hasattr(crawl_result, 'extracted_content') and crawl_result.extracted_content:
+            content = crawl_result.extracted_content
+        elif hasattr(crawl_result, 'cleaned_html') and crawl_result.cleaned_html:
+            content = crawl_result.cleaned_html
+        return self._tokenize(content.lower())
+
+    def _calculate_saturation(self, state: CrawlState) -> float:
+        """Diminishing returns indicator - are we still discovering new information?"""
+        if not state.new_terms_history:
+            return 0.0
+
+        if len(state.new_terms_history) < 2:
+            return 0.0  # Not enough history
+
+        recent_rate = state.new_terms_history[-1] if state.new_terms_history[-1] > 0 else 1
+        initial_rate = state.new_terms_history[0] if state.new_terms_history[0] > 0 else 1
+
+        saturation = 1 - (recent_rate / initial_rate)
+        return max(0.0, min(saturation, 1.0))
+
+    def _calculate_consistency(self, state: CrawlState) -> float:
+        """Information overlap between pages - high overlap suggests coherent topic coverage"""
+        if len(state.knowledge_base) < 2:
+            return 1.0  # Single or no documents are perfectly consistent
+
+        overlaps = []
+        for i in range(len(state.knowledge_base)):
+            for j in range(i + 1, len(state.knowledge_base)):
+                terms_i = set(self._get_document_terms(state.knowledge_base[i]))
+                terms_j = set(self._get_document_terms(state.knowledge_base[j]))
+
+                if terms_i and terms_j:
+                    overlap = len(terms_i & terms_j) / len(terms_i | terms_j)
+                    overlaps.append(overlap)
+
+        return sum(overlaps) / len(overlaps) if overlaps else 0.0
+
+    def _update_text_statistics(self, state: CrawlState, new_results: List[CrawlResult]) -> None:
+        """Update term frequencies, document frequencies, and saturation tracking"""
+        for result in new_results:
+            old_term_count = len(state.term_frequencies)
+
+            content = ""
+            if hasattr(result, 'markdown') and result.markdown:
+                if hasattr(result.markdown, 'raw_markdown'):
+                    content = result.markdown.raw_markdown or ""
+                else:
+                    content = str(result.markdown)
+            elif hasattr(result, 'extracted_content') and result.extracted_content:
+                content = result.extracted_content
+            elif hasattr(result, 'cleaned_html') and result.cleaned_html:
+                content = result.cleaned_html
+
+            terms = self._tokenize(content.lower())
+
+            term_set = set()
+            for term in terms:
+                state.term_frequencies[term] += 1
+                term_set.add(term)
+
+            doc_id = state.total_documents
+            for term in term_set:
+                if term not in state.documents_with_terms[term]:
+                    state.document_frequencies[term] += 1
+                    state.documents_with_terms[term].add(doc_id)
+
+            new_term_count = len(state.term_frequencies)
+            new_terms = new_term_count - old_term_count
+            state.new_terms_history.append(new_terms)
+            state.total_documents += 1
+
+            url = getattr(result, 'url', None)
+            if url and url not in state.crawl_order:
+                state.crawl_order.append(url)
+
     async def update_state(self, state: CrawlState, new_results: List[CrawlResult]) -> None:
         """Update embeddings and coverage metrics with deduplication"""
         from .utils import get_text_embeddings
-        
-        
+
+        # Update text statistics (terms, frequencies, saturation history)
+        self._update_text_statistics(state, new_results)
+
         # Extract text from results
         new_texts = []
         valid_results = []
@@ -1243,12 +1354,12 @@ class EmbeddingStrategy(CrawlStrategy):
             if content:  # Only process non-empty content
                 new_texts.append(content[:5000])  # Limit text length
                 valid_results.append(result)
-            
+
         if not new_texts:
             return
-            
+
         # Get embeddings for new texts
-        embedding_llm_config = self._get_embedding_llm_config_dict()      
+        embedding_llm_config = self._get_embedding_llm_config_dict()
         new_embeddings = await get_text_embeddings(new_texts, embedding_llm_config, self.embedding_model)
 
         # Deduplicate embeddings before adding to KB
@@ -1260,30 +1371,26 @@ class EmbeddingStrategy(CrawlStrategy):
             # Check for duplicates using vectorized similarity
             deduplicated_embeddings = []
             deduplicated_indices = []
-            
+
             for i, new_emb in enumerate(new_embeddings):
                 # Compute similarities with existing KB
                 new_emb_normalized = new_emb / np.linalg.norm(new_emb)
                 kb_normalized = state.kb_embeddings / np.linalg.norm(state.kb_embeddings, axis=1, keepdims=True)
                 similarities = np.dot(kb_normalized, new_emb_normalized)
-                
+
                 # Only add if not too similar to existing content
                 if np.max(similarities) < self._kb_similarity_threshold:
                     deduplicated_embeddings.append(new_emb)
                     deduplicated_indices.append(i)
-            
+
             # Add deduplicated embeddings
             if deduplicated_embeddings:
                 state.kb_embeddings = np.vstack([state.kb_embeddings, np.array(deduplicated_embeddings)])
-        
-        # Update crawl order only for non-duplicate results
-        for idx in deduplicated_indices:
-            state.crawl_order.append(valid_results[idx].url)
-        
+
         # Invalidate distance matrix cache since KB changed
         self._kb_embeddings_hash = None
         self._distance_matrix_cache = None
-            
+
         # Update coverage shape if needed
         if hasattr(state, 'query_embeddings') and state.query_embeddings is not None:
             state.coverage_shape = self.compute_coverage_shape(state.query_embeddings, self.config.alpha_shape_alpha if hasattr(self, 'config') else 0.5)
@@ -1608,6 +1715,7 @@ class AdaptiveCrawler:
                 table.add_row("Avg Min Distance", f"{self.state.metrics.get('avg_min_distance', 0):.3f}")
                 table.add_row("Avg Close Neighbors", f"{self.state.metrics.get('avg_close_neighbors', 0):.1f}")
                 table.add_row("Validation Score", f"{self.state.metrics.get('validation_confidence', 0):.2%}")
+                table.add_row("Saturation", f"{stats.get('saturation', 0):.2%}")
                 table.add_row("", "")  # Spacer
                 table.add_row("Is Sufficient?", "[green]Yes (Validated)[/green]" if self.is_sufficient else "[red]No[/red]")
             else:
