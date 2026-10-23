@@ -70,6 +70,8 @@ We would like to thank the following people for their contributions to Crawl4AI:
 - [cardit1](https://github.com/cardit1) - fix: ['AsyncPlaywrightCrawlerStrategy' object has no attribute 'downloads_path'](https://github.com/unclecode/crawl4ai/issues/585)
 - [dmurat](https://github.com/dmurat) - fix: [ Incorrect rendering of inline code inside of links ](https://github.com/unclecode/crawl4ai/issues/583)
 - [Sparshsing](https://github.com/Sparshsing) - fix: [Relative Urls in the webpage not extracted properly ](https://github.com/unclecode/crawl4ai/issues/570)
+- [QuangDuyReal](https://github.com/QuangDuyReal) - feat: calculate text statistics, saturation, and metrics in AdaptiveCrawler embedding strategy
+
 
 
 
