@@ -87,6 +87,7 @@ strategy = BFSDeepCrawlStrategy(
 - **`score_threshold`**: Minimum score for URLs to be crawled (default: -inf)
 - **`filter_chain`**: FilterChain instance for URL filtering
 - **`url_scorer`**: Scorer instance for evaluating URLs
+- **`dispatcher`**: Dispatcher forwarded to `arun_many()` for each batch (optional, see [8.3](#83-using-batch_size-and-dispatcher))
 
 ### 2.2 DFSDeepCrawlStrategy (Depth-First Search)
 
@@ -111,6 +112,7 @@ strategy = DFSDeepCrawlStrategy(
 - **`score_threshold`**: Minimum score for URLs to be crawled (default: -inf)
 - **`filter_chain`**: FilterChain instance for URL filtering
 - **`url_scorer`**: Scorer instance for evaluating URLs
+- **`dispatcher`**: Dispatcher forwarded to `arun_many()` for each batch (optional, see [8.3](#83-using-batch_size-and-dispatcher))
 
 ### 2.3 BestFirstCrawlingStrategy (⭐️ - Recommended Deep crawl strategy)
 
@@ -141,6 +143,7 @@ This crawling approach:
 - Helps focus crawl resources on the most relevant content
 - Can limit total pages crawled with `max_pages`
 - Does not need `score_threshold` as it naturally prioritizes by score
+- Crawls URLs in rounds of `batch_size` (default: 10), see [8.3](#83-using-batch_size-and-dispatcher)
 
 ---
 
@@ -461,6 +464,36 @@ strategy = DFSDeepCrawlStrategy(
 ```
 
 Note that for BestFirstCrawlingStrategy, score_threshold is not needed since pages are already processed in order of highest score first.
+
+### 8.3 Using batch_size and dispatcher
+
+Deep crawl strategies hand URLs to `arun_many()` in batches: BFS one level at a time, DFS one URL at a time, and BestFirst in rounds of `batch_size` URLs. You can pass a `dispatcher` to any strategy to control how each batch is crawled, for example to rate-limit requests to a site:
+
+```python
+from crawl4ai import RateLimiter
+from crawl4ai.async_dispatcher import MemoryAdaptiveDispatcher
+
+dispatcher = MemoryAdaptiveDispatcher(
+    max_session_permit=5,      # At most 5 concurrent pages
+    rate_limiter=RateLimiter(  # Back off on 429/503 responses
+        base_delay=(1.0, 2.0),
+        max_delay=30.0,
+        max_retries=2
+    ),
+)
+
+strategy = BestFirstCrawlingStrategy(
+    max_depth=2,
+    url_scorer=scorer,
+    max_pages=50,
+    batch_size=5,              # URLs pulled from the priority queue per round (default: 10)
+    dispatcher=dispatcher,     # Forwarded to arun_many() for every batch (optional)
+)
+```
+
+Note that `arun_many()` runs once per batch, so the dispatcher is started and stopped around every batch rather than once for the whole crawl. The rate limiter's per-domain delays carry over between batches, but the dispatcher's memory monitoring restarts each batch, and an attached `CrawlerMonitor` resets its timer and terminal display each batch.
+
+See [Advanced Multi-URL Crawling](../advanced/multi-url-crawling.md) for all dispatcher options.
 
 ## 9. Common Pitfalls & Tips
 
