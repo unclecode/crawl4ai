@@ -543,10 +543,16 @@ class AsyncWebCrawler:
                                     tag="ANTIBOT",
                                 )
                                 _block_reason = str(_crawl_err)
-                                # If this is the only proxy and only attempt, re-raise
-                                # so the caller gets the real error (not a silent swallow).
-                                # But if there are more proxies or retries to try, continue.
-                                if len(_proxy_list) <= 1 and _max_attempts <= 1:
+                                # Preserve the error when neither another attempt
+                                # nor a fallback is available.
+                                if (
+                                    len(_proxy_list) <= 1
+                                    and _max_attempts <= 1
+                                    and (
+                                        _is_raw_url
+                                        or not config.fallback_fetch_function
+                                    )
+                                ):
                                     raise
 
                     # Restore original proxy_config
