@@ -2647,7 +2647,7 @@ class RegexExtractionStrategy(ExtractionStrategy):
         # Money / numbers
         "currency":        r"(?:USD|EUR|RM|\$|€|£)\s?\d+(?:[.,]\d{2})?",
         "percentage":      r"\d+(?:\.\d+)?%",
-        "number":          r"\b\d{1,3}(?:[,.\s]\d{3})*(?:\.\d+)?\b",
+        "number":          r"\b(?:\d{1,3}(?:[,.\s]\d{3})*|\d+)(?:\.\d+)?\b",
         # Dates / Times
         "date_iso":        r"\d{4}-\d{2}-\d{2}",
         "date_us":         r"\d{1,2}/\d{1,2}/\d{2,4}",
