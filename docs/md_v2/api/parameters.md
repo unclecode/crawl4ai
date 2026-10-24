@@ -209,6 +209,8 @@ If your page is a single-page app with repeated JS updates, set `js_only=True` i
 
 Use these for link-level content filtering (often to keep crawls “internal” or to remove spammy domains).
 
+`exclude_internal_links` filters only `result.links["internal"]`; it leaves anchors and their text in cleaned HTML and generated Markdown unchanged.
+
 ---
 
 ### H) **Debug, Logging & Network Monitoring**
