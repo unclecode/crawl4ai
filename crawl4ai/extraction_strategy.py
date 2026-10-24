@@ -2502,6 +2502,9 @@ class JsonXPathExtractionStrategy(JsonElementExtractionStrategy):
         return element.xpath(xpath)
 
     def _get_element_text(self, element) -> str:
+        # XPath text() and attribute selections return strings, not elements.
+        if isinstance(element, str):
+            return element.strip()
         return "".join(element.xpath(".//text()")).strip()
 
     def _get_element_html(self, element) -> str:
