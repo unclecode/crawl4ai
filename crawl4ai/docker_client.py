@@ -180,7 +180,7 @@ class Crawl4aiDockerClient:
                                 yield CrawlResult(**result)
             return stream_results()
 
-        response = await self._request("POST", "/crawl", json=data, timeout=hooks_timeout)
+        response = await self._request("POST", "/crawl", json=data)
         result_data = response.json()
         if not result_data.get("success", False):
             raise RequestError(f"Crawl failed: {result_data.get('msg', 'Unknown error')}")
