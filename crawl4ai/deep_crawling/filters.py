@@ -262,8 +262,6 @@ class ContentTypeFilter(URLFilter):
 
     __slots__ = ("allowed_types", "_ext_map", "_check_extension")
 
-    # Constructor arguments, read back by to_serializable_dict() so the object
-    # survives CrawlerRunConfig.dump()/load().
     @property
     def check_extension(self) -> bool:
         return self._check_extension

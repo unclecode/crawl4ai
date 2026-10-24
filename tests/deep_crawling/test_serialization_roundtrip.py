@@ -110,4 +110,11 @@ def test_best_first_scorer_with_required_arguments_loads():
         )
     )
     back = CrawlerRunConfig.load(json.loads(json.dumps(cfg.dump())))
-    assert back.deep_crawl_strategy.url_scorer.keywords == ["api", "guide"]
+    original, loaded = (
+        cfg.deep_crawl_strategy.url_scorer,
+        back.deep_crawl_strategy.url_scorer,
+    )
+    assert [loaded.score(u) for u in URLS] == pytest.approx(
+        [original.score(u) for u in URLS]
+    )
+    assert loaded.score("https://docs.example.com/guide/api") > 0
