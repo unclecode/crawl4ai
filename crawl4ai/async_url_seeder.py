@@ -846,7 +846,7 @@ class AsyncUrlSeeder:
         if path.exists() and not force:
             self._log("info", "Loading CC URLs for {domain} from cache: {path}",
                       params={"domain": domain, "path": path}, tag="URL_SEED")
-            async with aiofiles.open(path, "r") as fp:
+            async with aiofiles.open(path, "r", encoding="utf-8") as fp:
                 async for line in fp:
                     url = line.strip()
                     if _match(url, pattern):
@@ -864,7 +864,9 @@ class AsyncUrlSeeder:
             try:
                 async with self.client.stream("GET", url) as r:
                     r.raise_for_status()
-                    async with aiofiles.open(path, "w") as fp:
+                    # URLs may contain non-ASCII characters; pin UTF-8 so the cache
+                    # round-trips on any system locale.
+                    async with aiofiles.open(path, "w", encoding="utf-8") as fp:
                         async for line in r.aiter_lines():
                             rec = json.loads(line)
                             u = rec["url"]
