@@ -363,8 +363,8 @@ Enable detailed logging by setting `DEBUG = True` in `assets/app.js`
 
 ## 📚 Additional Resources
 
-- **[C4A-Script Documentation](../../md_v2/core/c4a-script.md)** - Complete language guide
-- **[API Reference](../../md_v2/api/c4a-script-reference.md)** - Detailed command documentation
+- **[C4A-Script Documentation](../../core/c4a-script.md)** - Complete language guide
+- **[API Reference](../../api/c4a-script-reference.md)** - Detailed command documentation
 - **[Live Demo](https://docs.crawl4ai.com/c4a-script/demo)** - Try without installation
 - **[Example Scripts](../)** - More automation examples
 
