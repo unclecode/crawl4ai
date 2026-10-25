@@ -84,7 +84,6 @@ class ManagedBrowser:
     def build_browser_flags(config: BrowserConfig) -> List[str]:
         """Common CLI flags for launching Chromium"""
         flags = [
-            "--no-sandbox",
             "--disable-dev-shm-usage",
             "--no-first-run",
             "--no-default-browser-check",
@@ -104,6 +103,8 @@ class ManagedBrowser:
             "--disable-component-update",
             "--disable-domain-reliability",
         ]
+        if config.no_sandbox:
+            flags.append("--no-sandbox")
         # GPU flags disable WebGL which anti-bot sensors detect as headless.
         # Keep WebGL working (via SwiftShader) when stealth mode is active.
         if not config.enable_stealth:
@@ -1116,7 +1117,6 @@ class BrowserManager:
             "--disable-gpu",
             "--disable-gpu-compositing",
             "--disable-software-rasterizer",
-            "--no-sandbox",
             "--disable-dev-shm-usage",
             "--no-first-run",
             "--no-default-browser-check",
@@ -1138,6 +1138,9 @@ class BrowserManager:
             # "--single-process",
             f"--window-size={self.config.viewport_width},{self.config.viewport_height}",
         ]
+
+        if self.config.no_sandbox:
+            args.append("--no-sandbox")
 
         if self.config.memory_saving_mode:
             args.extend([
