@@ -10,6 +10,7 @@ Regression tests for https://github.com/unclecode/crawl4ai/issues/1749
 import pytest
 from unittest.mock import MagicMock
 
+from crawl4ai.async_configs import LinkPreviewConfig
 from crawl4ai.models import Link, Links
 from crawl4ai.link_preview import LinkPreview
 from crawl4ai.utils import calculate_total_score
@@ -181,3 +182,37 @@ class TestMergeHeadDataScoring:
         updated = preview._merge_head_data(links, head_results, config)
 
         assert updated.internal[0].total_score == 5.0
+
+
+class TestFilterLinksDeduplication:
+    """_filter_links must deduplicate BEFORE applying max_links, so the limit
+    counts distinct URLs instead of being spent on duplicate copies.
+
+    Regression for the truncate-before-dedup bug: with duplicate links at the
+    head of the list, the old code sliced [:max_links] first and then collapsed
+    the duplicates, returning far fewer than max_links unique URLs.
+    """
+
+    @staticmethod
+    def _internal(hrefs):
+        return Links(internal=[Link(href=h) for h in hrefs], external=[])
+
+    def test_dedup_runs_before_max_links(self):
+        # First three entries are duplicates of "a"; max_links=3 must still
+        # yield three DISTINCT urls, not collapse to one.
+        hrefs = ["https://x.com/a"] * 3 + ["https://x.com/b", "https://x.com/c", "https://x.com/d"]
+        cfg = LinkPreviewConfig(include_internal=True, include_external=False, max_links=3)
+        result = LinkPreview()._filter_links(self._internal(hrefs), cfg)
+        assert result == ["https://x.com/a", "https://x.com/b", "https://x.com/c"]
+
+    def test_keeps_all_when_uniques_below_max(self):
+        hrefs = ["https://x.com/a", "https://x.com/a", "https://x.com/b"]
+        cfg = LinkPreviewConfig(include_internal=True, include_external=False, max_links=3)
+        result = LinkPreview()._filter_links(self._internal(hrefs), cfg)
+        assert result == ["https://x.com/a", "https://x.com/b"]
+
+    def test_caps_distinct_urls_at_max(self):
+        hrefs = [f"https://x.com/{i}" for i in range(5)]
+        cfg = LinkPreviewConfig(include_internal=True, include_external=False, max_links=3)
+        result = LinkPreview()._filter_links(self._internal(hrefs), cfg)
+        assert result == ["https://x.com/0", "https://x.com/1", "https://x.com/2"]

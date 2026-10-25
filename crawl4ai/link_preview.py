@@ -154,24 +154,27 @@ class LinkPreview:
             self._log("debug", "After exclude patterns: {count} links remain",
                       params={"count": len(filtered_urls)})
         
-        # Limit number of links
-        max_links = link_config.max_links
-        if max_links > 0 and len(filtered_urls) > max_links:
-            filtered_urls = filtered_urls[:max_links]
-            self._log("debug", "Limited to {max_links} links",
-                      params={"max_links": max_links})
-        
-        # Remove duplicates while preserving order
+        # Remove duplicates while preserving order. This must run BEFORE the
+        # max_links limit: truncating first spends the budget on duplicate
+        # copies of the same URL (common for repeated nav/footer links), so the
+        # subsequent dedup would yield far fewer than max_links unique URLs.
         seen = set()
         unique_urls = []
         for url in filtered_urls:
             if url not in seen:
                 seen.add(url)
                 unique_urls.append(url)
-        
+
+        # Limit number of links (counting distinct URLs)
+        max_links = link_config.max_links
+        if max_links > 0 and len(unique_urls) > max_links:
+            unique_urls = unique_urls[:max_links]
+            self._log("debug", "Limited to {max_links} links",
+                      params={"max_links": max_links})
+
         self._log("debug", "Final filtered URLs: {count} unique links",
                   params={"count": len(unique_urls)})
-        
+
         return unique_urls
     
     async def _extract_heads_parallel(
