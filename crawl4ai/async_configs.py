@@ -243,7 +243,10 @@ _SCHEMA_STRATEGIES = {
 
 def _has_regex_field(node) -> bool:
     if isinstance(node, dict):
-        return node.get("type") == "regex" or any(_has_regex_field(v) for v in node.values())
+        # The extractor also runs "type" as a list of steps (["text", "regex"]).
+        steps = node.get("type")
+        steps = steps if isinstance(steps, list) else [steps]
+        return "regex" in steps or any(_has_regex_field(v) for v in node.values())
     if isinstance(node, list):
         return any(_has_regex_field(v) for v in node)
     return False

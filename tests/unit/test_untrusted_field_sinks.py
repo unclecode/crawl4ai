@@ -124,3 +124,93 @@ def test_trusted_regex_unchanged():
         "type": "RegexChunking", "params": {"patterns": [r"\n"]},
     }}, Provenance.TRUSTED)
     assert cfg.chunking_strategy.patterns == [r"\n"]
+
+
+# ── list-form "type" pipeline (report 2026-10, bypass of GHSA-j843) ─────
+
+
+SCHEMA_STRATEGIES = ["JsonCssExtractionStrategy", "JsonXPathExtractionStrategy", "JsonLxmlExtractionStrategy"]
+
+
+def _list_regex(steps):
+    return {"name": "f", "selector": "span", "type": steps, "pattern": "(a+)+$"}
+
+
+@pytest.mark.parametrize(
+    "steps",
+    [["regex"], ["text", "regex"], ["attribute", "regex"], ["html", "regex"],
+     ["regex", "text"], ["regex", "regex"]],
+)
+@pytest.mark.parametrize(
+    "place",
+    ["fields", "nested", "list", "nested_list", "baseFields", "dict_envelope"],
+)
+@pytest.mark.parametrize("strategy", SCHEMA_STRATEGIES)
+def test_untrusted_list_type_with_regex_refused(strategy, place, steps):
+    field = _list_regex(steps)
+    if place == "fields":
+        schema = _schema(field)
+    elif place == "baseFields":
+        schema = {"name": "x", "baseSelector": "p", "baseFields": [field], "fields": []}
+    elif place == "dict_envelope":
+        schema = {"type": "dict", "value": _schema(field)}
+    else:
+        schema = _schema({"name": "n", "selector": "div", "type": place, "fields": [field]})
+    with pytest.raises(UntrustedConfigError):
+        _load({"extraction_strategy": {"type": strategy, "params": {"schema": schema}}})
+
+
+@pytest.mark.parametrize("steps", [["text"], ["attribute", "text"], ["html"], []])
+def test_untrusted_benign_list_type_still_allowed(steps):
+    field = {"name": "regex", "selector": "span", "type": steps, "attribute": "title"}
+    cfg = _load({"extraction_strategy": {
+        "type": "JsonCssExtractionStrategy", "params": {"schema": _schema(field)},
+    }})
+    assert type(cfg.extraction_strategy).__name__ == "JsonCssExtractionStrategy"
+
+
+def test_trusted_list_type_regex_still_runs():
+    cfg = _load({"extraction_strategy": {
+        "type": "JsonCssExtractionStrategy",
+        "params": {"schema": _schema({"name": "n", "selector": "span",
+                                      "type": ["text", "regex"], "pattern": r"(\d+)"})},
+    }}, Provenance.TRUSTED)
+    assert cfg.extraction_strategy.extract("raw:", "<p><span>id 42</span></p>") == [{"n": "42"}]
+
+
+def test_no_untrusted_schema_reaches_re_search(monkeypatch):
+    """Gate and sink agree: every field shape the untrusted gate accepts is
+    run, and none of them may call the extractor's re.search."""
+    import itertools
+    import crawl4ai.extraction_strategy as es
+
+    real_search = es.re.search
+    ran = []
+
+    def tripwire(pattern, *a, **k):
+        # Recorded, not raised: the extractor catches per-field errors.
+        if pattern == "(a+)+$":
+            ran.append(pattern)
+            return None
+        return real_search(pattern, *a, **k)  # the library's own fixed patterns
+
+    monkeypatch.setattr(es.re, "search", tripwire)
+    words = ["text", "attribute", "html", "regex", "nested", "list", "Regex", None]
+    shapes = [w for w in words] + [list(p) for n in (1, 2, 3) for p in itertools.product(words[:4], repeat=n)]
+    accepted = 0
+    for strategy, steps in itertools.product(SCHEMA_STRATEGIES, shapes):
+        sel = "//span" if strategy == "JsonXPathExtractionStrategy" else "span"
+        base = "//p" if strategy == "JsonXPathExtractionStrategy" else "p"
+        field = {"name": "f", "selector": sel, "type": steps, "pattern": "(a+)+$", "attribute": "title"}
+        schema = {"name": "x", "baseSelector": base, "fields": [field]}
+        try:
+            cfg = _load({"extraction_strategy": {"type": strategy, "params": {"schema": schema}}})
+        except UntrustedConfigError:
+            continue
+        accepted += 1
+        try:
+            cfg.extraction_strategy.extract("raw:", '<p><span title="t">aaaa!</span></p>')
+        except Exception:
+            pass  # a malformed step may fail in other ways; only the regex matters
+        assert not ran, (strategy, steps)
+    assert accepted > 50  # the sweep really exercised accepted shapes
