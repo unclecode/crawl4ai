@@ -189,7 +189,7 @@ class KeywordRelevanceScorer(URLScorer):
 
 class PathDepthScorer(URLScorer):
     __slots__ = ('_weight', '_stats', '_optimal_depth')  # Remove _url_cache
-    
+
     def __init__(self, optimal_depth: int = 3, weight: float = 1.0):
         super().__init__(weight=weight)
         self._optimal_depth = optimal_depth
@@ -207,13 +207,13 @@ class PathDepthScorer(URLScorer):
         """
         if not path or path == '/':
             return 0
-            
+
         if '/' not in path:
             return 0
-            
+
         depth = 0
         last_was_slash = True
-        
+
         for c in path:
             if c == '/':
                 if not last_was_slash:
@@ -221,27 +221,28 @@ class PathDepthScorer(URLScorer):
                 last_was_slash = True
             else:
                 last_was_slash = False
-                
+
         if not last_was_slash:
             depth += 1
-            
+
         return depth
 
     @lru_cache(maxsize=10000)  # Cache the whole calculation
     def _calculate_score(self, url: str) -> float:
+        url = url.split("?", 1)[0].split("#", 1)[0]
         pos = url.find('/', url.find('://') + 3)
         if pos == -1:
             depth = 0
         else:
             depth = self._quick_depth(url[pos:])
-            
+
         # Use lookup table for common distances
         distance = depth - self._optimal_depth
         distance = distance if distance >= 0 else -distance  # Faster than abs()
-        
+
         if distance < 4:
             return _SCORE_LOOKUP[distance]
-            
+
         return 1.0 / (1.0 + distance)                                             
 
 class ContentTypeScorer(URLScorer):
