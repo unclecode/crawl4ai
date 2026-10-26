@@ -2398,6 +2398,8 @@ class CrawlerRunConfig():
             "disable_cache": self.disable_cache,
             "no_cache_read": self.no_cache_read,
             "no_cache_write": self.no_cache_write,
+            "check_cache_freshness": self.check_cache_freshness,
+            "cache_validation_timeout": self.cache_validation_timeout,
             "shared_data": self.shared_data,
             "wait_until": self.wait_until,
             "page_timeout": self.page_timeout,
@@ -2424,6 +2426,7 @@ class CrawlerRunConfig():
             "override_navigator": self.override_navigator,
             "magic": self.magic,
             "adjust_viewport_to_content": self.adjust_viewport_to_content,
+            "virtual_scroll_config": self.virtual_scroll_config,
             "screenshot": self.screenshot,
             "screenshot_wait_for": self.screenshot_wait_for,
             "screenshot_height_threshold": self.screenshot_height_threshold,
@@ -2461,6 +2464,7 @@ class CrawlerRunConfig():
             "match_mode": self.match_mode,
             "experimental": self.experimental,
             "max_retries": self.max_retries,
+            "fallback_fetch_function": self.fallback_fetch_function,
         }
 
     def clone(self, **kwargs):
