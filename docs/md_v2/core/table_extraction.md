@@ -89,6 +89,10 @@ The strategy pattern allows you to choose different table extraction algorithms 
 
 ### DefaultTableExtraction
 
+In structured table results, body cells with `rowspan` repeat their values
+within the same row group (`tbody` or `tfoot`). A `rowspan="0"` covers the
+remaining rows of that group; a longer span stops at the group's last row.
+
 The default strategy uses a sophisticated scoring system to identify data tables:
 
 ```python
