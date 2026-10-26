@@ -149,10 +149,10 @@ def list_numbering_start(attrs: Dict[str, Optional[str]]) -> int:
 
     :rtype: int or None
     """
-    if "start" in attrs:
-        assert attrs["start"] is not None
+    start = attrs.get("start")
+    if start is not None:
         try:
-            return int(attrs["start"]) - 1
+            return int(start) - 1
         except ValueError:
             pass
 
