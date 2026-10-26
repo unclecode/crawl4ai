@@ -1,5 +1,7 @@
 """CrawlerRunConfig.clone() must carry over fields that to_dict() used to drop."""
 
+import inspect
+
 from crawl4ai import CrawlerRunConfig
 from crawl4ai.async_configs import VirtualScrollConfig
 
@@ -36,3 +38,11 @@ def test_clone_preserves_cache_validation_and_virtual_scroll():
     assert cloned.check_cache_freshness is True
     assert cloned.cache_validation_timeout == 3.5
     assert cloned.virtual_scroll_config is scroll
+
+
+def test_to_dict_covers_every_init_param():
+    params = set(inspect.signature(CrawlerRunConfig.__init__).parameters) - {"self"}
+    # c4a_script is compiled into js_code, which to_dict() carries.
+    missing = params - set(CrawlerRunConfig().to_dict()) - {"c4a_script"}
+
+    assert not missing, f"add these to CrawlerRunConfig.to_dict(): {sorted(missing)}"
