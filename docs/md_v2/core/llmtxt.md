@@ -1,5 +1,5 @@
 I<div class="llmtxt-container">
-<iframe id="llmtxt-frame" src="../../llmtxt/index.html" width="100%" style="border:none; display: block;" title="Crawl4AI LLM Context Builder"></iframe>
+<iframe id="llmtxt-frame" src="../../apps/llmtxt/index.html" width="100%" style="border:none; display: block;" title="Crawl4AI LLM Context Builder"></iframe>
 </div>
 
 <script>

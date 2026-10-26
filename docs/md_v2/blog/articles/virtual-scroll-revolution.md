@@ -348,7 +348,7 @@ Welcome to the future of web scraping. Welcome to a world where virtual scroll i
 ## Learn More
 
 - 📖 [Virtual Scroll Documentation](https://docs.crawl4ai.com/advanced/virtual-scroll) - Complete API reference and configuration options
-- 💻 [Interactive Examples](https://docs.crawl4ai.com/examples/virtual_scroll_example.py) - Try it yourself with our test server
+- 💻 [Interactive Examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/virtual_scroll_example.py) - Try it yourself with our test server
 - 🚀 [Get Started with Crawl4AI](https://docs.crawl4ai.com/core/quickstart) - Full installation and setup guide
 - 🤝 [Join our Community](https://github.com/unclecode/crawl4ai) - Share your experiences and get help
 
