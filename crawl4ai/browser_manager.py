@@ -991,7 +991,7 @@ class BrowserManager:
             elif self.config.browser_type == "webkit":
                 self.browser = await self.playwright.webkit.launch(**browser_args)
             else:
-                self.browser = await self.playwright.chromium.launch(**browser_args)
+                self.browser = await self._launch_chromium(browser_args)
 
             self.default_context = self.browser
 
@@ -1110,6 +1110,25 @@ class BrowserManager:
         self.logger.debug(f"CDP verification failed after 5 attempts", tag="BROWSER")
         return False
 
+    async def _launch_chromium(self, browser_args: dict):
+        """Launch Chromium, falling back to Playwright's default binary when the
+        default full Chromium can't start (only chrome-headless-shell installed,
+        or the Windows exit-code-0 crash from #2051)."""
+        try:
+            return await self.playwright.chromium.launch(**browser_args)
+        except Exception as e:
+            if browser_args.get("channel") != "chromium":
+                raise
+            if self.logger:
+                self.logger.warning(
+                    f"Full Chromium failed to start ({str(e).splitlines()[0]}); "
+                    "falling back to chrome-headless-shell, which can behave differently. "
+                    "Run 'crawl4ai-setup' to install full Chromium.",
+                    tag="BROWSER",
+                )
+            fallback_args = {k: v for k, v in browser_args.items() if k != "channel"}
+            return await self.playwright.chromium.launch(**fallback_args)
+
     def _build_browser_args(self) -> dict:
         """Build browser launch arguments from config."""
         args = [
@@ -1171,11 +1190,11 @@ class BrowserManager:
         if chromium_sandbox_requested():
             browser_args["chromium_sandbox"] = True
 
-        # On Windows, passing channel='chromium' (the default) causes Playwright
-        # to look for a system Chrome installation instead of using the bundled
-        # ms-playwright binary.  This makes Chrome exit immediately with code 0,
-        # resulting in TargetClosedError.  Skip the default channel.
-        if self.config.chrome_channel and self.config.chrome_channel != "chromium":
+        # channel='chromium' (the default) launches the bundled full Chromium.
+        # Without a channel, headless Playwright launches chrome-headless-shell,
+        # which behaves differently (e.g. no automatic HTTPS upgrade, #2382).
+        # If full Chromium can't start, _launch_chromium falls back to the shell.
+        if self.config.chrome_channel:
             browser_args["channel"] = self.config.chrome_channel
 
         if self.config.accept_downloads:
