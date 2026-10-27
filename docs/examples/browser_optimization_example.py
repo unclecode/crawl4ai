@@ -34,7 +34,7 @@ async def crawl_sequential(urls: List[str]):
     # Configure crawl settings
     crawl_config = CrawlerRunConfig(
         markdown_generator=DefaultMarkdownGenerator(
-            #  content_filter=PruningContentFilter(), In case you need fit_markdown
+            #  content_filter=PruningContentFilterLXML(), In case you need fit_markdown
         ),
     )
 
@@ -71,7 +71,7 @@ async def crawl_parallel(urls: List[str], max_concurrent: int = 3):
 
     crawl_config = CrawlerRunConfig(
         markdown_generator=DefaultMarkdownGenerator(
-            #  content_filter=PruningContentFilter(), In case you need fit_markdown
+            #  content_filter=PruningContentFilterLXML(), In case you need fit_markdown
         ),
     )
 

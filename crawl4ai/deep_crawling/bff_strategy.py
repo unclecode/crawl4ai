@@ -179,6 +179,13 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             base_url = normalize_url_for_deep_crawl(url, source_url)
             if base_url in visited:
                 continue
+            # Already queued at an equal or shallower depth: a second entry would
+            # be scored and dropped for nothing. A strictly shallower find still
+            # has to re-queue, so the URL is crawled at its true distance from the
+            # start and its own children stay inside max_depth.
+            queued_depth = depths.get(base_url)
+            if queued_depth is not None and queued_depth <= new_depth:
+                continue
             if not await self.can_process_url(base_url, new_depth):
                 self.stats.urls_skipped += 1
                 continue
@@ -228,6 +235,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             await queue.put((-initial_score, 0, start_url, None))
             visited: Set[str] = set()
             depths: Dict[str, int] = {start_url: 0}
+            self._pages_crawled = 0
             # Initialize shadow list if callback is set
             if self._on_state_change:
                 self._queue_shadow = [(-initial_score, 0, start_url, None)]

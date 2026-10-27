@@ -1,4 +1,4 @@
-from crawl4ai import BrowserConfig, CrawlerRunConfig, PruningContentFilter, DefaultMarkdownGenerator
+from crawl4ai import BrowserConfig, CrawlerRunConfig, PruningContentFilterLXML, DefaultMarkdownGenerator
 from crawl4ai.deep_crawling.filters import ContentTypeFilter, DomainFilter
 from crawl4ai.deep_crawling.scorers import KeywordRelevanceScorer, PathDepthScorer
 from crawl4ai.cache_context import CacheMode
@@ -42,7 +42,7 @@ async def part1_basic_config():
     crawler_config = CrawlerRunConfig(
         word_count_threshold=200,
         markdown_generator=DefaultMarkdownGenerator(
-            content_filter=PruningContentFilter(threshold=0.5)
+            content_filter=PruningContentFilterLXML(threshold=0.5)
         )
     )
     
@@ -90,7 +90,7 @@ async def part3_complex_structures():
     config = CrawlerRunConfig(
         cache_mode=CacheMode.BYPASS,
         markdown_generator=DefaultMarkdownGenerator(
-            content_filter=PruningContentFilter()
+            content_filter=PruningContentFilterLXML()
         ),
         deep_crawl_strategy=BFSDeepCrawlStrategy(
             max_depth=5,
@@ -172,7 +172,7 @@ async def part5_direct_api():
                     "type": "DefaultMarkdownGenerator",
                     "params": {
                         "content_filter": {
-                            "type": "PruningContentFilter",
+                            "type": "PruningContentFilterLXML",
                             "params": {
                                 "threshold": 0.48,
                                 "threshold_type": "fixed"

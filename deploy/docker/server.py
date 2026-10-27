@@ -102,6 +102,8 @@ EXECUTE_JS_ENABLED = os.environ.get("CRAWL4AI_EXECUTE_JS_ENABLED", "false").lowe
 # an unprivileged user namespace (unprivileged_userns_clone=1) or a seccomp
 # profile, set CRAWL4AI_CHROMIUM_SANDBOX=true to drop --no-sandbox and run the
 # renderer sandboxed. Verify Chromium still starts after flipping it.
+# crawl4ai.browser_manager reads the same variable at launch, so the sandbox
+# also applies to browsers built from a request body, not only this config.
 CHROMIUM_SANDBOX = os.environ.get("CRAWL4AI_CHROMIUM_SANDBOX", "false").lower() == "true"
 
 # Warn loudly if API token is not set (all endpoints unauthenticated)
@@ -211,11 +213,18 @@ async def lifespan(_: FastAPI):
     from egress_proxy import PinningProxy
     from egress_broker import set_egress_proxy
     app.state.egress_proxy = PinningProxy()
-    set_egress_proxy(await app.state.egress_proxy.start())
+    _proxy_url = await app.state.egress_proxy.start()
+    set_egress_proxy(_proxy_url)
 
-    # The pinning proxy only covers Chromium. PDFContentScrapingStrategy fetches
-    # with requests on its own, so hand the library the same destination policy
-    # or that path stays an unguarded SSRF hole.
+    # Chromium is only one of the clients that fetch a caller-chosen URL. The
+    # library's own HTTP clients -- the URL seeder (link previews, sitemaps) and
+    # RobotsParser -- take a proxy kwarg, so point them at the same pinning
+    # proxy or those paths stay unguarded SSRF holes.
+    from crawl4ai.egress_policy import set_egress_proxy as set_library_egress_proxy
+    set_library_egress_proxy(_proxy_url)
+
+    # PDFContentScrapingStrategy fetches with requests, which has no proxy hook
+    # we can rely on here, so it gets the same destination policy by injection.
     _install_pdf_egress_policy()
 
     # Bounded background-job queue (per-principal quotas optional).
@@ -232,10 +241,7 @@ async def lifespan(_: FastAPI):
     monitor_module.monitor_stats.start_persistence_worker()
 
     # Initialize browser pool
-    await init_permanent(BrowserConfig(
-        extra_args=_browser_extra_args(),
-        **config["crawler"]["browser"].get("kwargs", {}),
-    ))
+    await init_permanent(get_default_browser_config())
 
     # Start background tasks
     app.state.janitor = asyncio.create_task(janitor())
@@ -838,8 +844,8 @@ async def execute_js(
             html: str
             success: bool
             cleaned_html: Optional[str] = None
-            media: Dict[str, List[Dict]] = {}
-            links: Dict[str, List[Dict]] = {}
+            media: Dict[str, List[Dict]] = {"images": [], "videos": [], "audios": []}
+            links: Dict[str, List[Dict]] = {"internal": [], "external": []}
             downloaded_files: Optional[List[str]] = None
             js_execution_result: Optional[Dict[str, Any]] = None
             screenshot: Optional[str] = None
@@ -1028,7 +1034,8 @@ async def stream_process(crawl_request: CrawlRequestWithHooks):
         browser_config=crawl_request.browser_config,
         crawler_config=crawl_request.crawler_config,
         config=config,
-        hooks_config=hooks_config
+        hooks_config=hooks_config,
+        crawler_configs=crawl_request.crawler_configs,
     )
     
     # Add hooks info to response headers if available

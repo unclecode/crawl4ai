@@ -418,7 +418,7 @@ When crawling diverse content types, you often need different configurations for
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, MatchMode
 from crawl4ai.processors.pdf import PDFContentScrapingStrategy
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 async def crawl_mixed_content():
@@ -434,7 +434,7 @@ async def crawl_mixed_content():
         CrawlerRunConfig(
             url_matcher=["*/blog/*", "*/article/*"],
             markdown_generator=DefaultMarkdownGenerator(
-                content_filter=PruningContentFilter(threshold=0.48)
+                content_filter=PruningContentFilterLXML(threshold=0.48)
             )
         ),
         

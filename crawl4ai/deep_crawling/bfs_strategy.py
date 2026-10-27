@@ -150,7 +150,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             return
 
         # If we've reached the max pages limit, don't discover new links
-        remaining_capacity = self.max_pages - self._pages_crawled
+        remaining_capacity = self.max_pages - self._pages_crawled - len(next_level)
         if remaining_capacity <= 0:
             self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping link discovery")
             return
@@ -232,6 +232,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             # current_level holds tuples: (url, parent_url)
             current_level: List[Tuple[str, Optional[str]]] = [(start_url, None)]
             depths: Dict[str, int] = {start_url: 0}
+            self._pages_crawled = 0
 
         results: List[CrawlResult] = []
 
@@ -247,7 +248,15 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 break
 
             next_level: List[Tuple[str, Optional[str]]] = []
+            # Siblings in a level queue links before the level's own pages are all
+            # counted, so cap the level to the budget left before fetching it.
+            # max_pages defaults to infinity, which is not a valid slice index.
+            remaining = self.max_pages - self._pages_crawled
+            if remaining < len(current_level):
+                current_level = current_level[:max(int(remaining), 0)]
             urls = [url for url, _ in current_level]
+            # reversed() keeps first-parent-wins if a resumed level repeats a URL
+            parents = dict(reversed(current_level))
 
             # Clone the config to disable deep crawling recursion and enforce batch mode.
             batch_config = config.clone(deep_crawl_strategy=None, stream=False)
@@ -258,7 +267,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 depth = depths.get(url, 0)
                 result.metadata = result.metadata or {}
                 result.metadata["depth"] = depth
-                parent_url = next((parent for (u, parent) in current_level if u == url), None)
+                parent_url = parents.get(url)
                 result.metadata["parent_url"] = parent_url
                 results.append(result)
 
@@ -327,6 +336,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             visited: Set[str] = set()
             current_level: List[Tuple[str, Optional[str]]] = [(start_url, None)]
             depths: Dict[str, int] = {start_url: 0}
+            self._pages_crawled = 0
 
         while current_level and not self._cancel_event.is_set():
             # Check external cancellation callback before processing this level
@@ -335,7 +345,18 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 break
 
             next_level: List[Tuple[str, Optional[str]]] = []
+            # Siblings in a level queue links before the level's own pages are all
+            # counted, so cap the level to the budget left before fetching it.
+            # max_pages defaults to infinity, which is not a valid slice index.
+            remaining = self.max_pages - self._pages_crawled
+            if remaining < len(current_level):
+                current_level = current_level[:max(int(remaining), 0)]
+            if not current_level:
+                self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping crawl")
+                break
             urls = [url for url, _ in current_level]
+            # reversed() keeps first-parent-wins if a resumed level repeats a URL
+            parents = dict(reversed(current_level))
             visited.update(urls)
 
             stream_config = config.clone(deep_crawl_strategy=None, stream=True)
@@ -348,7 +369,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 depth = depths.get(url, 0)
                 result.metadata = result.metadata or {}
                 result.metadata["depth"] = depth
-                parent_url = next((parent for (u, parent) in current_level if u == url), None)
+                parent_url = parents.get(url)
                 result.metadata["parent_url"] = parent_url
                 
                 # Count only successful crawls

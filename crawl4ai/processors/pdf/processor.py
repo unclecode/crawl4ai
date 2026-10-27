@@ -66,7 +66,6 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
             
         self.image_dpi = image_dpi
         self.image_quality = image_quality
-        self.current_page_number = 0
         self.extract_images = extract_images
         self.save_images_locally = save_images_locally
         self.image_save_dir = image_save_dir
@@ -122,8 +121,7 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
                 for page_num, page in enumerate(reader.pages):
                     if page_num >= page_limit:
                         break
-                    self.current_page_number = page_num + 1
-                    pdf_page = self._process_page(page, image_dir)
+                    pdf_page = self._process_page(page, image_dir, page_num + 1)
                     result.pages.append(pdf_page)
 
         except Exception as e:
@@ -186,8 +184,7 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
                 with pdf_path.open('rb') as file:
                     thread_reader = PdfReader(file)
                     page = thread_reader.pages[page_num]
-                    self.current_page_number = page_num + 1
-                    return self._process_page(page, image_dir)
+                    return self._process_page(page, image_dir, page_num + 1)
 
             # Process pages in parallel batches
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.batch_size) as executor:
@@ -221,9 +218,9 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
         result.processing_time = time() - start_time
         return result
 
-    def _process_page(self, page, image_dir: Optional[Path]) -> PDFPage:
+    def _process_page(self, page, image_dir: Optional[Path], page_number: int) -> PDFPage:
         pdf_page = PDFPage(
-            page_number=self.current_page_number,
+            page_number=page_number,
         )
 
         # Text and font extraction
@@ -240,18 +237,18 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
 
         # Image extraction
         if self.extract_images:
-            pdf_page.images = self._extract_images(page, image_dir)
+            pdf_page.images = self._extract_images(page, image_dir, page_number)
 
         # Link extraction
         pdf_page.links = self._extract_links(page)
         
         # Add markdown content
-        pdf_page.markdown = clean_pdf_text(self.current_page_number, pdf_page.raw_text)
-        pdf_page.html = clean_pdf_text_to_html(self.current_page_number, pdf_page.raw_text)
+        pdf_page.markdown = clean_pdf_text(page_number, pdf_page.raw_text)
+        pdf_page.html = clean_pdf_text_to_html(page_number, pdf_page.raw_text)
 
         return pdf_page
 
-    def _extract_images(self, page, image_dir: Optional[Path]) -> List[Dict]:
+    def _extract_images(self, page, image_dir: Optional[Path], page_number: int) -> List[Dict]:
         # Import pypdf for type checking only when needed
         try:
             from pypdf.generic import IndirectObject
@@ -276,7 +273,7 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
                             if xobj.get('/Subtype') == '/Image':
                                 try:
                                     img_count += 1
-                                    img_filename = f"page_{self.current_page_number}_img_{img_count}"
+                                    img_filename = f"page_{page_number}_img_{img_count}"
                                     data = xobj.get_data()
                                     filters = xobj.get('/Filter', [])
                                     if not isinstance(filters, list):

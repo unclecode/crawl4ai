@@ -21,3 +21,11 @@ We thank the following security researchers for their responsible disclosure:
 | Zhixi "Jace" Sun | GitHub: [manus-use](https://github.com/manus-use) | Arbitrary file write via unconfined PDFContentScrapingStrategy image-write fields in untrusted config bodies (0.9.3) | 2026-08-24 |
 | Nguyen Tran Thanh Lam | GitHub: [c240030](https://github.com/c240030) | SSRF via PDF download redirects, DoS via unbounded PDF size and page count, XSS via unescaped PDF text in cleaned_html (0.9.3) | 2026-07-27 |
 | e1codes | GitHub: [e1codes](https://github.com/e1codes) | DOM-based XSS in the Docker Playground leading to operator API-token theft (0.9.3) | 2026-07-24 |
+| x0root | GitHub: [x0root](https://github.com/x0root) | SSRF in the hosted service at stage.crawl4ai.com | 2026-09-02 |
+| arpe1618 | GitHub: [arpe1618](https://github.com/arpe1618) | Blind SSRF via the robots.txt fetch in RobotsParser.can_fetch bypassing the Docker egress controls (0.9.4) | 2026-09-04 |
+| Ibrahim AlJaafreh - Cystack RedTeam | [LinkedIn](https://www.linkedin.com/in/ibrahim-aljaafreh-glitch/), [cystack.ps](https://cystack.ps) | SSRF with response disclosure via link_preview_config through the URL seeder (0.9.4) | 2026-09-04 |
+| Adam Jordan | GitHub: [adamyordan](https://github.com/adamyordan) | Untrusted-config gate bypass via dict-wrapper laundering, leaking server env vars (0.9.4) | 2026-09-08 |
+| arpe1618 | GitHub: [arpe1618](https://github.com/arpe1618) | Blind SSRF via the CacheValidator freshness check bypassing the Docker egress proxy (0.9.5) | 2026-09-29 |
+| Zhixi "Jace" Sun | GitHub: [manus-use](https://github.com/manus-use) | Page JavaScript injection via css_selector and wait_for, HuggingFace model choice via CosineStrategy.model_name, and ReDoS via untrusted regex patterns on the Docker server (0.9.5) | 2026-10-01 |
+| Chunyi Liu | GitHub: [liuchunyi-buaa](https://github.com/liuchunyi-buaa) | SQL injection in the docs marketplace backend, DOM XSS in the LinkedIn graph view example, unbounded delay fields in untrusted config bodies, and Docker hardening gaps (header-name validation, DomainFilter host parsing, silent guard failures) (0.9.5) | 2026-09-21 |
+| Julian Godfrey | Email report | Chromium launched with --ignore-certificate-errors so TLS verification was off, and the Chromium sandbox opt-in had no effect (0.9.5) | 2026-10-04 |

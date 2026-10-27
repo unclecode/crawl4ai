@@ -1294,9 +1294,8 @@ Use these CSS variables for consistency across all styles:
 
 ### Download Assets
 
-- [Dank Mono Font Files](/docs/md_v2/assets/) (Regular, Bold, Italic)
-- [Brand CSS Template](/docs/md_v2/branding/assets/brand-examples.css)
-- [Component Library](/docs/md_v2/apps/)
+- [Dank Mono Font Files](https://github.com/unclecode/crawl4ai/tree/main/docs/md_v2/assets) (Regular, Bold, Italic)
+- [Component Library](../apps/index.md)
 
 ### Reference Files
 

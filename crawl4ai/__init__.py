@@ -42,6 +42,7 @@ from .content_filter_strategy import (
     LLMContentFilter,
     RelevantContentFilter,
 )
+from .content_filter_strategy_lxml import PruningContentFilterLXML
 from .models import CrawlResult, MarkdownGenerationResult, DisplayMode
 from .components.crawler_monitor import CrawlerMonitor
 from .link_preview import LinkPreview
@@ -176,6 +177,7 @@ __all__ = [
     "LLMTableExtraction",
     "RelevantContentFilter",
     "PruningContentFilter",
+    "PruningContentFilterLXML",
     "BM25ContentFilter",
     "LLMContentFilter",
     "BaseDispatcher",
