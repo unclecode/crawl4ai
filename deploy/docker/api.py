@@ -664,14 +664,16 @@ def _load_crawler_configs(
         CrawlerRunConfig.load(cc, provenance=Provenance.UNTRUSTED)
         for cc in crawler_configs
     ]
-    for cfg in config_list:
+    for raw_cfg, cfg in zip(crawler_configs, config_list):
         if cfg.deep_crawl_strategy is not None:
             raise HTTPException(status_code=400, detail="Deep crawling supports exactly one URL per request.")
+        # Apply server defaults only for keys the client did NOT send. The old
+        # "current_value is None or == ''" test silently skipped boolean/int
+        # defaults such as simulate_user=False. See #2121.
+        sent = raw_cfg if isinstance(raw_cfg, dict) else {}
         for key, value in (base_config or {}).items():
-            if hasattr(cfg, key):
-                current_value = getattr(cfg, key)
-                if current_value is None or current_value == "":
-                    setattr(cfg, key, value)
+            if hasattr(cfg, key) and key not in sent:
+                setattr(cfg, key, value)
         # SSRF: per-URL PDF strategies need the validator wired too
         if isinstance(cfg.scraping_strategy, PDFContentScrapingStrategy):
             cfg.scraping_strategy.url_validator = validate_url_destination
