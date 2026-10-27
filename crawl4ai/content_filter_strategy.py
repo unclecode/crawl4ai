@@ -665,7 +665,7 @@ class PruningContentFilter(RelevantContentFilter):
 
         # Prune tree starting from body
         body = soup.find("body")
-        self._prune_tree(body)
+        self._prune_tree(body, self._protected_ancestors(body))
 
         # Extract remaining content as list of HTML strings
         content_blocks = []
@@ -698,12 +698,25 @@ class PruningContentFilter(RelevantContentFilter):
                 return True
         return False
 
-    def _prune_tree(self, node):
+    def _protected_ancestors(self, root):
+        """Return the ids of all ancestors of <pre>/<code> and preserved nodes."""
+        ancestors = set()
+        for node in root.find_all(True):
+            if node.name in ("pre", "code") or self._is_preserved(node):
+                for parent in node.parents:
+                    if id(parent) in ancestors:
+                        break
+                    ancestors.add(id(parent))
+        return ancestors
+
+    def _prune_tree(self, node, protected=None):
         """
         Prunes the tree starting from the given node.
 
         Args:
             node (Tag): The node from which the pruning starts.
+            protected (set): ids of nodes that must not be decomposed because
+                they contain a <pre>/<code> or preserved descendant (optional).
         """
         if not node or not hasattr(node, "name") or node.name is None:
             return
@@ -718,6 +731,14 @@ class PruningContentFilter(RelevantContentFilter):
         # and get decomposed, corrupting code. Mirrors the scraper-side guard in
         # WebScrapingStrategy.remove_empty_elements_fast (#1181).
         if node.name in ("pre", "code"):
+            return
+
+        # Never decompose an ancestor of a protected block: a low-scoring wrapper
+        # such as <div class="highlight"> would take the block down with it.
+        # Its other children are still pruned normally.
+        if protected and id(node) in protected:
+            for child in [c for c in node.children if hasattr(c, "name")]:
+                self._prune_tree(child, protected)
             return
 
         text_len = len(node.get_text(strip=True))
@@ -760,7 +781,7 @@ class PruningContentFilter(RelevantContentFilter):
         else:
             children = [child for child in node.children if hasattr(child, "name")]
             for child in children:
-                self._prune_tree(child)
+                self._prune_tree(child, protected)
 
     def _compute_composite_score(self, metrics, text_len, tag_len, link_text_len):
         """Computes the composite score"""

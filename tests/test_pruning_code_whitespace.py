@@ -74,5 +74,43 @@ def test_rendered_text_keeps_token_spacing():
     assert "FROM golang:1.21 AS builder" in text
 
 
+# Highlighter wrapper (pygments/rouge emit <div class="highlight"><pre>...).
+# The wrapper scores low and was decomposed before recursion reached <pre>.
+WRAPPED_CODE_HTML = (
+    "<body><article>"
+    + "<p>" + "This article explains how to import libraries and run examples. " * 8 + "</p>"
+    + '<div class="highlight"><pre><code><span class="n">x</span>'
+    '<span class="o">=</span><span class="mi">1</span></code></pre></div>'
+    + "<p>" + "This article explains how to import libraries and run examples. " * 8 + "</p>"
+    + "</article></body>"
+)
+
+
+def _pre_text(out: str):
+    from bs4 import BeautifulSoup
+
+    pre = BeautifulSoup(out, "html.parser").find("pre")
+    return pre.get_text() if pre is not None else None
+
+
+def test_code_inside_low_scoring_wrapper_survives():
+    assert _pre_text(_filtered_html(WRAPPED_CODE_HTML)) == "x=1"
+
+
+def test_preserve_tags_survive_pruned_ancestor():
+    out = _filtered_html(WRAPPED_CODE_HTML, preserve_tags=["pre", "code"])
+    assert _pre_text(out) == "x=1"
+
+
+def test_siblings_of_code_in_wrapper_still_pruned():
+    html = WRAPPED_CODE_HTML.replace(
+        '<div class="highlight">',
+        '<div class="highlight"><div><a href="/copy">Copy</a></div>',
+    )
+    out = _filtered_html(html)
+    assert _pre_text(out) == "x=1"
+    assert "/copy" not in out
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
