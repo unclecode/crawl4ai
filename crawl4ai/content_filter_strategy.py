@@ -699,10 +699,14 @@ class PruningContentFilter(RelevantContentFilter):
         return False
 
     def _protected_ancestors(self, root):
-        """Return the ids of all ancestors of <pre>/<code> and preserved nodes."""
+        """Return the ids of all ancestors of <pre> and preserved nodes.
+
+        Inline <code> does not protect its ancestors. If it did, a boilerplate
+        link such as <a><code>map()</code></a> in a sidebar would never be pruned.
+        """
         ancestors = set()
         for node in root.find_all(True):
-            if node.name in ("pre", "code") or self._is_preserved(node):
+            if node.name == "pre" or self._is_preserved(node):
                 for parent in node.parents:
                     if id(parent) in ancestors:
                         break
@@ -716,7 +720,7 @@ class PruningContentFilter(RelevantContentFilter):
         Args:
             node (Tag): The node from which the pruning starts.
             protected (set): ids of nodes that must not be decomposed because
-                they contain a <pre>/<code> or preserved descendant (optional).
+                they contain a <pre> or preserved descendant (optional).
         """
         if not node or not hasattr(node, "name") or node.name is None:
             return
@@ -726,10 +730,10 @@ class PruningContentFilter(RelevantContentFilter):
             return
 
         # Skip pruning inside <pre>/<code> blocks where whitespace is significant.
-        # Syntax highlighters wrap every token in <span> (including whitespace-only
-        # spans like <span class="w"> </span>) which score far below any threshold
-        # and get decomposed, corrupting code. Mirrors the scraper-side guard in
-        # WebScrapingStrategy.remove_empty_elements_fast (#1181).
+        # Syntax highlighters wrap every token in <span>, also whitespace-only
+        # tokens such as <span class="w"> </span>. These spans score far below
+        # any threshold. Their removal corrupts the code. This mirrors the
+        # scraper-side guard in WebScrapingStrategy.remove_empty_elements_fast (#1181).
         if node.name in ("pre", "code"):
             return
 

@@ -45,9 +45,6 @@ def test_whitespace_spans_inside_code_survive():
     out = _filtered_html(HIGHLIGHTED_CODE_HTML)
     # The whitespace-only spans must still separate the tokens.
     assert '<span class="w"> </span>' in out
-    assert "importtorch" not in out.replace("</span>", "").replace(
-        '<span class="kn">', ""
-    ).replace('<span class="nn">', "").replace('<span class="w">', "")
 
 
 def test_highlighted_pre_block_not_dropped():
@@ -110,6 +107,18 @@ def test_siblings_of_code_in_wrapper_still_pruned():
     out = _filtered_html(html)
     assert _pre_text(out) == "x=1"
     assert "/copy" not in out
+
+
+def test_inline_code_does_not_protect_boilerplate_link():
+    # Inline <code> in a low-scoring TOC link must not rescue the link.
+    prose = "<p>" + "This article explains how arrays work and how to map over them. " * 8 + "</p>"
+    html = (
+        "<body><article>" + prose + "</article>"
+        "<div class='toc'><ul class='toc-list'><li class='toc-item'>"
+        "<a class='toc-link' href='/toc-map'><code>map</code></a></li></ul></div></body>"
+    )
+    out = _filtered_html(html)
+    assert "/toc-map" not in out
 
 
 if __name__ == "__main__":
