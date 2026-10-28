@@ -177,10 +177,11 @@ def load_text_multilabel_classifier():
 def load_nltk_punkt():
     import nltk
 
-    try:
-        nltk.data.find("tokenizers/punkt")
-    except LookupError:
-        nltk.download("punkt")
+    for resource in ("punkt", "punkt_tab"):
+        try:
+            nltk.data.find(f"tokenizers/{resource}")
+        except LookupError:
+            nltk.download(resource)
     return nltk.data.find("tokenizers/punkt")
 
 
