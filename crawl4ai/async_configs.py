@@ -337,6 +337,7 @@ _MAX_DELAY_SECONDS = 60  # ceiling for delay_before_return_html / mean_delay / m
 _MAX_VIEWPORT = 4000
 _MAX_PDF_BYTES = 100 * 1024 * 1024
 _MAX_PDF_PAGES = 2000
+_MAX_PDF_SECONDS = 300
 _MAX_LINK_PREVIEW_LINKS = 100      # the class default
 _MAX_LINK_PREVIEW_CONCURRENCY = 10  # the class default
 _MAX_LINK_PREVIEW_TIMEOUT_S = 10    # seconds here, not ms
@@ -514,7 +515,11 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
     elif type_name == "PDFContentScrapingStrategy":
         # This class has no field allowlist, so without clamping a body could
         # simply raise its own caps back to unbounded and re-open the DoS.
-        for f, cap in (("max_pdf_bytes", _MAX_PDF_BYTES), ("max_pdf_pages", _MAX_PDF_PAGES)):
+        for f, cap in (
+            ("max_pdf_bytes", _MAX_PDF_BYTES),
+            ("max_pdf_pages", _MAX_PDF_PAGES),
+            ("max_pdf_seconds", _MAX_PDF_SECONDS),
+        ):
             if f in params:
                 v = params[f]
                 # <=0 or non-int would read as "no limit"; pin to the cap.

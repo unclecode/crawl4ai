@@ -62,7 +62,7 @@ def test_remote_pdf_links_split_into_internal_and_external(tmp_path, monkeypatch
     )
     strategy = PDFContentScrapingStrategy(extract_images=False)
     # Skip the download: serve the local file for the remote URL.
-    monkeypatch.setattr(strategy, "_get_pdf_path", lambda url: str(pdf))
+    monkeypatch.setattr(strategy, "_get_pdf_path", lambda url, check=None: str(pdf))
 
     result = strategy.scrap("https://www.example.org/files/report.pdf", "")
 

@@ -1,5 +1,6 @@
 from pathlib import Path
 import asyncio
+import time
 from dataclasses import asdict
 from crawl4ai.async_logger import AsyncLogger
 from crawl4ai.async_crawler_strategy import AsyncCrawlerStrategy
@@ -15,6 +16,7 @@ from .processor import NaivePDFProcessorStrategy  # Assuming your current PDF co
 DEFAULT_MAX_PDF_BYTES = 100 * 1024 * 1024  # 100 MiB
 DEFAULT_MAX_PDF_PAGES = 2000
 DEFAULT_MAX_REDIRECTS = 5
+DEFAULT_MAX_PDF_SECONDS = 300  # total download + parse budget
 
 _REDIRECT_STATUSES = (301, 302, 303, 307, 308)
 
@@ -111,6 +113,7 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
                  max_pdf_bytes: int = DEFAULT_MAX_PDF_BYTES,
                  max_pdf_pages: int = DEFAULT_MAX_PDF_PAGES,
                  max_redirects: int = DEFAULT_MAX_REDIRECTS,
+                 max_pdf_seconds: float = DEFAULT_MAX_PDF_SECONDS,
                  logger: AsyncLogger = None,
                  url_validator=None):
         self.logger = logger
@@ -121,6 +124,7 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
         self.max_pdf_bytes = max_pdf_bytes
         self.max_pdf_pages = max_pdf_pages
         self.max_redirects = max_redirects
+        self.max_pdf_seconds = max_pdf_seconds
         self.pdf_processor = NaivePDFProcessorStrategy(
             save_images_locally=save_images_locally,
             extract_images=extract_images,
@@ -142,12 +146,13 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
         Returns:
             ScrapingResult: The scraped content.
         """
+        check = self._budget_check(url)
         # Download if URL or use local path
-        pdf_path = self._get_pdf_path(url)
+        pdf_path = self._get_pdf_path(url, check)
         try:
             # Process PDF
             # result = self.pdf_processor.process(Path(pdf_path))
-            result = self.pdf_processor.process_batch(Path(pdf_path))
+            result = self.pdf_processor.process_batch(Path(pdf_path), check=check)
             
             # Combine page HTML
             cleaned_html = f"""
@@ -218,6 +223,23 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
                     external[href] = Link(href=href, base_domain=get_base_domain(href))
 
         return Links(internal=list(internal.values()), external=list(external.values()))
+
+    def _budget_check(self, url: str):
+        """Return a callable that raises once max_pdf_seconds have elapsed.
+
+        scrap() runs synchronously, so a caller's asyncio deadline cannot stop
+        it; the budget is checked inside the download and parse loops instead.
+        """
+        if not self.max_pdf_seconds:
+            return None
+        deadline = time.monotonic() + self.max_pdf_seconds
+
+        def check():
+            if time.monotonic() > deadline:
+                raise TimeoutError(
+                    f"PDF from {url} exceeded max_pdf_seconds ({self.max_pdf_seconds}s)"
+                )
+        return check
 
     async def ascrap(self, url: str, html: str, **kwargs) -> ScrapingResult:
         # For simple cases, you can use the sync version
@@ -304,9 +326,11 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
             if _url_validator:
                 _url_validator(current)
 
-            # Connection timeout: 20s, Read timeout: 600s (for large PDFs)
+            # Connection timeout: 20s, Read timeout: 600s (for large PDFs),
+            # capped by the total budget so one stalled read cannot outlast it.
+            read_timeout = min(60 * 10, self.max_pdf_seconds or 60 * 10)
             response = session.get(
-                current, stream=True, timeout=(20, 60 * 10), allow_redirects=False
+                current, stream=True, timeout=(20, read_timeout), allow_redirects=False
             )
             is_redirect = response.status_code in _REDIRECT_STATUSES
             self._check_peer_ip(response, strict=not is_redirect)
@@ -328,7 +352,7 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
             f"Too many redirects (>{self.max_redirects}) downloading PDF from {url}"
         )
 
-    def _get_pdf_path(self, url: str) -> str:
+    def _get_pdf_path(self, url: str, check=None) -> str:
         if url.startswith(("http://", "https://")):
             import tempfile
             import requests
@@ -353,6 +377,8 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
                 with response:
                     with open(temp_file.name, 'wb') as f:
                         for chunk in response.iter_content(chunk_size=8192):
+                            if check:
+                                check()
                             downloaded += len(chunk)
                             if downloaded > self.max_pdf_bytes:
                                 raise RuntimeError(
