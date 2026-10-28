@@ -45,6 +45,14 @@ STAR_MILESTONES = [
     ("2025-11-01", 55000),
     ("2025-12-01", 57000),
     ("2026-01-01", 59000),
+    ("2026-03-01", 60118),
+    ("2026-04-01", 62060),
+    ("2026-05-01", 63989),
+    ("2026-06-01", 66690),
+    ("2026-07-01", 69888),
+    ("2026-08-01", 75219),
+    ("2026-09-01", 80214),
+    ("2026-10-01", 84387),
 ]
 
 # Historical PyPI monthly downloads (manually maintained).
@@ -203,7 +211,27 @@ def fetch_pypi_live() -> dict:
     return {"monthly": monthly_sorted, "daily": daily, "total": total}
 
 
-def merge_pypi_data(live: dict) -> dict:
+def fetch_pypi_monthly_clickhouse() -> dict:
+    """Fetch full monthly PyPI download history from ClickHouse's public PyPI dataset."""
+    print("Fetching PyPI monthly history (ClickHouse)...")
+    query = (
+        "SELECT toStartOfMonth(date), sum(count) FROM pypi.pypi_downloads_per_day "
+        f"WHERE project = '{PYPI_PACKAGE}' GROUP BY 1 ORDER BY 1 FORMAT JSONCompact"
+    )
+    try:
+        req = urllib.request.Request(
+            "https://sql-clickhouse.clickhouse.com/?user=demo",
+            data=query.encode(),
+            headers={"User-Agent": "crawl4ai-stats/1.0"},
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return {m[:7]: int(c) for m, c in json.loads(resp.read().decode())["data"]}
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        print(f"  [warn] ClickHouse PyPI query: {e}")
+        return {}
+
+
+def merge_pypi_data(live: dict, history: dict) -> dict:
     """Merge hardcoded historical monthly data with live API data.
 
     The API only has ~180 days. The first month in the API window is typically
@@ -214,6 +242,12 @@ def merge_pypi_data(live: dict) -> dict:
     """
     merged_monthly = dict(PYPI_MONTHLY_HISTORY)  # start with hardcoded
     live_monthly = live["monthly"]
+
+    # Fill months before the API window (and its partial first month) from ClickHouse
+    live_start = live["daily"][0]["date"][:7] if live["daily"] else "9999-99"
+    for month, value in history.items():
+        if month not in merged_monthly and month <= live_start:
+            merged_monthly[month] = value
 
     for month, value in live_monthly.items():
         if month in merged_monthly:
@@ -862,8 +896,12 @@ def main():
 
     pypi_live = fetch_pypi_live()
     print(f"  PyPI live: {len(pypi_live['monthly'])} months, {len(pypi_live['daily'])} daily points")
-    pypi = merge_pypi_data(pypi_live)
+    pypi = merge_pypi_data(pypi_live, fetch_pypi_monthly_clickhouse())
     print(f"  PyPI merged: {len(pypi['monthly'])} months, total: {pypi['total']:,}")
+    first, last = min(pypi["monthly"]), max(pypi["monthly"])
+    span = (int(last[:4]) - int(first[:4])) * 12 + int(last[5:]) - int(first[5:]) + 1
+    if len(pypi["monthly"]) != span:
+        sys.exit(f"[error] PyPI monthly data has gaps; not writing {OUTPUT_PATH}")
 
     docker_pulls = fetch_docker_pulls()
     print(f"  Docker pulls: {docker_pulls}")
