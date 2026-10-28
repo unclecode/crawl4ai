@@ -1220,6 +1220,8 @@ class BrowserConfig:
             "browser_context_id": self.browser_context_id,
             "target_id": self.target_id,
             "cdp_cleanup_on_close": self.cdp_cleanup_on_close,
+            "cdp_close_delay": self.cdp_close_delay,
+            "cache_cdp_connection": self.cache_cdp_connection,
             "create_isolated_context": self.create_isolated_context,
             "use_persistent_context": self.use_persistent_context,
             "user_data_dir": self.user_data_dir,
