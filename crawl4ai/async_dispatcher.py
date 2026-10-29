@@ -50,8 +50,8 @@ class RateLimiter:
             self.domains[domain] = DomainState()
             state = self.domains[domain]
 
-        now = time.time()
-        if state.last_request_time:
+        now = time.monotonic()
+        if state.last_request_time is not None:
             wait_time = max(0, state.current_delay - (now - state.last_request_time))
             if wait_time > 0:
                 await asyncio.sleep(wait_time)
@@ -60,7 +60,7 @@ class RateLimiter:
         if state.current_delay == 0:
             state.current_delay = random.uniform(*self.base_delay)
 
-        state.last_request_time = time.time()
+        state.last_request_time = time.monotonic()
 
     def update_delay(self, url: str, status_code: int) -> bool:
         domain = self.get_domain(url)
