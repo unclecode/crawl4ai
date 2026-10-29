@@ -1154,6 +1154,8 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
 
             if field["type"] == "nested":
                 nested_elements = self._get_elements(element, field["selector"])
+                if not nested_elements:
+                    return field.get("default", {})
                 nested_element = nested_elements[0] if nested_elements else None
                 return (
                     self._extract_item(nested_element, field["fields"])
