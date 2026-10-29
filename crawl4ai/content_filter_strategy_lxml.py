@@ -313,6 +313,9 @@ class PruningContentFilterLXML(PruningContentFilter):
     # Scoring (top-down pass)
     # ------------------------------------------------------------------ #
     def _should_remove(self, node, m: _NodeMetrics, metrics: Dict[object, _NodeMetrics]) -> bool:
+        if node.tag in self.inline_tags:
+            return False
+
         text_len = m.text_len
         tag_len = m.inner_len
 
