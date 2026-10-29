@@ -233,7 +233,7 @@ class ManagedBrowser:
                             shlex.split(f"lsof -t -i:{self.debugging_port}"),
                             stderr=subprocess.DEVNULL,
                         )
-                        .decode()
+                        .decode("utf-8", errors="replace")
                         .strip()
                         .splitlines()
                     )
@@ -314,8 +314,8 @@ class ManagedBrowser:
                 tag="ERROR",
                 params={
                     "code": self.browser_process.returncode,
-                    "stdout": stdout.decode() if stdout else "",
-                    "stderr": stderr.decode() if stderr else "",
+                    "stdout": stdout.decode("utf-8", errors="replace") if stdout else "",
+                    "stderr": stderr.decode("utf-8", errors="replace") if stderr else "",
                 },
             )
     
@@ -347,8 +347,8 @@ class ManagedBrowser:
                             tag="ERROR",
                             params={
                                 "code": self.browser_process.returncode,
-                                "stdout": stdout.decode(),
-                                "stderr": stderr.decode(),
+                                "stdout": stdout.decode("utf-8", errors="replace"),
+                                "stderr": stderr.decode("utf-8", errors="replace"),
                             },
                         )
                         await self.cleanup()
