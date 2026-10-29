@@ -104,6 +104,7 @@ def chunk_documents(
     token_queue = deque()
     contribution_queue = deque()
     current_token_count = 0.0
+    overlap_idx = 0
 
     for doc in documents:
         # Tokenize document
@@ -161,10 +162,10 @@ def chunk_documents(
 
             # Update current token count and yield chunk
             current_token_count -= sum(chunk_contrib)
-            yield " ".join(chunk_tokens[:len(chunk_tokens)-overlap_idx] if overlap_idx else chunk_tokens)
+            yield " ".join(chunk_tokens)
 
-    # Yield remaining tokens
-    if token_queue:
+    # Do not emit a tail consisting only of overlap from the last full chunk.
+    if len(token_queue) > overlap_idx:
         yield " ".join(token_queue)
 
 def merge_chunks(
