@@ -844,6 +844,10 @@ class BrowserManager:
     async def _start_impl(self):
         if self.playwright is not None:
             await self.close()
+        if self.config.service_workers == "block" and self.use_undetected:
+            # Undetected mode runs page scripts in an isolated world, which the
+            # block cannot reach. Refuse rather than let it be silently ignored.
+            raise ValueError("service_workers='block' is not supported with undetected mode")
 
         # Use cached CDP connection if enabled and cdp_url is set
         if self.config.cache_cdp_connection and self.config.cdp_url:
@@ -852,6 +856,14 @@ class BrowserManager:
             self.playwright, self.browser = await _CDPConnectionCache.acquire(
                 self.config.cdp_url, self.use_undetected
             )
+            # The cache is shared by URL, so the connection may be a Patchright one
+            # created by another (undetected) manager. Refuse as undetected mode does.
+            if self.config.service_workers == "block" and type(self.playwright).__module__.startswith("patchright"):
+                await _CDPConnectionCache.release(self.config.cdp_url)
+                self.playwright = None
+                self.browser = None
+                self._using_cached_cdp = False
+                raise ValueError("service_workers='block' is not supported with undetected mode")
         else:
             self._using_cached_cdp = False
             if self.use_undetected:
@@ -900,6 +912,7 @@ class BrowserManager:
                 "user_agent": self.config.user_agent or None,
                 "ignore_https_errors": self.config.ignore_https_errors,
                 "accept_downloads": self.config.accept_downloads,
+                "service_workers": self.config.service_workers,
             }
             if chromium_sandbox_requested():
                 launch_kwargs["chromium_sandbox"] = True
@@ -935,6 +948,13 @@ class BrowserManager:
             return
 
         if self.config.cdp_url or self.config.use_managed_browser:
+            # The default context of a browser we connect to is created by that
+            # browser, and Playwright applies service_workers only in new_context
+            # and launch_persistent_context. Isolated contexts are created here,
+            # so they are fine; the reused default context is not.
+            reason = self.config._unsupported_service_workers()
+            if reason:
+                raise ValueError(reason)
             self.config.use_managed_browser = True
 
             if not self._using_cached_cdp:
@@ -1409,6 +1429,7 @@ class BrowserManager:
             "ignore_https_errors": self.config.ignore_https_errors,
             "device_scale_factor": self.config.device_scale_factor,
             "java_script_enabled": self.config.java_script_enabled,
+            "service_workers": self.config.service_workers,
         }
         
         if crawlerRunConfig:

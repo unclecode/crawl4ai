@@ -287,7 +287,7 @@ UNTRUSTED_FIELD_ALLOWLIST = {
         "java_script_enabled", "text_mode", "light_mode", "enable_stealth",
         "avoid_ads", "avoid_css", "user_agent", "user_agent_mode",
         "user_agent_generator_config", "verbose", "memory_saving_mode",
-        "max_pages_before_recycle",
+        "max_pages_before_recycle", "service_workers",
     },
     "CrawlerRunConfig": {
         # content selection / cleaning
@@ -462,6 +462,10 @@ def _filter_untrusted_fields(type_name: str, params: dict) -> dict:
 def _clamp_untrusted(type_name: str, params: dict) -> dict:
     """Clamp attacker-influenced quantities to safe upper bounds."""
     ceiling = _max_timeout_ms()
+    if type_name == "BrowserConfig" and "service_workers" in params:
+        sw = params["service_workers"]
+        if sw not in ("allow", "block"):
+            raise UntrustedConfigError(f"invalid service_workers: {sw!r}")
 
     def _cap_timeout(v):
         # 0 historically meant "no timeout"; treat as the cap, never unbounded.
@@ -1031,6 +1035,12 @@ class BrowserConfig:
                                         process to reclaim leaked memory. 0 = disabled.
                                         Recommended: 500-1000 for long-running crawlers.
                                         Default: 0.
+        service_workers (str): "allow" (default) lets sites register service workers. "block"
+                               stops new registrations: register() resolves but no worker is created.
+                               Applies to contexts this config creates. Rejected for undetected mode,
+                               and for managed, builtin, Docker or cdp_url browsers unless
+                               create_isolated_context=True, because their reused default context
+                               was not created here. Existing workers are not stopped.
         avoid_ads (bool): If True, blocks ad-related and tracker network requests at the
                           browser context level using a curated blocklist of top ad/tracker
                           domains. Default: False.
@@ -1089,6 +1099,7 @@ class BrowserConfig:
         init_scripts: List[str] = None,
         memory_saving_mode: bool = False,
         max_pages_before_recycle: int = 0,
+        service_workers: str = "allow",
     ):
         
         self.browser_type = browser_type
@@ -1156,6 +1167,11 @@ class BrowserConfig:
         self.init_scripts = init_scripts if init_scripts is not None else []
         self.memory_saving_mode = memory_saving_mode
         self.max_pages_before_recycle = max_pages_before_recycle
+        if service_workers not in ("allow", "block"):
+            raise ValueError(
+                f"service_workers must be 'allow' or 'block', got {service_workers!r}"
+            )
+        self.service_workers = service_workers
 
         fa_user_agenr_generator = ValidUAGenerator()
         if self.user_agent_mode == "random":
@@ -1253,6 +1269,7 @@ class BrowserConfig:
             "init_scripts": self.init_scripts,
             "memory_saving_mode": self.memory_saving_mode,
             "max_pages_before_recycle": self.max_pages_before_recycle,
+            "service_workers": self.service_workers,
         }
 
 
@@ -1282,13 +1299,38 @@ class BrowserConfig:
         if provenance is None:
             provenance = Provenance.TRUSTED
         config = from_serializable_dict(data, provenance)
-        if isinstance(config, BrowserConfig):
-            return config
-        # Plain-dict path: enforce the untrusted gate on top-level fields too,
-        # so a body that sends bare kwargs (no {type,params}) cannot bypass it.
-        if provenance == Provenance.UNTRUSTED and isinstance(config, dict):
-            config = _enforce_untrusted("BrowserConfig", config)
-        return BrowserConfig.from_kwargs(config, provenance)
+        if not isinstance(config, BrowserConfig):
+            # Plain-dict path: enforce the untrusted gate on top-level fields too,
+            # so a body that sends bare kwargs (no {type,params}) cannot bypass it.
+            if provenance == Provenance.UNTRUSTED and isinstance(config, dict):
+                config = _enforce_untrusted("BrowserConfig", config)
+            config = BrowserConfig.from_kwargs(config, provenance)
+        # Judge the resolved config, so set_defaults() overrides count too.
+        if provenance == Provenance.UNTRUSTED:
+            reason = config._unsupported_service_workers()
+            if reason:
+                raise UntrustedConfigError(reason)
+        return config
+
+    def _unsupported_service_workers(self) -> Optional[str]:
+        """Why this resolved config cannot honour service_workers="block", or None.
+
+        Shared by BrowserManager.start() and the untrusted-request gate, so both
+        judge the same values, including class-level set_defaults() overrides.
+        """
+        if self.service_workers != "block":
+            return None
+        if self.use_persistent_context and not self.cdp_url:
+            return None  # launch_persistent_context honours the option
+        if (self.cdp_url or self.use_managed_browser
+                or self.browser_mode in ("builtin", "docker")) and not self.create_isolated_context:
+            return (
+                "service_workers='block' needs create_isolated_context=True with "
+                "cdp_url, browser_mode='builtin'/'docker' or other managed browsers: "
+                "their default context is reused, not created here. "
+                "Or use a dedicated browser or use_persistent_context=True."
+            )
+        return None
 
     def set_nstproxy(
         self,
