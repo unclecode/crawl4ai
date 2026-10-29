@@ -1574,7 +1574,7 @@ def extract_metadata_using_lxml(html, doc=None):
         title = title_el.text if title_el is not None else None
 
     # Final fallback: Use OpenGraph or Twitter title if <title> is missing or empty
-    if not title:
+    if not title or not title.strip():
         title_candidates = (
             doc.xpath("//meta[@property='og:title']/@content") or
             doc.xpath("//meta[@name='twitter:title']/@content")
