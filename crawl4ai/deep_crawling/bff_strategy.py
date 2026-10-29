@@ -10,12 +10,18 @@ from .filters import FilterChain
 from .scorers import URLScorer
 from . import DeepCrawlStrategy
 
-from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult, RunManyReturn
+from ..types import (
+    AsyncWebCrawler,
+    BaseDispatcher,
+    CrawlerRunConfig,
+    CrawlResult,
+    RunManyReturn,
+)
 from ..utils import normalize_url_for_deep_crawl
 
 from math import inf as infinity
 
-# Configurable batch size for processing items from the priority queue
+# Default batch size for processing items from the priority queue
 BATCH_SIZE = 10
 
 
@@ -47,6 +53,11 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         on_state_change: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
         # Optional cancellation callback - checked before each URL is processed
         should_cancel: Optional[Callable[[], Union[bool, Awaitable[bool]]]] = None,
+        # Number of items pulled from the priority queue per round and handed
+        # to arun_many() at once. Defaults to 10.
+        batch_size: int = BATCH_SIZE,
+        # Optional dispatcher forwarded to arun_many() for each batch
+        dispatcher: Optional[BaseDispatcher] = None,
     ):
         self.max_depth = max_depth
         self.filter_chain = filter_chain
@@ -54,6 +65,8 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         self.include_external = include_external
         self.score_threshold = score_threshold
         self.max_pages = max_pages
+        self.batch_size = batch_size
+        self.dispatcher = dispatcher
         # self.logger = logger or logging.getLogger(__name__)
         # Ensure logger is always a Logger instance, not a dict from serialization
         if isinstance(logger, logging.Logger):
@@ -179,6 +192,13 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             base_url = normalize_url_for_deep_crawl(url, source_url)
             if base_url in visited:
                 continue
+            # Already queued at an equal or shallower depth: a second entry would
+            # be scored and dropped for nothing. A strictly shallower find still
+            # has to re-queue, so the URL is crawled at its true distance from the
+            # start and its own children stay inside max_depth.
+            queued_depth = depths.get(base_url)
+            if queued_depth is not None and queued_depth <= new_depth:
+                continue
             if not await self.can_process_url(base_url, new_depth):
                 self.stats.urls_skipped += 1
                 continue
@@ -228,6 +248,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             await queue.put((-initial_score, 0, start_url, None))
             visited: Set[str] = set()
             depths: Dict[str, int] = {start_url: 0}
+            self._pages_crawled = 0
             # Initialize shadow list if callback is set
             if self._on_state_change:
                 self._queue_shadow = [(-initial_score, 0, start_url, None)]
@@ -245,15 +266,16 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
 
             # Calculate how many more URLs we can process in this batch
             remaining = self.max_pages - self._pages_crawled
-            batch_size = min(BATCH_SIZE, remaining)
-            if batch_size <= 0:
+            effective_batch_size = min(self.batch_size, remaining)
+            if effective_batch_size <= 0:
                 # No more pages to crawl
                 self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping crawl")
                 break
-                
+
             batch: List[Tuple[float, int, str, Optional[str]]] = []
-            # Retrieve up to BATCH_SIZE items from the priority queue.
-            for _ in range(BATCH_SIZE):
+            # Retrieve up to effective_batch_size items from the priority queue,
+            # so the final round never fetches past the max_pages budget.
+            for _ in range(effective_batch_size):
                 if queue.empty():
                     break
                 item = await queue.get()
@@ -272,17 +294,26 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             if not batch:
                 continue
 
-            # Process the current batch of URLs.
+            # Process the current batch of URLs concurrently, but process the
+            # results in the original priority-queue order. arun_many streams
+            # results as requests finish, so discovering links immediately can
+            # make subsequent queue ordering depend on network timing.
             urls = [item[2] for item in batch]
             batch_config = config.clone(deep_crawl_strategy=None, stream=True)
-            stream_gen = await crawler.arun_many(urls=urls, config=batch_config)
+            arun_many_kwargs = (
+                {"dispatcher": self.dispatcher} if self.dispatcher is not None else {}
+            )
+            stream_gen = await crawler.arun_many(
+                urls=urls, config=batch_config, **arun_many_kwargs
+            )
+            results_by_url: Dict[str, CrawlResult] = {}
             async for result in stream_gen:
-                result_url = result.url
-                # Find the corresponding tuple from the batch.
-                corresponding = next((item for item in batch if item[2] == result_url), None)
-                if not corresponding:
+                results_by_url[result.url] = result
+
+            for score, depth, url, parent_url in batch:
+                result = results_by_url.get(url)
+                if result is None:
                     continue
-                score, depth, url, parent_url = corresponding
                 result.metadata = result.metadata or {}
                 result.metadata["depth"] = depth
                 result.metadata["parent_url"] = parent_url
@@ -291,18 +322,22 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                 # Count only successful crawls toward max_pages limit
                 if result.success:
                     self._pages_crawled += 1
-                    # Check if we've reached the limit during batch processing
-                    if self._pages_crawled >= self.max_pages:
-                        self.logger.info(f"Max pages limit ({self.max_pages}) reached during batch, stopping crawl")
-                        break  # Exit the generator
-                
+
+                # Yield the result before any limit check so the boundary page is
+                # kept (mirrors BFS/DFS, which append the result before breaking).
                 yield result
-                
+
+                # Stop once the limit is reached, but only after yielding the
+                # successful boundary page above.
+                if result.success and self._pages_crawled >= self.max_pages:
+                    self.logger.info(f"Max pages limit ({self.max_pages}) reached during batch, stopping crawl")
+                    break  # Exit the generator
+
                 # Only discover links from successful crawls
                 if result.success:
                     # Discover new links from this result
                     new_links: List[Tuple[str, Optional[str]]] = []
-                    await self.link_discovery(result, result_url, depth, visited, new_links, depths)
+                    await self.link_discovery(result, url, depth, visited, new_links, depths)
                     
                     for new_url, new_parent in new_links:
                         new_depth = depths.get(new_url, depth + 1)

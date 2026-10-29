@@ -1,6 +1,7 @@
 import inspect
 import re
 import time
+import warnings
 from bs4 import BeautifulSoup, Tag
 from typing import List, Tuple, Dict, Optional
 from rank_bm25 import BM25Okapi
@@ -566,6 +567,8 @@ class PruningContentFilter(RelevantContentFilter):
         min_word_threshold: int = None,
         threshold_type: str = "fixed",
         threshold: float = 0.48,
+        preserve_classes: list = None,
+        preserve_tags: list = None,
     ):
         """
         Initializes the PruningContentFilter class, if not provided, falls back to page metadata.
@@ -578,11 +581,28 @@ class PruningContentFilter(RelevantContentFilter):
             min_word_threshold (int): Minimum word threshold for filtering (optional).
             threshold_type (str): Threshold type for dynamic threshold (default: 'fixed').
             threshold (float): Fixed threshold value (default: 0.48).
+            preserve_classes (list): CSS class names to always keep regardless of score (optional).
+            preserve_tags (list): HTML tag names to always keep regardless of score (optional).
         """
         super().__init__(None)
+        # Deprecation: the BeautifulSoup engine is superseded by the lxml one.
+        # Only warn for direct use of this class, not when PruningContentFilterLXML
+        # (a subclass) calls super().__init__.
+        if type(self) is PruningContentFilter:
+            warnings.warn(
+                "PruningContentFilter (BeautifulSoup-based) is deprecated in favor of "
+                "PruningContentFilterLXML, an lxml reimplementation that is ~10x faster "
+                "with identical output. Switch to PruningContentFilterLXML now. In an "
+                "upcoming release PruningContentFilter will become an alias for the lxml "
+                "implementation, and PruningContentFilterLXML will be kept as a legacy alias.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         self.min_word_threshold = min_word_threshold
         self.threshold_type = threshold_type
         self.threshold = threshold
+        self.preserve_classes = set(preserve_classes) if preserve_classes else set()
+        self.preserve_tags = set(preserve_tags) if preserve_tags else set()
 
         # Add tag importance for dynamic threshold
         self.tag_importance = {
@@ -682,6 +702,16 @@ class PruningContentFilter(RelevantContentFilter):
             for element in soup.find_all(tag):
                 element.decompose()
 
+    def _is_preserved(self, node):
+        """Check if a node matches the preserve whitelist."""
+        if self.preserve_tags and node.name in self.preserve_tags:
+            return True
+        if self.preserve_classes and "class" in getattr(node, "attrs", {}):
+            node_classes = set(node["class"]) if isinstance(node["class"], list) else {node["class"]}
+            if node_classes & self.preserve_classes:
+                return True
+        return False
+
     def _prune_tree(self, node):
         """
         Prunes the tree starting from the given node.
@@ -690,6 +720,10 @@ class PruningContentFilter(RelevantContentFilter):
             node (Tag): The node from which the pruning starts.
         """
         if not node or not hasattr(node, "name") or node.name is None:
+            return
+
+        # Skip pruning for preserved nodes — always keep them
+        if self._is_preserved(node):
             return
 
         text_len = len(node.get_text(strip=True))
@@ -1088,3 +1122,17 @@ class LLMContentFilter(RelevantContentFilter):
                     f"{i:<10} {usage.completion_tokens:>12,} "
                     f"{usage.prompt_tokens:>12,} {usage.total_tokens:>12,}"
                 )
+
+
+def __getattr__(name):
+    """Lazily re-export PruningContentFilterLXML from this module.
+
+    The lxml engine lives in ``content_filter_strategy_lxml`` (which imports
+    from this module). Exposing it here via PEP 562 lazy attribute access lets
+    ``from crawl4ai.content_filter_strategy import PruningContentFilterLXML``
+    work without creating an import-time circular dependency.
+    """
+    if name == "PruningContentFilterLXML":
+        from .content_filter_strategy_lxml import PruningContentFilterLXML
+        return PruningContentFilterLXML
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -1,5 +1,27 @@
 # Self-Hosting Crawl4AI 🚀
 
+> **🔐 0.9.0+ is secure-by-default (breaking changes).** The self-hosted Docker
+> server requires authentication by default, binds to loopback unless you
+> set a token, validates request bodies against a strict trust boundary, uses
+> declarative hooks instead of inline Python, and returns artifact ids for
+> screenshot/pdf. If you are upgrading from 0.8.x, read the
+> [migration guide](https://github.com/unclecode/crawl4ai/blob/main/deploy/docker/MIGRATION.md)
+> first.
+>
+> **The single most important thing to know:** without a `CRAWL4AI_API_TOKEN`,
+> the server binds loopback **inside the container** — published ports will
+> answer with *connection reset* even though the container reports healthy.
+> Every quickstart below therefore starts by setting a token.
+
+!!! tip "Don't want to run the server?"
+    [Crawl4AI Cloud](https://crawl4ai.com/?ref=docs-selfhost) is the same engine, hosted: no Docker, no browsers, one key over HTTPS. Self-hosting stays fully supported. 1,000 free credits every month, no card. [Get a key →](https://crawl4ai.com/?ref=docs-selfhost)
+
+    ```bash
+    curl -X POST https://api.crawl4ai.com/scrape \
+      -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
+      -d '{"url": "https://example.com", "format": "md"}'
+    ```
+
 **Take Control of Your Web Crawling Infrastructure**
 
 Self-hosting Crawl4AI gives you complete control over your web crawling and data extraction pipeline. Unlike cloud-based solutions, you own your data, infrastructure, and destiny.
@@ -49,7 +71,7 @@ When you self-host, you can scale from a single container to a full browser infr
 ## Prerequisites
 
 Before we dive in, make sure you have:
-- Docker installed and running (version 20.10.0 or higher), including `docker compose` (usually bundled with Docker Desktop).
+- Docker installed and running (version 20.10.0 or higher), including `docker compose` v2.24+ (usually bundled with Docker Desktop).
 - `git` for cloning the repository.
 - At least 4GB of RAM available for the container (more recommended for heavy use).
 - Python 3.10+ (if using the Python SDK).
@@ -67,13 +89,13 @@ Pull and run images directly from Docker Hub without building locally.
 
 #### 1. Pull the Image
 
-Our latest release is `0.8.0`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
+Our latest release is `0.9.2`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
 
-> 💡 **Note**: The `latest` tag points to the stable `0.8.0` version.
+> 💡 **Note**: The `latest` tag points to the most recent stable version.
 
 ```bash
 # Pull the latest version
-docker pull unclecode/crawl4ai:0.8.0
+docker pull unclecode/crawl4ai:0.9.2
 
 # Or pull using the latest tag
 docker pull unclecode/crawl4ai:latest
@@ -112,7 +134,23 @@ EOL
 ```
 > 🔑 **Note**: Keep your API keys secure! Never commit `.llm.env` to version control.
 
-#### 3. Run the Container
+#### 3. Set an API Token (Required to Reach the Server)
+
+Since 0.9.0 the server is secure-by-default: **without a token it binds
+loopback inside the container**, so the published port answers with
+*connection reset* — even though `docker ps` shows the container healthy and
+the port mapped. Generate a token first:
+
+```bash
+export CRAWL4AI_API_TOKEN="$(openssl rand -hex 32)"
+```
+
+> ⚠️ Use the explicit form `-e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN"` below.
+> The shorthand `-e CRAWL4AI_API_TOKEN` (no value) forwards the variable from
+> the *current shell* — in a shell where it isn't set, it silently passes an
+> empty value and the server starts in loopback mode with no host-side warning.
+
+#### 4. Run the Container
 
 *   **Basic run:**
     ```bash
@@ -120,6 +158,7 @@ EOL
       -p 11235:11235 \
       --name crawl4ai \
       --shm-size=1g \
+      -e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN" \
       unclecode/crawl4ai:latest
     ```
 
@@ -131,12 +170,30 @@ EOL
       --name crawl4ai \
       --env-file .llm.env \
       --shm-size=1g \
+      -e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN" \
       unclecode/crawl4ai:latest
     ```
 
-> The server will be available at `http://localhost:11235`. Visit `/playground` to access the interactive testing interface.
+The server will be available at `http://localhost:11235` after a short startup
+(allow ~10 seconds; the healthcheck allows up to 40). Verify:
 
-#### 4. Stopping the Container
+```bash
+curl http://localhost:11235/health   # no auth needed for /health
+```
+
+Every other endpoint requires `Authorization: Bearer $CRAWL4AI_API_TOKEN`.
+Visit `/playground` for the interactive testing interface and `/dashboard` for
+the monitoring UI — both have an **API token** bar in the top navigation; paste
+your token there and click **Set**.
+
+> 💡 **Troubleshooting "connection reset":** during the ~10s startup window the
+> published port also answers with connection reset — the same symptom as the
+> missing-token failure. If resets persist after 20s, check
+> `docker logs crawl4ai` for `binding loopback only`: that means no token
+> reached the container (note the `127.0.0.1` in that log line is the
+> *container's* loopback, not your host's — the port mapping cannot reach it).
+
+#### 5. Stopping the Container
 
 ```bash
 docker stop crawl4ai && docker rm crawl4ai
@@ -145,7 +202,7 @@ docker stop crawl4ai && docker rm crawl4ai
 #### Docker Hub Versioning Explained
 
 *   **Image Name:** `unclecode/crawl4ai`
-*   **Tag Format:** `LIBRARY_VERSION[-SUFFIX]` (e.g., `0.8.0`)
+*   **Tag Format:** `LIBRARY_VERSION[-SUFFIX]` (e.g., `0.9.2`)
     *   `LIBRARY_VERSION`: The semantic version of the core `crawl4ai` Python library
     *   `SUFFIX`: Optional tag for release candidates (``) and revisions (`r1`)
 *   **`latest` Tag:** Points to the most recent stable version
@@ -162,16 +219,38 @@ git clone https://github.com/unclecode/crawl4ai.git
 cd crawl4ai
 ```
 
-#### 2. Environment Setup (API Keys)
+#### 2. Environment Setup (Required)
 
-If you plan to use LLMs, copy the example environment file and add your API keys. This file should be in the **project root directory**.
+Export an API token in your shell — the compose file passes it into the
+container. **Required**, or the server will be unreachable (loopback-only,
+published port → connection reset):
+
+```bash
+export CRAWL4AI_API_TOKEN="$(openssl rand -hex 32)"
+```
+
+Prefer a file? Put the same line in a `.env` file in the project root —
+compose reads it automatically on every run, no export needed (if both are
+set, the shell export wins):
+
+```bash
+echo "CRAWL4AI_API_TOKEN=$(openssl rand -hex 32)" > .env
+```
+
+If you use LLMs, also create `.llm.env` in the **project root directory** with
+your API keys (optional — compose starts fine without it):
 
 ```bash
 # Make sure you are in the 'crawl4ai' root directory
 cp deploy/docker/.llm.env.example .llm.env
 
-# Now edit .llm.env and add your API keys
+# Now edit .llm.env and add your LLM API keys
 ```
+
+> ⚠️ Run the export in the **same shell** you run `docker compose up` from.
+> With compose, only the shell export or a `.env` line carries the token — a
+> `CRAWL4AI_API_TOKEN=` line in `.llm.env` is overridden by the compose
+> passthrough.
 
 **Flexible LLM Provider Configuration:**
 
@@ -240,7 +319,9 @@ The `docker-compose.yml` file in the project root provides a simplified approach
     ENABLE_GPU=true docker compose up --build -d
     ```
 
-> The server will be available at `http://localhost:11235`.
+> The server will be available at `http://localhost:11235` (allow ~10 seconds
+> for startup). All endpoints except `GET /health` require
+> `Authorization: Bearer <your exported token>`.
 
 #### 4. Stopping the Service
 
@@ -278,12 +359,20 @@ docker buildx build \
 
 #### 3. Run the Container
 
+Set a token first (required — without it the server is loopback-only and the
+published port answers with connection reset):
+
+```bash
+export CRAWL4AI_API_TOKEN="$(openssl rand -hex 32)"
+```
+
 *   **Basic run (no LLM support):**
     ```bash
     docker run -d \
       -p 11235:11235 \
       --name crawl4ai-standalone \
       --shm-size=1g \
+      -e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN" \
       crawl4ai-local:latest
     ```
 
@@ -295,10 +384,13 @@ docker buildx build \
       --name crawl4ai-standalone \
       --env-file .llm.env \
       --shm-size=1g \
+      -e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN" \
       crawl4ai-local:latest
     ```
 
-> The server will be available at `http://localhost:11235`.
+> The server will be available at `http://localhost:11235` (allow ~10 seconds
+> for startup). All endpoints except `GET /health` require
+> `Authorization: Bearer $CRAWL4AI_API_TOKEN`.
 
 #### 4. Stopping the Manual Container
 
@@ -393,13 +485,32 @@ Captures a full-page PNG screenshot of the specified URL.
 ```json
 {
   "url": "https://example.com",
-  "screenshot_wait_for": 2,
-  "output_path": "/path/to/save/screenshot.png"
+  "screenshot_wait_for": 2
 }
 ```
 
 - `screenshot_wait_for`: Optional delay in seconds before capture (default: 2)
-- `output_path`: Optional path to save the screenshot (recommended)
+
+The response contains the image inline (base64) **and** an artifact id you can
+fetch later:
+
+```json
+{"success": true, "screenshot": "<base64>",
+ "artifact_id": "…", "url": "/artifacts/…", "mime": "image/png", "size": 16668}
+```
+
+Download the stored file with an authenticated request (artifacts have a TTL
+and a storage quota):
+
+```bash
+curl -H "Authorization: Bearer $CRAWL4AI_API_TOKEN" \
+  -o screenshot.png http://localhost:11235/artifacts/<artifact_id>
+```
+
+> **⚠️ Changed in 0.9.0:** `output_path` was removed (server-side file writes
+> were a path-traversal risk). A request that still includes `output_path`
+> currently returns `success: true` but **silently ignores the field** — no
+> file is written. Use the artifact flow above instead.
 
 ### PDF Export Endpoint
 
@@ -411,12 +522,13 @@ Generates a PDF document of the specified URL.
 
 ```json
 {
-  "url": "https://example.com",
-  "output_path": "/path/to/save/document.pdf"
+  "url": "https://example.com"
 }
 ```
 
-- `output_path`: Optional path to save the PDF (recommended)
+Like `/screenshot`, the response returns the document plus an `artifact_id`;
+fetch the file via `GET /artifacts/{artifact_id}` with your Bearer token.
+`output_path` was removed in 0.9.0 and is silently ignored if sent.
 
 ### JavaScript Execution Endpoint
 
@@ -440,675 +552,112 @@ Executes JavaScript snippets on the specified URL and returns the full crawl res
 
 ---
 
-## User-Provided Hooks API
+## Hooks (Declarative Actions)
 
-The Docker API supports user-provided hook functions, allowing you to customize the crawling behavior by injecting your own Python code at specific points in the crawling pipeline. This powerful feature enables authentication, performance optimization, and custom content extraction without modifying the server code.
+> **⚠️ Changed in 0.9.0.** The previous hooks API — sending Python code strings in
+> `hooks.code` — was removed. It was an unauthenticated remote-code-execution
+> surface. The server now accepts **declarative hooks**: a fixed set of safe,
+> server-validated actions supplied as JSON. No code execution. If you need
+> arbitrary hook code, use the in-process Python SDK (`AsyncWebCrawler`), where
+> you keep full control.
 
-> ⚠️ **IMPORTANT SECURITY WARNING**: 
-> - **Never use hooks with untrusted code or on untrusted websites**
-> - **Be extremely careful when crawling sites that might be phishing or malicious**
-> - **Hook code has access to page context and can interact with the website**
-> - **Always validate and sanitize any data extracted through hooks**
-> - **Never expose credentials or sensitive data in hook code**
-> - **Consider running the Docker container in an isolated network when testing**
+### Enabling hooks
 
-### Hook Information Endpoint
-
-```
-GET /hooks/info
-```
-
-Returns information about available hook points and their signatures:
+Hooks are **disabled by default**. Enable them with an environment variable when
+starting the container:
 
 ```bash
-curl http://localhost:11235/hooks/info
+docker run -d \
+  -p 11235:11235 \
+  --name crawl4ai \
+  --shm-size=1g \
+  -e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN" \
+  -e CRAWL4AI_HOOKS_ENABLED=true \
+  unclecode/crawl4ai:latest
 ```
 
-### Available Hook Points
-
-The API supports 8 hook points that match the local SDK:
-
-| Hook Point | Parameters | Description | Best Use Cases |
-|------------|------------|-------------|----------------|
-| `on_browser_created` | `browser` | After browser instance creation | Light setup tasks |
-| `on_page_context_created` | `page, context` | After page/context creation | **Authentication, cookies, route blocking** |
-| `before_goto` | `page, context, url` | Before navigating to URL | Custom headers, logging |
-| `after_goto` | `page, context, url, response` | After navigation completes | Verification, waiting for elements |
-| `on_user_agent_updated` | `page, context, user_agent` | When user agent changes | UA-specific logic |
-| `on_execution_started` | `page, context` | When JS execution begins | JS-related setup |
-| `before_retrieve_html` | `page, context` | Before getting final HTML | **Scrolling, lazy loading** |
-| `before_return_html` | `page, context, html` | Before returning HTML | Final modifications, metrics |
-
-### Using Hooks in Requests
-
-Add hooks to any crawl request by including the `hooks` parameter:
+Without the flag, any request containing `hooks` returns:
 
 ```json
-{
-  "urls": ["https://httpbin.org/html"],
-  "hooks": {
-    "code": {
-      "hook_point_name": "async def hook(...): ...",
-      "another_hook": "async def hook(...): ..."
-    },
-    "timeout": 30  // Optional, default 30 seconds (max 120)
-  }
-}
+{"detail": "Hooks are disabled. Set CRAWL4AI_HOOKS_ENABLED=true to enable."}
 ```
 
-### Hook Examples with Real URLs
+### Available actions
 
-#### 1. Authentication with Cookies (GitHub)
+| Action | Hook point | Description |
+|--------|-----------|-------------|
+| `block_resources` | `on_page_context_created` | Abort matching resource types (`image`, `stylesheet`, `font`, `media`) |
+| `add_cookies` | `on_page_context_created` | Add cookies to the browser context before navigation (auth) |
+| `set_headers` | `before_goto` | Set extra HTTP request headers before navigating |
+| `scroll_to_bottom` | `before_retrieve_html` | Scroll to the page bottom in bounded steps (lazy-load), `max_steps` 1–50, `delay_ms` 0–5000 |
+| `wait_for_timeout` | `before_retrieve_html` | Wait a bounded number of milliseconds (0–60000) before retrieving HTML |
 
-```python
-import requests
+Get the full parameter schemas at runtime:
 
-# Example: Setting GitHub session cookie (use your actual session)
-hooks_code = {
-    "on_page_context_created": """
-async def hook(page, context, **kwargs):
-    # Add authentication cookies for GitHub
-    # WARNING: Never hardcode real credentials!
-    await context.add_cookies([
-        {
-            'name': 'user_session',
-            'value': 'your_github_session_token',  # Replace with actual token
-            'domain': '.github.com',
-            'path': '/',
-            'httpOnly': True,
-            'secure': True,
-            'sameSite': 'Lax'
-        }
-    ])
-    return page
-"""
-}
-
-response = requests.post("http://localhost:11235/crawl", json={
-    "urls": ["https://github.com/settings/profile"],  # Protected page
-    "hooks": {"code": hooks_code, "timeout": 30}
-})
+```bash
+curl -H "Authorization: Bearer $CRAWL4AI_API_TOKEN" \
+  http://localhost:11235/hooks/info
 ```
 
-#### 2. Basic Authentication (httpbin.org for testing)
+### Using hooks in a request
 
-```python
-# Safe testing with httpbin.org (a service designed for HTTP testing)
-hooks_code = {
-    "before_goto": """
-async def hook(page, context, url, **kwargs):
-    import base64
-    # httpbin.org/basic-auth expects username="user" and password="passwd"
-    credentials = base64.b64encode(b"user:passwd").decode('ascii')
-    
-    await page.set_extra_http_headers({
-        'Authorization': f'Basic {credentials}'
-    })
-    return page
-"""
-}
+Add a `hooks` object with a list of actions (maximum 10 per request):
 
-response = requests.post("http://localhost:11235/crawl", json={
-    "urls": ["https://httpbin.org/basic-auth/user/passwd"],
-    "hooks": {"code": hooks_code, "timeout": 15}
-})
-```
-
-#### 3. Performance Optimization (News Sites)
-
-```python
-# Example: Optimizing crawling of news sites like CNN or BBC
-hooks_code = {
-    "on_page_context_created": """
-async def hook(page, context, **kwargs):
-    # Block images, fonts, and media to speed up crawling
-    await context.route("**/*.{png,jpg,jpeg,gif,webp,svg,ico}", lambda route: route.abort())
-    await context.route("**/*.{woff,woff2,ttf,otf,eot}", lambda route: route.abort())
-    await context.route("**/*.{mp4,webm,ogg,mp3,wav,flac}", lambda route: route.abort())
-    
-    # Block common tracking and ad domains
-    await context.route("**/googletagmanager.com/*", lambda route: route.abort())
-    await context.route("**/google-analytics.com/*", lambda route: route.abort())
-    await context.route("**/doubleclick.net/*", lambda route: route.abort())
-    await context.route("**/facebook.com/tr/*", lambda route: route.abort())
-    await context.route("**/amazon-adsystem.com/*", lambda route: route.abort())
-    
-    # Disable CSS animations for faster rendering
-    await page.add_style_tag(content='''
-        *, *::before, *::after {
-            animation-duration: 0s !important;
-            transition-duration: 0s !important;
-        }
-    ''')
-    
-    return page
-"""
-}
-
-response = requests.post("http://localhost:11235/crawl", json={
-    "urls": ["https://www.bbc.com/news"],  # Heavy news site
-    "hooks": {"code": hooks_code, "timeout": 30}
-})
-```
-
-#### 4. Handling Infinite Scroll (Twitter/X)
-
-```python
-# Example: Scrolling on Twitter/X (requires authentication)
-hooks_code = {
-    "before_retrieve_html": """
-async def hook(page, context, **kwargs):
-    # Scroll to load more tweets
-    previous_height = 0
-    for i in range(5):  # Limit scrolls to avoid infinite loop
-        current_height = await page.evaluate("document.body.scrollHeight")
-        if current_height == previous_height:
-            break  # No more content to load
-            
-        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-        await page.wait_for_timeout(2000)  # Wait for content to load
-        previous_height = current_height
-    
-    return page
-"""
-}
-
-# Note: Twitter requires authentication for most content
-response = requests.post("http://localhost:11235/crawl", json={
-    "urls": ["https://twitter.com/nasa"],  # Public profile
-    "hooks": {"code": hooks_code, "timeout": 30}
-})
-```
-
-#### 5. E-commerce Login (Example Pattern)
-
-```python
-# SECURITY WARNING: This is a pattern example. 
-# Never use real credentials in code!
-# Always use environment variables or secure vaults.
-
-hooks_code = {
-    "on_page_context_created": """
-async def hook(page, context, **kwargs):
-    # Example pattern for e-commerce sites
-    # DO NOT use real credentials here!
-    
-    # Navigate to login page first
-    await page.goto("https://example-shop.com/login")
-    
-    # Wait for login form to load
-    await page.wait_for_selector("#email", timeout=5000)
-    
-    # Fill login form (use environment variables in production!)
-    await page.fill("#email", "test@example.com")  # Never use real email
-    await page.fill("#password", "test_password")   # Never use real password
-    
-    # Handle "Remember Me" checkbox if present
-    try:
-        await page.uncheck("#remember_me")  # Don't remember on shared systems
-    except:
-        pass
-    
-    # Submit form
-    await page.click("button[type='submit']")
-    
-    # Wait for redirect after login
-    await page.wait_for_url("**/account/**", timeout=10000)
-    
-    return page
-"""
-}
-```
-
-#### 6. Extracting Structured Data (Wikipedia)
-
-```python
-# Safe example using Wikipedia
-hooks_code = {
-    "after_goto": """
-async def hook(page, context, url, response, **kwargs):
-    # Wait for Wikipedia content to load
-    await page.wait_for_selector("#content", timeout=5000)
-    return page
-""",
-    
-    "before_retrieve_html": """
-async def hook(page, context, **kwargs):
-    # Extract structured data from Wikipedia infobox
-    metadata = await page.evaluate('''() => {
-        const infobox = document.querySelector('.infobox');
-        if (!infobox) return null;
-        
-        const data = {};
-        const rows = infobox.querySelectorAll('tr');
-        
-        rows.forEach(row => {
-            const header = row.querySelector('th');
-            const value = row.querySelector('td');
-            if (header && value) {
-                data[header.innerText.trim()] = value.innerText.trim();
-            }
-        });
-        
-        return data;
-    }''')
-    
-    if metadata:
-        print("Extracted metadata:", metadata)
-    
-    return page
-"""
-}
-
-response = requests.post("http://localhost:11235/crawl", json={
-    "urls": ["https://en.wikipedia.org/wiki/Python_(programming_language)"],
-    "hooks": {"code": hooks_code, "timeout": 20}
-})
-```
-
-### Security Best Practices
-
-> 🔒 **Critical Security Guidelines**:
-
-1. **Never Trust User Input**: If accepting hook code from users, always validate and sandbox it
-2. **Avoid Phishing Sites**: Never use hooks on suspicious or unverified websites
-3. **Protect Credentials**: 
-   - Never hardcode passwords, tokens, or API keys in hook code
-   - Use environment variables or secure secret management
-   - Rotate credentials regularly
-4. **Network Isolation**: Run the Docker container in an isolated network when testing
-5. **Audit Hook Code**: Always review hook code before execution
-6. **Limit Permissions**: Use the least privileged access needed
-7. **Monitor Execution**: Check hook execution logs for suspicious behavior
-8. **Timeout Protection**: Always set reasonable timeouts (default 30s)
-
-### Hook Response Information
-
-When hooks are used, the response includes detailed execution information:
-
-```json
-{
-  "success": true,
-  "results": [...],
-  "hooks": {
-    "status": {
-      "status": "success",  // or "partial" or "failed"
-      "attached_hooks": ["on_page_context_created", "before_retrieve_html"],
-      "validation_errors": [],
-      "successfully_attached": 2,
-      "failed_validation": 0
-    },
-    "execution_log": [
-      {
-        "hook_point": "on_page_context_created",
-        "status": "success",
-        "execution_time": 0.523,
-        "timestamp": 1234567890.123
-      }
-    ],
-    "errors": [],  // Any runtime errors
-    "summary": {
-      "total_executions": 2,
-      "successful": 2,
-      "failed": 0,
-      "timed_out": 0,
-      "success_rate": 100.0
-    }
-  }
-}
-```
-
-### Error Handling
-
-The hooks system is designed to be resilient:
-
-1. **Validation Errors**: Caught before execution (syntax errors, wrong parameters)
-2. **Runtime Errors**: Handled gracefully - crawl continues with original page object
-3. **Timeout Protection**: Hooks automatically terminated after timeout (configurable 1-120s)
-
-### Complete Example: Safe Multi-Hook Crawling
-
-```python
-import requests
-import json
-import os
-
-# Safe example using httpbin.org for testing
-hooks_code = {
-    "on_page_context_created": """
-async def hook(page, context, **kwargs):
-    # Set viewport and test cookies
-    await page.set_viewport_size({"width": 1920, "height": 1080})
-    await context.add_cookies([
-        {"name": "test_cookie", "value": "test_value", "domain": ".httpbin.org", "path": "/"}
-    ])
-    
-    # Block unnecessary resources for httpbin
-    await context.route("**/*.{png,jpg,jpeg}", lambda route: route.abort())
-    return page
-""",
-    
-    "before_goto": """
-async def hook(page, context, url, **kwargs):
-    # Add custom headers for testing
-    await page.set_extra_http_headers({
-        "X-Test-Header": "crawl4ai-test",
-        "Accept-Language": "en-US,en;q=0.9"
-    })
-    print(f"[HOOK] Navigating to: {url}")
-    return page
-""",
-    
-    "before_retrieve_html": """
-async def hook(page, context, **kwargs):
-    # Simple scroll for any lazy-loaded content
-    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-    await page.wait_for_timeout(1000)
-    return page
-"""
-}
-
-# Make the request to safe testing endpoints
-response = requests.post("http://localhost:11235/crawl", json={
-    "urls": [
-        "https://httpbin.org/html",
-        "https://httpbin.org/json"
-    ],
+```bash
+curl -X POST http://localhost:11235/crawl \
+  -H "Authorization: Bearer $CRAWL4AI_API_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "urls": ["https://example.com"],
     "hooks": {
-        "code": hooks_code,
-        "timeout": 30
-    },
-    "crawler_config": {
-        "cache_mode": "bypass"
+      "hooks": [
+        {"action": "block_resources", "params": {"resource_types": ["image", "font"]}},
+        {"action": "scroll_to_bottom", "params": {"max_steps": 10, "delay_ms": 500}}
+      ]
     }
-})
-
-# Check results
-if response.status_code == 200:
-    data = response.json()
-    
-    # Check hook execution
-    if data['hooks']['status']['status'] == 'success':
-        print(f"✅ All {len(data['hooks']['status']['attached_hooks'])} hooks executed successfully")
-        print(f"Execution stats: {data['hooks']['summary']}")
-    
-    # Process crawl results
-    for result in data['results']:
-        print(f"Crawled: {result['url']} - Success: {result['success']}")
-else:
-    print(f"Error: {response.status_code}")
+  }'
 ```
 
-> 💡 **Remember**: Always test your hooks on safe, known websites first before using them on production sites. Never crawl sites that you don't have permission to access or that might be malicious.
+The response reports what was attached and executed:
 
-### Hooks Utility: Function-Based Approach (Python)
+```json
+{"success": true, "results": [...], "hooks": {"status": "success", "attached": ["before_retrieve_html"]}}
+```
 
-For Python developers, Crawl4AI provides a more convenient way to work with hooks using the `hooks_to_string()` utility function and Docker client integration.
+Cookie example (authentication):
 
-#### Why Use Function-Based Hooks?
-
-**String-Based Approach (shown above)**:
-```python
-hooks_code = {
-    "on_page_context_created": """
-async def hook(page, context, **kwargs):
-    await page.set_viewport_size({"width": 1920, "height": 1080})
-    return page
-"""
+```json
+{
+  "urls": ["https://example.com/account"],
+  "hooks": {
+    "hooks": [
+      {"action": "add_cookies", "params": {"cookies": [
+        {"name": "session", "value": "your-session-token",
+         "domain": ".example.com", "path": "/", "secure": true}
+      ]}},
+      {"action": "set_headers", "params": {"headers": {"Accept-Language": "en-US"}}}
+    ]
+  }
 }
 ```
 
-**Function-Based Approach (recommended for Python)**:
-```python
-from crawl4ai import Crawl4aiDockerClient
+### Migrating from 0.8.x `hooks.code`
 
-async def my_hook(page, context, **kwargs):
-    await page.set_viewport_size({"width": 1920, "height": 1080})
-    return page
+Requests using the removed `hooks.code` (Python strings) format are **not
+executed**. Be aware of the current behavior:
 
-async with Crawl4aiDockerClient(base_url="http://localhost:11235") as client:
-    result = await client.crawl(
-        ["https://example.com"],
-        hooks={"on_page_context_created": my_hook}
-    )
-```
+- With hooks disabled (default): HTTP 403 "Hooks are disabled…" — note that
+  enabling hooks will *not* make code hooks work.
+- With hooks enabled: the request succeeds (HTTP 200) but the inline code is
+  **silently ignored** — the response shows `"hooks": {"status": "success",
+  "attached": []}`. If you see an empty `attached` list, your hooks did not run.
 
-**Benefits**:
-- ✅ Write hooks as regular Python functions
-- ✅ Full IDE support (autocomplete, syntax highlighting, type checking)
-- ✅ Easy to test and debug
-- ✅ Reusable hook libraries
-- ✅ Automatic conversion to API format
+Map your old hook code to declarative actions where possible (resource blocking,
+cookies, headers, scrolling, waits). For anything beyond the fixed action set —
+custom JavaScript, form logins, conditional logic — use the in-process Python
+SDK, which retains the full 8-hook-point API described in the
+[hooks documentation](../advanced/hooks-auth.md).
 
-#### Using the Hooks Utility
-
-The `hooks_to_string()` utility converts Python function objects to the string format required by the API:
-
-```python
-from crawl4ai import hooks_to_string
-
-# Define your hooks as functions
-async def setup_hook(page, context, **kwargs):
-    await page.set_viewport_size({"width": 1920, "height": 1080})
-    await context.add_cookies([{
-        "name": "session",
-        "value": "token",
-        "domain": ".example.com"
-    }])
-    return page
-
-async def scroll_hook(page, context, **kwargs):
-    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-    return page
-
-# Convert to string format
-hooks_dict = {
-    "on_page_context_created": setup_hook,
-    "before_retrieve_html": scroll_hook
-}
-hooks_string = hooks_to_string(hooks_dict)
-
-# Now use with REST API or Docker client
-# hooks_string contains the string representations
-```
-
-#### Docker Client with Automatic Conversion
-
-The Docker client automatically detects and converts function objects:
-
-```python
-from crawl4ai import Crawl4aiDockerClient
-
-async def auth_hook(page, context, **kwargs):
-    """Add authentication cookies"""
-    await context.add_cookies([{
-        "name": "auth_token",
-        "value": "your_token",
-        "domain": ".example.com"
-    }])
-    return page
-
-async def performance_hook(page, context, **kwargs):
-    """Block unnecessary resources"""
-    await context.route("**/*.{png,jpg,gif}", lambda r: r.abort())
-    await context.route("**/analytics/*", lambda r: r.abort())
-    return page
-
-async with Crawl4aiDockerClient(base_url="http://localhost:11235") as client:
-    # Pass functions directly - automatic conversion!
-    result = await client.crawl(
-        ["https://example.com"],
-        hooks={
-            "on_page_context_created": performance_hook,
-            "before_goto": auth_hook
-        },
-        hooks_timeout=30  # Optional timeout in seconds (1-120)
-    )
-
-    print(f"Success: {result.success}")
-    print(f"HTML: {len(result.html)} chars")
-```
-
-#### Creating Reusable Hook Libraries
-
-Build collections of reusable hooks:
-
-```python
-# hooks_library.py
-class CrawlHooks:
-    """Reusable hook collection for common crawling tasks"""
-
-    @staticmethod
-    async def block_images(page, context, **kwargs):
-        """Block all images to speed up crawling"""
-        await context.route("**/*.{png,jpg,jpeg,gif,webp}", lambda r: r.abort())
-        return page
-
-    @staticmethod
-    async def block_analytics(page, context, **kwargs):
-        """Block analytics and tracking scripts"""
-        tracking_domains = [
-            "**/google-analytics.com/*",
-            "**/googletagmanager.com/*",
-            "**/facebook.com/tr/*",
-            "**/doubleclick.net/*"
-        ]
-        for domain in tracking_domains:
-            await context.route(domain, lambda r: r.abort())
-        return page
-
-    @staticmethod
-    async def scroll_infinite(page, context, **kwargs):
-        """Handle infinite scroll to load more content"""
-        previous_height = 0
-        for i in range(5):  # Max 5 scrolls
-            current_height = await page.evaluate("document.body.scrollHeight")
-            if current_height == previous_height:
-                break
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            await page.wait_for_timeout(1000)
-            previous_height = current_height
-        return page
-
-    @staticmethod
-    async def wait_for_dynamic_content(page, context, url, response, **kwargs):
-        """Wait for dynamic content to load"""
-        await page.wait_for_timeout(2000)
-        try:
-            # Click "Load More" if present
-            load_more = await page.query_selector('[class*="load-more"]')
-            if load_more:
-                await load_more.click()
-                await page.wait_for_timeout(1000)
-        except:
-            pass
-        return page
-
-# Use in your application
-from hooks_library import CrawlHooks
-from crawl4ai import Crawl4aiDockerClient
-
-async def crawl_with_optimizations(url):
-    async with Crawl4aiDockerClient() as client:
-        result = await client.crawl(
-            [url],
-            hooks={
-                "on_page_context_created": CrawlHooks.block_images,
-                "before_retrieve_html": CrawlHooks.scroll_infinite
-            }
-        )
-        return result
-```
-
-#### Choosing the Right Approach
-
-| Approach | Best For | IDE Support | Language |
-|----------|----------|-------------|----------|
-| **String-based** | Non-Python clients, REST APIs, other languages | ❌ None | Any |
-| **Function-based** | Python applications, local development | ✅ Full | Python only |
-| **Docker Client** | Python apps with automatic conversion | ✅ Full | Python only |
-
-**Recommendation**:
-- **Python applications**: Use Docker client with function objects (easiest)
-- **Non-Python or REST API**: Use string-based hooks (most flexible)
-- **Manual control**: Use `hooks_to_string()` utility (middle ground)
-
-#### Complete Example with Function Hooks
-
-```python
-from crawl4ai import Crawl4aiDockerClient, BrowserConfig, CrawlerRunConfig, CacheMode
-
-# Define hooks as regular Python functions
-async def setup_environment(page, context, **kwargs):
-    """Setup crawling environment"""
-    # Set viewport
-    await page.set_viewport_size({"width": 1920, "height": 1080})
-
-    # Block resources for speed
-    await context.route("**/*.{png,jpg,gif}", lambda r: r.abort())
-
-    # Add custom headers
-    await page.set_extra_http_headers({
-        "Accept-Language": "en-US",
-        "X-Custom-Header": "Crawl4AI"
-    })
-
-    print("[HOOK] Environment configured")
-    return page
-
-async def extract_content(page, context, **kwargs):
-    """Extract and prepare content"""
-    # Scroll to load lazy content
-    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-    await page.wait_for_timeout(1000)
-
-    # Extract metadata
-    metadata = await page.evaluate('''() => ({
-        title: document.title,
-        links: document.links.length,
-        images: document.images.length
-    })''')
-
-    print(f"[HOOK] Page metadata: {metadata}")
-    return page
-
-async def main():
-    async with Crawl4aiDockerClient(base_url="http://localhost:11235", verbose=True) as client:
-        # Configure crawl
-        browser_config = BrowserConfig(headless=True)
-        crawler_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
-
-        # Crawl with hooks
-        result = await client.crawl(
-            ["https://httpbin.org/html"],
-            browser_config=browser_config,
-            crawler_config=crawler_config,
-            hooks={
-                "on_page_context_created": setup_environment,
-                "before_retrieve_html": extract_content
-            },
-            hooks_timeout=30
-        )
-
-        if result.success:
-            print(f"✅ Crawl successful!")
-            print(f"   URL: {result.url}")
-            print(f"   HTML: {len(result.html)} chars")
-            print(f"   Markdown: {len(result.markdown)} chars")
-        else:
-            print(f"❌ Crawl failed: {result.error_message}")
-
-if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
-```
-
-#### Additional Resources
-
-- **Comprehensive Examples**: See `/docs/examples/hooks_docker_client_example.py` for Python function-based examples
-- **REST API Examples**: See `/docs/examples/hooks_rest_api_example.py` for string-based examples
-- **Comparison Guide**: See `/docs/examples/README_HOOKS.md` for detailed comparison
-- **Utility Documentation**: See `/docs/hooks-utility-guide.md` for complete guide
 
 ---
 
@@ -1616,7 +1165,14 @@ Communicate with the running Docker server via its REST API (defaulting to `http
 
 ### Playground Interface
 
-A built-in web playground is available at `http://localhost:11235/playground` for testing and generating API requests. The playground allows you to:
+A built-in web playground is available at `http://localhost:11235/playground` for testing and generating API requests.
+
+> 🔑 Before running requests, paste your API token into the **API token** bar in
+> the top navigation and click **Set** — otherwise every request returns
+> `{"detail": "Authentication required"}` (note: the status banner may still
+> show "Success" for such error responses; check the response body).
+
+The playground allows you to:
 
 1. Configure `CrawlerRunConfig` and `BrowserConfig` using the main library's Python syntax
 2. Test crawling operations directly from the interface
@@ -1628,7 +1184,13 @@ This is the easiest way to translate Python configuration to JSON requests when 
 
 Install the SDK: `pip install crawl4ai`
 
-The Python SDK provides a convenient way to interact with the Docker API, including **automatic hook conversion** when using function objects.
+The Python SDK provides a convenient way to interact with the Docker API.
+
+> **⚠️ Changed in 0.9.0:** the SDK's function-based hooks (`hooks={...}` with
+> Python functions) no longer work against the Docker server — they were
+> converted to code strings server-side, and request-supplied hook code was
+> removed. Use [declarative hooks](#hooks-declarative-actions) over the REST
+> API, or run the in-process SDK (`AsyncWebCrawler`) for full hook support.
 
 ```python
 import asyncio
@@ -1669,25 +1231,6 @@ async def main():
         except Exception as e:
             print(f"Streaming crawl failed: {e}")
 
-        # Example with hooks (Python function objects)
-        print("\n--- Crawl with Hooks ---")
-
-        async def my_hook(page, context, **kwargs):
-            """Custom hook to optimize performance"""
-            await page.set_viewport_size({"width": 1920, "height": 1080})
-            await context.route("**/*.{png,jpg}", lambda r: r.abort())
-            print("[HOOK] Page optimized")
-            return page
-
-        result = await client.crawl(
-            ["https://httpbin.org/html"],
-            browser_config=BrowserConfig(headless=True),
-            crawler_config=CrawlerRunConfig(cache_mode=CacheMode.BYPASS),
-            hooks={"on_page_context_created": my_hook},  # Pass function directly!
-            hooks_timeout=30
-        )
-        print(f"Crawl with hooks success: {result.success}")
-
         # Example Get schema
         print("\n--- Getting Schema ---")
         schema = await client.get_schema()
@@ -1712,8 +1255,6 @@ The Docker client supports the following parameters:
 - `urls` (List[str]): List of URLs to crawl
 - `browser_config` (Optional[BrowserConfig]): Browser configuration
 - `crawler_config` (Optional[CrawlerRunConfig]): Crawler configuration
-- `hooks` (Optional[Dict]): Hook functions or strings - **automatically converts function objects!**
-- `hooks_timeout` (int): Timeout for each hook execution in seconds (default: 30)
 
 **Returns**:
 - Single URL: `CrawlResult` object
@@ -1758,7 +1299,61 @@ Crucially, when sending configurations directly via JSON, they **must** follow t
 ```
 
 **LLM Extraction Strategy** *(Keep example, ensure schema uses type/value wrapper)*
-*(Keep Deep Crawler Example)*
+#### Deep Crawling (opt-in)
+
+Deep crawling over the API is **disabled by default**: a request with
+`deep_crawl_strategy` returns HTTP 400. To allow it, start the container with
+`CRAWL4AI_ALLOW_DEEP_CRAWL=true`:
+
+```bash
+docker run -d \
+  -p 11235:11235 \
+  --name crawl4ai \
+  --shm-size=1g \
+  -e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN" \
+  -e CRAWL4AI_ALLOW_DEEP_CRAWL=true \
+  unclecode/crawl4ai:latest
+```
+
+With Docker Compose, put `CRAWL4AI_ALLOW_DEEP_CRAWL=true` in the `.env` file in
+the project root, or export it in your shell.
+
+```json
+{
+  "urls": ["https://docs.crawl4ai.com"],
+  "crawler_config": {
+    "type": "CrawlerRunConfig",
+    "params": {
+      "deep_crawl_strategy": {
+        "type": "BFSDeepCrawlStrategy",
+        "params": {
+          "max_depth": 2,
+          "max_pages": 20,
+          "filter_chain": {
+            "type": "FilterChain",
+            "params": {
+              "filters": [
+                {"type": "URLPatternFilter", "params": {"patterns": ["*/core/*"]}},
+                {"type": "DomainFilter", "params": {"allowed_domains": ["docs.crawl4ai.com"]}}
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Rules the server applies:
+
+- **One start URL** per request, and not inside `crawler_configs`.
+- `max_pages` and `max_depth` are clamped to `limits.max_pages` and `limits.max_depth` in `config.yml` (default 100 and 5; `max_pages: 0` means no limit). The crawl stops after `limits.wall_clock_s`, also on `/crawl/stream`.
+- **Allowed types:** `BFSDeepCrawlStrategy`, `DFSDeepCrawlStrategy`, `BestFirstCrawlingStrategy`; `FilterChain` with `URLPatternFilter`, `DomainFilter`, `ContentTypeFilter`; scorers `KeywordRelevanceScorer`, `CompositeScorer`, `DomainAuthorityScorer`, `FreshnessScorer`, `PathDepthScorer`. `SEOFilter` and `ContentRelevanceFilter` are refused (they fetch pages outside the egress controls).
+- `URLPatternFilter` accepts globs that start with `*` (`*/blog/*`), `/prefix/*` or `*.ext`. Regex patterns are refused.
+- `resume_state` is refused, and so is `fetch_ssl_certificate` together with a deep crawl. Lists (patterns, keywords, filters, scorers) are limited to 100 items. One strategy may have at most 20 filters and scorers and 200 list items in total, and a `CompositeScorer` cannot contain another `CompositeScorer`. Discovered links longer than 2048 characters are skipped.
+
+Turn the flag on only when you accept that one request can fetch many pages.
 
 ### LLM Configuration Examples
 
@@ -1949,6 +1544,29 @@ async def test_stream_crawl(token: str = None): # Made token optional
 # asyncio.run(test_stream_crawl())
 ```
 
+#### Per-URL Configs (`crawler_configs`)
+
+To crawl different URLs with different settings in one request, send `crawler_configs`: a list of `CrawlerRunConfig` payloads, each with a `url_matcher`. Every URL uses the first entry whose `url_matcher` matches it, and an entry without a `url_matcher` matches every URL.
+
+```python
+payload = {
+    "urls": ["https://docs.example.com/guide", "https://example.com/"],
+    "crawler_configs": [
+        {
+            "type": "CrawlerRunConfig",
+            "params": {"url_matcher": "*docs.example.com*", "css_selector": "main"},
+        },
+        # Catch-all: decides every URL the entries above did not match
+        {"type": "CrawlerRunConfig", "params": {"url_matcher": "*"}},
+    ],
+}
+```
+
+- The list is used for one URL or many, on both `/crawl` and `/crawl/stream`.
+- When a list is sent, `crawler_config` is ignored. It is not a fallback: a URL that no entry matches comes back as a failed result (`No matching configuration found for URL: ...`), so end the list with a catch-all entry (`"url_matcher": "*"`).
+- The server's `crawler.base_config` defaults from `config.yml` are applied to each entry on both endpoints.
+- A list that mixes `PDFContentScrapingStrategy` entries with other scraping strategies is refused with `400`, because one crawler serves every URL of a request.
+
 ---
 
 ## Real-time Monitoring & Operations
@@ -1960,8 +1578,15 @@ One of the key advantages of self-hosting is complete visibility into your infra
 Access the **built-in real-time monitoring dashboard** for complete operational visibility:
 
 ```
-http://localhost:11235/monitor
+http://localhost:11235/dashboard
 ```
+
+> ⚠️ The dashboard UI lives at `/dashboard`. `/monitor` is the API namespace
+> (`/monitor/health`, `/monitor/ws`, …); older docs pointed there, so that exact
+> URL now redirects to `/dashboard` for convenience — the `/monitor/*` routes
+> themselves still require a token. On the dashboard, paste
+> your API token into the **API token** bar (top right) and click **Set**; the
+> WebSocket then connects and live stats appear.
 
 ![Monitoring Dashboard](https://via.placeholder.com/800x400?text=Crawl4AI+Monitoring+Dashboard)
 
@@ -2407,7 +2032,7 @@ Returns:
 ```json
 {
   "status": "healthy",
-  "version": "0.7.4"
+  "version": "0.9.2"
 }
 ```
 
@@ -2459,6 +2084,11 @@ rate_limiting:
   storage_uri: "memory://"  # Use "redis://localhost:6379" if you need persistent/shared limits
 
 # Security Configuration
+# NOTE (0.9.0): the defaults below reflect 0.8.x. In 0.9.0 the Docker server is
+# secure-by-default - authentication is required, the server binds loopback
+# unless a token is set, and request bodies are validated against a trust
+# boundary. See the migration guide for the 0.9.0 defaults and config keys:
+# https://github.com/unclecode/crawl4ai/blob/main/deploy/docker/MIGRATION.md
 security:
   enabled: false # Master toggle for security features
   jwt_enabled: false # Enable JWT authentication (requires security.enabled=true)
@@ -2599,14 +2229,14 @@ By self-hosting Crawl4AI, you:
 **Next Steps:**
 
 1. **Start Simple**: Deploy with Docker Hub image and test with the playground
-2. **Monitor Everything**: Open `http://localhost:11235/monitor` to watch your server
+2. **Monitor Everything**: Open `http://localhost:11235/dashboard` to watch your server
 3. **Integrate**: Connect your applications using the Python SDK or REST API
 4. **Scale Smart**: Use the monitoring data to optimize your deployment
 5. **Go Production**: Set up alerting, log aggregation, and automated cleanup
 
 **Key Resources:**
 - 🎮 **Playground**: `http://localhost:11235/playground` - Interactive testing
-- 📊 **Monitor Dashboard**: `http://localhost:11235/monitor` - Real-time visibility
+- 📊 **Monitor Dashboard**: `http://localhost:11235/dashboard` - Real-time visibility
 - 📖 **Architecture Docs**: `deploy/docker/ARCHITECTURE.md` - Deep technical dive
 - 💬 **Discord Community**: Get help and share experiences
 - ⭐ **GitHub**: Report issues, contribute, show support

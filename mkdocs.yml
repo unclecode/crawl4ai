@@ -1,4 +1,4 @@
-site_name: Crawl4AI Documentation (v0.8.x)
+site_name: Crawl4AI Documentation (v0.9.x)
 site_description:  🚀🤖 Crawl4AI, Open-source LLM-Friendly Web Crawler & Scraper
 site_url: https://docs.crawl4ai.com
 repo_url: https://github.com/unclecode/crawl4ai
@@ -29,6 +29,7 @@ nav:
     - "Deep Crawling": "core/deep-crawling.md"
     - "Adaptive Crawling": "core/adaptive-crawling.md"
     - "URL Seeding": "core/url-seeding.md"
+    - "Domain Mapping": "core/domain-mapping.md"
     - "C4A-Script": "core/c4a-script.md"
     - "Crawler Result": "core/crawler-result.md"
     - "Browser, Crawler & LLM Config": "core/browser-crawler-config.md"
@@ -112,6 +113,7 @@ extra_css:
   - assets/dmvendor.css
   - assets/feedback-overrides.css
   - assets/page_actions.css
+  - assets/cloud-banner.css
 
 extra_javascript:
   - https://www.googletagmanager.com/gtag/js?id=G-58W0K2ZQ25
@@ -125,4 +127,5 @@ extra_javascript:
   - assets/copy_code.js
   - assets/floating_ask_ai_button.js
   - assets/mobile_menu.js
+  - assets/cloud-banner.js
   - assets/page_actions.js?v=20251006

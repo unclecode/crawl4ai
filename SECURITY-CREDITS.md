@@ -1,0 +1,31 @@
+# Security Credits
+
+We thank the following security researchers for their responsible disclosure:
+
+| Researcher | Contact | Vulnerability | Date Reported |
+|---|---|---|---|
+| Song Binglin (q1uf3ng) | q1uf3ng@proton.me | AST sandbox escape via gi_frame.f_back chain (CVSS 9.8) | 2026-03-29 |
+| Jeongbean Jeon | wjswjdqls7@gmail.com | File write, SSRF, monitor auth bypass, stored XSS | 2026-04-13 |
+| wulonchia | wulonchia@gmail.com | File write via output_path (independent report) | 2026-04-13 |
+| by111 (August829) | GitHub: [August829](https://github.com/August829) | Hardcoded JWT secret, eval in /config/dump, /execute_js, hook sandbox escape | 2026-04-14 |
+| secsys_codex | secsys_codex@163.com | SSRF via /md, /crawl, /llm endpoints (URL destination validation) | 2026-04-18 |
+| Velayutham Selvaraj | [LinkedIn](https://www.linkedin.com/in/velayuthamselvaraj) | SSRF via missing host validation in validate_url_scheme (independent report) | 2026-05-06 |
+| IcySun & Yashon | icysun@qq.com, liyaoyin@qq.com | SSRF, file write via output_path, missing auth by default, hook sandbox bypass via asyncio (independent report) | 2026-05-15 |
+| Geo ([geo-chen](https://github.com/geo-chen)) | cve@sageby.com | LLM API key exfiltration via unvalidated base_url (0.8.8) | 2026-06-02 |
+| Geo ([geo-chen](https://github.com/geo-chen)) | cve@sageby.com | SSRF via proxy_config.server bypassing the SSRF check (0.8.9) | 2026-06-04 |
+| Y4tacker | y4tacker@gmail.com | Download path traversal -> file write; Chromium launch-arg injection via extra_args (0.9.0) | 2026-06-18 |
+| KOH Jun Sheng ([seankohjs](https://github.com/seankohjs)) | jskoh.2023@scis.smu.edu.sg | SSRF on the streaming crawl path /crawl/stream (0.9.0) | 2026-06-18 |
+| UDU_RisePho | GitHub: [hoanggxyuuki](https://github.com/hoanggxyuuki) | Chromium launch-flag RCE class via extra_args (0.9.0) | 2026-06-18 |
+| Y4tacker | GitHub: [Y4tacker](https://github.com/Y4tacker) | Hook system exec() sandbox escape (MRO chain RCE), Chromium launch-arg injection (--utility-cmd-prefix RCE), HTTP crawler path traversal arbitrary file write | 2026-07-09 |
+| Rafael | GitHub: [rafaelfiguereod-stack](https://github.com/rafaelfiguereod-stack) | Reported SSRF, LLM key exfiltration, and auth gaps (already fixed / not exploitable in current code) | 2026-07-09 |
+| Zhixi "Jace" Sun | GitHub: [manus-use](https://github.com/manus-use) | Arbitrary file write via unconfined PDFContentScrapingStrategy image-write fields in untrusted config bodies (0.9.3) | 2026-08-24 |
+| Nguyen Tran Thanh Lam | GitHub: [c240030](https://github.com/c240030) | SSRF via PDF download redirects, DoS via unbounded PDF size and page count, XSS via unescaped PDF text in cleaned_html (0.9.3) | 2026-07-27 |
+| e1codes | GitHub: [e1codes](https://github.com/e1codes) | DOM-based XSS in the Docker Playground leading to operator API-token theft (0.9.3) | 2026-07-24 |
+| x0root | GitHub: [x0root](https://github.com/x0root) | SSRF in the hosted service at stage.crawl4ai.com | 2026-09-02 |
+| arpe1618 | GitHub: [arpe1618](https://github.com/arpe1618) | Blind SSRF via the robots.txt fetch in RobotsParser.can_fetch bypassing the Docker egress controls (0.9.4) | 2026-09-04 |
+| Ibrahim AlJaafreh - Cystack RedTeam | [LinkedIn](https://www.linkedin.com/in/ibrahim-aljaafreh-glitch/), [cystack.ps](https://cystack.ps) | SSRF with response disclosure via link_preview_config through the URL seeder (0.9.4) | 2026-09-04 |
+| Adam Jordan | GitHub: [adamyordan](https://github.com/adamyordan) | Untrusted-config gate bypass via dict-wrapper laundering, leaking server env vars (0.9.4) | 2026-09-08 |
+| arpe1618 | GitHub: [arpe1618](https://github.com/arpe1618) | Blind SSRF via the CacheValidator freshness check bypassing the Docker egress proxy (0.9.5) | 2026-09-29 |
+| Zhixi "Jace" Sun | GitHub: [manus-use](https://github.com/manus-use) | Page JavaScript injection via css_selector and wait_for, HuggingFace model choice via CosineStrategy.model_name, and ReDoS via untrusted regex patterns on the Docker server (0.9.5) | 2026-10-01 |
+| Chunyi Liu | GitHub: [liuchunyi-buaa](https://github.com/liuchunyi-buaa) | SQL injection in the docs marketplace backend, DOM XSS in the LinkedIn graph view example, unbounded delay fields in untrusted config bodies, and Docker hardening gaps (header-name validation, DomainFilter host parsing, silent guard failures) (0.9.5) | 2026-09-21 |
+| Julian Godfrey | Email report | Chromium launched with --ignore-certificate-errors so TLS verification was off, and the Chromium sandbox opt-in had no effect (0.9.5) | 2026-10-04 |

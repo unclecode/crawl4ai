@@ -41,6 +41,20 @@ BROWSER_DISABLE_OPTIONS = [
 ]
 
 
+def chromium_sandbox_requested() -> bool:
+    """True when the operator opts into the Chromium sandbox
+    (CRAWL4AI_CHROMIUM_SANDBOX=true). The default keeps --no-sandbox because
+    Chromium cannot start sandboxed in a container without user namespaces."""
+    return os.environ.get("CRAWL4AI_CHROMIUM_SANDBOX", "false").lower() == "true"
+
+
+def apply_sandbox_policy(args: List[str]) -> List[str]:
+    """Drop --no-sandbox, also from extra_args, when the sandbox is requested."""
+    if chromium_sandbox_requested():
+        return [a for a in args if a != "--no-sandbox"]
+    return args
+
+
 class ManagedBrowser:
     """
     Manages the browser process and context. This class allows to connect to the browser using CDP protocol.
@@ -76,8 +90,6 @@ class ManagedBrowser:
             "--no-default-browser-check",
             "--disable-infobars",
             "--window-position=0,0",
-            "--ignore-certificate-errors",
-            "--ignore-certificate-errors-spki-list",
             "--disable-blink-features=AutomationControlled",
             "--window-position=400,0",
             "--disable-renderer-backgrounding",
@@ -85,8 +97,10 @@ class ManagedBrowser:
             "--force-color-profile=srgb",
             "--mute-audio",
             "--disable-background-timer-throttling",
-            # Memory-saving flags: disable unused Chrome features
-            "--disable-features=OptimizationHints,MediaRouter,DialMediaRouteProvider",
+            # Memory-saving flags: disable unused Chrome features.
+            # Do not disable OptimizationHints — it SEGV_ACCERRs Chrome-for-Testing
+            # under --headless=new on macOS arm64 (issue #2239).
+            "--disable-features=MediaRouter,DialMediaRouteProvider",
             "--disable-component-update",
             "--disable-domain-reliability",
         ]
@@ -122,7 +136,7 @@ class ManagedBrowser:
         elif config.proxy_config:
             flags.append(f"--proxy-server={config.proxy_config.server}")
         # dedupe
-        return list(dict.fromkeys(flags))
+        return apply_sandbox_policy(list(dict.fromkeys(flags)))
 
     browser_type: str
     user_data_dir: str
@@ -195,6 +209,7 @@ class ManagedBrowser:
         
         if self.browser_config.extra_args:
             args.extend(self.browser_config.extra_args)
+            args = apply_sandbox_policy(args)
             
 
         # ── make sure no old Chromium instance is owning the same port/profile ──
@@ -393,6 +408,10 @@ class ManagedBrowser:
                 flags.append(f"--window-size={self.browser_config.viewport_width},{self.browser_config.viewport_height}")
             # merge common launch flags
             flags.extend(self.build_browser_flags(self.browser_config))
+            # The default context of a CDP-connected browser takes no
+            # ignore_https_errors option, so insecure mode needs the launch flag.
+            if self.browser_config.ignore_https_errors:
+                flags.append("--ignore-certificate-errors")
         elif self.browser_type == "firefox":
             flags = [
                 "--remote-debugging-port",
@@ -626,17 +645,33 @@ class _CDPConnectionCache:
             else:
                 from playwright.async_api import async_playwright
             pw = await async_playwright().start()
-            browser = await pw.chromium.connect_over_cdp(cdp_url)
+            try:
+                browser = await pw.chromium.connect_over_cdp(cdp_url)
+            except BaseException:
+                # Stop the driver we just started so a failed connect doesn't leak it
+                try:
+                    await pw.stop()
+                except BaseException:
+                    pass
+                raise
             cls._cache[cdp_url] = (pw, browser, 1)
             return pw, browser
 
     @classmethod
-    async def release(cls, cdp_url: str):
-        """Decrement ref count; close connection when last user releases."""
+    async def release(cls, cdp_url: str, browser=None):
+        """Decrement ref count; close connection when last user releases.
+
+        Pass the browser the caller acquired: if acquire() already replaced it
+        as stale, the cached entry belongs to newer users and must not be
+        touched (acquire() stopped the stale driver already).
+        """
         async with cls._get_lock():
             if cdp_url not in cls._cache:
                 return
-            pw, browser, count = cls._cache[cdp_url]
+            pw, cached, count = cls._cache[cdp_url]
+            if browser is not None and cached is not browser:
+                return
+            browser = cached
             if count <= 1:
                 try:
                     await browser.close()
@@ -788,6 +823,25 @@ class BrowserManager:
 
         Note: This method should be called in a separate task to avoid blocking the main event loop.
         """
+        try:
+            await self._start_impl()
+        except BaseException:
+            # Roll back partial startup (e.g. Playwright driver) since a failed __aenter__ never triggers __aexit__
+            try:
+                await self.close()
+            except BaseException:
+                pass
+            if self.playwright is not None:
+                # close() intentionally skips the driver for external-CDP configs; on failed startup we still own it
+                try:
+                    await self.playwright.stop()
+                except BaseException:
+                    pass
+                self.playwright = None
+            self.browser = None
+            raise
+
+    async def _start_impl(self):
         if self.playwright is not None:
             await self.close()
 
@@ -838,7 +892,7 @@ class BrowserManager:
 
             launch_kwargs = {
                 "headless": self.config.headless,
-                "args": list(dict.fromkeys(cli_args)),  # dedupe
+                "args": apply_sandbox_policy(list(dict.fromkeys(cli_args))),  # dedupe
                 "viewport": {
                     "width": self.config.viewport_width,
                     "height": self.config.viewport_height,
@@ -847,6 +901,8 @@ class BrowserManager:
                 "ignore_https_errors": self.config.ignore_https_errors,
                 "accept_downloads": self.config.accept_downloads,
             }
+            if chromium_sandbox_requested():
+                launch_kwargs["chromium_sandbox"] = True
 
             if self.config.proxy_config:
                 launch_kwargs["proxy"] = {
@@ -935,7 +991,7 @@ class BrowserManager:
             elif self.config.browser_type == "webkit":
                 self.browser = await self.playwright.webkit.launch(**browser_args)
             else:
-                self.browser = await self.playwright.chromium.launch(**browser_args)
+                self.browser = await self._launch_chromium(browser_args)
 
             self.default_context = self.browser
 
@@ -1054,6 +1110,25 @@ class BrowserManager:
         self.logger.debug(f"CDP verification failed after 5 attempts", tag="BROWSER")
         return False
 
+    async def _launch_chromium(self, browser_args: dict):
+        """Launch Chromium, falling back to Playwright's default binary when the
+        default full Chromium can't start (only chrome-headless-shell installed,
+        or the Windows exit-code-0 crash from #2051)."""
+        try:
+            return await self.playwright.chromium.launch(**browser_args)
+        except Exception as e:
+            if browser_args.get("channel") != "chromium":
+                raise
+            if self.logger:
+                self.logger.warning(
+                    f"Full Chromium failed to start ({str(e).splitlines()[0]}); "
+                    "falling back to chrome-headless-shell, which can behave differently. "
+                    "Run 'crawl4ai-setup' to install full Chromium.",
+                    tag="BROWSER",
+                )
+            fallback_args = {k: v for k, v in browser_args.items() if k != "channel"}
+            return await self.playwright.chromium.launch(**fallback_args)
+
     def _build_browser_args(self) -> dict:
         """Build browser launch arguments from config."""
         args = [
@@ -1066,8 +1141,6 @@ class BrowserManager:
             "--no-default-browser-check",
             "--disable-infobars",
             "--window-position=0,0",
-            "--ignore-certificate-errors",
-            "--ignore-certificate-errors-spki-list",
             "--disable-blink-features=AutomationControlled",
             "--window-position=400,0",
             "--disable-renderer-backgrounding",
@@ -1075,8 +1148,10 @@ class BrowserManager:
             "--force-color-profile=srgb",
             "--mute-audio",
             "--disable-background-timer-throttling",
-            # Memory-saving flags: disable unused Chrome features
-            "--disable-features=OptimizationHints,MediaRouter,DialMediaRouteProvider",
+            # Memory-saving flags: disable unused Chrome features.
+            # Do not disable OptimizationHints — it SEGV_ACCERRs Chrome-for-Testing
+            # under --headless=new on macOS arm64 (issue #2239).
+            "--disable-features=MediaRouter,DialMediaRouteProvider",
             "--disable-component-update",
             "--disable-domain-reliability",
             # "--single-process",
@@ -1108,10 +1183,17 @@ class BrowserManager:
             args.extend(self.config.extra_args)
 
         # Deduplicate args
-        args = list(dict.fromkeys(args))
+        args = apply_sandbox_policy(list(dict.fromkeys(args)))
         
         browser_args = {"headless": self.config.headless, "args": args}
+        # Playwright adds --no-sandbox itself unless chromium_sandbox is True.
+        if chromium_sandbox_requested():
+            browser_args["chromium_sandbox"] = True
 
+        # channel='chromium' (the default) launches the bundled full Chromium.
+        # Without a channel, headless Playwright launches chrome-headless-shell,
+        # which behaves differently (e.g. no automatic HTTPS upgrade, #2382).
+        # If full Chromium can't start, _launch_chromium falls back to the shell.
         if self.config.chrome_channel:
             browser_args["channel"] = self.config.chrome_channel
 
@@ -1969,7 +2051,7 @@ class BrowserManager:
             session_ids = list(self.sessions.keys())
             for session_id in session_ids:
                 await self.kill_session(session_id)
-            for ctx in self.contexts_by_config.values():
+            for ctx in list(self.contexts_by_config.values()):
                 try:
                     await ctx.close()
                 except Exception:
@@ -1978,7 +2060,7 @@ class BrowserManager:
             self._context_refcounts.clear()
             self._context_last_used.clear()
             self._page_to_sig.clear()
-            await _CDPConnectionCache.release(self.config.cdp_url)
+            await _CDPConnectionCache.release(self.config.cdp_url, self.browser)
             self.browser = None
             self.playwright = None
             self._using_cached_cdp = False
@@ -1995,7 +2077,7 @@ class BrowserManager:
                     await self.kill_session(session_id)
 
                 # Close all contexts we created
-                for ctx in self.contexts_by_config.values():
+                for ctx in list(self.contexts_by_config.values()):
                     try:
                         await ctx.close()
                     except Exception:
@@ -2032,7 +2114,7 @@ class BrowserManager:
             session_ids = list(self.sessions.keys())
             for session_id in session_ids:
                 await self.kill_session(session_id)
-            for ctx in self.contexts_by_config.values():
+            for ctx in list(self.contexts_by_config.values()):
                 try:
                     await ctx.close()
                 except Exception:
@@ -2064,7 +2146,7 @@ class BrowserManager:
             await self.kill_session(session_id)
 
         # Now close all contexts we created. This reclaims memory from ephemeral contexts.
-        for ctx in self.contexts_by_config.values():
+        for ctx in list(self.contexts_by_config.values()):
             try:
                 await ctx.close()
             except Exception as e:

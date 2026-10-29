@@ -64,7 +64,7 @@ DEFAULT_CONFIG = {
         "memory_threshold_percent": 95.0,
         "rate_limiter": {"enabled": True, "base_delay": [1.0, 2.0]},
         "timeouts": {"stream_init": 30.0, "batch_process": 300.0},
-        "pool": {"max_pages": 40, "idle_ttl_sec": 300},
+        "pool": {"max_pages": 40, "idle_ttl_sec": 300, "max_pages_before_recycle": 200},
         "browser": {
             "kwargs": {"headless": True, "text_mode": True},
             "extra_args": [
@@ -72,9 +72,6 @@ DEFAULT_CONFIG = {
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
                 "--disable-software-rasterizer",
-                "--disable-web-security",
-                "--allow-insecure-localhost",
-                "--ignore-certificate-errors",
             ],
         },
     },
@@ -150,12 +147,36 @@ def load_config() -> Dict:
 
     return config
 
+class CRLFSafeFilter(logging.Filter):
+    """Strip CR/LF/control chars from log records (log-injection / forging).
+
+    A crawl URL or error reflected into a log line could otherwise inject
+    newlines and forge additional log entries.
+    """
+
+    _BAD = {ord(c): None for c in "\r\n"} | {i: None for i in range(0, 32) if i not in (9,)}
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            msg = record.getMessage()
+            cleaned = msg.translate(self._BAD)
+            if cleaned != msg:
+                record.msg = cleaned
+                record.args = ()
+        except Exception:
+            pass
+        return True
+
+
 def setup_logging(config: Dict) -> None:
-    """Configure application logging."""
+    """Configure application logging with CRLF-safe records."""
     logging.basicConfig(
         level=config["logging"]["level"],
         format=config["logging"]["format"]
     )
+    crlf = CRLFSafeFilter()
+    for handler in logging.getLogger().handlers:
+        handler.addFilter(crlf)
 
 def get_base_url(request: Request) -> str:
     """Get base URL including scheme and host."""
@@ -291,6 +312,89 @@ def get_llm_base_url(config: Dict, provider: Optional[str] = None) -> Optional[s
     
     # Check global LLM_BASE_URL
     return os.environ.get("LLM_BASE_URL")
+
+
+# ── Security utilities ──────────────────────────────────────
+# validate_output_path / ALLOWED_OUTPUT_DIR were removed: caller-supplied
+# output paths are no longer accepted (string-only validation was bypassable via
+# symlink/TOCTOU and sibling-prefix names -> arbitrary write -> RCE). The server
+# owns all artifact paths now (see artifacts.py).
+
+
+import ipaddress
+import socket
+from urllib.parse import urlparse
+
+_BLOCKED_NETWORKS = [
+    ipaddress.ip_network("0.0.0.0/8"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("100.64.0.0/10"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.0.0.0/24"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("198.18.0.0/15"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+    ipaddress.ip_network("fe80::/10"),
+]
+
+_BLOCKED_HOSTNAMES = {
+    "localhost", "metadata.google.internal", "metadata",
+    "kubernetes.default", "kubernetes.default.svc",
+}
+
+
+ALLOW_INTERNAL_URLS = os.environ.get("CRAWL4AI_ALLOW_INTERNAL_URLS", "false").lower() == "true"
+
+
+def validate_url_destination(url: str) -> None:
+    """Block crawl URLs targeting internal/private networks (SSRF protection).
+    Skipped when CRAWL4AI_ALLOW_INTERNAL_URLS=true.
+    Skipped for raw: URLs (inline HTML, no network fetch)."""
+    if ALLOW_INTERNAL_URLS:
+        return
+    if str(url).startswith(("raw:", "raw://")):
+        return
+    try:
+        validate_webhook_url(url)
+    except ValueError as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=f"URL blocked (SSRF protection): {e}")
+
+
+def _expand_ip_candidates(ip):
+    """Return [ip] plus any IPv4 form wrapped inside the IPv6 address.
+    SSRF guards must check the unwrapped form because ::ffff:127.0.0.1 and
+    ::127.0.0.1 route to 127.0.0.1 but would not match IPv4 blocklists directly."""
+    candidates = [ip]
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip.ipv4_mapped is not None:
+            candidates.append(ip.ipv4_mapped)
+        else:
+            as_int = int(ip)
+            if 0 < as_int < 2**32:
+                candidates.append(ipaddress.IPv4Address(as_int))
+    return candidates
+
+
+def validate_webhook_url(url: str) -> None:
+    """Reject webhook/crawl URLs targeting non-global networks (SSRF protection).
+
+    Delegates to the single egress rule (egress_broker: reject any resolved IP
+    where not ip.is_global, including v4-mapped/NAT64/6to4/v4-compat embedded
+    forms). The raised message is intentionally opaque - it never echoes the
+    resolved IP or hostname, so this is not a DNS/oracle leak.
+    """
+    from egress_broker import resolve_and_pin, EgressBlocked
+    parsed = urlparse(str(url))
+    if not parsed.hostname:
+        raise ValueError("URL must have a valid hostname")
+    try:
+        resolve_and_pin(url)
+    except EgressBlocked:
+        raise ValueError("URL blocked")
 
 
 def verify_email_domain(email: str) -> bool:

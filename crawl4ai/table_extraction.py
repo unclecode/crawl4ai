@@ -210,6 +210,52 @@ class DefaultTableExtraction(TableExtractionStrategy):
         threshold = kwargs.get("table_score_threshold", self.table_score_threshold)
         return score >= threshold
     
+    # HTML Standard caps colspan at 1000; browsers clamp to the same value.
+    COLSPAN_LIMIT = 1000
+
+    @classmethod
+    def _build_grid(cls, rows: List[etree.Element]) -> List[List[str]]:
+        """Lay <tr> cells into a rectangular grid, honouring colspan/rowspan.
+
+        Each cell writes its text into every slot of the rectangle it spans,
+        including slots in later rows, so a row only has to fill the slots the
+        rows above it left free. Nothing is carried between iterations, so a
+        short row cannot leave a stale span behind (see issue #2258).
+        """
+        grid: List[List[str]] = [[] for _ in rows]
+
+        def span(value, limit: int) -> int:
+            """Read a span attribute the way a browser does: junk counts as 1."""
+            try:
+                return min(max(int(value), 1), limit)
+            except (TypeError, ValueError):
+                return 1
+
+        def put(r: int, c: int, text: str) -> None:
+            row = grid[r]
+            row.extend([None] * (c + 1 - len(row)))
+            row[c] = text
+
+        for r, tr in enumerate(rows):
+            c = 0
+            for cell in tr.xpath("./th|./td"):
+                while c < len(grid[r]) and grid[r][c] is not None:
+                    c += 1  # slot already taken by a rowspan from above
+                text = cell.text_content().strip()
+                # Both spans are clamped, so one crafted cell cannot make the
+                # work explode: scraped HTML is untrusted, and rowspan*colspan
+                # is a product. COLSPAN_LIMIT is the HTML Standard's cap, which
+                # is what browsers apply; a rowspan cannot reach past the last
+                # row, which is a tighter bound than the standard's 65534.
+                colspan = span(cell.get("colspan"), cls.COLSPAN_LIMIT)
+                rowspan = span(cell.get("rowspan"), len(grid) - r)
+                for dr in range(rowspan):
+                    for dc in range(colspan):
+                        put(r + dr, c + dc, text)
+                c += colspan
+
+        return [[text or "" for text in row] for row in grid if row]
+
     def extract_table_data(self, table: etree.Element) -> Dict[str, Any]:
         """
         Extract structured data from a table element.
@@ -232,6 +278,7 @@ class DefaultTableExtraction(TableExtractionStrategy):
         
         # Extract headers with colspan handling
         headers = []
+        implicit_header_row = None
         thead_rows = table.xpath(".//thead/tr")
         if thead_rows:
             header_cells = thead_rows[0].xpath(".//th")
@@ -243,21 +290,21 @@ class DefaultTableExtraction(TableExtractionStrategy):
             # Check first row for headers
             first_row = table.xpath(".//tr[1]")
             if first_row:
-                for cell in first_row[0].xpath(".//th|.//td"):
+                implicit_header_row = first_row[0]
+                for cell in implicit_header_row.xpath(".//th|.//td"):
                     text = cell.text_content().strip()
                     colspan = int(cell.get("colspan", 1))
                     headers.extend([text] * colspan)
         
-        # Extract rows with colspan handling
-        rows = []
-        for row in table.xpath(".//tr[not(ancestor::thead)]"):
-            row_data = []
-            for cell in row.xpath(".//td"):
-                text = cell.text_content().strip()
-                colspan = int(cell.get("colspan", 1))
-                row_data.extend([text] * colspan)
-            if row_data:
-                rows.append(row_data)
+        # Extract rows, laying each cell into a grid so colspan/rowspan land in
+        # the columns they actually cover and <th> row headers are kept (#2258).
+        body_rows = table.xpath(".//tr[not(ancestor::thead)]")
+        # A first row made only of <th> is the header, so don't repeat it as
+        # data. A first row mixing <th scope="row"> with <td> is a key/value
+        # data row and must stay.
+        if implicit_header_row is not None and not implicit_header_row.xpath("./td"):
+            body_rows = body_rows[1:]
+        rows = self._build_grid(body_rows)
         
         # Align rows with headers
         max_columns = len(headers) if headers else (

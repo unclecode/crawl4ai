@@ -683,9 +683,9 @@ class TestCrawlEndpoints:
         # Should return 200 with failed results, not 500
         print(f"Status code: {response.status_code}")
         print(f"Response: {response.text}")
-        assert response.status_code == 500
+        assert response.status_code == 200
         data = response.json()
-        assert data["detail"].startswith("Crawl request failed:")
+        assert all(not result["success"] for result in data["results"])
 
     async def test_mixed_success_failure_urls(self, async_client: httpx.AsyncClient):
         """Test handling of mixed success/failure URLs."""

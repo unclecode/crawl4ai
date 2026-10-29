@@ -3,7 +3,7 @@ import warnings
 
 from .async_webcrawler import AsyncWebCrawler, CacheMode
 # MODIFIED: Add SeedingConfig and VirtualScrollConfig here
-from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig, SeedingConfig, VirtualScrollConfig, LinkPreviewConfig, MatchMode
+from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig, SeedingConfig, VirtualScrollConfig, LinkPreviewConfig, MatchMode, DomainMapperConfig
 
 from .content_scraping_strategy import (
     ContentScrapingStrategy,
@@ -42,6 +42,7 @@ from .content_filter_strategy import (
     LLMContentFilter,
     RelevantContentFilter,
 )
+from .content_filter_strategy_lxml import PruningContentFilterLXML
 from .models import CrawlResult, MarkdownGenerationResult, DisplayMode
 from .components.crawler_monitor import CrawlerMonitor
 from .link_preview import LinkPreview
@@ -78,6 +79,7 @@ from .deep_crawling import (
 )
 # NEW: Import AsyncUrlSeeder
 from .async_url_seeder import AsyncUrlSeeder
+from .domain_mapper import DomainMapper
 # Adaptive Crawler
 from .adaptive_crawler import (
     AdaptiveCrawler,
@@ -122,6 +124,9 @@ __all__ = [
     "VirtualScrollConfig",
     # NEW: Add AsyncUrlSeeder
     "AsyncUrlSeeder",
+    # DomainMapper
+    "DomainMapper",
+    "DomainMapperConfig",
     # Adaptive Crawler
     "AdaptiveCrawler",
     "AdaptiveConfig", 
@@ -172,6 +177,7 @@ __all__ = [
     "LLMTableExtraction",
     "RelevantContentFilter",
     "PruningContentFilter",
+    "PruningContentFilterLXML",
     "BM25ContentFilter",
     "LLMContentFilter",
     "BaseDispatcher",

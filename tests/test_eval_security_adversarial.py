@@ -428,12 +428,17 @@ class TestHookManagerBuiltins(unittest.TestCase):
                                 elt.value for elt in node.value.elts
                                 if isinstance(elt, ast.Constant)
                             ]
+                            # Batch 2 hardening: hasattr, type, __build_class__ also removed
                             self.assertNotIn("getattr", values,
                                 "getattr must not be in hook allowed_builtins (sandbox escape)")
                             self.assertNotIn("setattr", values,
                                 "setattr must not be in hook allowed_builtins (sandbox escape)")
-                            self.assertIn("hasattr", values,
-                                "hasattr should remain (read-only, safe)")
+                            self.assertNotIn("hasattr", values,
+                                "hasattr removed in batch 2 (info disclosure via probing)")
+                            self.assertNotIn("type", values,
+                                "type removed in batch 2 (__subclasses__ MRO chain escape)")
+                            self.assertNotIn("__build_class__", values,
+                                "__build_class__ removed in batch 2 (__init_subclass__ abuse)")
                             return
 
         self.fail("Could not find allowed_builtins in hook_manager.py")

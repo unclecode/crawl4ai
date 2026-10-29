@@ -3,6 +3,7 @@ import functools
 import importlib
 import os
 import warnings
+from urllib.parse import unquote
 import requests
 from .config import (
     DEFAULT_PROVIDER,
@@ -126,14 +127,14 @@ ALLOWED_DESERIALIZE_TYPES = {
     # Config classes
     "BrowserConfig", "CrawlerRunConfig", "HTTPCrawlerConfig",
     "LLMConfig", "ProxyConfig", "GeolocationConfig",
-    "SeedingConfig", "VirtualScrollConfig", "LinkPreviewConfig",
+    "SeedingConfig", "VirtualScrollConfig", "LinkPreviewConfig", "DomainMapperConfig",
     # Extraction strategies
     "JsonCssExtractionStrategy", "JsonXPathExtractionStrategy",
     "JsonLxmlExtractionStrategy", "LLMExtractionStrategy",
     "CosineStrategy", "RegexExtractionStrategy",
     # Markdown / content
     "DefaultMarkdownGenerator",
-    "PruningContentFilter", "BM25ContentFilter", "LLMContentFilter",
+    "PruningContentFilter", "PruningContentFilterLXML", "BM25ContentFilter", "LLMContentFilter",
     # Scraping
     "LXMLWebScrapingStrategy", "PDFContentScrapingStrategy",
     # Chunking
@@ -154,6 +155,397 @@ ALLOWED_DESERIALIZE_TYPES = {
     # Proxy
     "RoundRobinProxyStrategy",
 }
+
+
+# ───────────────────────── untrusted-input trust boundary ─────────────────────────
+# When a config is deserialized from an untrusted source (a network request body
+# on the Docker server), it may only construct a strict subset of types and may
+# only set scalar, non-power fields, which are then clamped. SDK / in-process use
+# is TRUSTED by default, so this changes nothing for library callers.
+
+
+class Provenance(Enum):
+    """Where deserialized config data came from.
+
+    TRUSTED   - SDK / in-process construction (unchanged behavior).
+    UNTRUSTED - a network request body; gated by the allowlists below.
+    """
+    TRUSTED = "trusted"
+    UNTRUSTED = "untrusted"
+
+
+class UntrustedConfigError(ValueError):
+    """An untrusted request tried to construct a forbidden type or set a
+    forbidden power-field. The Docker layer maps this to HTTP 400."""
+
+
+# Types an untrusted body may construct - a strict subset of
+# ALLOWED_DESERIALIZE_TYPES. Deliberately EXCLUDES everything that can run code,
+# read secrets, route traffic, or recurse the crawl: LLMConfig,
+# LLMExtractionStrategy, LLMContentFilter, LLMTableExtraction, ProxyConfig,
+# RoundRobinProxyStrategy, all DeepCrawl*/Filter/Scorer/Dispatcher classes,
+# SeedingConfig and DomainMapperConfig.
+UNTRUSTED_ALLOWED_TYPES = {
+    "CrawlerRunConfig", "BrowserConfig", "HTTPCrawlerConfig",
+    "GeolocationConfig", "VirtualScrollConfig", "LinkPreviewConfig",
+    # non-LLM extraction / markdown / scraping / chunking strategies
+    "JsonCssExtractionStrategy", "JsonXPathExtractionStrategy",
+    "JsonLxmlExtractionStrategy", "RegexExtractionStrategy", "CosineStrategy",
+    "DefaultMarkdownGenerator", "PruningContentFilter", "PruningContentFilterLXML", "BM25ContentFilter",
+    "LXMLWebScrapingStrategy", "PDFContentScrapingStrategy",
+    "RegexChunking",
+    "DefaultTableExtraction", "NoTableExtraction",
+    # safe scalar enums
+    "CacheMode", "MatchMode", "DisplayMode",
+}
+
+# Allowed only with CRAWL4AI_ALLOW_DEEP_CRAWL=true; SEOFilter/ContentRelevanceFilter excluded (unguarded httpx fetch).
+UNTRUSTED_DEEP_CRAWL_TYPES = {
+    "BFSDeepCrawlStrategy", "DFSDeepCrawlStrategy", "BestFirstCrawlingStrategy",
+    "FilterChain", "URLPatternFilter", "DomainFilter", "ContentTypeFilter",
+    "KeywordRelevanceScorer", "CompositeScorer", "DomainAuthorityScorer",
+    "FreshnessScorer", "PathDepthScorer",
+}
+
+# Fields that must NEVER come from an untrusted body. Presence => 400 (loud), so
+# a client smuggling these gets an explicit error rather than a silent drop.
+UNTRUSTED_FORBIDDEN_FIELDS = {
+    "BrowserConfig": {
+        "proxy", "proxy_config", "extra_args", "user_data_dir", "channel",
+        "chrome_channel", "cdp_url", "debugging_port", "host", "storage_state",
+        "cookies", "headers", "init_scripts", "browser_context_id", "target_id",
+    },
+    "CrawlerRunConfig": {
+        "js_code", "js_code_before_wait", "c4a_script", "deep_crawl_strategy",
+        "proxy_config", "proxy_rotation_strategy", "proxy_session_id",
+        "proxy_session_ttl", "proxy_session_auto_release",
+        "fallback_fetch_function", "experimental", "base_url", "simulate_user",
+        "override_navigator", "magic", "process_in_browser", "shared_data",
+        "session_id",
+    },
+    # PDFContentScrapingStrategy has no scalar allowlist (it is kept for its
+    # value fields), so its filesystem-write knobs must be blocked explicitly:
+    # image_save_dir is an unconfined write destination and save_images_locally
+    # turns the write on. extract_images stays allowed - it only returns the
+    # image bytes base64-inline in the response, no disk write.
+    "PDFContentScrapingStrategy": {
+        "image_save_dir", "save_images_locally",
+    },
+    # resume_state.pending would queue URLs that skip seed validation.
+    **{
+        name: {"resume_state", "logger", "on_state_change", "should_cancel"}
+        for name in ("BFSDeepCrawlStrategy", "DFSDeepCrawlStrategy", "BestFirstCrawlingStrategy")
+    },
+    # Same reason, no scalar allowlist. model_name is a HuggingFace repo id
+    # handed to from_pretrained: the caller would pick the weights the server
+    # downloads and unpickles.
+    "CosineStrategy": {"model_name"},
+    # Caller-supplied regexes. Python's re holds the GIL while it matches, so
+    # one catastrophic-backtracking pattern freezes the whole server, and the
+    # crawl deadline cannot interrupt it. The built-in patterns stay available.
+    "RegexExtractionStrategy": {"custom"},
+    "RegexChunking": {"patterns"},
+}
+
+# Extraction schemas are free-form dicts, so their "regex" field type (a
+# caller-supplied re.search pattern, same ReDoS as above) is checked by walking
+# the schema rather than by field name.
+_SCHEMA_STRATEGIES = {
+    "JsonCssExtractionStrategy", "JsonXPathExtractionStrategy", "JsonLxmlExtractionStrategy",
+}
+
+
+def _has_regex_field(node) -> bool:
+    if isinstance(node, dict):
+        return node.get("type") == "regex" or any(_has_regex_field(v) for v in node.values())
+    if isinstance(node, list):
+        return any(_has_regex_field(v) for v in node)
+    return False
+
+# Field names that must NEVER be set from an untrusted body on ANY allowed
+# type, checked regardless of per-type allowlist. This is the fail-closed
+# backstop: the per-type maps above only cover BrowserConfig/CrawlerRunConfig,
+# so a strategy that (now or in future) exposes a filesystem-write, code, or
+# routing constructor arg is caught here even with no explicit allowlist.
+# Presence => 400 (loud), matching js_code/extra_args behavior.
+UNTRUSTED_GLOBAL_FORBIDDEN_FIELDS = {
+    # filesystem write / read sinks
+    "image_save_dir", "save_images_locally", "downloads_path", "user_data_dir",
+    "output_path", "save_path", "file_path", "local_path", "storage_state",
+    # code / command execution
+    "js_code", "js_code_before_wait", "c4a_script", "init_scripts",
+    "code", "command", "hook", "hooks",
+}
+
+# Scalar knobs an untrusted body MAY set, per class. A field not listed here is
+# dropped (forward-compatible: new SDK fields don't open a hole). Strategy-object
+# fields are kept so the nested object is itself type-gated by the recursion.
+UNTRUSTED_FIELD_ALLOWLIST = {
+    "BrowserConfig": {
+        "browser_type", "headless", "browser_mode", "viewport_width",
+        "viewport_height", "viewport", "device_scale_factor", "accept_downloads",
+        "java_script_enabled", "text_mode", "light_mode", "enable_stealth",
+        "avoid_ads", "avoid_css", "user_agent", "user_agent_mode",
+        "user_agent_generator_config", "verbose", "memory_saving_mode",
+        "max_pages_before_recycle",
+    },
+    "CrawlerRunConfig": {
+        # content selection / cleaning
+        "word_count_threshold", "only_text", "css_selector", "target_elements",
+        "excluded_tags", "excluded_selector", "keep_data_attributes", "keep_attrs",
+        "remove_forms", "prettiify", "parser_type",
+        # strategy objects (nested type is gated by the recursion)
+        "extraction_strategy", "chunking_strategy", "markdown_generator",
+        "scraping_strategy", "table_extraction",
+        # locale / geo
+        "locale", "timezone_id", "geolocation",
+        # cache
+        "cache_mode", "bypass_cache", "disable_cache", "no_cache_read",
+        "no_cache_write", "check_cache_freshness", "cache_validation_timeout",
+        "fetch_ssl_certificate",
+        # timing / waiting
+        "wait_until", "page_timeout", "wait_for", "wait_for_timeout",
+        "body_visibility_timeout",
+        "wait_for_images", "delay_before_return_html", "mean_delay", "max_range",
+        # scrolling / rendering
+        "ignore_body_visibility", "scan_full_page", "scroll_delay",
+        "max_scroll_steps", "process_iframes", "flatten_shadow_dom",
+        "remove_overlay_elements", "remove_consent_popups",
+        "adjust_viewport_to_content", "virtual_scroll_config",
+        # media / capture
+        "screenshot", "screenshot_wait_for", "screenshot_height_threshold",
+        "force_viewport_screenshot", "pdf", "capture_mhtml",
+        "image_description_min_word_threshold", "image_score_threshold",
+        "table_score_threshold",
+        # links / images filtering
+        "exclude_external_images", "exclude_all_images",
+        "exclude_social_media_domains", "exclude_external_links",
+        "exclude_social_media_links", "exclude_domains", "exclude_internal_links",
+        "score_links", "preserve_https_for_internal_links", "link_preview_config",
+        # misc safe knobs
+        "verbose", "log_console", "capture_network_requests",
+        "capture_console_messages", "method", "stream", "prefetch", "url",
+        "check_robots_txt", "user_agent", "user_agent_mode",
+        "user_agent_generator_config", "url_matcher", "match_mode", "max_retries",
+    },
+}
+
+# Upper bounds applied to attacker-influenced quantities after filtering.
+_DEFAULT_MAX_TIMEOUT_MS = 60_000
+_MAX_SCROLL_STEPS = 1000
+_MAX_DELAY_SECONDS = 60  # ceiling for delay_before_return_html / mean_delay / max_range
+_MAX_VIEWPORT = 4000
+_MAX_PDF_BYTES = 100 * 1024 * 1024
+_MAX_PDF_PAGES = 2000
+_MAX_LINK_PREVIEW_LINKS = 100      # the class default
+_MAX_LINK_PREVIEW_CONCURRENCY = 10  # the class default
+_MAX_LINK_PREVIEW_TIMEOUT_S = 10    # seconds here, not ms
+_MAX_DEEP_CRAWL_LIST = 100          # patterns, keywords, filters, scorers per object
+_MAX_DEEP_CRAWL_OBJECTS = 20        # filters and scorers in one strategy
+_MAX_DEEP_CRAWL_ITEMS = 200         # list and dict items (patterns, keywords, ...) in one strategy
+
+
+def _max_timeout_ms() -> int:
+    """Ceiling for the untrusted timeout fields, in milliseconds.
+
+    60s is the right bound for a server reachable by untrusted callers, and
+    stays the default. An operator whose deployment is not public — a crawler
+    on a private network fetching pages that legitimately take minutes — can
+    raise it with CRAWL4AI_MAX_TIMEOUT_MS, or lower it to tighten the bound.
+
+    Read per call rather than captured at import so the setting applies
+    wherever the process picked its environment up, and so a test can set it
+    without reloading the module. A value that is not a positive integer is
+    refused loudly and the default kept: a typo here would silently widen a
+    DoS bound, which is the one outcome worse than the timeout being fixed.
+    """
+    raw = os.getenv("CRAWL4AI_MAX_TIMEOUT_MS")
+
+    if raw is None or raw == "":
+        return _DEFAULT_MAX_TIMEOUT_MS
+
+    try:
+        ceiling = int(raw)
+    except ValueError:
+        ceiling = 0
+
+    if ceiling <= 0:
+        warnings.warn(
+            f"CRAWL4AI_MAX_TIMEOUT_MS={raw!r} is not a positive integer; "
+            f"keeping the {_DEFAULT_MAX_TIMEOUT_MS}ms default.",
+            stacklevel=2,
+        )
+        return _DEFAULT_MAX_TIMEOUT_MS
+
+    return ceiling
+
+
+def _deep_crawl_allowed() -> bool:
+    """Operator opt-in for deep crawling from untrusted requests."""
+    return os.getenv("CRAWL4AI_ALLOW_DEEP_CRAWL", "false").lower() == "true"
+
+
+def _all_nodes(node):
+    """Yield every value in a request tree. An object's params dict is entered but not yielded."""
+    yield node
+    if _is_typed_shape(node) and isinstance(node.get("params"), dict):
+        node = node["params"]
+    children = node.values() if isinstance(node, dict) else node if isinstance(node, list) else []
+    for child in children:
+        yield from _all_nodes(child)
+
+
+def _filter_untrusted_fields(type_name: str, params: dict) -> dict:
+    """Drop non-allowlisted fields and raise on forbidden (power) fields."""
+    forbidden = UNTRUSTED_FORBIDDEN_FIELDS.get(type_name, set())
+    allowlist = UNTRUSTED_FIELD_ALLOWLIST.get(type_name)  # None => keep all non-forbidden
+    if type_name == "CrawlerRunConfig" and _deep_crawl_allowed():
+        forbidden = forbidden - {"deep_crawl_strategy"}
+        allowlist = allowlist | {"deep_crawl_strategy"}
+    out = {}
+    for key, value in params.items():
+        if key in UNTRUSTED_GLOBAL_FORBIDDEN_FIELDS or key in forbidden:
+            raise UntrustedConfigError(
+                f"field '{key}' is not permitted on {type_name} from an untrusted request"
+            )
+        if allowlist is not None and key not in allowlist:
+            continue  # silently drop unknown/unsafe fields (forward-compatible)
+        out[key] = value
+    if type_name in UNTRUSTED_DEEP_CRAWL_TYPES and any(
+        isinstance(v, list) and len(v) > _MAX_DEEP_CRAWL_LIST for v in out.values()
+    ):
+        raise UntrustedConfigError(
+            f"{type_name} list parameters are limited to {_MAX_DEEP_CRAWL_LIST} items"
+        )
+    if type_name in ("BFSDeepCrawlStrategy", "DFSDeepCrawlStrategy", "BestFirstCrawlingStrategy"):
+        # Filters and scorers run synchronously on the event loop for every discovered link.
+        nodes = [n for value in out.values() for n in _all_nodes(value)]
+        filters_and_scorers = sum(1 for n in nodes if isinstance(n, dict) and n.get("type") in UNTRUSTED_DEEP_CRAWL_TYPES)
+        list_items = sum(len(n) for n in nodes if isinstance(n, (list, dict)) and not _is_typed_shape(n))
+        if filters_and_scorers > _MAX_DEEP_CRAWL_OBJECTS or list_items > _MAX_DEEP_CRAWL_ITEMS:
+            raise UntrustedConfigError(
+                f"{type_name} is limited to {_MAX_DEEP_CRAWL_OBJECTS} filters and scorers "
+                f"and {_MAX_DEEP_CRAWL_ITEMS} list items in total"
+            )
+    if type_name == "URLPatternFilter":
+        # Regex and *.domain:// patterns compile unescaped, and globs not led by * search in
+        # quadratic time; allow only *-led globs, /prefix/* and *.ext.
+        patterns = out.get("patterns")
+        patterns = [patterns] if isinstance(patterns, str) else patterns
+        if not isinstance(patterns, list) or not all(
+            isinstance(p, str)
+            and not (p.startswith("^") or p.endswith("$") or "\\d" in p or "**" in p)
+            and not ("://" in p and p.startswith("*."))
+            and (p.startswith("*") or (p.count("*") == 1 and p.endswith("/*")))
+            for p in patterns
+        ):
+            raise UntrustedConfigError(
+                "URLPatternFilter accepts only globs that start with '*' or end with a "
+                "single '/*' from an untrusted request"
+            )
+    if type_name == "CompositeScorer" and any(
+        isinstance(s, dict) and s.get("type") == "CompositeScorer" for s in out.get("scorers") or []
+    ):
+        raise UntrustedConfigError("CompositeScorer cannot be nested from an untrusted request")
+    if type_name == "CrawlerRunConfig" and out.get("deep_crawl_strategy") and out.get("fetch_ssl_certificate"):
+        # The certificate fetch dials each discovered link directly, outside the egress proxy.
+        raise UntrustedConfigError(
+            "fetch_ssl_certificate cannot be combined with deep_crawl_strategy from an untrusted request"
+        )
+    cache_mode = out.get("cache_mode") if type_name == "CrawlerRunConfig" else None
+    if isinstance(cache_mode, str) and cache_mode.lower() not in {m.value for m in CacheMode}:
+        # CrawlerRunConfig raises ValueError on it, which would surface as a 500.
+        raise UntrustedConfigError(f"invalid cache_mode: {cache_mode!r}")
+    return out
+
+
+def _clamp_untrusted(type_name: str, params: dict) -> dict:
+    """Clamp attacker-influenced quantities to safe upper bounds."""
+    ceiling = _max_timeout_ms()
+
+    def _cap_timeout(v):
+        # 0 historically meant "no timeout"; treat as the cap, never unbounded.
+        # Malformed input is the one value an attacker gets for free, so it
+        # falls back to the 60s default rather than to a raised ceiling.
+        if not isinstance(v, (int, float)) or v <= 0:
+            return min(_DEFAULT_MAX_TIMEOUT_MS, ceiling)
+        return min(int(v), ceiling)
+
+    # delay_before_return_html is held with a browser page open; mean_delay and
+    # max_range seed the arun_many rate limiter. All three are seconds, not ms,
+    # so they get their own cap rather than reusing the ms timeout ceiling.
+    _delay_defaults = {
+        "delay_before_return_html": 0.1,
+        "mean_delay": 0.1,
+        "max_range": 0.3,
+    }
+
+    def _cap_delay(v, default):
+        if not isinstance(v, (int, float)) or isinstance(v, bool) or not v >= 0:  # also NaN
+            return default
+        return min(v, _MAX_DELAY_SECONDS)
+
+    if type_name == "CrawlerRunConfig":
+        for f in ("page_timeout", "wait_for_timeout", "body_visibility_timeout"):
+            if f in params:
+                params[f] = _cap_timeout(params[f])
+        for f, default in _delay_defaults.items():
+            if f in params:
+                params[f] = _cap_delay(params[f], default)
+        if isinstance(params.get("max_scroll_steps"), int):
+            params["max_scroll_steps"] = min(params["max_scroll_steps"], _MAX_SCROLL_STEPS)
+        # smart_wait runs "js:...", function-shaped values, and any value that
+        # is not a valid selector as page JavaScript -- the js_code ban by
+        # another name. Untrusted callers get CSS selector waits only; the
+        # "css:" branch never falls back to JS.
+        wait_for = params.get("wait_for")
+        if isinstance(wait_for, str) and wait_for.strip():
+            wait_for = wait_for.strip()
+            if wait_for.startswith(("js:", "()", "function")):
+                raise UntrustedConfigError(
+                    "a JavaScript wait_for is not permitted from an untrusted request"
+                )
+            if not wait_for.startswith("css:"):
+                params["wait_for"] = "css:" + wait_for
+    elif type_name == "BrowserConfig":
+        for f in ("viewport_width", "viewport_height"):
+            if isinstance(params.get(f), int):
+                params[f] = max(1, min(params[f], _MAX_VIEWPORT))
+    elif type_name == "PDFContentScrapingStrategy":
+        # This class has no field allowlist, so without clamping a body could
+        # simply raise its own caps back to unbounded and re-open the DoS.
+        for f, cap in (("max_pdf_bytes", _MAX_PDF_BYTES), ("max_pdf_pages", _MAX_PDF_PAGES)):
+            if f in params:
+                v = params[f]
+                # <=0 or non-int would read as "no limit"; pin to the cap.
+                params[f] = cap if not isinstance(v, int) or v <= 0 else min(v, cap)
+        # Rasterizing every page is the most expensive thing this strategy can
+        # do, and nothing about untrusted crawling needs it.
+        params["extract_images"] = False
+    elif type_name in _SCHEMA_STRATEGIES:
+        if _has_regex_field(params.get("schema")):
+            raise UntrustedConfigError(
+                f"schema fields of type 'regex' are not permitted on {type_name} "
+                "from an untrusted request"
+            )
+    elif type_name == "LinkPreviewConfig":
+        # Also no field allowlist, and each link is a separate outbound fetch:
+        # unclamped, one request body can order millions of them at any
+        # concurrency it likes.
+        for f, cap in (
+            ("max_links", _MAX_LINK_PREVIEW_LINKS),
+            ("concurrency", _MAX_LINK_PREVIEW_CONCURRENCY),
+            ("timeout", _MAX_LINK_PREVIEW_TIMEOUT_S),
+        ):
+            if f in params:
+                v = params[f]
+                params[f] = cap if not isinstance(v, int) or v <= 0 else min(v, cap)
+    return params
+
+
+def _enforce_untrusted(type_name: str, params: dict) -> dict:
+    """Filter then clamp a parameter dict for an untrusted construction."""
+    return _clamp_untrusted(type_name, _filter_untrusted_fields(type_name, params))
 
 
 def to_serializable_dict(obj: Any, ignore_default_value : bool = False):
@@ -237,10 +629,32 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False):
     return str(obj)
 
 
-def from_serializable_dict(data: Any) -> Any:
+def _is_typed_shape(data: Any) -> bool:
+    """True for the dict shapes to_serializable_dict() emits:
+    {"type": "<ClassName>", "params": {...}} or {"type": "dict", "value": {...}}.
+
+    Plain business dicts that happen to carry a "type" key (JSON-Schema
+    fragments, JsonCss field specs like {"type": "text", "name": "..."}) have
+    neither "params" nor "value" and are not typed shapes.
+    """
+    return (
+        isinstance(data, dict)
+        and "type" in data
+        and ("params" in data or (data["type"] == "dict" and "value" in data))
+    )
+
+
+def from_serializable_dict(data: Any, provenance: "Provenance" = None) -> Any:
     """
     Recursively convert a serializable dictionary back to an object instance.
+
+    provenance defaults to TRUSTED (SDK/in-process). When UNTRUSTED, every typed
+    object must be in UNTRUSTED_ALLOWED_TYPES and its params are filtered (drop
+    unknown, raise on forbidden) and clamped before construction.
     """
+    if provenance is None:
+        provenance = Provenance.TRUSTED
+
     if data is None:
         return None
 
@@ -255,14 +669,23 @@ def from_serializable_dict(data: Any) -> Any:
     # carry a "type" key (e.g. JSON-Schema fragments, JsonCss field specs like
     # {"type": "text", "name": "..."}) have neither "params" nor "value" and
     # must fall through to the raw-dict path below so they are passed as data.
-    if (
-        isinstance(data, dict)
-        and "type" in data
-        and ("params" in data or (data["type"] == "dict" and "value" in data))
-    ):
+    if _is_typed_shape(data):
         # Handle plain dictionaries
         if data["type"] == "dict" and "value" in data:
-            return {k: from_serializable_dict(v) for k, v in data["value"].items()}
+            unwrapped = {
+                k: from_serializable_dict(v, provenance) for k, v in data["value"].items()
+            }
+            # The unwrap above recurses over .items(), so data["value"] is never
+            # seen as a whole typed object and the type gate below never fires
+            # for it. Without this check an untrusted body launders a forbidden
+            # type past the gate by wrapping it:
+            #   {"type": "dict", "value": {"type": "LLMConfig", "params": {...}}}
+            if provenance == Provenance.UNTRUSTED and _is_typed_shape(unwrapped):
+                raise UntrustedConfigError(
+                    "an untrusted request may not wrap a typed object in "
+                    "{'type': 'dict', 'value': ...}"
+                )
+            return unwrapped
 
         # Security: only allow known-safe types to be deserialized.
         # Unknown types (e.g. logging.Logger serialized by older clients) are
@@ -270,6 +693,17 @@ def from_serializable_dict(data: Any) -> Any:
         type_name = data["type"]
         if type_name not in ALLOWED_DESERIALIZE_TYPES:
             return None
+
+        # Untrusted bodies may only construct the strict subset of types and
+        # may not set forbidden power-fields.
+        if (
+            provenance == Provenance.UNTRUSTED
+            and type_name not in UNTRUSTED_ALLOWED_TYPES
+            and not (type_name in UNTRUSTED_DEEP_CRAWL_TYPES and _deep_crawl_allowed())
+        ):
+            raise UntrustedConfigError(
+                f"type '{type_name}' may not be constructed from an untrusted request"
+            )
 
         cls = None
         module_paths = ["crawl4ai"]
@@ -288,19 +722,22 @@ def from_serializable_dict(data: Any) -> Any:
                 return cls(data["params"])
 
             if "params" in data:
+                params = data["params"]
+                if provenance == Provenance.UNTRUSTED:
+                    params = _enforce_untrusted(type_name, dict(params))
                 # Handle class instances
                 constructor_args = {
-                    k: from_serializable_dict(v) for k, v in data["params"].items()
+                    k: from_serializable_dict(v, provenance) for k, v in params.items()
                 }
                 return cls(**constructor_args)
 
     # Handle lists
     if isinstance(data, list):
-        return [from_serializable_dict(item) for item in data]
+        return [from_serializable_dict(item, provenance) for item in data]
 
     # Handle raw dictionaries (legacy support)
     if isinstance(data, dict):
-        return {k: from_serializable_dict(v) for k, v in data.items()}
+        return {k: from_serializable_dict(v, provenance) for k, v in data.items()}
 
     return data
 
@@ -419,8 +856,8 @@ class ProxyConfig:
                 username, password = credentials.split(":", 1)
                 return ProxyConfig(
                     server=f"{protocol}://{server_part}",
-                    username=username,
-                    password=password,
+                    username=unquote(username),
+                    password=unquote(password),
                 )
         # URL without credentials (keep scheme)
         if "://" in s and "@" not in s:
@@ -759,11 +1196,13 @@ class BrowserConfig:
             )
 
     @staticmethod
-    def from_kwargs(kwargs: dict) -> "BrowserConfig":
+    def from_kwargs(kwargs: dict, provenance: "Provenance" = None) -> "BrowserConfig":
         # Auto-deserialize any dict values that use the {"type": ..., "params": ...}
         # serialization format (e.g. from JSON API requests or dump()/load() roundtrips).
         kwargs = {
-            k: from_serializable_dict(v) if isinstance(v, dict) and "type" in v else v
+            k: from_serializable_dict(v, provenance)
+            if isinstance(v, dict) and "type" in v
+            else v
             for k, v in kwargs.items()
         }
         # Only pass keys present in kwargs so that __init__ defaults (and
@@ -838,12 +1277,18 @@ class BrowserConfig:
         return to_serializable_dict(self)
 
     @staticmethod
-    def load(data: dict) -> "BrowserConfig":
+    def load(data: dict, provenance: "Provenance" = None) -> "BrowserConfig":
         # Deserialize the object from a dictionary
-        config = from_serializable_dict(data)
+        if provenance is None:
+            provenance = Provenance.TRUSTED
+        config = from_serializable_dict(data, provenance)
         if isinstance(config, BrowserConfig):
             return config
-        return BrowserConfig.from_kwargs(config)
+        # Plain-dict path: enforce the untrusted gate on top-level fields too,
+        # so a body that sends bare kwargs (no {type,params}) cannot bypass it.
+        if provenance == Provenance.UNTRUSTED and isinstance(config, dict):
+            config = _enforce_untrusted("BrowserConfig", config)
+        return BrowserConfig.from_kwargs(config, provenance)
 
     def set_nstproxy(
         self,
@@ -1133,10 +1578,14 @@ class HTTPCrawlerConfig:
         return to_serializable_dict(self)
 
     @staticmethod
-    def load(data: dict) -> "HTTPCrawlerConfig":
-        config = from_serializable_dict(data)
+    def load(data: dict, provenance: "Provenance" = None) -> "HTTPCrawlerConfig":
+        if provenance is None:
+            provenance = Provenance.TRUSTED
+        config = from_serializable_dict(data, provenance)
         if isinstance(config, HTTPCrawlerConfig):
             return config
+        if provenance == Provenance.UNTRUSTED and isinstance(config, dict):
+            config = _enforce_untrusted("HTTPCrawlerConfig", config)
         return HTTPCrawlerConfig.from_kwargs(config)
 
 @_with_defaults
@@ -1276,6 +1725,8 @@ class CrawlerRunConfig():
                         Default: False.
         ignore_body_visibility (bool): If True, ignore whether the body is visible before proceeding.
                                        Default: True.
+        body_visibility_timeout (int): Maximum time in ms to wait for the body to become visible.
+                                       Default: 30000.
         scan_full_page (bool): If True, scroll through the entire page to load all content.
                                Default: False.
         scroll_delay (float): Delay in seconds between scroll steps if scan_full_page is True.
@@ -1453,6 +1904,7 @@ class CrawlerRunConfig():
         c4a_script: Union[str, List[str]] = None,
         js_only: bool = False,
         ignore_body_visibility: bool = True,
+        body_visibility_timeout: int = 30000,
         scan_full_page: bool = False,
         scroll_delay: float = 0.2,
         max_scroll_steps: Optional[int] = None,
@@ -1555,7 +2007,8 @@ class CrawlerRunConfig():
         self.fetch_ssl_certificate = fetch_ssl_certificate
 
         # Caching Parameters
-        self.cache_mode = cache_mode
+        # Accept "enabled" etc. from CLI -c and YAML/JSON config files
+        self.cache_mode = CacheMode(cache_mode.lower()) if isinstance(cache_mode, str) else cache_mode
         self.session_id = session_id
         self.bypass_cache = bypass_cache
         self.disable_cache = disable_cache
@@ -1583,6 +2036,13 @@ class CrawlerRunConfig():
         self.c4a_script = c4a_script
         self.js_only = js_only
         self.ignore_body_visibility = ignore_body_visibility
+        if (
+            not isinstance(body_visibility_timeout, (int, float))
+            or isinstance(body_visibility_timeout, bool)
+            or body_visibility_timeout <= 0
+        ):
+            raise ValueError("body_visibility_timeout must be a positive number")
+        self.body_visibility_timeout = body_visibility_timeout
         self.scan_full_page = scan_full_page
         self.scroll_delay = scroll_delay
         self.max_scroll_steps = max_scroll_steps
@@ -1870,12 +2330,14 @@ class CrawlerRunConfig():
         super().__setattr__(name, value)
 
     @staticmethod
-    def from_kwargs(kwargs: dict) -> "CrawlerRunConfig":
+    def from_kwargs(kwargs: dict, provenance: "Provenance" = None) -> "CrawlerRunConfig":
         # Auto-deserialize any dict values that use the {"type": ..., "params": ...}
         # serialization format (e.g. from JSON API requests or dump()/load() roundtrips).
         # This covers markdown_generator, extraction_strategy, content_filter, etc.
         kwargs = {
-            k: from_serializable_dict(v) if isinstance(v, dict) and "type" in v else v
+            k: from_serializable_dict(v, provenance)
+            if isinstance(v, dict) and "type" in v
+            else v
             for k, v in kwargs.items()
         }
         # Only pass keys present in kwargs so that __init__ defaults (and
@@ -1889,12 +2351,16 @@ class CrawlerRunConfig():
         return to_serializable_dict(self)
 
     @staticmethod
-    def load(data: dict) -> "CrawlerRunConfig":
+    def load(data: dict, provenance: "Provenance" = None) -> "CrawlerRunConfig":
         # Deserialize the object from a dictionary
-        config = from_serializable_dict(data)
+        if provenance is None:
+            provenance = Provenance.TRUSTED
+        config = from_serializable_dict(data, provenance)
         if isinstance(config, CrawlerRunConfig):
             return config
-        return CrawlerRunConfig.from_kwargs(config)
+        if provenance == Provenance.UNTRUSTED and isinstance(config, dict):
+            config = _enforce_untrusted("CrawlerRunConfig", config)
+        return CrawlerRunConfig.from_kwargs(config, provenance)
 
     def to_dict(self):
         return {
@@ -1932,6 +2398,8 @@ class CrawlerRunConfig():
             "disable_cache": self.disable_cache,
             "no_cache_read": self.no_cache_read,
             "no_cache_write": self.no_cache_write,
+            "check_cache_freshness": self.check_cache_freshness,
+            "cache_validation_timeout": self.cache_validation_timeout,
             "shared_data": self.shared_data,
             "wait_until": self.wait_until,
             "page_timeout": self.page_timeout,
@@ -1946,6 +2414,7 @@ class CrawlerRunConfig():
             "js_code_before_wait": self.js_code_before_wait,
             "js_only": self.js_only,
             "ignore_body_visibility": self.ignore_body_visibility,
+            "body_visibility_timeout": self.body_visibility_timeout,
             "scan_full_page": self.scan_full_page,
             "scroll_delay": self.scroll_delay,
             "max_scroll_steps": self.max_scroll_steps,
@@ -1957,9 +2426,11 @@ class CrawlerRunConfig():
             "override_navigator": self.override_navigator,
             "magic": self.magic,
             "adjust_viewport_to_content": self.adjust_viewport_to_content,
+            "virtual_scroll_config": self.virtual_scroll_config,
             "screenshot": self.screenshot,
             "screenshot_wait_for": self.screenshot_wait_for,
             "screenshot_height_threshold": self.screenshot_height_threshold,
+            "force_viewport_screenshot": self.force_viewport_screenshot,
             "pdf": self.pdf,
             "capture_mhtml": self.capture_mhtml,
             "image_description_min_word_threshold": self.image_description_min_word_threshold,
@@ -1994,6 +2465,8 @@ class CrawlerRunConfig():
             "match_mode": self.match_mode,
             "experimental": self.experimental,
             "max_retries": self.max_retries,
+            "fallback_fetch_function": self.fallback_fetch_function,
+            "base_url": self.base_url,
         }
 
     def clone(self, **kwargs):
@@ -2039,8 +2512,35 @@ class LLMConfig:
         backoff_base_delay: Optional[int] = None,
         backoff_max_attempts: Optional[int] = None,
         backoff_exponential_factor: Optional[int] = None,
+        provenance: "Provenance" = None,
     ):
         """Configuaration class for LLM provider and API token."""
+        if provenance is None:
+            provenance = Provenance.TRUSTED
+        # Defense in depth: untrusted callers can already not reach here (the
+        # type gate forbids constructing LLMConfig from a request body), but if
+        # they ever do, never resolve env vars or read provider keys from the
+        # environment - that is the credential-exfil gadget.
+        if provenance == Provenance.UNTRUSTED:
+            if api_token and api_token.startswith("env:"):
+                raise UntrustedConfigError(
+                    "LLMConfig.api_token may not reference an environment variable "
+                    "from an untrusted request"
+                )
+            self.provider = provider
+            self.api_token = api_token  # never os.getenv
+            self.base_url = base_url
+            self.temperature = temperature
+            self.max_tokens = max_tokens
+            self.top_p = top_p
+            self.frequency_penalty = frequency_penalty
+            self.presence_penalty = presence_penalty
+            self.stop = stop
+            self.n = n
+            self.backoff_base_delay = backoff_base_delay if backoff_base_delay is not None else 2
+            self.backoff_max_attempts = backoff_max_attempts if backoff_max_attempts is not None else 3
+            self.backoff_exponential_factor = backoff_exponential_factor if backoff_exponential_factor is not None else 2
+            return
         self.provider = provider
         self.provider_config = provider_config or {}
         if api_token and not api_token.startswith("env:"):
@@ -2215,3 +2715,99 @@ class SeedingConfig:
         config_dict = self.to_dict()
         config_dict.update(kwargs)
         return SeedingConfig.from_kwargs(config_dict)
+
+
+class DomainMapperConfig:
+    """
+    Configuration for comprehensive domain URL discovery via DomainMapper.
+
+    Discovers all URLs under a domain using multiple sources (sitemap, Common Crawl,
+    Wayback Machine, Certificate Transparency, path probing, robots.txt mining,
+    RSS/Atom feeds, homepage link extraction) without deep crawling.
+    """
+    def __init__(
+        self,
+        source: str = "sitemap+cc+crt+probe",
+        max_urls: int = -1,
+        concurrency: int = 50,
+        hits_per_sec: int = 10,
+        force: bool = False,
+        extract_head: bool = True,
+        filter_nonsense_urls: bool = True,
+        soft_404_detection: bool = True,
+        query: Optional[str] = None,
+        score_threshold: Optional[float] = None,
+        scoring_method: str = "bm25",
+        probe_paths: Optional[List[str]] = None,
+        common_subdomains: Optional[List[str]] = None,
+        include_subdomains: bool = True,
+        source_timeout: float = 30.0,
+        use_browser_for_homepage: bool = False,
+        verbose: Optional[bool] = None,
+        cache_ttl_hours: int = 24,
+        base_directory: Optional[str] = None,
+        dns_timeout: float = 3.0,
+        http_timeout: float = 10.0,
+    ):
+        """
+        Args:
+            source: Discovery sources joined by '+'. Valid: sitemap, cc, wayback,
+                    crt, probe, robots, feed, homepage. Default: "sitemap+cc+crt+probe"
+            max_urls: Maximum URLs to return. -1 for unlimited.
+            concurrency: Max concurrent requests across all hosts.
+            hits_per_sec: Rate limit in requests/second.
+            force: Bypass all caches.
+            extract_head: Fetch and parse <head> metadata for each URL.
+            filter_nonsense_urls: Filter utility URLs (robots.txt, favicon, etc.).
+            soft_404_detection: Fingerprint and filter soft-404 pages (SPAs).
+            query: BM25 relevance query. Requires extract_head=True.
+            score_threshold: Minimum relevance score (0.0-1.0) to include URL.
+            scoring_method: Scoring algorithm. Currently only "bm25".
+            probe_paths: Extra paths to probe on each host (added to defaults).
+            common_subdomains: Extra subdomain prefixes to guess (added to defaults).
+            include_subdomains: Discover and scan subdomains. When False, only scans
+                               the exact domain provided (skips crt.sh, DNS guessing,
+                               Wayback/CC host discovery). Default True.
+            source_timeout: Max seconds per discovery source. Sources that exceed
+                           this are killed and skipped. Prevents slow sources from
+                           blocking fast results. Default 30.0.
+            use_browser_for_homepage: Use Playwright for JS-rendered homepages.
+            verbose: Override logger verbose setting.
+            cache_ttl_hours: Hours before cached results expire.
+            base_directory: Base directory for cache files.
+            dns_timeout: Timeout in seconds for DNS resolution.
+            http_timeout: Timeout in seconds for HTTP requests.
+        """
+        self.source = source
+        self.max_urls = max_urls
+        self.concurrency = concurrency
+        self.hits_per_sec = hits_per_sec
+        self.force = force
+        self.extract_head = extract_head
+        self.filter_nonsense_urls = filter_nonsense_urls
+        self.soft_404_detection = soft_404_detection
+        self.query = query
+        self.score_threshold = score_threshold
+        self.scoring_method = scoring_method
+        self.probe_paths = probe_paths
+        self.common_subdomains = common_subdomains
+        self.include_subdomains = include_subdomains
+        self.source_timeout = source_timeout
+        self.use_browser_for_homepage = use_browser_for_homepage
+        self.verbose = verbose
+        self.cache_ttl_hours = cache_ttl_hours
+        self.base_directory = base_directory
+        self.dns_timeout = dns_timeout
+        self.http_timeout = http_timeout
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {k: v for k, v in self.__dict__.items()}
+
+    @staticmethod
+    def from_kwargs(kwargs: Dict[str, Any]) -> 'DomainMapperConfig':
+        return DomainMapperConfig(**kwargs)
+
+    def clone(self, **kwargs: Any) -> 'DomainMapperConfig':
+        config_dict = self.to_dict()
+        config_dict.update(kwargs)
+        return DomainMapperConfig.from_kwargs(config_dict)

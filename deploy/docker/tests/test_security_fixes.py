@@ -82,40 +82,23 @@ class TestURLValidation(unittest.TestCase):
 
 
 class TestHookBuiltins(unittest.TestCase):
-    """Test that dangerous builtins are removed from hooks."""
+    """Hooks are declarative now - there is no builtins sandbox to harden.
 
-    def test_import_not_in_allowed_builtins(self):
-        """__import__ must NOT be in allowed_builtins."""
-        allowed_builtins = [
-            'print', 'len', 'str', 'int', 'float', 'bool',
-            'list', 'dict', 'set', 'tuple', 'range', 'enumerate',
-            'zip', 'map', 'filter', 'any', 'all', 'sum', 'min', 'max',
-            'sorted', 'reversed', 'abs', 'round', 'isinstance', 'type',
-            'hasattr', 'callable', 'iter', 'next',
-            '__build_class__'
-        ]
+    The exec()-based hook system was removed (no in-process sandbox survives
+    attacker Python). Hooks are a fixed registry of server-authored actions, so
+    the relevant guarantee is simply that no action runs arbitrary code.
+    """
 
-        self.assertNotIn('__import__', allowed_builtins)
-        self.assertNotIn('eval', allowed_builtins)
-        self.assertNotIn('exec', allowed_builtins)
-        self.assertNotIn('compile', allowed_builtins)
-        self.assertNotIn('open', allowed_builtins)
-        # getattr/setattr are sandbox escape vectors - must not be present
-        self.assertNotIn('getattr', allowed_builtins)
-        self.assertNotIn('setattr', allowed_builtins)
-
-    def test_build_class_in_allowed_builtins(self):
-        """__build_class__ must be in allowed_builtins (needed for class definitions)."""
-        allowed_builtins = [
-            'print', 'len', 'str', 'int', 'float', 'bool',
-            'list', 'dict', 'set', 'tuple', 'range', 'enumerate',
-            'zip', 'map', 'filter', 'any', 'all', 'sum', 'min', 'max',
-            'sorted', 'reversed', 'abs', 'round', 'isinstance', 'type',
-            'hasattr', 'callable', 'iter', 'next',
-            '__build_class__'
-        ]
-
-        self.assertIn('__build_class__', allowed_builtins)
+    def test_registry_actions_are_fixed_and_codeless(self):
+        from hook_registry import HOOK_REGISTRY
+        # No action accepts/executes raw code.
+        for action in HOOK_REGISTRY:
+            self.assertNotIn("code", action.lower())
+            self.assertNotIn("eval", action.lower())
+            self.assertNotIn("exec", action.lower())
+        # The documented safe actions are present.
+        self.assertTrue({"block_resources", "add_cookies", "set_headers",
+                         "scroll_to_bottom", "wait_for_timeout"}.issubset(HOOK_REGISTRY))
 
 
 class TestHooksEnabled(unittest.TestCase):

@@ -33,10 +33,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.11/clipboard.min.js"></script>
-    <!-- CodeMirror (python mode) -->
+    <!-- CodeMirror (JSON mode) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/darcula.min.css">
@@ -172,6 +172,14 @@
         </h1>
 
         <div class="ml-auto flex items-center space-x-4">
+            <!-- Token bar -->
+            <div id="token-bar" class="flex items-center space-x-2">
+                <input id="token-input" type="password" placeholder="API token"
+                       class="bg-dark border border-border rounded px-2 py-1 text-xs w-48">
+                <button id="token-save" class="px-2 py-1 bg-primary text-dark rounded text-xs hover:bg-primarydim">Set</button>
+                <button onclick="clearToken()" class="px-2 py-1 border border-border rounded text-xs hover:bg-surface">Clear</button>
+                <span id="token-status" class="text-xs"></span>
+            </div>
             <a href="/dashboard" class="text-xs text-secondary hover:text-primary underline">Monitor</a>
             <div class="flex space-x-2">
                 <button id="play-tab"
@@ -243,7 +251,7 @@
                 <!-- Advanced config for /crawl endpoints -->
                 <details id="adv-config" class="mb-4">
                     <summary class="text-sm text-secondary cursor-pointer">Advanced Config <span
-                        class="text-xs text-primary">(Python → auto‑JSON)</span></summary>
+                        class="text-xs text-primary">(JSON params)</span></summary>
 
                     <!-- Toolbar -->
                     <div class="flex items-center justify-end space-x-3 mt-2">
@@ -402,6 +410,44 @@
     </div>
 
     <script>
+        // ================ AUTH ================
+        const _savedToken = sessionStorage.getItem('crawl4ai_token');
+        const _tokenBar = document.getElementById('token-bar');
+        const _tokenInput = document.getElementById('token-input');
+        const _tokenSave = document.getElementById('token-save');
+        const _tokenStatus = document.getElementById('token-status');
+
+        function getToken() { return sessionStorage.getItem('crawl4ai_token') || ''; }
+
+        function authFetch(url, opts = {}) {
+            const token = getToken();
+            if (token) {
+                opts.headers = { ...opts.headers, 'Authorization': 'Bearer ' + token };
+            }
+            return fetch(url, opts);
+        }
+
+        function applyToken() {
+            const val = _tokenInput.value.trim();
+            if (!val) return;
+            sessionStorage.setItem('crawl4ai_token', val);
+            _tokenStatus.textContent = 'Token saved';
+            _tokenStatus.className = 'text-xs text-green-400';
+            setTimeout(() => { _tokenStatus.textContent = ''; }, 2000);
+        }
+
+        function clearToken() {
+            sessionStorage.removeItem('crawl4ai_token');
+            _tokenInput.value = '';
+            _tokenStatus.textContent = 'Token cleared';
+            _tokenStatus.className = 'text-xs text-yellow-400';
+            setTimeout(() => { _tokenStatus.textContent = ''; }, 2000);
+        }
+
+        if (_savedToken) _tokenInput.value = _savedToken;
+        _tokenSave.addEventListener('click', applyToken);
+        _tokenInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyToken(); });
+
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -452,12 +498,24 @@
         });
 
         // ================ ADVANCED CONFIG EDITOR ================
+        // The server validates every field against UNTRUSTED_FIELD_ALLOWLIST, so the
+        // editor holds the `params` object literally rather than a Python snippet:
+        // /config/dump stopped eval-ing code in the 0.8.x security work (issue #2260).
+        const TEMPLATES = {
+            CrawlerRunConfig: `{
+    "stream": true,
+    "cache_mode": "bypass"
+}`,
+            BrowserConfig: `{
+    "headless": true,
+    "viewport_width": 1280,
+    "viewport_height": 720
+}`,
+        };
+
         const cm = CodeMirror(document.getElementById('adv-editor'), {
-            value: `CrawlerRunConfig(
-    stream=True,
-    cache_mode=CacheMode.BYPASS,
-)`,
-            mode: 'python',
+            value: TEMPLATES.CrawlerRunConfig,
+            mode: 'application/json',
             lineNumbers: true,
             theme: 'darcula',
             tabSize: 4,
@@ -467,23 +525,9 @@
             lineWrapping: true,
         });
 
-        const TEMPLATES = {
-            CrawlerRunConfig: `CrawlerRunConfig(
-    stream=True,
-    cache_mode=CacheMode.BYPASS,
-)`,
-            BrowserConfig: `BrowserConfig(
-    headless=True,
-    extra_args=[
-        "--no-sandbox",
-        "--disable-gpu",
-    ],
-)`,
-        };
-
         document.getElementById('cfg-type').addEventListener('change', (e) => {
             cm.setValue(TEMPLATES[e.target.value]);
-            document.getElementById('cfg-status').textContent = '';
+            setCfgStatus('', 'text-secondary');
         });
         
         // Handle endpoint selection change to show appropriate options
@@ -493,6 +537,10 @@
             const llmOptions = document.getElementById('llm-options');
             const advConfig = document.getElementById('adv-config');
             
+            // Advanced Config is /crawl-only; clear its status so a previous
+            // run's '✖ config error' does not linger on md/llm (#2260).
+            setCfgStatus('', 'text-secondary');
+
             // Hide all option sections first
             mdOptions.classList.add('hidden');
             llmOptions.classList.add('hidden');
@@ -513,28 +561,57 @@
             }
         });
 
-        async function pyConfigToJson() {
-            const code = cm.getValue().trim();
-            if (!code) return {};
+        function setCfgStatus(text, cls) {
+            const el = document.getElementById('cfg-status');
+            el.textContent = text;
+            el.className = 'text-xs ml-2 ' + cls;
+        }
 
-            const res = await fetch('/config/dump', {
+        // Validate the editor's params against /config/dump and return the
+        // { type, params } the crawl endpoints expect. Throws with the server's
+        // message so the caller can surface the offending field.
+        async function validateConfig() {
+            const text = cm.getValue().trim();
+            if (!text) {
+                setCfgStatus('', 'text-secondary');  // no config is not an error
+                return {};
+            }
+
+            let params;
+            try {
+                params = JSON.parse(text);
+            } catch (err) {
+                setCfgStatus('✖ not valid JSON', 'text-red-400');
+                throw new Error('Advanced Config is not valid JSON: ' + err.message);
+            }
+            if (params === null || typeof params !== 'object' || Array.isArray(params)) {
+                setCfgStatus('✖ expected a JSON object', 'text-red-400');
+                throw new Error('Advanced Config must be a JSON object of parameters');
+            }
+            if (!Object.keys(params).length) {
+                setCfgStatus('', 'text-secondary');  // no config is not an error
+                return {};
+            }
+
+            const cfgType = document.getElementById('cfg-type').value;
+            const res = await authFetch('/config/dump', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code }),
+                body: JSON.stringify({ type: cfgType, params }),
             });
 
-            const statusEl = document.getElementById('cfg-status');
             if (!res.ok) {
                 const msg = await res.text();
-                statusEl.textContent = '✖ config error';
-                statusEl.className = 'text-xs text-red-400';
+                setCfgStatus('✖ config error', 'text-red-400');
                 throw new Error(msg || 'Invalid config');
             }
 
-            statusEl.textContent = '✓ parsed';
-            statusEl.className = 'text-xs text-green-400';
-
-            return await res.json();
+            setCfgStatus('✓ validated', 'text-green-400');
+            // Send back what the user typed, not /config/dump's echo. dump()
+            // fills in server-derived fields -- BrowserConfig gains generated
+            // `headers` -- that the untrusted gate then refuses on /crawl, so
+            // the echo is a validation result, not a re-submittable payload.
+            return { type: cfgType, params };
         }
 
         // ================ SERVER COMMUNICATION ================
@@ -566,6 +643,25 @@
             if (memory !== undefined && peakMemory !== undefined) {
                 document.getElementById('exec-mem').textContent = `Δ${memory >= 0 ? '+' : ''}${memory}MB (Peak: ${peakMemory}MB)`;
             }
+        }
+
+        // Build a useful error message from a failed HTTP response
+        function httpErrorMessage(response, data) {
+            let detail = data && (data.detail || data.error);
+            // FastAPI 422s send detail as an array of error objects; other
+            // non-strings would render as [object Object].
+            if (Array.isArray(detail)) {
+                detail = detail.map(e => e && e.msg ? `${(e.loc || []).join('.')}: ${e.msg}` : JSON.stringify(e)).join('; ');
+            } else if (detail && typeof detail !== 'string') {
+                detail = JSON.stringify(detail);
+            }
+            let msg = detail || `HTTP ${response.status}`;
+            if (response.status === 401) {
+                msg += getToken()
+                    ? ' — token rejected; check the API token in the token bar (top right)'
+                    : ' — set your API token in the token bar (top right)';
+            }
+            return msg;
         }
 
         // Generate code snippets
@@ -606,33 +702,33 @@
         // Detect if stream is requested inside payload
         function shouldUseStream(payload) {
             const toBool = (v) => v === true || (typeof v === 'string' && v.toLowerCase() === 'true');
-            const fromCrawler = payload && payload.crawler_config && payload.crawler_config.params && payload.crawler_config.params.stream;
+            // Successful /config/dump returns { type, params: { stream, ... } }
+            const fromCrawlerParams = payload && payload.crawler_config && payload.crawler_config.params && payload.crawler_config.params.stream;
+            // Fallback / minimal shapes may set stream at the crawler_config top level
+            const fromCrawlerTop = payload && payload.crawler_config && payload.crawler_config.stream;
             const direct = payload && payload.stream;
-            return toBool(fromCrawler) || toBool(direct);
+            return toBool(fromCrawlerParams) || toBool(fromCrawlerTop) || toBool(direct);
         }
 
         // Main run function
         async function runCrawl() {
             const endpoint = document.getElementById('endpoint').value;
             const urls = document.getElementById('urls').value.trim().split(/\n/).filter(u => u);
-            // 1) grab python from CodeMirror, validate via /config/dump
+            // 1) grab the params from CodeMirror, validate via /config/dump.
+            // Advanced Config is /crawl-only, so md/llm skip this entirely.
             let advConfig = {};
-            try {
-                const cfgJson = await pyConfigToJson(); // may throw
-                if (Object.keys(cfgJson).length) {
-                    const cfgType = document.getElementById('cfg-type').value;
-                    advConfig = cfgType === 'CrawlerRunConfig'
-                        ? { crawler_config: cfgJson }
-                        : { browser_config: cfgJson };
-                }
-            } catch (err) {
-                const codeText = cm.getValue();
-                const streamFlag = /stream\s*=\s*True/i.test(codeText);
-                const isCrawlEndpoint = document.getElementById('endpoint').value === 'crawl';
-                if (isCrawlEndpoint && streamFlag) {
-                    // Fallback: proceed with minimal config only for stream
-                    advConfig = { crawler_config: { stream: true } };
-                } else {
+            if (endpoint === 'crawl' || endpoint === 'crawl_stream') {
+                try {
+                    const cfgJson = await validateConfig(); // may throw
+                    if (Object.keys(cfgJson).length) {
+                        const cfgType = document.getElementById('cfg-type').value;
+                        advConfig = cfgType === 'CrawlerRunConfig'
+                            ? { crawler_config: cfgJson }
+                            : { browser_config: cfgJson };
+                    }
+                } catch (err) {
+                    // No fallback: a rejected config used to be swapped for a
+                    // stream-only one, which silently discarded everything else (#2260).
                     updateStatus('error');
                     document.querySelector('#response-content code').textContent =
                         JSON.stringify({ error: err.message }, null, 2);
@@ -691,15 +787,15 @@
                     // Get the question from the LLM-specific input
                     const question = document.getElementById('llm-question').value.trim() || "What is this page about?";
                     
-                    response = await fetch(`${api}/${encodedUrl}?q=${encodeURIComponent(question)}`, {
+                    response = await authFetch(`${api}/${encodedUrl}?q=${encodeURIComponent(question)}`, {
                         method: 'GET',
                         headers: { 'Accept': 'application/json' }
                     });
-                    responseData = await response.json();
+                    responseData = await response.json().catch(() => ({}));
                     const time = Math.round(performance.now() - startTime);
                     if (!response.ok) {
                         updateStatus('error', time);
-                        throw new Error(responseData.error || 'Request failed');
+                        throw new Error(httpErrorMessage(response, responseData));
                     }
                     updateStatus('success', time);
                     document.querySelector('#response-content code').textContent = JSON.stringify(responseData, null, 2);
@@ -707,11 +803,17 @@
                     forceHighlightElement(document.querySelector('#response-content code'));
                 } else if (endpoint === 'crawl_stream' || useStreamOverride) {
                     // Stream processing - now handled directly by /crawl endpoint
-                    response = await fetch(api, {
+                    response = await authFetch(api, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
+
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        updateStatus('error', Math.round(performance.now() - startTime));
+                        throw new Error(httpErrorMessage(response, errData));
+                    }
 
                     const reader = response.body.getReader();
                     let text = '';
@@ -746,18 +848,18 @@
                     forceHighlightElement(document.querySelector('#response-content code'));
                 } else {
                     // Regular request (handles /crawl and /md)
-                    response = await fetch(api, {
+                    response = await authFetch(api, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
 
-                    responseData = await response.json();
+                    responseData = await response.json().catch(() => ({}));
                     const time = Math.round(performance.now() - startTime);
 
                     if (!response.ok) {
                         updateStatus('error', time);
-                        throw new Error(responseData.error || 'Request failed');
+                        throw new Error(httpErrorMessage(response, responseData));
                     }
 
                     updateStatus(
@@ -835,7 +937,7 @@
 
                 try {
                     if (useStream) {
-                        const response = await fetch(api, {
+                        const response = await authFetch(api, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)
@@ -859,7 +961,7 @@
 
                         memory = maxMem;
                     } else {
-                        const response = await fetch(api, {
+                        const response = await authFetch(api, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)
@@ -923,9 +1025,11 @@
             // Save current scroll position (important for large code blocks)
             const scrollTop = element.parentElement.scrollTop;
 
-            // Reset the element
-            const text = element.textContent;
-            element.innerHTML = text;
+            // Reset highlight.js state. NOTE: do NOT round-trip through
+            // innerHTML here — the response text contains attacker-controlled
+            // crawled content and `element.innerHTML = element.textContent`
+            // re-parses it as live HTML (DOM-based XSS). highlight.js renders
+            // safely from textContent and emits escaped markup.
             element.removeAttribute('data-highlighted');
 
             // Reapply highlighting

@@ -133,8 +133,15 @@ class CrawlResult(BaseModel):
     fit_html: Optional[str] = None
     success: bool
     cleaned_html: Optional[str] = None
-    media: Dict[str, List[Dict]] = {}
-    links: Dict[str, List[Dict]] = {}
+    # The keys a scraped page gets (arun moves media's "tables" to .tables), so
+    # a result built without them -- robots.txt refusal, a failed fetch --
+    # keeps the shape.
+    media: Dict[str, List[Dict]] = Field(
+        default_factory=lambda: {"images": [], "videos": [], "audios": []}
+    )
+    links: Dict[str, List[Dict]] = Field(
+        default_factory=lambda: {"internal": [], "external": []}
+    )
     downloaded_files: Optional[List[str]] = None
     js_execution_result: Optional[Dict[str, Any]] = None
     screenshot: Optional[str] = None
@@ -338,6 +345,7 @@ class AsyncCrawlResponse(BaseModel):
     mhtml_data: Optional[str] = None
     get_delayed_content: Optional[Callable[[Optional[float]], Awaitable[str]]] = None
     downloaded_files: Optional[List[str]] = None
+    placeholder_html: bool = False # True if html is a stand-in for the content, actual content is produced by the scraping strategy (eg. using PDFCrawlerStrategy)
     ssl_certificate: Optional[SSLCertificate] = None
     redirected_url: Optional[str] = None
     redirected_status_code: Optional[int] = None

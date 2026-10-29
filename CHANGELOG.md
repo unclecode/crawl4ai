@@ -5,6 +5,342 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `crawl4ai-setup` no longer points to Crawl4AI Cloud when the browser install fails. It retries the browser without `--with-deps` (which needs root on Linux), prints the exact command for the system libraries, and exits with code 1 instead of printing "completed". The cloud banner at the end shows only after a successful setup.
+- `crawl4ai-doctor` exits with code 1 when its test crawl fails, counts a blocked page as a failure, and shows no cloud banner.
+- The cloud banner and the blocked line state the current free offer: 1,000 free credits every month.
+
+### Crawl4AI Cloud
+
+- Requests with `proxy: isp` and a country (for example UK pricing pages) no longer fail with "no-proxy-exit" after the address set is renewed. Thanks to [Summone](https://summone.co.uk) for the report.
+
+## [0.9.5] - 2026-10-14
+
+0.9.5 is a security release. It closes six coordinated-disclosure advisories in the Docker server's handling of untrusted request bodies: one more SSRF path outside the egress proxy, page JavaScript injection through `css_selector` and `wait_for`, a caller-chosen HuggingFace model in `CosineStrategy`, ReDoS through caller-supplied regexes, unbounded delay fields, and Chromium launched with certificate checks off. It also adds opt-in deep crawling on the Docker server and ships the bug fixes that landed on `develop` since 0.9.4. Users who self-host the Docker server should upgrade.
+
+### Security
+
+- **Blind SSRF via the cache freshness check (CWE-918, medium)**: `CacheValidator.validate()` sent its HEAD and GET requests on its own HTTP client, outside the Docker server's pinning egress proxy. It now goes through the proxy like the seeder and robots.txt fetches fixed in 0.9.4. Credit: [arpe1618](https://github.com/arpe1618). (GHSA-w4xc-px5p-c32w)
+- **Page JavaScript injection via `css_selector` and `wait_for` (CWE-95, medium)**: `css_selector` was pasted into a JavaScript string, and `wait_for` could run as page script, so an untrusted body could run JavaScript in the crawl page even though `js_code` is refused. `css_selector` is now passed to `evaluate()` as an argument, which also makes selectors with quotes work. For untrusted bodies, JavaScript `wait_for` values are refused and a bare value is treated as a CSS selector. Credit: Zhixi "Jace" Sun ([manus-use](https://github.com/manus-use)). (GHSA-qj46-wp7m-rgj8)
+- **Caller-chosen model in `CosineStrategy` (CWE-502, high)**: an untrusted body could set `CosineStrategy.model_name`, so the server downloaded and loaded any HuggingFace repository. With PyTorch older than 2.6 a crafted pickle weight file runs code in the server. `model_name` is now refused from untrusted bodies. The default image does not install PyTorch and is not affected. Credit: Zhixi "Jace" Sun ([manus-use](https://github.com/manus-use)). (GHSA-f856-7xp9-w3cc)
+- **ReDoS via caller-supplied regexes (CWE-1333, medium)**: `RegexExtractionStrategy.custom`, `RegexChunking.patterns`, and `"type": "regex"` fields in extraction schemas let a client send a catastrophic-backtracking pattern. Python's `re` holds the GIL while it matches, so one request froze the whole server. These fields are now refused from untrusted bodies. The built-in patterns stay available. Credit: Zhixi "Jace" Sun ([manus-use](https://github.com/manus-use)). (GHSA-j843-8p47-rhxp)
+- **Unbounded delay fields (CWE-770, medium)**: `delay_before_return_html`, `mean_delay`, and `max_range` were allowed in untrusted bodies with no upper bound, so one request could hold a browser page or stall the rate limiter. They are now capped at 60 seconds, and negative, NaN, and non-numeric values fall back to the default. Credit: Chunyi Liu ([liuchunyi-buaa](https://github.com/liuchunyi-buaa)). (GHSA-rhjm-7hj7-75fx)
+- **Chromium launched with certificate checks off (CWE-295, medium)**: both default launch flag lists carried `--ignore-certificate-errors`, so `ignore_https_errors=False` and the Docker server's TLS-on default had no effect. The flag is gone; insecure mode now comes only from `ignore_https_errors`. `CRAWL4AI_CHROMIUM_SANDBOX=true` now reaches every browser, including ones built from a request body. Credit: Julian Godfrey. (GHSA-j2qh-f73r-mg3q)
+
+Hardening, no advisory (credit: Chunyi Liu, [liuchunyi-buaa](https://github.com/liuchunyi-buaa)):
+
+- `DomainFilter` parses the real host with `urlparse()`, so userinfo, a port, or a trailing dot no longer slips past `blocked_domains`.
+- Webhook header names and artifact ids are checked with `fullmatch`, so a trailing newline no longer passes.
+- `enforce_egress` refuses the crawl with `EgressBlocked` when it cannot pin the browser to the egress proxy, instead of running unpinned. `clamp_deep_crawl` logs a warning when it cannot clamp.
+- Documentation examples: the marketplace backend (`docs/md_v2/marketplace/backend/`) uses bound SQL parameters and returns a generic error, and the LinkedIn graph view example escapes crawled data.
+
+All reporters are credited in `SECURITY-CREDITS.md`. GitHub Security Advisories accompany this release.
+
+### Added
+
+- Docker server: opt-in deep crawling. With `CRAWL4AI_ALLOW_DEEP_CRAWL=true`, requests may set `deep_crawl_strategy` with BFS, DFS, or BestFirst, safe filter and scorer types, and glob-only URL patterns. Page and depth budgets come from `limits.max_pages` and `limits.max_depth` in `config.yml`, a strategy is limited to 20 filters and scorers, and streamed deep crawls get a deadline. Off by default. (#2340, issue #2308, thanks @SohamKukreti)
+- A short Crawl4AI Cloud notice at `crawl4ai-setup`, at first run, and when a crawl is blocked. `CRAWL4AI_NO_CLOUD_NOTICE=1` turns it off.
+
+### Fixed
+
+**Crawler and core**
+
+- Deep crawl: BFS counts URLs already queued for the next level against `max_pages`, so `max_pages=50` no longer fetches hundreds of pages. (#2339, issue #2338, thanks @drakeo338)
+- Deep crawl: a reused strategy resets its page budget on a fresh run. (#2317, issue #2309, thanks @Artechie0806)
+- Scraping: page content nested in an unclosed `<noscript>` is kept in `cleaned_html` and `fit_html`. (#2284, thanks @tommypacker; #2360, #2363, issue #2293)
+- Scraping: a space is kept where a whitespace-only element is removed, so words no longer run together. (#2329, issue #2328, thanks @drakeo338)
+- `CrawlResult.links` and `.media` default to the scraped shape (`internal`, `external`, `images`, ...) on failed results. (#2289, issue #2286, thanks @talelboussetta)
+- PDF: markdown is deterministic with `batch_size > 1`. (#2320, issue #2319, thanks @Kylinny)
+- HTTP crawler: proxy credentials with `#`, `/`, `?`, or `%` work, and `ProxyConfig.from_string` decodes percent-encoded credentials. (#2327, issue #2326, thanks @omarbounawarapy)
+- HTTP crawler: proxy credentials no longer appear in error messages. (#2361, thanks @alkaz-nodemaven)
+
+**CLI**
+
+- `crwl -c cache_mode=...` is honored instead of always bypassing the cache. (#2366, issue #2365)
+- `crwl -o json` without an extraction strategy fails early with a clear message instead of crashing after the crawl. (#2362, #2335, issue #2334, thanks @SohamKukreti and @ege-arhan)
+
+**Docker server**
+
+- `crawler_configs` applies to single-URL and streaming requests, and a per-URL config list decides the PDF crawler. (#2290, issue #2287, thanks @talelboussetta)
+- A seed that fails the destination check is returned as a failed result instead of failing the whole batch with 400. (#2359, issue #2288)
+- An invalid `cache_mode` string returns 400 instead of 500.
+- MCP over SSE: `initialize` is processed before early `tools/call` requests, so fan-out clients no longer get -32602 on connect. (#2273, issue #2233, thanks @SohamKukreti)
+
+### Tests
+
+- `tests/unit/test_egress_policy.py` and `deploy/docker/tests/test_security_ssrf_seeder.py`: the cache freshness check goes through the egress proxy.
+- `tests/unit/test_untrusted_field_sinks.py` and `tests/browser/test_css_selector_injection.py`: `css_selector`, `wait_for`, `model_name`, regex, and delay fields under the untrusted gate.
+- `tests/unit/test_browser_tls_sandbox_flags.py`: launch flags with and without `ignore_https_errors` and the sandbox opt-in.
+- `tests/unit/test_domain_filter_host.py`, `deploy/docker/tests/test_security_hardening_2026_10.py`, `docs/md_v2/marketplace/backend/test_sql_injection.py`: the hardening fixes.
+- Coverage for the deep-crawl, noscript, proxy, CLI, and Docker fixes.
+
+### Breaking Changes
+
+None for library users. On the Docker server, untrusted request bodies that set `CosineStrategy.model_name`, `RegexExtractionStrategy.custom`, `RegexChunking.patterns`, a `"type": "regex"` schema field, or a JavaScript `wait_for` are now refused with 400.
+
+## [0.9.4] - 2026-09-23
+
+0.9.4 is a security release. It closes three coordinated-disclosure advisories: two SSRF paths that bypassed the Docker server's egress controls, and a trust-boundary bypass that let a non-admin API client read server environment variables. It also makes content pruning about 10x faster with the new lxml-native `PruningContentFilterLXML`, now the default, and ships the bug fixes that accumulated on `develop` since 0.9.3. There are no breaking changes. Users who self-host the Docker server should upgrade.
+
+### Security
+
+- **Blind SSRF via the robots.txt fetch (CWE-918, medium)**: `RobotsParser.can_fetch()` fetched `/robots.txt` on a bare `aiohttp` client that followed redirects and re-resolved the host, so `check_robots_txt` in an untrusted request body could make the Docker server reach internal, loopback, and cloud-metadata addresses. The fetch now goes through the server's pinning egress proxy, which checks every hop and dials the pinned IP. Credit: [arpe1618](https://github.com/arpe1618). (GHSA-f77g-77vp-r96v)
+- **SSRF with response disclosure via `link_preview_config` (CWE-918, high)**: the URL seeder fetched every link on a crawled page with its own `httpx` client, outside the egress controls, and returned each page's parsed `<head>` to the caller. The seeder's fetches now go through the same pinning egress proxy, and `LinkPreviewConfig` gets caps on `max_links`, `concurrency`, and `timeout` for untrusted bodies. Credit: Ibrahim AlJaafreh ([LinkedIn](https://www.linkedin.com/in/ibrahim-aljaafreh-glitch/)), Cystack RedTeam ([cystack.ps](https://cystack.ps)). (GHSA-wh5w-hmj3-vgg7)
+- **Untrusted-config gate bypass via dict-wrapper laundering (CWE-501, high)**: wrapping a forbidden typed object such as `LLMConfig` in `{"type": "dict", "value": {...}}` slipped it past `UNTRUSTED_ALLOWED_TYPES`, and `from_kwargs` then rebuilt it as trusted. A non-admin client could read any server environment variable, including LLM keys and `SECRET_KEY`. The unwrapped value is now re-checked under the untrusted gate, and `from_kwargs` carries the caller's provenance instead of defaulting to trusted. Credit: Adam Jordan ([adamyordan](https://github.com/adamyordan)). (GHSA-5w5p-vcv6-mm3f)
+
+The two SSRF fixes share one mechanism: the new `crawl4ai/egress_policy.py` holds a process-wide egress proxy URL for the library's own HTTP clients. The Docker server registers its existing `PinningProxy` there at boot. A plain library caller sets nothing and sees no change.
+
+All reporters are credited in `SECURITY-CREDITS.md`. GitHub Security Advisories accompany this release.
+
+### Added
+
+- `PruningContentFilterLXML`: an lxml-native pruning filter. It computes every per-node metric in one bottom-up pass instead of re-walking each subtree, so pruning is O(N) instead of super-linear. Output is byte-identical to `PruningContentFilter`. Measured pruning time: medium page 134 to 13 ms, 6000-card page 2200 to 260 ms. It is now the default for the Docker server's fit filter and the CLI pruning filter.
+- `CRAWL4AI_MAX_TIMEOUT_MS` sets the ceiling for `page_timeout`, `wait_for_timeout`, and `body_visibility_timeout` on untrusted configs. The default stays 60000 ms. (#2212, thanks @damusix; #2266)
+- Docker server: `crawler.pool.max_pages_before_recycle` (default 200) recycles a pooled browser context after it serves that many pages. A context gets slower with sustained use, and the idle janitor never fires on a busy server. Set it to 0 to disable. (#2232, issue #2231)
+
+### Deprecated
+
+- `PruningContentFilter` emits a `DeprecationWarning` on direct use. Switch to `PruningContentFilterLXML`, which takes the same arguments and gives the same output. Existing import paths keep working.
+
+### Fixed
+
+**Crawler and core**
+
+- Deep crawl: BFS no longer re-scans the whole level to match each result to its parent, and BestFirst no longer enqueues the same URL twice. De-duplication keeps the shallowest depth, so no subtree is lost. (#2265, issue #2242)
+- Tables: `rowspan` and `colspan` are expanded into a grid, and `<th>` row headers are kept instead of shifting the row left. Spans are clamped, so one cell cannot hang the parse. (#2261, issue #2258)
+- robots.txt: `Disallow: /*?` no longer blocks the whole site. (#2229, thanks @Nalhin)
+- robots.txt: the wildcard patch is skipped on Python 3.14+, where the standard library already supports wildcards and the patch broke `Allow:` precedence. (#2278)
+- Timeouts: malformed or non-positive timeout values fall back to the 60 s default instead of the configured ceiling. (#2266)
+- Chrome for Testing no longer crashes under `--headless=new` on macOS arm64. `OptimizationHints` is no longer disabled. (#2241, issue #2239, thanks @Zsanz3)
+
+**Docker server**
+
+- Playground: the Advanced Config panel is a JSON params editor. The old Python editor sent a `code` field that the untrusted boundary rejects. (#2262, issue #2260)
+- Playground: `md` and `llm` runs skip the `/config/dump` pre-flight, which failed on the legacy `code` field. (#2224, issue #2222)
+- The permanent browser is built with the egress-hardened default config, so its pool signature matches incoming requests. (#2237)
+
+**Documentation and CI**
+
+- `SECURITY.md` lists 0.9.x as supported. (#2269, thanks @nightcityblade)
+- The Discord stargazer notification no longer depends on a dead Google Apps Script step. (#2263, #2279)
+
+### Tests
+
+- `tests/unit/test_egress_policy.py` and `deploy/docker/tests/test_security_ssrf_seeder.py`: seeder and robots.txt fetches through the egress proxy.
+- `tests/unit/test_config_provenance.py`: direct, wrapped, and nested forbidden types refused under the untrusted gate.
+- `tests/async/test_content_filter_prune_lxml.py`: `PruningContentFilterLXML` output matches `PruningContentFilter`.
+- Coverage for the deep-crawl, table, robots.txt, timeout, and pool-recycle fixes.
+
+### Breaking Changes
+
+None.
+
+## [0.9.3] - 2026-08-31
+
+0.9.3 is a security release. It closes five coordinated-disclosure advisories in the PDF processing path and the Docker Playground UI, and ships the 33 bug fixes that accumulated on `develop` since 0.9.2, most of them in the Docker server. There are no new features and no breaking changes. Users who accept untrusted URLs on the Docker server, or who open PDFs from sources they do not control, should upgrade.
+
+### Security
+
+The PDF path was the common thread. `PDFContentScrapingStrategy` is selectable from an untrusted Docker API request body, and it fetches with `requests` outside the browser, so none of the Chromium-side egress or resource controls applied to it.
+
+- **Arbitrary file write via PDF image-write fields (CWE-22, high)**: `PDFContentScrapingStrategy` had no field allowlist, so an untrusted request body could set `save_images_locally` and `image_save_dir` and make the server write extracted images to a path of the caller's choosing. Those fields are now filtered at the trust boundary and `extract_images` is forced off for untrusted bodies. Credit: Zhixi "Jace" Sun ([manus-use](https://github.com/manus-use)). (GHSA-xpp7-j28w-2gvx)
+- **SSRF via PDF download redirects (CWE-918, high)**: the PDF download followed redirects without consulting any destination policy, so a public URL that redirected to an internal address reached it. Redirects are now resolved by hand with a per-hop destination check, bounded at five hops, and the peer IP of the response actually read back is validated to close DNS rebinding. The Docker server installs its egress policy into this path at boot. Credit: Nguyen Tran Thanh Lam ([c240030](https://github.com/c240030)). (GHSA-q5rj-45vw-vp2g)
+- **Denial of service via unbounded PDF size and page count (CWE-400, medium)**: a remote PDF was streamed to disk and parsed with no cap on bytes or pages. Downloads now stop at `max_pdf_bytes` (100 MiB default), enforced on the running total rather than the caller-supplied `content-length`, and parsing stops at `max_pdf_pages` (2000 default). Untrusted bodies cannot raise their own caps. The Docker config now ships a non-zero `limits.wall_clock_s` of 300 seconds. Credit: Nguyen Tran Thanh Lam ([c240030](https://github.com/c240030)). (GHSA-v2rm-hvrj-2x9q)
+- **XSS via unescaped PDF text in `cleaned_html` (CWE-79, medium)**: paragraph text taken verbatim from a PDF was written into `cleaned_html` without escaping, so markup embedded in a PDF survived into the result and executed when rendered. Paragraph text is now escaped like every other sink in that function. Credit: Nguyen Tran Thanh Lam ([c240030](https://github.com/c240030)). (GHSA-7g3g-vhm6-79f3)
+- **DOM-based XSS in the Docker Playground leading to API token theft (CWE-79, high)**: the result viewer reset syntax highlighting with `element.innerHTML = element.textContent`, which re-parsed attacker-controlled crawled content as live HTML in the operator's session. The round trip is removed; highlight.js renders safely from `textContent`. Credit: [e1codes](https://github.com/e1codes). (GHSA-m446-hp3q-qfxp)
+
+All reporters are credited in `SECURITY-CREDITS.md`. GitHub Security Advisories accompany this release.
+
+### Fixed
+
+This release also carries the bug fixes that accumulated on `develop` since 0.9.2.
+
+**Docker server**
+
+- PDF scraping is supported by default, and requests selecting `PDFContentScrapingStrategy` are routed to `PDFCrawlerStrategy` so the pairing works without extra configuration. (#2094, #2150)
+- The egress proxy chains through an upstream `HTTP_PROXY` / `HTTPS_PROXY` instead of ignoring it. (#2142)
+- Junk proxy environment values fall through to the next candidate, and non-http proxy schemes are refused. (#2094)
+- Compose v5 compatibility, clearer warnings on legacy fields, and better playground error handling. (#2094)
+- `CRAWL4AI_API_TOKEN` is forwarded through compose, and `.llm.env` is optional rather than required. (#2094)
+- The disabled-hooks 403 distinguishes the removed `hooks.code` field from other rejections. (#2094)
+- `output_path` is declared a deprecated no-op rather than silently ignored. (#2094)
+- `GET /monitor` redirects to the dashboard UI. (#2157, issue #2091)
+- Failed crawl results are preserved instead of dropped, for both batch and single-URL requests. (#2094, #2134, issue #2133)
+- An unavailable IPv6 loopback no longer breaks startup. (#2081, issue #2078)
+- `mcp` is capped below 2 so the v1 low-level API used by `mcp_bridge` keeps working. (#2148, thanks @weike-zhang)
+- Commented environment variable lines in compose are aligned with the environment list. (#2156)
+
+**Crawler and core**
+
+- `ManagedBrowser` no longer leaks a Playwright driver process when the browser fails to launch inside `__aenter__`. (#2160)
+- `PDFCrawlerStrategy` placeholder responses are no longer vetoed as anti-bot blocks, which previously failed every PDF crawl and burned the retry budget. (#2138, issue #2135)
+- Cookies are carried across manual PDF redirect hops, so gated and CDN-signed PDFs download correctly. (#2159)
+- Unconditional `setTimeout` waits are removed from the overlay and consent removal scripts, which could hang a crawl under a restrictive CSP. (#2139)
+- `remove_overlay_elements` no longer removes `<body>` when the body carries a global popup class. (#2163, thanks @Nalhin)
+- The body-visibility timeout is configurable and validated, and the timeout warning is emitted even with `verbose=False`. (#2117, #2131, #2145, issues #2116, #2129, #2144)
+
+**Documentation**
+
+- Self-hosting and migration guides updated for 0.9.x. (#2093)
+- The `PDFCrawlerStrategy` plus `PDFContentScrapingStrategy` pairing requirement is documented.
+
+### Tests
+
+- `tests/unit/test_pdf_download_limits.py`: 22 tests covering per-hop destination validation, DNS rebinding, redirect bounds, byte and page caps, and untrusted-body clamping.
+- `tests/unit/test_pdf_html_escaping.py`: escaping of PDF paragraph text in `cleaned_html`.
+- `deploy/docker/tests/test_security_pdf_image_write.py`: rejection of image-write fields from untrusted bodies.
+- Docker endpoint coverage for crawl failures and for the per-URL `crawler_configs` PDF guard.
+
+### Breaking Changes
+
+None.
+
+## [0.9.0] - 2026-06-18
+
+0.9.0 is a major, secure-by-default release of the Crawl4AI Docker API server. The out-of-the-box deployment is now hardened with defense in depth: authentication is on by default, the server binds loopback unless you give it a token, and the network request body is treated as an untrusted trust boundary. This release contains breaking changes for the self-hosted HTTP server only. The core pip library (SDK / in-process use) is unchanged.
+
+**What changed:** the Docker server moved from an open, trust-the-caller posture to a closed, secure-by-default one. Defaults that used to be permissive (open bind, no auth, request-supplied browser internals, TLS verification off, Redis with no password) are now safe by default and gated behind explicit configuration.
+
+**What you must do:** set `CRAWL4AI_API_TOKEN` and re-issue any tokens, then review whether you relied on any of the request fields or features that are now configured server-side. Most plain "crawl these URLs" users only need the two steps in the "Everyone" section of the migration guide. The full guide is at `deploy/docker/MIGRATION.md`.
+
+### Security
+
+This release completes the secure-by-default hardening of the Docker API server begun in 0.8.7 and 0.8.8. It moves the worst remaining issues from mitigation to architecture: unauthenticated access and request-supplied code/config are eliminated by design rather than patched in place. Every change is hardening; users self-hosting the Docker server should upgrade and follow the migration guide.
+
+- **Authentication on by default, loopback bind**: the server no longer serves an unauthenticated API on `0.0.0.0`. With no token it binds `127.0.0.1` and prints a one-off local token; exposing it requires `CRAWL4AI_API_TOKEN` and `Authorization: Bearer <token>` on every request except `GET /health`.
+- **Request trust boundary**: a crawl request body now carries declarative, scalar options only. Fields that previously let a caller drive browser internals or arbitrary code are rejected at the network boundary.
+- **Declarative hooks replace hook code**: arbitrary Python hook strings are replaced by a fixed set of declarative actions, removing request-supplied code from the server entirely.
+- **Strengthened JWT, admin-scoped monitor actions, deny-by-default CORS, strict security headers, TLS verification on, password-protected loopback-only Redis, bounded job queue, generic error responses with correlation ids, and validated webhook headers** round out the defense-in-depth posture. See the migration guide for the full list.
+- **Download path confinement (CWE-22)**: both download sinks now confine writes with basename plus realpath plus `O_NOFOLLOW`, closing a path-traversal-to-file-write class. Credit: Y4tacker.
+- **SSRF destination validation on the streaming crawl path (CWE-918)**: `/crawl/stream` and `/crawl` with `stream=true` now validate the destination and return HTTP 400 for disallowed targets, matching the non-streaming handlers. Credit: KOH Jun Sheng.
+- **Request-supplied `browser_config.extra_args` rejected (CWE-94)**: launch arguments can no longer be supplied over the network, closing a Chromium launch-arg injection class. Credit: Y4tacker, UDU_RisePho ([hoanggxyuuki](https://github.com/hoanggxyuuki)).
+
+All reporters are credited in `SECURITY-CREDITS.md`. GitHub Security Advisories accompany this release.
+
+### Breaking Changes
+
+These apply to the self-hosted Docker API server only. The pip library is unaffected. See `deploy/docker/MIGRATION.md` for the step-by-step migration and `deploy/docker/SECURITY-VERIFY.md` for the deployment checklist.
+
+- **Auth is on by default**: set `CRAWL4AI_API_TOKEN` and send `Authorization: Bearer <token>`. With no token the server binds loopback only.
+- **Loopback bind by default**: the server no longer binds `0.0.0.0` without a token; put a TLS-terminating reverse proxy in front when you expose it.
+- **Tokens must be re-issued**: the JWT implementation changed and tokens from older versions are no longer valid. Re-mint via `POST /token`.
+- **Request trust boundary**: `js_code`, `js_code_before_wait`, `c4a_script`, `proxy` / `proxy_config`, `extra_args`, `user_data_dir`, `cdp_url`, `cookies`, `headers`, `init_scripts`, `base_url`, `deep_crawl_strategy`, `simulate_user`, `magic`, `process_in_browser`, and nested LLM config objects are rejected with HTTP 400 when sent over the network. Configure them server-side or use the in-process SDK. Unknown fields are dropped; timeouts, viewport, and scroll counts are clamped.
+- **Hooks are declarative**: `hooks.code` is replaced by a fixed action set (`block_resources`, `add_cookies`, `set_headers`, `scroll_to_bottom`, `wait_for_timeout`). See `GET /hooks/info`.
+- **`output_path` removed, replaced by an artifact id**: `/screenshot` and `/pdf` store the result and return `artifact_id` + URL; fetch via authenticated `GET /artifacts/{artifact_id}` (TTL and quota apply).
+- **LLM `base_url` removed**: `/md`, `/llm`, and `/llm/job` select a provider by name only; endpoint and key are configured server-side and constrained by `config.llm.allowed_providers`.
+- **Monitor actions require an admin token**: `POST /monitor/actions/*` and `/monitor/stats/reset` need an admin-scope principal.
+- **CORS deny-by-default**: cross-origin browser requests are denied unless listed in `security.cors_allow_origins`.
+- **TLS verification on**: self-signed / internal TLS targets fail by default. Escape hatches for trusted internal testing: `CRAWL4AI_ALLOW_INSECURE_TLS=true`, `CRAWL4AI_ALLOW_INTERNAL_URLS=true`.
+- **Webhook headers validated**: malformed or hop-by-hop / sensitive headers are rejected with HTTP 422.
+- **Redis requires a password**: in-container Redis is loopback-only, password-protected, and its port is no longer published. For external Redis set `REDIS_PASSWORD`.
+- **Bounded background job queue**: request body size, per-crawl wall clock, queue size, and per-principal concurrency are now capped (configurable; `0` = unbounded).
+- **Generic 5xx responses**: server errors return `{"error": "Internal server error", "correlation_id": "…"}`; match the id in the logs for detail.
+
+### Security Credits
+
+Y4tacker, KOH Jun Sheng, and UDU_RisePho ([hoanggxyuuki](https://github.com/hoanggxyuuki)). See `SECURITY-CREDITS.md`.
+
+## [0.8.9] - 2026-06-04
+
+0.8.9 is a follow-up, backward-compatible security patch for the self-hosted Docker API server, closing an SSRF path that 0.8.8 did not cover. Upgrade in place; no configuration changes required.
+
+### Security
+
+A security advisory accompanies this release.
+
+- **SSRF via proxy settings (CWE-918)**: the SSRF destination check was applied only to the crawl target URL, not to the proxy address. An unauthenticated `/crawl`, `/crawl/stream`, or `/crawl/job` request could set `browser_config.proxy_config.server` (or the deprecated `browser_config.proxy`, or `crawler_config.proxy_config`, or a `--proxy-server` / `--host-resolver-rules` flag in `extra_args`) to an internal address and route the browser through it, reaching internal services and cloud-metadata endpoints. All proxy destinations are now validated with the same global-routability check before the browser is built, and proxy/DNS-redirecting flags are stripped from `extra_args`. A legitimate public proxy still works. Credit: Geo ([geo-chen](https://github.com/geo-chen)).
+
+Backward compatible. Note: raw `--proxy-server` / `--host-resolver-rules` / `--proxy-bypass-list` / `--proxy-pac-url` flags passed via `extra_args` are now ignored; configure proxies through `proxy_config` (which is validated).
+
+## [0.8.8] - 2026-06-04
+
+0.8.8 is a focused, backward-compatible security patch for the self-hosted Docker API server. Upgrade in place; no configuration changes are required. If you run the Docker server, upgrade. If it is exposed to a network, also set `CRAWL4AI_API_TOKEN`.
+
+### Security
+
+Security advisories accompany this release.
+
+- **SSRF filter gaps closed (CWE-918)**: the Docker server's SSRF protection now rejects any resolved address that is not globally routable, evaluated on IPv6 transition forms too (NAT64 `64:ff9b::/96`, 6to4 `2002::/16`, IPv4-mapped, and the unspecified `::`), which previously bypassed the explicit blocklist and could reach internal services and cloud-metadata endpoints. SSRF errors no longer echo the resolved address. Credit: internal security audit.
+- **Arbitrary file write via `output_path` hardened (CWE-59/22)**: `/screenshot` and `/pdf` now resolve symlinks and re-check containment before writing, and write with `O_NOFOLLOW`, closing a symlink/TOCTOU bypass of the directory restriction. `output_path` behavior is unchanged for normal use. Credit: internal security audit.
+- **LLM credential exfiltration closed (CWE-522/200)**: the LLM endpoints (`/md`, `/llm`, `/llm/job`) ignore a request-supplied `base_url`, so the configured provider key can no longer be redirected to an attacker endpoint. `LLMConfig` additionally refuses to resolve protected environment variables via the `env:` token form. The `base_url` field is still accepted but no longer honored. Credit: Geo ([geo-chen](https://github.com/geo-chen)); the `env:` hardening from internal security audit.
+- **CRLF-safe logging (CWE-117)** and **webhook request-header validation (CWE-93)**: log records are stripped of CR/LF/control characters, and user-supplied webhook headers are validated (name pattern, no control characters, hop-by-hop/sensitive headers denied).
+
+All changes are backward compatible.
+
+### Coming next: secure-by-default Docker server (~1-2 weeks)
+
+The next release is a larger, secure-by-default update for the self-hosted Docker API server, with intentional breaking changes. We are giving advance notice so you can prepare. If you run the Docker server, start planning now and test in staging before upgrading:
+
+- Authentication will be on by default. The server binds loopback unless a credential (`CRAWL4AI_API_TOKEN`) is configured.
+- Request bodies are validated more strictly and safer defaults apply (TLS verification on, stricter outbound egress controls, declarative hook actions instead of inline code).
+- A few request options move server-side: `/screenshot` and `/pdf` return an artifact id instead of a file path, and the LLM endpoint is selected by provider name.
+- Hardened container defaults (least-privilege compose, Redis authentication, loopback bind).
+
+A full migration guide will accompany the pre-announcement on Discord and X.
+
+## [0.8.7] - 2026-06-01
+
+0.8.7 is a security-hardening release. It bundles every responsibly-disclosed vulnerability patched since 0.8.6, plus the new DomainMapper feature and a batch of scraping, deep-crawl, and LLM fixes.
+
+### Security
+
+This release fixes multiple critical vulnerabilities in the Docker API server. If you self-host the Docker API, upgrade immediately. Two GitHub Security Advisories accompany this release.
+
+- **CRITICAL: AST Sandbox Escape leading to Pre-Auth RCE (CVSS 9.8, CWE-94/913)**: a `gi_frame.f_back` frame-chain escape in the computed-field `eval()` path. Removed `eval()` from computed fields entirely and deleted `_safe_eval_expression`. Credit: Song Binglin ([q1uf3ng](https://github.com/q1uf3ng)).
+- **CRITICAL: Hook Sandbox Escape RCE (CVSS 9.8, CWE-94)**: injected module objects (`asyncio`, `json`, `re`) carried a full `__builtins__`, bypassing the `__import__` block. Stripped injected builtins and removed dangerous allowlist entries. Credit: by111 ([August829](https://github.com/August829)).
+- **CRITICAL: Hardcoded JWT Secret (CVSS 9.8, CWE-798)**: the default signing key `"mysecret"` allowed token forgery. Removed the default, reject weak/short secrets, and auto-generate an ephemeral key when JWT is enabled with no key set. Credit: by111 ([August829](https://github.com/August829)).
+- **HIGH: Arbitrary File Write via `output_path` (CVSS 9.1, CWE-22)**: `/screenshot` and `/pdf` wrote to any path. Restricted writes to `CRAWL4AI_OUTPUT_DIR` and reject `..` traversal. Credit: Jeongbean Jeon, wulonchia.
+- **HIGH: SSRF via Webhook URL (CVSS 8.6, CWE-918)**: webhook URLs on `/crawl/job` and `/llm/job` could reach internal and cloud-metadata IPs. Added a blocklist and `follow_redirects=False`. Credit: Jeongbean Jeon.
+- **HIGH: SSRF via Direct Crawl Endpoints (CVSS 8.6, CWE-918)**: `/crawl`, `/md`, and `/llm` fetched arbitrary URLs, and IPv6-mapped IPv4 addresses (`[::ffff:169.254.169.254]`) bypassed naive checks. Added destination validation on all entry points and normalize IPv6-mapped IPv4 before the blocklist check. Credit: secsys_codex, Velayutham Selvaraj, IcySun.
+- **HIGH: Arbitrary JavaScript Execution via `/execute_js` (CVSS 8.1, CWE-94)**: disabled by default via `CRAWL4AI_EXECUTE_JS_ENABLED`, removed `--disable-web-security` from default browser args, and added an SSRF blocklist on the destination. Credit: by111 ([August829](https://github.com/August829)).
+- **MEDIUM: Monitor Endpoint Auth Bypass (CVSS 6.5, CWE-306)**: `/monitor/*` routes, including destructive actions, were unauthenticated. Added `token_dep` to the router and an explicit token check on the WebSocket endpoint. Credit: Jeongbean Jeon.
+- **MEDIUM: Stored XSS in Monitor Dashboard (CVSS 6.1, CWE-79)**: URLs and errors were rendered via `innerHTML` without escaping. Added server-side `html.escape()` and a client-side `escapeHtml()` wrapper. Credit: Jeongbean Jeon.
+- **eval() removed from `/config/dump`**: replaced with JSON input validated by Pydantic.
+- **Config hardening**: validate the `markdown_generator` type in `CrawlerRunConfig` to reject malformed JSON (#1880).
+
+### Added
+
+- **DomainMapper**: comprehensive domain URL discovery, with an `include_subdomains` flag and a per-source timeout.
+- **arun_many config-list support in the Docker API**: per-URL configs (#1837).
+- **Docker server can listen on all addresses.**
+
+### Fixed
+
+- **Markdown and scraping fidelity**:
+  - Preserve mermaid diagram text from SVGs and prevent nested fences (#1043)
+  - Preserve table `rowspan`/`colspan` in cleaned HTML (#1920)
+  - Preserve `.tail` text when removing empty elements (#1938)
+  - Keep sentence order in `NlpSentenceChunking` (#1909)
+- **Deep crawl and dispatcher**:
+  - Fix the deep-crawl streaming ContextVar bug, using `set(False)` instead of `reset(token)` (#1917)
+  - Wire `semaphore_count` into the auto-created `MemoryAdaptiveDispatcher` and default it to 10 (#1927)
+- **LLM and providers**:
+  - Add Bedrock to the provider prefixes so AWS credential auth works
+  - Default `LLMExtractionStrategy.extraction_type` to schema
+  - Add `LLMTableExtraction` to the Docker deserialization allowlist
+- **Crawler and downloads**:
+  - Return `success=True` for binary downloads and skip the block check when `downloaded_files` is set
+  - Honor `<base href>` in prefetch `quick_extract_links` (#752)
+- **Logging and MCP**:
+  - Route `AsyncLogger` output to stderr by default (#1968) and use `Console(width=200)` for non-TTY contexts
+  - Use `ensure_ascii=False` in the MCP bridge to preserve CJK characters (#1967)
+- **Browser and misc**:
+  - `browser_adapter` now uses the `Stealth` import, fixing a stealth import mismatch (#1960)
+  - Correct the `arun()` return type to `CrawlResultContainer` (#1898)
+  - Log the real failure reason before COMPLETE, fixing a misleading "SCRAPE ok" line (#1949)
+  - Assistant toolbar scroll fix and issue-1973 fix
+
+### Docs
+
+- Added Privacy Policy, Terms of Service, and Support pages.
+
+### Security Credits
+
+Song Binglin (q1uf3ng), by111 (August829), Jeongbean Jeon, wulonchia, secsys_codex, Velayutham Selvaraj, and IcySun. See `SECURITY-CREDITS.md`.
+
 ## [0.8.0] - 2026-01-12
 
 ### Security

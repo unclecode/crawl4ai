@@ -15,7 +15,7 @@ from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 from crawl4ai import AsyncWebCrawler, CacheMode, BrowserConfig, CrawlerRunConfig
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 from crawl4ai import (
     JsonCssExtractionStrategy,
     LLMExtractionStrategy,
@@ -48,7 +48,7 @@ async def clean_content():
         excluded_tags=["nav", "footer", "aside"],
         remove_overlay_elements=True,
         markdown_generator=DefaultMarkdownGenerator(
-            content_filter=PruningContentFilter(
+            content_filter=PruningContentFilterLXML(
                 threshold=0.48, threshold_type="fixed", min_word_threshold=0
             ),
             options={"ignore_links": True},

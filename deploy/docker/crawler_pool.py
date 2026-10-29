@@ -20,7 +20,26 @@ LOCK = asyncio.Lock()
 # Config
 MEM_LIMIT = CONFIG.get("crawler", {}).get("memory_threshold_percent", 95.0)
 BASE_IDLE_TTL = CONFIG.get("crawler", {}).get("pool", {}).get("idle_ttl_sec", 300)
+RECYCLE_PAGES = CONFIG.get("crawler", {}).get("pool", {}).get("max_pages_before_recycle", 0)
 DEFAULT_CONFIG_SIG = None  # Cached sig for default config
+_PERMANENT_CFG: Optional[BrowserConfig] = None  # To relaunch a crashed permanent browser
+_CLOSING = set()  # Strong refs to detached close tasks
+
+
+def _apply_pool_defaults(cfg: BrowserConfig) -> BrowserConfig:
+    """Apply pool-owned policy to a browser config before it is pooled.
+
+    Browsers handed out by this pool are long-lived, and the endpoints build
+    their BrowserConfig from the request body (see api.py handle_crawl_request),
+    so config.yml's browser kwargs never reach them. Pooling is what makes a
+    browser long-lived, so the pool is where its recycling policy belongs.
+
+    Applied before _sig() so every request shares one signature and pooling is
+    unaffected. An explicit per-request value wins. See #2231.
+    """
+    if RECYCLE_PAGES and not cfg.max_pages_before_recycle:
+        cfg.max_pages_before_recycle = RECYCLE_PAGES
+    return cfg
 
 
 def get_pool_snapshot() -> dict:
@@ -52,12 +71,57 @@ def _is_default_config(sig: str) -> bool:
     """Check if config matches default."""
     return sig == DEFAULT_CONFIG_SIG
 
+def _is_alive(crawler: AsyncWebCrawler) -> bool:
+    """False once the crawler's browser process has died (OOM, crash, kill).
+
+    Without this a dead browser stays pooled forever: the janitor only closes
+    idle crawlers, and a dead one keeps being handed out. See #842.
+    """
+    bm = getattr(crawler.crawler_strategy, "browser_manager", None)
+    if bm is None:
+        return True
+    if bm.browser is not None:
+        return bm.browser.is_connected()
+    # Persistent context: there is no Browser object, only the context
+    impl = getattr(bm.default_context, "_impl_obj", None)
+    return not getattr(impl, "_closing_or_closed", False)
+
+def _close_detached(crawler: AsyncWebCrawler):
+    """Close a dead crawler in the background so it never blocks LOCK."""
+    async def _close():
+        with suppress(Exception):
+            await asyncio.wait_for(crawler.close(), timeout=30)
+    task = asyncio.create_task(_close())
+    _CLOSING.add(task)
+    task.add_done_callback(_CLOSING.discard)
+
+def _evict(pool: Dict[str, AsyncWebCrawler], sig: str):
+    """Drop a dead hot/cold crawler; the next request for its config gets a new one."""
+    logger.warning(f"💀 Pooled browser died, dropping it (sig={sig[:8]})")
+    _close_detached(pool.pop(sig))
+    LAST_USED.pop(sig, None)
+    USAGE_COUNT.pop(sig, None)
+
+async def _restart_permanent():
+    """Relaunch a crashed permanent browser. Caller holds LOCK.
+
+    On failure PERMANENT keeps the dead crawler, so the next call retries.
+    """
+    global PERMANENT
+    logger.warning("💀 Permanent browser died, relaunching")
+    crawler = AsyncWebCrawler(config=_PERMANENT_CFG, thread_safe=False)
+    await crawler.start()
+    _close_detached(PERMANENT)
+    PERMANENT = crawler
+
 async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
     """Get crawler from pool with tiered strategy."""
-    sig = _sig(cfg)
+    sig = _sig(_apply_pool_defaults(cfg))
     async with LOCK:
         # Check permanent browser for default config
         if PERMANENT and _is_default_config(sig):
+            if not _is_alive(PERMANENT):
+                await _restart_permanent()
             LAST_USED[sig] = time.time()
             USAGE_COUNT[sig] = USAGE_COUNT.get(sig, 0) + 1
             if not hasattr(PERMANENT, 'active_requests'):
@@ -65,6 +129,10 @@ async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
             PERMANENT.active_requests += 1
             logger.info("🔥 Using permanent browser")
             return PERMANENT
+
+        for pool in (HOT_POOL, COLD_POOL):
+            if sig in pool and not _is_alive(pool[sig]):
+                _evict(pool, sig)  # falls through to create a new one
 
         # Check hot pool
         if sig in HOT_POOL:
@@ -131,11 +199,12 @@ async def release_crawler(crawler: AsyncWebCrawler):
 
 async def init_permanent(cfg: BrowserConfig):
     """Initialize permanent default browser."""
-    global PERMANENT, DEFAULT_CONFIG_SIG
+    global PERMANENT, DEFAULT_CONFIG_SIG, _PERMANENT_CFG
     async with LOCK:
         if PERMANENT:
             return
-        DEFAULT_CONFIG_SIG = _sig(cfg)
+        DEFAULT_CONFIG_SIG = _sig(_apply_pool_defaults(cfg))
+        _PERMANENT_CFG = cfg
         logger.info("🔥 Creating permanent default browser")
         PERMANENT = AsyncWebCrawler(config=cfg, thread_safe=False)
         await PERMANENT.start()
@@ -173,6 +242,16 @@ async def janitor():
 
         now = time.time()
         async with LOCK:
+            # Replace dead browsers before any request reaches them
+            if PERMANENT and not _is_alive(PERMANENT):
+                try:
+                    await _restart_permanent()
+                except Exception as e:
+                    logger.error(f"🧹 Could not relaunch permanent browser: {e}")
+            for pool in (HOT_POOL, COLD_POOL):
+                for sig in [s for s, c in pool.items() if not _is_alive(c)]:
+                    _evict(pool, sig)
+
             # Clean cold pool
             for sig in list(COLD_POOL.keys()):
                 if now - LAST_USED.get(sig, now) > cold_ttl:

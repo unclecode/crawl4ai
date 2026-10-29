@@ -395,6 +395,5 @@ print(f"Query term coverage: {coverage_ratio:.0%}")
 
 ## Next Steps
 
-- Explore [Custom Strategy Implementation](../tutorials/custom-adaptive-strategies.md)
-- Learn about [Knowledge Base Management](../tutorials/knowledge-base-management.md)
-- See [Performance Benchmarks](../benchmarks/adaptive-performance.md)
+- Start with the [Adaptive Crawling guide](../core/adaptive-crawling.md)
+- Read [Adaptive Crawling: the idea behind it](../blog/articles/adaptive-crawling-revolution.md)

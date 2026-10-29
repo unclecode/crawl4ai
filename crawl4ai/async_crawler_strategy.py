@@ -13,6 +13,7 @@ from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import hashlib
 import random
+import re
 import uuid
 from .js_snippet import load_js_script
 from .models import AsyncCrawlResponse
@@ -28,7 +29,7 @@ import aiofiles
 import aiohttp
 import chardet
 from aiohttp.client import ClientTimeout
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 from types import MappingProxyType
 import contextlib
 from functools import partial
@@ -812,6 +813,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await page.wait_for_selector("body", state="attached", timeout=30000)
 
                 # Use the new check_visibility function with csp_compliant_wait
+                _visibility_wait_start = time.perf_counter()
                 is_visible = await self.csp_compliant_wait(
                     page,
                     """() => {
@@ -823,8 +825,37 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                                         style.opacity !== '0';
                         return isVisible;
                     }""",
-                    timeout=30000,
+                    timeout=config.body_visibility_timeout,
                 )
+
+                _visibility_wait_ms = (
+                    time.perf_counter() - _visibility_wait_start
+                ) * 1000
+
+                # csp_compliant_wait also returns False when the evaluation itself
+                # fails (page closed, context destroyed by a redirect), which costs
+                # no time — only warn about a wait that actually burned its budget.
+                if (
+                    not is_visible
+                    and config.ignore_body_visibility
+                    and _visibility_wait_ms >= config.body_visibility_timeout * 0.9
+                ):
+                    # The wait timed out and its result is about to be discarded, so
+                    # the crawl still succeeds — just this much slower, on every crawl
+                    # of this page. force_verbose because the whole point is that the
+                    # delay is otherwise invisible, and the servers and batch jobs that
+                    # most need to see it run with verbose off (see #2144).
+                    self.logger.warning(
+                        message=(
+                            "Body never became visible after {elapsed}ms — the page may "
+                            "use ng-cloak/v-cloak. This delay is added to every crawl of "
+                            "this page; lower CrawlerRunConfig.body_visibility_timeout "
+                            "to shorten it."
+                        ),
+                        tag="WARNING",
+                        params={"elapsed": round(_visibility_wait_ms)},
+                        force_verbose=True,
+                    )
 
                 if not is_visible and not config.ignore_body_visibility:
                     visibility_info = await self.check_visibility(page)
@@ -1069,10 +1100,14 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
                     for selector in selectors:
                         try:
+                            # Passed as an argument, never pasted into the
+                            # script: a '"' in the selector used to end the
+                            # string literal and run the rest as JavaScript.
                             content = await self.adapter.evaluate(page,
-                                f"""Array.from(document.querySelectorAll("{selector}"))
+                                """(sel) => Array.from(document.querySelectorAll(sel))
                                     .map(el => el.outerHTML)
-                                    .join('')"""
+                                    .join('')""",
+                                selector,
                             )
                             html_parts.append(content)
                         except Error as e:
@@ -1474,7 +1509,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         try:
             suggested_filename = download.suggested_filename
-            download_path = os.path.join(self.browser_config.downloads_path, suggested_filename)
+            download_path = _safe_download_filepath(self.browser_config.downloads_path, suggested_filename)
+            # Playwright's save_as performs the write itself (no O_NOFOLLOW
+            # hook), so reject a symlink planted at the target before writing.
+            if os.path.islink(download_path):
+                raise ValueError(f"Refusing to write download through symlink: {download_path}")
 
             self.logger.info(
                 message="Downloading {filename} to {path}",
@@ -1530,7 +1569,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 }})()
             """
             )
-            await page.wait_for_timeout(500)  # Wait for any animations to complete
+            await page.wait_for_timeout(600)  # Wait for any animations to complete
         except Exception as e:
             self.logger.warning(
                 message="Failed to remove overlay elements: {error}",
@@ -2413,6 +2452,35 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 # HTTP Crawler Strategy
 ####################################################################################################
 
+def _safe_download_filepath(downloads_path: str, filename: str) -> str:
+    """Resolve a download destination confined to ``downloads_path``.
+
+    The filename is derived from attacker-influenced input (a remote
+    Content-Disposition header, or the browser's suggested filename), so it is
+    reduced to a bare basename (dropping absolute paths and ``..`` traversal)
+    and the resolved path is re-checked to live inside the downloads root,
+    rejecting any pre-existing symlink that points outside. Raises ValueError
+    on any escape. The final write must still use ``_nofollow_opener`` (or an
+    equivalent ``O_NOFOLLOW`` / pre-write symlink check) to close the TOCTOU
+    window between this check and the open.
+    """
+    safe_name = os.path.basename(filename or "")
+    if not safe_name or safe_name in (".", ".."):
+        safe_name = f"download_{hashlib.md5((filename or '').encode()).hexdigest()[:10]}"
+    real_root = os.path.realpath(downloads_path)
+    real_path = os.path.realpath(os.path.join(real_root, safe_name))
+    if os.path.commonpath([real_root, real_path]) != real_root:
+        raise ValueError(f"Unsafe download filename rejected: {filename!r}")
+    return real_path
+
+
+def _nofollow_opener(path, flags):
+    """Opener for ``open``/``aiofiles.open`` that refuses to follow a symlink at
+    the final path component, closing the TOCTOU symlink-swap race after a path
+    has been confined by ``_safe_download_filepath``."""
+    return os.open(path, flags | os.O_NOFOLLOW)
+
+
 class HTTPCrawlerError(Exception):
     """Base error class for HTTP crawler specific exceptions"""
     pass
@@ -2579,6 +2647,8 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
 
         if username and password:
             # Insert credentials into URL: http://user:pass@host:port
+            username = quote(username, safe='')
+            password = quote(password, safe='')
             if '://' in server:
                 protocol, rest = server.split('://', 1)
                 return f"{protocol}://{username}:{password}@{rest}"
@@ -2586,6 +2656,42 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
                 return f"http://{username}:{password}@{server}"
 
         return server
+
+    # scheme://user:pass@ in any URL inside a message
+    _URL_USERINFO = re.compile(r"([A-Za-z][A-Za-z0-9+.-]*://)[^/\s@]+@")
+
+    @classmethod
+    def _redact_proxy_credentials(cls, message: str, proxy_url: Optional[str]) -> str:
+        """Mask proxy credentials in an error message before it is raised.
+
+        Some aiohttp errors quote the proxy URL (``InvalidURL`` carries all of
+        it), and the errors raised from ``_handle_http`` end up in logs and in
+        crawl results.
+        """
+        if proxy_url and "@" in proxy_url:
+            from urllib.parse import unquote
+
+            userinfo = proxy_url.split("://", 1)[-1].rsplit("@", 1)[0]
+            # The exact string first: a password with "/" or "#" in it is not
+            # matched whole by the pattern below.
+            for secret in {userinfo, unquote(userinfo)}:
+                message = message.replace(secret + "@", "***@")
+        return cls._URL_USERINFO.sub(r"\1***@", message)
+
+    @classmethod
+    def _wrap_error(cls, exc_type, prefix: str, error: BaseException, proxy_url: Optional[str]):
+        """``exc_type(f"{prefix}: {error}")`` with proxy credentials masked.
+
+        When the original message carried credentials, it is also kept out of
+        the traceback, which would otherwise print it under "During handling
+        of the above exception".
+        """
+        text = str(error)
+        safe = cls._redact_proxy_credentials(text, proxy_url)
+        wrapped = exc_type(f"{prefix}: {safe}")
+        if safe != text:
+            wrapped.__suppress_context__ = True
+        return wrapped
 
     # Content types treated as text (decoded into html field)
     _TEXT_CONTENT_TYPES: Final = frozenset({
@@ -2649,8 +2755,10 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
         config: CrawlerRunConfig
     ) -> AsyncCrawlResponse:
         async with self._session_context() as session:
+            # page_timeout is in ms (Playwright convention), but aiohttp expects seconds
+            timeout_sec = (config.page_timeout / 1000) if config.page_timeout else self.DEFAULT_TIMEOUT
             timeout = ClientTimeout(
-                total=config.page_timeout or self.DEFAULT_TIMEOUT,
+                total=timeout_sec,
                 connect=10,
                 sock_read=30
             )
@@ -2707,9 +2815,9 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
                         os.makedirs(downloads_path, exist_ok=True)
 
                         filename = self._extract_filename(content_disposition, url, content_type)
-                        filepath = os.path.join(downloads_path, filename)
+                        filepath = _safe_download_filepath(downloads_path, filename)
 
-                        async with aiofiles.open(filepath, 'wb') as f:
+                        async with aiofiles.open(filepath, 'wb', opener=_nofollow_opener) as f:
                             await f.write(raw_bytes)
 
                         downloaded_files = [filepath]
@@ -2742,23 +2850,23 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
 
             except aiohttp.ServerTimeoutError as e:
                 await self.hooks['on_error'](e)
-                raise ConnectionTimeoutError(f"Request timed out: {str(e)}")
+                raise self._wrap_error(ConnectionTimeoutError, "Request timed out", e, proxy_url)
                 
             except aiohttp.ClientConnectorError as e:
                 await self.hooks['on_error'](e)
-                raise ConnectionError(f"Connection failed: {str(e)}")
+                raise self._wrap_error(ConnectionError, "Connection failed", e, proxy_url)
                 
             except aiohttp.ClientError as e:
                 await self.hooks['on_error'](e)
-                raise HTTPCrawlerError(f"HTTP client error: {str(e)}")
+                raise self._wrap_error(HTTPCrawlerError, "HTTP client error", e, proxy_url)
             
             except asyncio.exceptions.TimeoutError as e:
                 await self.hooks['on_error'](e)
-                raise ConnectionTimeoutError(f"Request timed out: {str(e)}")
+                raise self._wrap_error(ConnectionTimeoutError, "Request timed out", e, proxy_url)
             
             except Exception as e:
                 await self.hooks['on_error'](e)
-                raise HTTPCrawlerError(f"HTTP request failed: {str(e)}")
+                raise self._wrap_error(HTTPCrawlerError, "HTTP request failed", e, proxy_url)
 
     async def crawl(
         self, 
