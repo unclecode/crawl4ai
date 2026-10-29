@@ -50,7 +50,10 @@ def test_nested_field_uses_explicit_default_when_selector_matches_nothing(
         else ".//div[@class='missing']"
     )
 
-    assert _extract(extraction_strategy, selector, default) == [{"details": default}]
+    result = _extract(extraction_strategy, selector, default)
+
+    assert result == [{"details": default}]
+    assert type(result[0]["details"]) is type(default)
 
 
 def test_nested_field_without_default_keeps_empty_object(extraction_strategy):
