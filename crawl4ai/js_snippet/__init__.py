@@ -13,6 +13,6 @@ def load_js_script(script_name):
             f"Script {script_name} not found in the folder {current_script_path}"
         )
     # Load the content of the script
-    with open(script_path, "r") as f:
+    with open(script_path, "r", encoding="utf-8") as f:
         script_content = f.read()
     return script_content
