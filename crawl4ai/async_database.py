@@ -358,6 +358,11 @@ class AsyncDatabaseManager:
                         else:
                             row_dict[field] = {}
 
+                # Tables use the historical media JSON slot only inside the cache.
+                cached_media = row_dict["media"].copy()
+                row_dict["tables"] = cached_media.pop("tables", [])
+                row_dict["media"] = cached_media
+
                 if isinstance(row_dict["markdown"], Dict):
                     if row_dict["markdown"].get("raw_markdown"):
                         row_dict["markdown"] = row_dict["markdown"]["raw_markdown"]
@@ -477,6 +482,10 @@ class AsyncDatabaseManager:
 
     async def acache_url(self, result: CrawlResult):
         """Cache CrawlResult data"""
+        # Preserve legacy table inputs without mutating the public media dictionary.
+        cached_media = result.media.copy()
+        cached_media["tables"] = result.tables or cached_media.get("tables", [])
+
         # Store content files and get hashes
         content_map = {
             "html": (result.html, "html"),
@@ -564,7 +573,7 @@ class AsyncDatabaseManager:
                     content_hashes["markdown"],
                     content_hashes["extracted_content"],
                     result.success,
-                    json.dumps(result.media),
+                    json.dumps(cached_media),
                     json.dumps(result.links),
                     json.dumps(result.metadata or {}),
                     content_hashes["screenshot"],
