@@ -2461,6 +2461,7 @@ class CrawlerRunConfig():
             "deep_crawl_strategy": self.deep_crawl_strategy,
             "link_preview_config": self.link_preview_config.to_dict() if self.link_preview_config else None,
             "url": self.url,
+            "base_url": self.base_url,
             "url_matcher": self.url_matcher,
             "match_mode": self.match_mode,
             "experimental": self.experimental,
