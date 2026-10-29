@@ -48,7 +48,7 @@ Docker server, CLI and every option: [Installation](#installation) · [docs.craw
 
 ### ☁️ Or use the cloud: no browsers, no proxies
 
-1. [![Get a key in 10 seconds](https://img.shields.io/badge/Get_a_key_in_10_seconds-20_free_credits%2C_no_signup-f5a300?style=for-the-badge&labelColor=0d0d10)](https://crawl4ai.com/?ref=readme)  
+1. [![Get a key in 10 seconds](https://img.shields.io/badge/Get_a_key_in_10_seconds-1%2C000_free_credits-f5a300?style=for-the-badge&labelColor=0d0d10)](https://crawl4ai.com/?ref=readme)  
    Verify your email and 1,000 free credits are yours every month. No card.
 2. Get any page as Markdown:
 
