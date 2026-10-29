@@ -11,6 +11,7 @@ test_security_ssrf_egress.py.)
 """
 
 import asyncio
+import time
 
 import pytest
 
@@ -132,6 +133,57 @@ class TestPinningProxy:
         finally:
             await proxy.stop()
 
+    async def test_slow_dns_does_not_block_the_event_loop(self, monkeypatch):
+        # resolve_and_pin calls getaddrinfo, which blocks. Run on the event loop,
+        # every lookup freezes the whole server (other requests included) and
+        # concurrent lookups run one after another (#2423).
+        lookup_s = 1.0
+
+        def slow_pin(url):
+            time.sleep(lookup_s)
+            raise EgressBlocked()
+        monkeypatch.setattr(egress_proxy, "resolve_and_pin", slow_pin)
+
+        proxy = PinningProxy()
+        await proxy.start()
+        gaps, done = [], asyncio.Event()
+
+        async def ticker():
+            last = time.monotonic()
+            while not done.is_set():
+                await asyncio.sleep(0.05)
+                now = time.monotonic()
+                gaps.append(now - last)
+                last = now
+
+        async def request(line):
+            r, w = await asyncio.open_connection(proxy.bound_host, proxy.bound_port)
+            w.write(line)
+            await w.drain()
+            status = await asyncio.wait_for(r.readline(), timeout=10)
+            w.close()
+            return status
+
+        requests = [
+            b"CONNECT slow-a.example:443 HTTP/1.1\r\n\r\n",
+            b"CONNECT slow-b.example:443 HTTP/1.1\r\n\r\n",
+            b"GET http://slow-c.example/ HTTP/1.1\r\nHost: slow-c.example\r\n\r\n",
+            b"GET http://slow-d.example/ HTTP/1.1\r\nHost: slow-d.example\r\n\r\n",
+        ]
+        tick = asyncio.create_task(ticker())
+        started = time.monotonic()
+        try:
+            statuses = await asyncio.gather(*(request(line) for line in requests))
+            elapsed = time.monotonic() - started
+        finally:
+            done.set()
+            await tick
+            await proxy.stop()
+
+        assert all(b"403" in s for s in statuses)
+        assert max(gaps) < 0.5, f"event loop stalled {max(gaps):.2f}s"
+        assert elapsed < len(requests) * lookup_s * 0.75, f"lookups ran serially ({elapsed:.2f}s)"
+
 
 async def _fake_corporate_proxy(seen):
     """Minimal HTTP proxy: records the CONNECT request line, replies 200, then
@@ -232,8 +284,13 @@ class TestUpstreamChaining:
             assert b"200" in first
             # Attempt to smuggle an unvalidated request on the same connection.
             w.write(b"GET http://rebind.evil/ HTTP/1.1\r\nHost: rebind.evil\r\n\r\n")
-            await w.drain()
-            leftover = await asyncio.wait_for(r.read(200), timeout=5)
+            try:
+                await w.drain()
+                leftover = await asyncio.wait_for(r.read(200), timeout=5)
+            except ConnectionError:
+                # The proxy may already have closed this connection, so the
+                # write can draw a reset or broken pipe instead of a clean EOF.
+                leftover = b""
             assert leftover == b""  # upstream closed; nothing came back
             w.close()
         finally:
