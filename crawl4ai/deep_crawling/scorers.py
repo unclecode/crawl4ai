@@ -8,6 +8,7 @@ from functools import lru_cache
 from array import array
 import ctypes
 import platform
+from datetime import date
 PLATFORM = platform.system()
 
 # Pre-computed scores for common year differences
@@ -332,7 +333,7 @@ class ContentTypeScorer(URLScorer):
 class FreshnessScorer(URLScorer):
     __slots__ = ('_weight', '_date_pattern', '_current_year')
 
-    def __init__(self, weight: float = 1.0, current_year: int = 2024):
+    def __init__(self, weight: float = 1.0, current_year: Optional[int] = None):
         """Initialize freshness scorer.
         
         Extracts and scores dates from URLs using format:
@@ -343,9 +344,11 @@ class FreshnessScorer(URLScorer):
         
         Args:
             weight: Score multiplier
-            current_year: Year to calculate freshness against (default 2024)
+            current_year: Year to calculate freshness against (default: this year)
         """
         super().__init__(weight=weight)
+        if current_year is None:
+            current_year = date.today().year
         self._current_year = current_year
         
         # Combined pattern for all date formats
