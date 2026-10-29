@@ -281,7 +281,7 @@ class DefaultTableExtraction(TableExtractionStrategy):
         implicit_header_row = None
         thead_rows = table.xpath(".//thead/tr")
         if thead_rows:
-            header_cells = thead_rows[0].xpath(".//th")
+            header_cells = thead_rows[0].xpath("./th|./td")
             for cell in header_cells:
                 text = cell.text_content().strip()
                 colspan = int(cell.get("colspan", 1))
