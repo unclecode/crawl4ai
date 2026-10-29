@@ -25,7 +25,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
     def __init__(
         self,
         max_depth: int,
-        filter_chain: FilterChain = FilterChain(),
+        filter_chain: Optional[FilterChain] = None,
         url_scorer: Optional[URLScorer] = None,
         include_external: bool = False,
         score_threshold: float = -infinity,
@@ -40,7 +40,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         dispatcher: Optional[BaseDispatcher] = None,
     ):
         self.max_depth = max_depth
-        self.filter_chain = filter_chain
+        self.filter_chain = filter_chain if filter_chain is not None else FilterChain()
         self.url_scorer = url_scorer
         self.include_external = include_external
         self.score_threshold = score_threshold
