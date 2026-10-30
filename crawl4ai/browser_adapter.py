@@ -6,14 +6,17 @@ with minimal changes to existing codebase.
 
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional, Callable
+import asyncio
 import time
 import json
 
 # Import both, but use conditionally
 try:
     from playwright.async_api import Page
+    from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 except ImportError:
     Page = Any
+    PlaywrightTimeoutError = TimeoutError
 
 try:
     from patchright.async_api import Page as UndetectedPage
@@ -21,11 +24,51 @@ except ImportError:
     UndetectedPage = Any
 
 
+# ---------------------------------------------------------------------------
+# Why evaluate() needs an explicit bound
+#
+# Playwright's evaluate() takes no `timeout` argument.  The Python client sends
+# no timeout field, so the driver arms no timer at all — the call can only ever
+# end when it gets a reply or the target is closed.  What it waits on is the
+# frame's execution-context promise, and every navigation *replaces* that
+# promise with a fresh, unresolved one.  So an evaluate issued while the main
+# frame is between documents never returns: `page_timeout` does not cover it
+# (that only reaches page.goto and the wait_* family), and because most call
+# sites wrap evaluate in a swallow-all try/except, nothing is logged either.
+#
+# Observed in production 2026-07-30: a WordPress + Turnstile site kept
+# committing navigations, an evaluate stalled, and the request burned the whole
+# 180 s wall-clock fence in total silence.  Bound it so a wedged renderer costs
+# seconds instead of the caller's entire budget.
+# ---------------------------------------------------------------------------
+EVALUATE_TIMEOUT_S = 30.0
+
+
+async def bounded_evaluate(awaitable, timeout: float, what: str = "page.evaluate"):
+    """Await a Playwright evaluate with a hard ceiling.
+
+    Raises Playwright's TimeoutError — the same type Playwright itself raises
+    for the operations that *do* carry a timeout, so existing
+    `except Error` / `except Exception` handlers keep working, and it stays
+    distinguishable from an outer asyncio deadline.
+    """
+    try:
+        return await asyncio.wait_for(awaitable, timeout)
+    except asyncio.TimeoutError:
+        raise PlaywrightTimeoutError(
+            f"{what} did not return within {timeout:g}s — the page is most "
+            f"likely navigating and its execution context never settled"
+        ) from None
+
+
 class BrowserAdapter(ABC):
     """Abstract adapter for browser-specific operations"""
     
     @abstractmethod
-    async def evaluate(self, page: Page, expression: str, arg: Any = None) -> Any:
+    async def evaluate(
+        self, page: Page, expression: str, arg: Any = None,
+        timeout: Optional[float] = None,
+    ) -> Any:
         """Execute JavaScript in the page"""
         pass
     
@@ -58,11 +101,13 @@ class BrowserAdapter(ABC):
 class PlaywrightAdapter(BrowserAdapter):
     """Adapter for standard Playwright"""
     
-    async def evaluate(self, page: Page, expression: str, arg: Any = None) -> Any:
-        """Standard Playwright evaluate"""
-        if arg is not None:
-            return await page.evaluate(expression, arg)
-        return await page.evaluate(expression)
+    async def evaluate(
+        self, page: Page, expression: str, arg: Any = None,
+        timeout: Optional[float] = None,
+    ) -> Any:
+        """Standard Playwright evaluate, bounded (see bounded_evaluate)"""
+        coro = page.evaluate(expression, arg) if arg is not None else page.evaluate(expression)
+        return await bounded_evaluate(coro, timeout or EVALUATE_TIMEOUT_S)
     
     async def setup_console_capture(self, page: Page, captured_console: List[Dict]) -> Optional[Callable]:
         """Setup console capture using Playwright's event system"""
@@ -175,11 +220,13 @@ class StealthAdapter(BrowserAdapter):
             # Fail silently or log error depending on requirements
             pass
 
-    async def evaluate(self, page: Page, expression: str, arg: Any = None) -> Any:
-        """Standard Playwright evaluate with stealth applied"""
-        if arg is not None:
-            return await page.evaluate(expression, arg)
-        return await page.evaluate(expression)
+    async def evaluate(
+        self, page: Page, expression: str, arg: Any = None,
+        timeout: Optional[float] = None,
+    ) -> Any:
+        """Standard Playwright evaluate with stealth applied, bounded"""
+        coro = page.evaluate(expression, arg) if arg is not None else page.evaluate(expression)
+        return await bounded_evaluate(coro, timeout or EVALUATE_TIMEOUT_S)
 
     async def setup_console_capture(self, page: Page, captured_console: List[Dict]) -> Optional[Callable]:
         """Setup console capture using Playwright's event system with stealth"""
@@ -274,8 +321,11 @@ class UndetectedAdapter(BrowserAdapter):
     def __init__(self):
         self._console_script_injected = {}
     
-    async def evaluate(self, page: UndetectedPage, expression: str, arg: Any = None) -> Any:
-        """Undetected browser evaluate with isolated context"""
+    async def evaluate(
+        self, page: UndetectedPage, expression: str, arg: Any = None,
+        timeout: Optional[float] = None,
+    ) -> Any:
+        """Undetected browser evaluate with isolated context, bounded"""
         # For most evaluations, use isolated context for stealth
         # Only use non-isolated when we need to access our injected console capture
         isolated = not (
@@ -285,9 +335,12 @@ class UndetectedAdapter(BrowserAdapter):
             "window.__" in expression
         )
         
-        if arg is not None:
-            return await page.evaluate(expression, arg, isolated_context=isolated)
-        return await page.evaluate(expression, isolated_context=isolated)
+        coro = (
+            page.evaluate(expression, arg, isolated_context=isolated)
+            if arg is not None
+            else page.evaluate(expression, isolated_context=isolated)
+        )
+        return await bounded_evaluate(coro, timeout or EVALUATE_TIMEOUT_S)
     
     async def setup_console_capture(self, page: UndetectedPage, captured_console: List[Dict]) -> Optional[Callable]:
         """Setup console capture using JavaScript injection for undetected browsers"""
