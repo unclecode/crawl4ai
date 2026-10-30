@@ -679,7 +679,7 @@ class PruningContentFilter(RelevantContentFilter):
 
         # Prune tree starting from body
         body = soup.find("body")
-        self._prune_tree(body)
+        self._prune_tree(body, self._protected_ancestors(body))
 
         # Extract remaining content as list of HTML strings
         content_blocks = []
@@ -712,18 +712,51 @@ class PruningContentFilter(RelevantContentFilter):
                 return True
         return False
 
-    def _prune_tree(self, node):
+    def _protected_ancestors(self, root):
+        """Return the ids of all ancestors of <pre> and preserved nodes.
+
+        Inline <code> does not protect its ancestors. If it did, a boilerplate
+        link such as <a><code>map()</code></a> in a sidebar would never be pruned.
+        """
+        ancestors = set()
+        for node in root.find_all(True):
+            if node.name == "pre" or self._is_preserved(node):
+                for parent in node.parents:
+                    if id(parent) in ancestors:
+                        break
+                    ancestors.add(id(parent))
+        return ancestors
+
+    def _prune_tree(self, node, protected=None):
         """
         Prunes the tree starting from the given node.
 
         Args:
             node (Tag): The node from which the pruning starts.
+            protected (set): ids of nodes that must not be decomposed because
+                they contain a <pre> or preserved descendant (optional).
         """
         if not node or not hasattr(node, "name") or node.name is None:
             return
 
         # Skip pruning for preserved nodes — always keep them
         if self._is_preserved(node):
+            return
+
+        # Skip pruning inside <pre>/<code> blocks where whitespace is significant.
+        # Syntax highlighters wrap every token in <span>, also whitespace-only
+        # tokens such as <span class="w"> </span>. These spans score far below
+        # any threshold. Their removal corrupts the code. This mirrors the
+        # scraper-side guard in WebScrapingStrategy.remove_empty_elements_fast (#1181).
+        if node.name in ("pre", "code"):
+            return
+
+        # Never decompose an ancestor of a protected block: a low-scoring wrapper
+        # such as <div class="highlight"> would take the block down with it.
+        # Its other children are still pruned normally.
+        if protected and id(node) in protected:
+            for child in [c for c in node.children if hasattr(c, "name")]:
+                self._prune_tree(child, protected)
             return
 
         text_len = len(node.get_text(strip=True))
@@ -766,7 +799,7 @@ class PruningContentFilter(RelevantContentFilter):
         else:
             children = [child for child in node.children if hasattr(child, "name")]
             for child in children:
-                self._prune_tree(child)
+                self._prune_tree(child, protected)
 
     def _compute_composite_score(self, metrics, text_len, tag_len, link_text_len):
         """Computes the composite score"""
