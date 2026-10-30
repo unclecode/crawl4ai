@@ -483,10 +483,13 @@ from crawl4ai import CrawlerRunConfig, CacheMode # Assuming you have crawl4ai in
 
 async def main():
     # Point to the correct server port
-    async with Crawl4aiDockerClient(base_url="http://localhost:11235", verbose=True) as client:
-        # Send the API token with every request
-        # (client.authenticate() does not work with the 0.9 server)
-        client._token = os.environ["CRAWL4AI_API_TOKEN"]
+    # api_token is sent with every request
+    # (client.authenticate() does not work with the 0.9 server)
+    async with Crawl4aiDockerClient(
+        base_url="http://localhost:11235",
+        api_token=os.environ["CRAWL4AI_API_TOKEN"],
+        verbose=True,
+    ) as client:
 
         # Example Non-streaming crawl
         print("--- Running Non-Streaming Crawl ---")
