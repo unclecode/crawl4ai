@@ -71,6 +71,22 @@ def test_browser_config_wrapped_proxy_refused():
         BrowserConfig.load(data, provenance=UNTRUSTED)
 
 
+def test_browser_config_dump_passes_the_untrusted_load():
+    """dump() leaves out the sec-ch-ua header that __init__ adds; load() adds it back."""
+    for cfg in (BrowserConfig(), BrowserConfig(user_agent="MyUA/1.0")):
+        loaded = BrowserConfig.load(cfg.dump(), provenance=UNTRUSTED)
+        assert loaded.headers == cfg.headers
+
+
+def test_browser_config_dump_keeps_custom_headers_and_they_are_refused():
+    """Only the auto-added sec-ch-ua is dropped; a user's own headers stay and are refused."""
+    for headers in ({"X-A": "1"}, {"sec-ch-ua": "custom"}):
+        data = BrowserConfig(headers=dict(headers)).dump()
+        assert data["params"]["headers"]["value"] == headers
+        with pytest.raises(UntrustedConfigError):
+            BrowserConfig.load(data, provenance=UNTRUSTED)
+
+
 def test_trusted_load_is_unchanged(monkeypatch):
     """TRUSTED (SDK) callers keep the old behavior: no raise, and the wrapped
     envelope still unwraps to the same plain dict it did before the fix."""

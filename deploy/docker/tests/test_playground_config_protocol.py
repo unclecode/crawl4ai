@@ -103,21 +103,7 @@ class TestTemplatesSurviveTheUntrustedGate(unittest.TestCase):
         self.assertIs(params.get("stream"), True)
 
     def test_the_validated_params_are_forwarded_not_the_dump_echo(self):
-        """dump() adds server-derived fields the untrusted gate then refuses.
-
-        BrowserConfig picks up generated `headers`, which is not allowlisted, so
-        posting /config/dump's echo to /crawl 400s. The page must forward the
-        params the user typed.
-        """
-        params = json.loads(read_templates()["BrowserConfig"])
-        echo = BrowserConfig.load(
-            {"type": "BrowserConfig", "params": params}, provenance=Provenance.UNTRUSTED
-        ).dump()
-        forbidden = set(echo["params"]) - UNTRUSTED_FIELD_ALLOWLIST["BrowserConfig"]
-        self.assertTrue(
-            forbidden,
-            "if dump() ever became re-submittable this guard can go, but check the page first",
-        )
+        """The page must forward the params the user typed, not /config/dump's echo."""
         page = read_page()
         self.assertIn("return { type: cfgType, params };", page,
                       "validateConfig must forward the typed params, not the echo")

@@ -1274,7 +1274,14 @@ class BrowserConfig:
     # Create a funciton returns dict of the object
     def dump(self) -> dict:
         # Serialize the object to a dictionary
-        return to_serializable_dict(self)
+        data = to_serializable_dict(self)
+        # __init__ re-adds the auto sec-ch-ua on load; drop it, the server rejects `headers`.
+        headers = data["params"].get("headers") if data else None
+        if isinstance(headers, dict) and headers["value"].get("sec-ch-ua") == self.browser_hint:
+            del headers["value"]["sec-ch-ua"]
+            if not headers["value"]:
+                del data["params"]["headers"]
+        return data
 
     @staticmethod
     def load(data: dict, provenance: "Provenance" = None) -> "BrowserConfig":
