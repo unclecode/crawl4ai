@@ -52,13 +52,17 @@ async def test_content_read_propagates_cancellation_and_closes_file(manager):
                 if error.errno != errno.ENXIO:
                     raise
                 await asyncio.sleep(0.01)
-        os.write(writer, b"x")
-        pending = array.array("i", [1])
-        while True:
-            fcntl.ioctl(writer, termios.FIONREAD, pending, True)
-            if not pending[0]:
-                return
-            await asyncio.sleep(0.01)
+        observer = os.open(fifo, os.O_RDONLY | os.O_NONBLOCK)
+        try:
+            os.write(writer, b"x")
+            pending = array.array("i", [1])
+            while True:
+                fcntl.ioctl(observer, termios.FIONREAD, pending, True)
+                if not pending[0]:
+                    return
+                await asyncio.sleep(0.01)
+        finally:
+            os.close(observer)
 
     try:
         await asyncio.wait_for(wait_for_read(), timeout=2)
