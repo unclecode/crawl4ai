@@ -7,6 +7,7 @@ from urllib.parse import urljoin
 from crawl4ai.models import AsyncCrawlResponse, Link, Links, ScrapingResult
 from crawl4ai.content_scraping_strategy import ContentScrapingStrategy
 from crawl4ai.utils import get_base_domain, is_external_url
+from crawl4ai.__version__ import __version__
 from .processor import NaivePDFProcessorStrategy  # Assuming your current PDF code is in pdf_processor.py
 
 # Default resource bounds for remote PDF fetches. These cap what an untrusted
@@ -298,6 +299,9 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
         # redirects (common for gated or CDN-signed PDFs) would never get it
         # back. allow_redirects=True used to carry cookies for us.
         session = requests.Session()
+        session.headers["User-Agent"] = (
+            f"Crawl4AI/{__version__} (+https://github.com/unclecode/crawl4ai)"
+        )
         for _ in range(self.max_redirects + 1):
             if self.url_validator:
                 self.url_validator(current)
