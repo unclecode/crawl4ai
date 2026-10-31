@@ -5,7 +5,7 @@ Two concerns:
      (ported from test_content_filter_prune.py).
   2. The new filter is output-equivalent to the original (bs4) implementation
      across a battery of HTML shapes and configs -- this is the fidelity guard
-     for the lxml rewrite.
+     for the lxml rewrite, except for intentionally preserved code blocks.
 """
 import os
 import sys
@@ -76,7 +76,6 @@ EQUIVALENCE_CASES = {
     "tail_after_nav": '<body><div>before text content <nav>NAVIGATION MENU</nav> after text continues here now</div></body>',
     "tail_after_script": '<body><div>start text <script>var x=1;</script> middle part <style>.a{}</style> end content text</div></body>',
     "comment_interspersed": '<body><div>alpha text <!-- a comment --> beta text <!--another--> gamma delta content</div></body>',
-    "pre_whitespace": '<body><pre>  line one\n      line two\n   line three with content  </pre></body>',
     "table": '<body><table><tr><td>cell one content</td><td>cell two content</td></tr><tr><td>three</td><td>four</td></tr></table></body>',
     "unicode_emoji": '<body><div><p>Héllo wörld 你好 مرحبا 🚀🔥 emoji test paragraph content</p></div></body>',
     "nbsp": '<body><div><p>&nbsp;&nbsp;&nbsp;</p><p>actual real content paragraph text goes here now today</p></div></body>',
@@ -151,6 +150,101 @@ class TestPruningContentFilterLXMLBehavior:
 
 
 # --------------------------------------------------------------------------- #
+# Code preservation deliberately differs from the deprecated bs4 filter.
+# --------------------------------------------------------------------------- #
+class TestPruningCodePreservation:
+    def test_highlighter_whitespace_and_operators_survive(self):
+        prose = "<p>" + "This article explains Python examples in detail. " * 8 + "</p>"
+        html = (
+            "<body>" + prose
+            + '<pre><code><span>import</span><span class="w"> </span>'
+            '<span>torch</span><span class="w">\n    </span>'
+            '<span>x</span><span class="w"> </span><span>=</span>'
+            '<span class="w"> </span><span>a</span><span class="w"> </span>'
+            '<span>&amp;</span><span class="w"> </span><span>b</span>'
+            "</code></pre>" + prose + "</body>"
+        )
+        blocks = PruningContentFilterLXML().filter_content(html)
+        result = BeautifulSoup("".join(blocks), "lxml")
+        assert result.pre.code.get_text() == "import torch\n    x = a & b"
+
+    @pytest.mark.parametrize("config", CONFIGS)
+    def test_pre_whitespace_is_preserved(self, config):
+        text = "  line one\n      line two\n   line three with content  "
+        blocks = PruningContentFilterLXML(**config).filter_content(
+            f"<body><pre>{text}</pre></body>"
+        )
+        assert len(blocks) == 1
+        assert BeautifulSoup(blocks[0], "lxml").pre.get_text() == text
+
+    @pytest.mark.parametrize("threshold_type", ["fixed", "dynamic"])
+    def test_highlighted_code_survives_low_scoring_wrappers(self, threshold_type):
+        html = (
+            '<body><section class="sidebar"><div><pre><code>'
+            '<span class="keyword">def</span> answer():\n    return 42\n'
+            '</code></pre><a href="#">Copy</a></div></section>'
+            "<p>Unrelated sibling</p></body>"
+        )
+        blocks = PruningContentFilterLXML(
+            threshold_type=threshold_type, threshold=1.0, min_word_threshold=100
+        ).filter_content(html)
+        assert len(blocks) == 1
+        result = BeautifulSoup(blocks[0], "lxml")
+        assert (
+            result.section.div.pre.code.get_text() == "def answer():\n    return 42\n"
+        )
+        assert result.pre.code.span.get_text() == "def"
+        assert result.find("a") is None
+        assert "Unrelated sibling" not in result.get_text()
+
+    def test_inline_code_keeps_highlighting_in_surviving_content(self):
+        html = (
+            "<body><p>This paragraph contains enough words to survive pruning "
+            "and explains the following short inline example: "
+            '<code><span class="name">x</span> = 1</code>.</p></body>'
+        )
+        blocks = PruningContentFilterLXML(min_word_threshold=10).filter_content(html)
+        result = BeautifulSoup("".join(blocks), "lxml")
+        assert result.code.get_text() == "x = 1"
+        assert result.code.span.get_text() == "x"
+
+    def test_inline_code_does_not_rescue_toc(self):
+        html = (
+            "<body><article><p>This substantial paragraph contains enough words "
+            "to pass the word threshold and should remain in the final output.</p>"
+            '<div class="toc"><a href="#one"><code>one()</code></a>'
+            '<a href="#two"><code>two()</code></a></div></article></body>'
+        )
+        blocks = PruningContentFilterLXML(min_word_threshold=10).filter_content(html)
+        result = BeautifulSoup("".join(blocks), "lxml")
+        assert "substantial paragraph" in result.get_text()
+        assert result.find(class_="toc") is None
+        assert result.find("code") is None
+
+    @pytest.mark.parametrize("excluded_tag", ["nav", "section", "pre"])
+    def test_excluded_code_does_not_protect_ancestors(self, excluded_tag):
+        f = PruningContentFilterLXML(threshold=1.0, min_word_threshold=100)
+        f.excluded_tags = {excluded_tag}
+        html = "<body><div><section><nav><pre>hidden code</pre></nav></section>discard</div></body>"
+        assert f.filter_content(html) == []
+
+    def test_exclusions_still_apply_inside_protected_code(self):
+        f = PruningContentFilterLXML(threshold=1.0, min_word_threshold=100)
+        f.excluded_tags.add("span")
+        html = (
+            "<body><pre><code>kept\n<span>excluded span</span>"
+            "<script>excluded script</script><!-- excluded comment -->"
+            "    tail\n</code></pre></body>"
+        )
+        blocks = f.filter_content(html)
+        assert len(blocks) == 1
+        result = BeautifulSoup(blocks[0], "lxml")
+        assert result.pre.code.get_text() == "kept\n    tail\n"
+        assert result.find(["span", "script"]) is None
+        assert "excluded" not in blocks[0]
+
+
+# --------------------------------------------------------------------------- #
 # Fidelity: new output must match the original bs4 implementation
 # --------------------------------------------------------------------------- #
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")  # deliberately exercises the deprecated bs4 filter
@@ -166,18 +260,51 @@ class TestPruningEquivalence:
         )
 
     def test_fixture_files_match_original(self):
-        """If saved server fixtures exist, diff old vs new on them too (large)."""
+        """Compare saved non-code fixtures; code preservation differs by design."""
         fixtures = os.environ.get("PRUNE_FIXTURES_DIR")
         if not fixtures or not os.path.isdir(fixtures):
             pytest.skip("no PRUNE_FIXTURES_DIR set")
+        checked_files = 0
         for fn in sorted(os.listdir(fixtures)):
             if not fn.endswith(".html"):
                 continue
             html = open(os.path.join(fixtures, fn)).read()
+            if BeautifulSoup(html, "lxml").find(["pre", "code"]) is not None:
+                continue
+            checked_files += 1
             for config in CONFIGS:
                 old = PruningContentFilter(**config).filter_content(html)
                 new = PruningContentFilterLXML(**config).filter_content(html)
                 assert _norm_block_texts(old) == _norm_block_texts(new), f"{fn} {config}"
+        if not checked_files:
+            pytest.skip("no HTML fixtures without pre/code found")
+
+    @pytest.mark.parametrize("include_non_code", [False, True])
+    def test_fixture_directory_ignores_code_html(
+        self, tmp_path, monkeypatch, include_non_code
+    ):
+        (tmp_path / "block.html").write_text("<body><pre>code</pre></body>")
+        (tmp_path / "inline.html").write_text("<body><p><code>x</code></p></body>")
+        non_code = "<body><p>Substantial paragraph without any code in its HTML.</p></body>"
+        if include_non_code:
+            (tmp_path / "content.html").write_text(non_code)
+        monkeypatch.setenv("PRUNE_FIXTURES_DIR", str(tmp_path))
+        checked = []
+        original_filter = PruningContentFilter.filter_content
+
+        def record_filter(instance, html):
+            checked.append(html)
+            return original_filter(instance, html)
+
+        monkeypatch.setattr(PruningContentFilter, "filter_content", record_filter)
+        if include_non_code:
+            self.test_fixture_files_match_original()
+        else:
+            with pytest.raises(
+                pytest.skip.Exception, match="no HTML fixtures without pre/code found"
+            ):
+                self.test_fixture_files_match_original()
+        assert checked == ([non_code] * len(CONFIGS) if include_non_code else [])
 
 
 # --------------------------------------------------------------------------- #
