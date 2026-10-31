@@ -33,19 +33,49 @@ async def test_content_read_and_cache_misses(manager):
 @pytest.mark.asyncio
 @pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="Requires POSIX named pipes")
 async def test_content_read_propagates_cancellation_and_closes_file(manager):
+    import array
+    import fcntl
+    import termios
+
     fifo = os.path.join(manager.content_paths["html"], "pending")
     os.mkfifo(fifo)
-    writer = os.open(fifo, os.O_RDWR | os.O_NONBLOCK)
+    writer = None
     task = asyncio.create_task(manager._load_content("pending", "html"))
+    cancel_requested = False
+
+    async def wait_for_read():
+        nonlocal writer
+        while writer is None:
+            try:
+                writer = os.open(fifo, os.O_WRONLY | os.O_NONBLOCK)
+            except OSError as error:
+                if error.errno != errno.ENXIO:
+                    raise
+                await asyncio.sleep(0.01)
+        os.write(writer, b"x")
+        pending = array.array("i", [1])
+        while True:
+            fcntl.ioctl(writer, termios.FIONREAD, pending, True)
+            if not pending[0]:
+                return
+            await asyncio.sleep(0.01)
+
     try:
-        await asyncio.sleep(0.05)
+        await asyncio.wait_for(wait_for_read(), timeout=2)
         assert not task.done()
         task.cancel()
+        cancel_requested = True
+        await asyncio.sleep(0)
     finally:
+        if not task.done() and not cancel_requested:
+            task.cancel()
+        if writer is None:
+            writer = os.open(fifo, os.O_RDWR | os.O_NONBLOCK)
         os.close(writer)
+        await asyncio.wait_for(asyncio.gather(task, return_exceptions=True), timeout=2)
 
     with pytest.raises(asyncio.CancelledError):
-        await asyncio.wait_for(task, timeout=1)
+        await task
 
     assert task.cancelled()
     with pytest.raises(OSError) as error:
