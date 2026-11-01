@@ -100,6 +100,54 @@ This page provides a comprehensive list of example scripts that demonstrate vari
 | Chainlit Integration | Shows how to integrate Crawl4AI with Chainlit. | [View Guide](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/chainlit.md) |
 | Crawl4AI vs FireCrawl | Compares Crawl4AI with the FireCrawl library. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/crawlai_vs_firecrawl.py) |
 
+## Community Integrations
+
+Crawl4AI works well with AG2 (formerly AutoGen) for agentic browsing. The example below uses `Crawl4AITool` with a Pydantic schema to return structured data.
+
+```python
+# Install: `pip install "ag2[openai,crawl4ai]"`
+
+import os
+from autogen import AssistantAgent, UserProxyAgent, LLMConfig
+from autogen.tools.experimental import Crawl4AITool
+from pydantic import BaseModel, Field
+
+
+class NewsArticle(BaseModel):
+    title: str = Field(description="The headline of the article")
+    summary: str = Field(description="A brief summary of the content")
+
+
+llm_config = LLMConfig({
+        "api_type": "openai",
+        "model": "gpt-4o",
+        "api_key": os.environ["OPENAI_API_KEY"],
+    }
+)
+
+researcher = AssistantAgent(
+    name="WebResearcher",
+    system_message="You are a precise web researcher. Use the crawl tool to get data.",
+    llm_config=llm_config,
+)
+
+user_proxy = UserProxyAgent(
+    name="Admin",
+    human_input_mode="NEVER",
+    max_consecutive_auto_reply=2,
+)
+
+crawl_tool = Crawl4AITool(llm_config=llm_config, extraction_model=NewsArticle)
+crawl_tool.register_for_execution(user_proxy)
+crawl_tool.register_for_llm(researcher)
+
+user_proxy.run(
+    recipient=researcher,
+    message="Extract the top 3 headlines and summaries from https://techcrunch.com using the news schema.",
+    max_turns=2,
+).process()
+```
+
 ## Content Generation & Markdown
 
 | Example | Description | Link |
