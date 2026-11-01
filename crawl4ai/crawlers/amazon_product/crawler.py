@@ -1,4 +1,5 @@
 from crawl4ai.hub import BaseCrawler
+import json
 
 __meta__ = {
     "version": "1.2.0",
