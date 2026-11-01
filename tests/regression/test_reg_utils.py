@@ -10,6 +10,7 @@ import pytest
 from crawl4ai.utils import (
     extract_xml_data,
     extract_xml_data_legacy,
+    get_content_of_website_optimized,
     normalize_url,
     normalize_url_for_deep_crawl,
     efficient_normalize_url_for_deep_crawl,
@@ -111,6 +112,22 @@ class TestExtractXmlDataLegacy:
         """Legacy function should return empty string for missing tags."""
         result = extract_xml_data_legacy(["missing"], "no tags here")
         assert result["missing"] == ""
+
+
+class TestContentExtraction:
+    """Verify utility HTML cleanup preserves neighboring text."""
+
+    def test_only_text_sup_preserves_following_text(self):
+        """Fix for sup cleanup removing text after the closing tag."""
+        result = get_content_of_website_optimized(
+            "https://example.com",
+            "<html><body><p>Alpha<sup>1</sup>Beta</p></body></html>",
+            only_text=True,
+        )
+
+        assert result is not None
+        assert "Alpha1Beta" in result["cleaned_html"]
+        assert "Beta" in result["markdown"]
 
 
 # ===================================================================
