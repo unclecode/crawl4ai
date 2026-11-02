@@ -607,10 +607,8 @@
             }
 
             setCfgStatus('✓ validated', 'text-green-400');
-            // Send back what the user typed, not /config/dump's echo. dump()
-            // fills in server-derived fields -- BrowserConfig gains generated
-            // `headers` -- that the untrusted gate then refuses on /crawl, so
-            // the echo is a validation result, not a re-submittable payload.
+            // Send back what the user typed, not /config/dump's echo: the echo
+            // is a validation result, not the payload.
             return { type: cfgType, params };
         }
 
