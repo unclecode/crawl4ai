@@ -1028,7 +1028,7 @@ You've built a complete AI research assistant that:
 
 - 🐙 **GitHub**: [github.com/unclecode/crawl4ai](https://github.com/unclecode/crawl4ai)
 - 📚 **Documentation**: [crawl4ai.com/docs](https://crawl4ai.com/docs)
-- 💬 **Discord**: [Join our community](https://discord.gg/crawl4ai)
+- 💬 **Discord**: [Join our community](https://discord.gg/jP8KfhDhyN)
 
 Thank you for learning with Crawl4AI! 🙏
 

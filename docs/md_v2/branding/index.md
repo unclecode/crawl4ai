@@ -1311,7 +1311,7 @@ If you're unsure about which style to use or need help implementing these guidel
 
 - Check existing examples in the relevant section
 - Review the "When to Use Each Style" guidelines above
-- Ask in our [Discord community](https://discord.gg/crawl4ai)
+- Ask in our [Discord community](https://discord.gg/jP8KfhDhyN)
 - Open an issue on [GitHub](https://github.com/unclecode/crawl4ai)
 
 ---

@@ -294,7 +294,7 @@ Want to know when new apps are released?
 
 - ⭐ [Star us on GitHub](https://github.com/unclecode/crawl4ai) to get notifications
 - 🐦 Follow [@unclecode](https://twitter.com/unclecode) for announcements
-- 💬 Join our [Discord community](https://discord.gg/crawl4ai) for early access
+- 💬 Join our [Discord community](https://discord.gg/jP8KfhDhyN) for early access
 
 ---
 

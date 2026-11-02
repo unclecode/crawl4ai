@@ -31,7 +31,7 @@ Please search existing issues first, and include a minimal reproducible example 
 
 ## Community
 
-- **Discord** — chat with other users and the team: [discord.gg/crawl4ai](https://discord.gg/crawl4ai)
+- **Discord** — chat with other users and the team: [discord.gg/jP8KfhDhyN](https://discord.gg/jP8KfhDhyN)
 - **Twitter / X** — release news and tips: [@unclecode](https://twitter.com/unclecode)
 
 ## Status
