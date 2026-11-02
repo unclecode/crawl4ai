@@ -181,13 +181,19 @@ class PruningContentFilterLXML(PruningContentFilter):
         if body_metrics is None:
             return []
 
-        # The original scores the body itself first; if it fails, the whole
-        # body is decomposed and nothing is returned.
-        if self._should_remove(body, body_metrics, metrics):
+        # Keep pre wrappers without rescuing their unrelated siblings.
+        protected_ancestors = set()
+        for block in body.iter("pre"):
+            for ancestor in block.iterancestors():
+                if ancestor in protected_ancestors:
+                    break
+                protected_ancestors.add(ancestor)
+
+        if body not in protected_ancestors and self._should_remove(body, body_metrics, metrics):
             return []
 
         # Top-down pass: a node survives only if it and every ancestor up to
-        # body pass the threshold. Iterative (explicit stack) to avoid Python
+        # body pass the threshold or protect pre. Iterative stack avoids Python
         # recursion limits on deeply nested documents.
         stack = [body]
         while stack:
@@ -195,8 +201,12 @@ class PruningContentFilterLXML(PruningContentFilter):
             for child in list(node):
                 if not isinstance(child.tag, str):
                     continue
+                if child.tag in ("pre", "code"):
+                    continue
                 child_metrics = metrics.get(child)
-                if child_metrics is None or self._should_remove(child, child_metrics, metrics):
+                if child not in protected_ancestors and (
+                    child_metrics is None or self._should_remove(child, child_metrics, metrics)
+                ):
                     child.drop_tree()  # removes subtree, preserves following text
                 else:
                     stack.append(child)
