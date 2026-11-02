@@ -82,12 +82,15 @@ If errors occur, rerun `crawl4ai-doctor` or manually ensure Playwright is instal
 ```bash
 crawl4ai-download-models
 ```
-## 5. Docker (Experimental)
+## 5. Docker
+The Docker server needs a token. Without one it answers only inside its container.
 ```bash
-docker pull unclecode/crawl4ai:basic
-docker run -p 11235:11235 unclecode/crawl4ai:basic
+export CRAWL4AI_API_TOKEN="$(openssl rand -hex 32)"
+docker run -d -p 11235:11235 --name crawl4ai --shm-size=1g \
+  -e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN" \
+  unclecode/crawl4ai:latest
 ```
-You can then make POST requests to `http://localhost:11235/crawl` to perform crawls. **Production usage** is discouraged until our new Docker approach is ready (planned in Jan or Feb 2025).
+Send the token with every request (`Authorization: Bearer $CRAWL4AI_API_TOKEN`). For LLM keys, MCP and all settings, see the [Self-hosting guide](core/self-hosting.md).
 ## 6. Local Server Mode (Legacy)
 ## Summary
 1. **Install** with `pip install crawl4ai` and run `crawl4ai-setup`.

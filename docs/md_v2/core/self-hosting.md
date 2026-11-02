@@ -421,7 +421,8 @@ You can add Crawl4AI as an MCP tool provider in Claude Code with a simple comman
 
 ```bash
 # Add the Crawl4AI server as an MCP provider
-claude mcp add --transport sse c4ai-sse http://localhost:11235/mcp/sse
+claude mcp add --transport sse c4ai-sse http://localhost:11235/mcp/sse \
+  --header "Authorization: Bearer $CRAWL4AI_API_TOKEN"
 
 # List all MCP providers to verify it was added
 claude mcp list
@@ -2198,7 +2199,7 @@ We're here to help you succeed with Crawl4AI! Here's how to get support:
 
 - 📖 Check our [full documentation](https://docs.crawl4ai.com)
 - 🐛 Found a bug? [Open an issue](https://github.com/unclecode/crawl4ai/issues)
-- 💬 Join our [Discord community](https://discord.gg/crawl4ai)
+- 💬 Join our [Discord community](https://discord.gg/jP8KfhDhyN)
 - ⭐ Star us on GitHub to show support!
 
 ## Summary
