@@ -42,6 +42,63 @@ curl -s https://api.crawl4ai.com/scrape \
   -d '{"url": "https://news.ycombinator.com"}' | jq -r .markdown
 ```
 
+<details>
+<summary>Python 3</summary>
+
+```python
+import json
+import os
+from urllib.request import Request, urlopen
+
+request = Request(
+    "https://api.crawl4ai.com/scrape",
+    data=json.dumps({"url": "https://news.ycombinator.com"}).encode("utf-8"),
+    headers={
+        "Authorization": f"Bearer {os.environ['CRAWL4AI_KEY']}",
+        "Content-Type": "application/json",
+    },
+    method="POST",
+)
+
+with urlopen(request) as response:
+    print(json.load(response)["markdown"])
+```
+
+</details>
+
+<details>
+<summary>Node.js (18+)</summary>
+
+```javascript
+async function main() {
+  const key = process.env.CRAWL4AI_KEY;
+  if (!key) throw new Error("Set CRAWL4AI_KEY first.");
+
+  const response = await fetch("https://api.crawl4ai.com/scrape", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ url: "https://news.ycombinator.com" }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Scrape failed (HTTP ${response.status}): ${await response.text()}`);
+  }
+
+  const { markdown } = await response.json();
+  console.log(markdown);
+}
+
+main().catch((error) => {
+  console.error(error.message);
+  process.exitCode = 1;
+});
+```
+
+</details>
+
 Example Markdown output (illustrative excerpt):
 
 ```markdown
