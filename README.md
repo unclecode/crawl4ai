@@ -6,6 +6,8 @@
 
 **[Get a free API key](https://crawl4ai.com/?ref=readme)** · 1,000 free credits every month. No credit card required.
 
+[Try a URL in the playground](https://crawl4ai.com/?ref=readme-playground#playground) · [Set up Crawl4AI Cloud in Claude Code, Cursor, or Codex](https://crawl4ai.com/llms.txt)
+
 This repository is home to the Apache-2.0 crawler that powers Crawl4AI Cloud. [Run it yourself](#run-crawl4ai-yourself) with Python or Docker.
 
 <a href="https://crawl4ai.com/?ref=readme-banner">
@@ -38,6 +40,15 @@ curl -s https://api.crawl4ai.com/scrape \
   -H "Authorization: Bearer $CRAWL4AI_KEY" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://news.ycombinator.com"}' | jq -r .markdown
+```
+
+Example Markdown output (illustrative excerpt):
+
+```markdown
+# Hacker News
+
+1. [Example story title](https://example.com/story)
+2. [Another story title](https://example.com/another-story)
 ```
 
 The same key works for `/extract`, `/search`, `/serp`, `/answer` and many URLs at once (`/scrape/batch`, `/scrape/jobs`). Pay as you go: [live prices](https://crawl4ai.com/docs?ref=readme#pricing).
