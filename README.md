@@ -1,31 +1,38 @@
-# 🚀🤖 Crawl4AI: the open-source web crawler for LLMs and AI agents
+# Crawl4AI
 
-<div align="center">
+**Crawl4AI Cloud is a hosted web scraping, extraction, and search API for AI agents and data pipelines.** Turn pages into clean Markdown for RAG, extract structured JSON, or search the live web with one API key. Crawl4AI runs the browsers and manages the proxies.
 
-<a href="https://trendshift.io/repositories/11716" target="_blank"><img src="https://trendshift.io/api/badge/repositories/11716" alt="unclecode%2Fcrawl4ai | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+**[Get a free API key](https://crawl4ai.com/?ref=readme)** · 1,000 free credits every month. No credit card required.
 
-[![GitHub Stars](https://img.shields.io/github/stars/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/stargazers)
-[![PyPI version](https://badge.fury.io/py/crawl4ai.svg)](https://badge.fury.io/py/crawl4ai)
-[![Downloads](https://static.pepy.tech/badge/crawl4ai/month)](https://pepy.tech/project/crawl4ai)
-[![Discord](https://img.shields.io/badge/Discord-join%20us-5865F2?logo=discord&logoColor=white)](https://discord.gg/jP8KfhDhyN)
-[![Crawl4AI Cloud](https://img.shields.io/badge/Crawl4AI_Cloud-try_it_free-f5a300?style=flat&labelColor=0d0d10)](https://crawl4ai.com/?ref=readme-badge)
+This repository is home to the Apache-2.0 crawler that powers Crawl4AI Cloud. [Run it yourself](#run-crawl4ai-yourself) with Python or Docker.
+
+## Cloud quickstart
+
+Hosted API base URL: `https://api.crawl4ai.com`.
+
+[Cloud API reference](https://api.crawl4ai.com/docs) · [Agent setup and MCP](https://crawl4ai.com/llms.txt)
+
+Set `CRAWL4AI_KEY` to your API key, then scrape a page as Markdown:
+
+```bash
+curl -s https://api.crawl4ai.com/scrape \
+  -H "Authorization: Bearer $CRAWL4AI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://news.ycombinator.com"}' | jq -r .markdown
+```
+
+The same key works for `/extract`, `/search`, `/serp`, `/answer` and many URLs at once (`/scrape/batch`, `/scrape/jobs`). Pay as you go: [live prices](https://crawl4ai.com/docs?ref=readme#pricing).
+For Claude Code, connect to the hosted MCP server:
+
+```bash
+claude mcp add --transport http crawl4ai https://api.crawl4ai.com/mcp \
+  --header "Authorization: Bearer $CRAWL4AI_KEY"
+```
+
+## Run Crawl4AI yourself
 
 **Latest: [v0.9.5](https://github.com/unclecode/crawl4ai/releases/tag/v0.9.5) (14 Oct 2026)** · [all releases →](https://github.com/unclecode/crawl4ai/releases)
 
-<a href="https://crawl4ai.com/?ref=readme-banner">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/cloud-launch-banner-dark.svg">
-    <img alt="Crawl4AI Cloud is live. 1,000 free credits every month, no card. Get your key." src="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/cloud-launch-banner-light.svg" width="960">
-  </picture>
-</a>
-
-</div>
-
-Crawl4AI turns any website into clean, LLM-ready Markdown for RAG, AI agents and data pipelines. Run the open-source web crawler and scraper yourself, free forever, or use it hosted with one key: `/scrape` a page to Markdown, `/extract` it to JSON, `/search` the web, `/serp` for Google's results page as data, `/answer` a question with sources; MCP for your agent. Free: 1,000 credits every month, 10 a minute, 2 at a time. Paid: 120 a minute, 10 at a time, from $10 a month.
-
-## Two ways to use Crawl4AI
-
-### 🐍 Run it yourself: open source, forever
 
 ```bash
 pip install -U crawl4ai
@@ -44,37 +51,35 @@ async def main():
 asyncio.run(main())
 ```
 
-Docker server, CLI and every option: [Installation](#installation) · [docs.crawl4ai.com](https://docs.crawl4ai.com)
-
-### ☁️ Or use the cloud: no browsers, no proxies
-
-1. [![Get a key in 10 seconds](https://img.shields.io/badge/Get_a_key_in_10_seconds-20_free_credits%2C_no_signup-f5a300?style=for-the-badge&labelColor=0d0d10)](https://crawl4ai.com/?ref=readme)  
-   Verify your email and 1,000 free credits are yours every month. No card.
-2. Get any page as Markdown:
-
-   ```bash
-   curl -s https://api.crawl4ai.com/scrape \
-     -H "Authorization: Bearer $CRAWL4AI_KEY" \
-     -H "Content-Type: application/json" \
-     -d '{"url": "https://news.ycombinator.com"}' | jq -r .markdown
-   ```
-
-   The same key works for `/extract`, `/search`, `/serp`, `/answer` and many URLs at once (`/scrape/batch`, `/scrape/jobs`). Pay as you go: [live prices](https://crawl4ai.com/docs?ref=readme#pricing).
-3. Give it to your AI agent. Claude Code shown; [Codex, Cursor and OpenCode →](https://crawl4ai.com/docs?ref=readme#mcp)
-
-   ```bash
-   claude mcp add --transport http crawl4ai https://api.crawl4ai.com/mcp \
-     --header "Authorization: Bearer $CRAWL4AI_KEY"
-   ```
+Docker server, CLI and every option: [Installation](#installation) · [Self-hosted docs](https://docs.crawl4ai.com)
 
 ### Which one?
 
-| | 🐍 Library | 🐳 Your own server | ☁️ Crawl4AI Cloud |
+| | ☁️ Crawl4AI Cloud | 🐍 Library | 🐳 Your own server |
 |---|---|---|---|
-| **Runs the browsers** | you, in your Python process | you, in Docker on your machine | we do |
-| **JS-heavy pages and bot walls** | your settings, your proxies | your settings, your proxies | handled for you, automatically |
-| **Web search** | – | – | `/search`, `/serp` and `/answer` |
-| **Price** | free, forever | free (your hosting) | 1,000 free credits a month; plans from $10 |
+| **Runs the browsers** | we do | you, in your Python process | you, in Docker on your machine |
+| **JS-heavy pages and bot walls** | handled for you, automatically | your settings, your proxies | your settings, your proxies |
+| **Web search** | `/search`, `/serp` and `/answer` | – | – |
+| **Price** | 1,000 free credits a month; plans from $10 | free, forever | free (your hosting) |
+
+<div align="center">
+
+<a href="https://trendshift.io/repositories/11716" target="_blank"><img src="https://trendshift.io/api/badge/repositories/11716" alt="unclecode%2Fcrawl4ai | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+
+[![GitHub Stars](https://img.shields.io/github/stars/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/stargazers)
+[![PyPI version](https://badge.fury.io/py/crawl4ai.svg)](https://badge.fury.io/py/crawl4ai)
+[![Downloads](https://static.pepy.tech/badge/crawl4ai/month)](https://pepy.tech/project/crawl4ai)
+[![Discord](https://img.shields.io/badge/Discord-join%20us-5865F2?logo=discord&logoColor=white)](https://discord.gg/jP8KfhDhyN)
+[![Crawl4AI Cloud](https://img.shields.io/badge/Crawl4AI_Cloud-try_it_free-f5a300?style=flat&labelColor=0d0d10)](https://crawl4ai.com/?ref=readme-badge)
+
+<a href="https://crawl4ai.com/?ref=readme-banner">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/cloud-launch-banner-dark.svg">
+    <img alt="Crawl4AI Cloud is live. 1,000 free credits every month, no card. Get your key." src="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/cloud-launch-banner-light.svg" width="960">
+  </picture>
+</a>
+
+</div>
 
 <details>
   <summary>🤓 <strong>My Personal Story</strong></summary>
