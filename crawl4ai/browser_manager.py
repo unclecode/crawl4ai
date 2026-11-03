@@ -1132,9 +1132,6 @@ class BrowserManager:
     def _build_browser_args(self) -> dict:
         """Build browser launch arguments from config."""
         args = [
-            "--disable-gpu",
-            "--disable-gpu-compositing",
-            "--disable-software-rasterizer",
             "--no-sandbox",
             "--disable-dev-shm-usage",
             "--no-first-run",
@@ -1157,6 +1154,16 @@ class BrowserManager:
             # "--single-process",
             f"--window-size={self.config.viewport_width},{self.config.viewport_height}",
         ]
+
+        # GPU flags disable WebGL which anti-bot sensors detect as headless.
+        # Keep WebGL working (via SwiftShader) when stealth mode is active,
+        # matching build_browser_flags().
+        if not self.config.enable_stealth:
+            args.extend([
+                "--disable-gpu",
+                "--disable-gpu-compositing",
+                "--disable-software-rasterizer",
+            ])
 
         if self.config.memory_saving_mode:
             args.extend([
