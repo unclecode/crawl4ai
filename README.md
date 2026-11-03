@@ -146,14 +146,14 @@ Docker server, CLI and every option: [Installation](#installation) · [Self-host
 | **Runs the browsers** | we do | you, in your Python process | you, in Docker on your machine |
 | **JS-heavy pages and bot walls** | handled for you, automatically | your settings, your proxies | your settings, your proxies |
 | **Web search** | `/search`, `/serp` and `/answer` | – | – |
-| **Price** | 1,000 free credits a month; plans from $10 | free, forever | free (your hosting) |
+| **Price** | 1,000 free credits a month; plans from $10 | Free, Apache-2.0. You cover infrastructure. | Free, Apache-2.0. You cover hosting. |
 
 <details>
   <summary>🤓 <strong>My Personal Story</strong></summary>
 
 I grew up on an Amstrad, thanks to my dad, and never stopped building. In grad school I specialized in NLP and built crawlers for research. That’s where I learned how much extraction matters.
 
-In 2023, I needed web-to-Markdown. The “open source” option wanted an account, API token, and $16, and still under-delivered. I went turbo anger mode, built Crawl4AI in days, and it went viral. Now it’s the most-starred crawler on GitHub.
+In 2023, I needed web-to-Markdown. The “open source” option wanted an account, API token, and $16, and still under-delivered. I went turbo anger mode, built Crawl4AI in days, and it went viral.
 
 I made it open source for **availability**, anyone can use it without a gate. Now I’m building the platform for **affordability**, anyone can run serious crawls without breaking the bank. If that resonates, join in, send feedback, or just crawl something amazing.
 
@@ -167,7 +167,7 @@ That platform is live now: [Crawl4AI Cloud](https://crawl4ai.com/?ref=readme).
 - **Fast in practice**: async browser pool, caching, minimal hops
 - **Full control**: sessions, proxies, cookies, user scripts, hooks
 - **Adaptive intelligence**: learns site patterns, explores only what matters
-- **Deploy anywhere**: no keys needed, CLI and Docker, or the hosted cloud
+- **Deploy anywhere**: run locally with Python or the CLI, secure your Docker server with a self-managed token, or use a Crawl4AI Cloud API key.
 </details>
 
 ## ✨ Features
@@ -540,7 +540,7 @@ These companies provide core infrastructure and technology that power Crawl4AI�
 
 | Company | About |
 |------|------|
-| <a href="https://www.joinmassive.com/" target="_blank"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/sponsors/massive_light.svg"><source media="(prefers-color-scheme: light)" srcset="docs/assets/sponsors/massive.svg"><img alt="Massive" src="docs/assets/sponsors/massive.svg" height="40"/></picture></a> | Massive is a web access API backed by millions of volunteer devices in 195+ countries. AI agents, models, and data pipelines use it to reach any site on the internet, reliably, in real time, and at scale. |
+| <a href="https://www.joinmassive.com/" target="_blank"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/sponsors/massive_light.svg"><source media="(prefers-color-scheme: light)" srcset="docs/assets/sponsors/massive.svg"><img alt="Massive" src="docs/assets/sponsors/massive.svg" height="40"/></picture></a> | Massive provides a web access API for AI agents and data pipelines. [Partnership details](https://www.joinmassive.com/blog/crawl4ai-partner-spotlight). |
 
 ### 🏢 Enterprise Sponsors
 
@@ -586,7 +586,7 @@ A heartfelt thanks to our individual supporters! Every contribution helps us kee
 [Discord](https://discord.gg/jP8KfhDhyN) · [X @unclecode](https://x.com/unclecode) · [GitHub @unclecode](https://github.com/unclecode) · hello@crawl4ai.com
 
 - **Building crawlers or AI agents for a living?** DM me on X. I want to work with people like you, and we are hiring.
-- **From a company?** We have an enterprise offer and we tailor it to your business. SOC 2 Type I is done, Type II is in progress. Write to hello@crawl4ai.com.
+- **From a company?** We have an enterprise offer and we tailor it to your business. See our [security and compliance page](https://gate.crawl4ai.com/security/) for current details. Write to hello@crawl4ai.com.
 
 <p align="center">
   <a href="https://github.com/unclecode/crawl4ai/network/members"><img src="https://img.shields.io/github/forks/unclecode/crawl4ai?style=social" alt="GitHub Forks"/></a>
