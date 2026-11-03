@@ -6,6 +6,13 @@
 
 This repository is home to the Apache-2.0 crawler that powers Crawl4AI Cloud. [Run it yourself](#run-crawl4ai-yourself) with Python or Docker.
 
+<a href="https://crawl4ai.com/?ref=readme-banner">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/cloud-launch-banner-dark.svg">
+    <img alt="Crawl4AI Cloud is live. 1,000 free credits every month, no card. Get your key." src="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/cloud-launch-banner-light.svg" width="960">
+  </picture>
+</a>
+
 ## Cloud quickstart
 
 Hosted API base URL: `https://api.crawl4ai.com`.
@@ -71,13 +78,6 @@ Docker server, CLI and every option: [Installation](#installation) · [Self-host
 [![Downloads](https://static.pepy.tech/badge/crawl4ai/month)](https://pepy.tech/project/crawl4ai)
 [![Discord](https://img.shields.io/badge/Discord-join%20us-5865F2?logo=discord&logoColor=white)](https://discord.gg/jP8KfhDhyN)
 [![Crawl4AI Cloud](https://img.shields.io/badge/Crawl4AI_Cloud-try_it_free-f5a300?style=flat&labelColor=0d0d10)](https://crawl4ai.com/?ref=readme-badge)
-
-<a href="https://crawl4ai.com/?ref=readme-banner">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/cloud-launch-banner-dark.svg">
-    <img alt="Crawl4AI Cloud is live. 1,000 free credits every month, no card. Get your key." src="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/cloud-launch-banner-light.svg" width="960">
-  </picture>
-</a>
 
 </div>
 
