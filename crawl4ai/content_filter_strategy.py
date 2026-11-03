@@ -651,6 +651,40 @@ class PruningContentFilter(RelevantContentFilter):
             "h6": 0.7,
         }
 
+        # Phrasing tags that sit inside a kept node's own text are part of a
+        # sentence, so they are kept whole instead of being scored alone.
+        self.inline_tags = frozenset(
+            {
+                "a",
+                "abbr",
+                "b",
+                "bdi",
+                "bdo",
+                "cite",
+                "code",
+                "data",
+                "del",
+                "dfn",
+                "em",
+                "i",
+                "ins",
+                "kbd",
+                "mark",
+                "q",
+                "ruby",
+                "s",
+                "samp",
+                "small",
+                "span",
+                "strong",
+                "sub",
+                "sup",
+                "time",
+                "u",
+                "var",
+            }
+        )
+
     def filter_content(self, html: str, min_word_threshold: int = None) -> List[str]:
         """
         Implements content filtering using pruning algorithm with dynamic threshold.
@@ -764,8 +798,13 @@ class PruningContentFilter(RelevantContentFilter):
         if should_remove:
             node.decompose()
         else:
+            in_sentence = any(
+                isinstance(c, NavigableString) and c.strip() for c in node.children
+            )
             children = [child for child in node.children if hasattr(child, "name")]
             for child in children:
+                if in_sentence and child.name in self.inline_tags:
+                    continue
                 self._prune_tree(child)
 
     def _compute_composite_score(self, metrics, text_len, tag_len, link_text_len):
