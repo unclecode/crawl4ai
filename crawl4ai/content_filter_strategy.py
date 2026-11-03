@@ -678,7 +678,6 @@ class PruningContentFilter(RelevantContentFilter):
                 "span",
                 "strong",
                 "sub",
-                "sup",
                 "time",
                 "u",
                 "var",

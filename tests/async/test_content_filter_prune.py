@@ -98,16 +98,17 @@ class TestPruningContentFilter:
         ids=["bs4", "lxml"],
     )
     @pytest.mark.filterwarnings("ignore::DeprecationWarning")
-    def test_pruning_still_scores_inline_tags_outside_sentences(self, filter_class):
+    def test_pruning_still_drops_promo_links_and_citation_markers(self, filter_class):
         html = """<html><body><div>
-        <p>The council approved the new budget on Tuesday after a long debate about road
-        repairs, school funding and the library expansion plan for next year.</p>
+        <p>The council approved the new budget on Tuesday.<sup class="reference"><a href="#cite-1">[1]</a></sup>
+        The debate was about road repairs, school funding and the library expansion plan for next year.</p>
         <span class="ad"><span>Advertisement</span></span><span class="promo"><a href="/subscribe">Subscribe now</a></span>
         </div></body></html>"""
         actual = " ".join(filter_class().filter_content(html))
 
         assert "library expansion plan" in actual
         assert "Subscribe now" not in actual
+        assert "[1]" not in actual
 
     def test_basic_pruning(self, basic_html):
         """Test basic content pruning functionality"""
