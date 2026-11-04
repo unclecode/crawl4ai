@@ -407,3 +407,83 @@ def test_untrusted_body_cannot_enable_image_extraction():
     out = _clamp_untrusted("PDFContentScrapingStrategy", {"extract_images": True})
 
     assert out["extract_images"] is False
+
+
+# ── total time budget (#2460) ───────────────────────────────────────────
+
+
+class SlowResponse(FakeResponse):
+    """Trickles one byte per interval, so every single read beats the read timeout."""
+
+    def iter_content(self, chunk_size=8192):
+        import time
+
+        for _ in range(200):
+            time.sleep(0.02)
+            yield b"A"
+
+
+def test_slow_stream_aborts_past_total_budget(monkeypatch):
+    import sys
+    import time
+
+    strategy = _strategy(max_pdf_seconds=0.2)
+    monkeypatch.setitem(sys.modules, "requests", FakeRequests([SlowResponse(200)]))
+
+    start = time.monotonic()
+    with pytest.raises(RuntimeError, match="max_pdf_seconds"):
+        strategy.scrap("https://public.example/slow.pdf", "")
+
+    assert time.monotonic() - start < 2
+    assert strategy._temp_files == [], "temp file must be removed on timeout"
+
+
+def test_read_timeout_never_exceeds_total_budget():
+    strategy = _strategy(max_pdf_seconds=30)
+    requests = FakeRequests([FakeResponse(200, {}, [b"%PDF"])])
+
+    strategy._fetch_with_redirect_checks(requests, "https://public.example/doc.pdf")
+
+    assert requests.calls[0][1]["timeout"][1] <= 30
+
+
+def test_slow_parse_aborts_past_total_budget(tmp_path, monkeypatch):
+    import time
+
+    from pypdf import PdfWriter
+
+    from crawl4ai.processors.pdf.processor import NaivePDFProcessorStrategy
+
+    writer = PdfWriter()
+    for _ in range(50):
+        writer.add_blank_page(width=72, height=72)
+    pdf = tmp_path / "doc.pdf"
+    with open(pdf, "wb") as f:
+        writer.write(f)
+
+    parsed = []
+    original = NaivePDFProcessorStrategy._process_page
+
+    def slow_page(self, page, image_dir, page_number):
+        parsed.append(page_number)
+        time.sleep(0.05)
+        return original(self, page, image_dir, page_number)
+
+    monkeypatch.setattr(NaivePDFProcessorStrategy, "_process_page", slow_page)
+    strategy = _strategy(max_pdf_seconds=0.2, batch_size=1)
+
+    start = time.monotonic()
+    with pytest.raises(TimeoutError, match="max_pdf_seconds"):
+        strategy.scrap(str(pdf), "")
+
+    assert time.monotonic() - start < 2
+    assert len(parsed) < 50, "queued pages must not keep parsing after the budget"
+
+
+@pytest.mark.parametrize("sent, expected", [(10**9, 300), (0, 300), (None, 300), (30, 30)])
+def test_untrusted_body_cannot_raise_its_time_budget(sent, expected):
+    from crawl4ai.async_configs import _clamp_untrusted
+
+    out = _clamp_untrusted("PDFContentScrapingStrategy", {"max_pdf_seconds": sent})
+
+    assert out["max_pdf_seconds"] == expected
