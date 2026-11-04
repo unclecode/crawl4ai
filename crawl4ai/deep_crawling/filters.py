@@ -587,7 +587,7 @@ class ContentRelevanceFilter(URLFilter):
 class SEOFilter(URLFilter):
     """Quantitative SEO quality assessment filter using head section analysis"""
 
-    __slots__ = ("threshold", "_weights", "_kw_patterns")
+    __slots__ = ("threshold", "_keywords", "_weights", "_kw_patterns")
 
     # Based on SEMrush/Google ranking factors research
     DEFAULT_WEIGHTS = {
@@ -608,6 +608,9 @@ class SEOFilter(URLFilter):
     ):
         super().__init__(name="SEOFilter")
         self.threshold = threshold
+        # The raw keywords are kept so to_serializable_dict() can read them back;
+        # only the compiled pattern is used for scoring.
+        self._keywords = list(keywords) if keywords else None
         self._weights = weights or self.DEFAULT_WEIGHTS
         self._kw_patterns = (
             re.compile(
@@ -616,6 +619,16 @@ class SEOFilter(URLFilter):
             if keywords
             else None
         )
+
+    @property
+    def keywords(self) -> Union[List[str], None]:
+        return list(self._keywords) if self._keywords else None
+
+    @property
+    def weights(self) -> Union[Dict[str, float], None]:
+        if self._weights is self.DEFAULT_WEIGHTS:
+            return None
+        return dict(self._weights)
 
     async def apply(self, url: str) -> bool:
         head_content = await HeadPeekr.peek_html(url)
