@@ -15,7 +15,7 @@ from datetime import timedelta
 ###############################
 @dataclass
 class DomainState:
-    last_request_time: float = 0
+    last_request_time: Optional[float] = None
     current_delay: float = 0
     fail_count: int = 0
 
