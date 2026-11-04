@@ -537,6 +537,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
         for attr, value in img.attrib.items():
             if (
                 attr.startswith("data-")
+                and attr != "data-srcset"  # Already parsed above.
                 and ("src" in attr or "srcset" in attr)
                 and "http" in value
             ):
