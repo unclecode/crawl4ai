@@ -376,6 +376,10 @@ class MediaItem(BaseModel):
     group_id: Optional[int] = 0
     format: Optional[str] = None
     width: Annotated[Optional[int], BeforeValidator(_coerce_int)] = None
+    # PDFContentScrapingStrategy reports a locally saved image as {"path": ...}
+    # and builds MediaItem(**image) from it; without this field pydantic drops
+    # the path and callers get src="" with no way to locate the written file.
+    path: Optional[str] = None
 
 
 class Link(BaseModel):
