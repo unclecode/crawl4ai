@@ -1166,7 +1166,12 @@ class BrowserConfig:
             pass
 
         self.browser_hint = UAGen.generate_client_hints(self.user_agent)
-        self.headers.setdefault("sec-ch-ua", self.browser_hint)
+        # An empty user agent (or one with no recognizable browser) yields an
+        # empty client-hints value; sending an empty sec-ch-ua header misleads
+        # servers, so only auto-add the header when there is a hint to send.
+        # A caller-provided sec-ch-ua is still respected via setdefault.
+        if self.browser_hint:
+            self.headers.setdefault("sec-ch-ua", self.browser_hint)
 
         # Set appropriate browser management flags based on browser_mode
         if self.browser_mode == "builtin":
