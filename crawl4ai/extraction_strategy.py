@@ -2098,12 +2098,6 @@ class JsonLxmlExtractionStrategy(JsonElementExtractionStrategy):
         if len(parts) <= 1:
             return selector_str
             
-        # For very long selectors, consider using just the last specific part
-        if len(parts) > 3 and any(p.startswith('.') or p.startswith('#') for p in parts):
-            specific_parts = [p for p in parts if p.startswith('.') or p.startswith('#')]
-            if specific_parts:
-                return specific_parts[-1]  # Use most specific class/id selector
-                
         return selector_str
     
     def _create_selector_function(self, selector_str):
