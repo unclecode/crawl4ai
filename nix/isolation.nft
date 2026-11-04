@@ -1,0 +1,52 @@
+# Host-side egress filter for a Crawl4AI container veth enslaved to a bridge.
+#
+# Bridged frames do not traverse the host iptables FORWARD chain unless
+# br_netfilter is loaded. This table is the boundary: a root process inside
+# the container can flush its own firewall and still cannot open new
+# connections to local addresses.
+#
+# Allowed from the container:
+#   - replies to connections others opened (MCP clients on local nets)
+#   - DHCP (udp/67), including unicast renew to the local DHCP server
+#   - new connections whose destination is not a non-global / local range
+# Dropped:
+#   - new connections to RFC1918, link-local, CGNAT, multicast, and other
+#     IANA special-purpose ranges
+#   - any new frame aimed at the host itself (bridge input)
+#   - all IPv6 from the container
+#
+# Residual: ARP on the bridge segment is not filtered (the gateway MAC is
+# not known here). A public destination that a router DNATs back to an
+# internal host is not covered.
+#
+# @ifname@ is replaced with the host-side veth name (ve-<container>).
+table bridge crawl4ai_isolation {
+  chain input {
+    type filter hook input priority filter; policy accept;
+    iifname "@ifname@" ct state established,related accept
+    iifname "@ifname@" drop
+  }
+
+  chain forward {
+    type filter hook forward priority filter; policy accept;
+    iifname "@ifname@" ct state established,related accept
+    iifname "@ifname@" udp dport 67 accept
+    iifname "@ifname@" ip daddr {
+      0.0.0.0/8,
+      10.0.0.0/8,
+      100.64.0.0/10,
+      127.0.0.0/8,
+      169.254.0.0/16,
+      172.16.0.0/12,
+      192.0.0.0/24,
+      192.0.2.0/24,
+      192.168.0.0/16,
+      198.18.0.0/15,
+      198.51.100.0/24,
+      203.0.113.0/24,
+      224.0.0.0/4,
+      240.0.0.0/4
+    } drop
+    iifname "@ifname@" ether type ip6 drop
+  }
+}
