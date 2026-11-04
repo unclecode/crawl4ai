@@ -109,3 +109,33 @@ async def test_batch_crawl_without_max_pages_crawls_everything():
     crawler = FakeCrawler()
     results = await strategy._arun_batch(ROOT, crawler, CrawlerRunConfig())
     assert len(results) == 1 + 35 + 35 * 30
+
+
+@pytest.mark.asyncio
+async def test_stream_crawl_yields_the_page_that_reaches_max_pages():
+    strategy = BFSDeepCrawlStrategy(max_depth=2, max_pages=50)
+    crawler = FakeCrawler()
+    config = CrawlerRunConfig(stream=True)
+    results = [r async for r in strategy._arun_stream(ROOT, crawler, config)]
+    assert crawler.fetched == 50
+    assert len(results) == 50
+
+
+# Every page links back to the home page (written without its trailing slash).
+def _self_links(url):
+    return ["https://EXAMPLE.com"] + [f"{url.rstrip('/')}/s{j}" for j in range(3)]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stream", [False, True])
+async def test_crawl_does_not_refetch_start_url(stream):
+    strategy = BFSDeepCrawlStrategy(max_depth=2, max_pages=10)
+    crawler = FakeCrawler(_self_links)
+    if stream:
+        config = CrawlerRunConfig(stream=True)
+        results = [r async for r in strategy._arun_stream(ROOT, crawler, config)]
+    else:
+        results = await strategy._arun_batch(ROOT, crawler, CrawlerRunConfig())
+    urls = [r.url for r in results]
+    assert len(urls) == len(set(urls)) == 10
+    assert crawler.fetched == 10
