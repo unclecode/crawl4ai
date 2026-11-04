@@ -378,6 +378,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
     ) -> List[CrawlerTaskResult]:
         self.crawler = crawler
+        active_tasks = []
         
         # Start the memory monitor task
         memory_monitor = asyncio.create_task(self._memory_monitor_task())
@@ -395,8 +396,6 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                     self.monitor.add_task(task_id, url)
                 # Add to queue with initial priority 0, retry count 0, and current time
                 await self.task_queue.put((0, (url, task_id, 0, time.time())))
-
-            active_tasks = []
 
             # Process until both queues are empty
             while not self.task_queue.empty() or active_tasks:
@@ -462,8 +461,23 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             raise       
         
         finally:
-            # Clean up
+            # Await owned crawl cleanup before the caller can reuse this
+            # dispatcher or close the browser after a failed/cancelled batch.
+            for task in active_tasks:
+                if not task.done():
+                    task.cancel()
+            if active_tasks:
+                await asyncio.gather(*active_tasks, return_exceptions=True)
+
+            # Discard URLs queued by this batch that never started.
+            while True:
+                try:
+                    self.task_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+
             memory_monitor.cancel()
+            await asyncio.gather(memory_monitor, return_exceptions=True)
             if self.monitor:
                 self.monitor.stop()
         return results
