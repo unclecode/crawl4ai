@@ -1,4 +1,4 @@
-<a href="https://trendshift.io/repositories/11716" target="_blank"><img align="right" src="https://trendshift.io/api/badge/repositories/11716" alt="unclecode%2Fcrawl4ai | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+<a href="https://trendshift.io/repositories/11716" target="_blank"><img align="right" src="https://trendshift.io/api/badge/repositories/11716" alt="unclecode%2Fcrawl4ai | Trendshift" width="140"/></a>
 
 # Crawl4AI
 
