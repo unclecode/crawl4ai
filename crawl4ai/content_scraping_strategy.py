@@ -327,7 +327,8 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                         kwargs.get("exclude_external_links", False)
                         or link_base_domain in exclude_domains
                     ):
-                        link.getparent().remove(link)
+                        # Remove the link content, but retain following prose.
+                        link.drop_tree()
                         continue
 
                     if normalized_href not in external_links_dict:
