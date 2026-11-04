@@ -858,10 +858,22 @@ class DomainMapper:
                 parser = etree.XMLParser(recover=True)
                 root = etree.fromstring(xml_text.encode("utf-8", "replace"), parser=parser)
 
-                # RSS: <item><link>URL</link></item>
-                for link in root.xpath("//*[local-name()='item']/*[local-name()='link']"):
-                    if link.text and link.text.strip():
-                        urls.append(urljoin(base_url, link.text.strip()))
+                # RSS: prefer each item's links, then its permalink GUIDs.
+                for item in root.xpath("//*[local-name()='item']"):
+                    has_link = False
+                    for link in item.xpath("./*[local-name()='link']"):
+                        if link.text and link.text.strip():
+                            urls.append(urljoin(base_url, link.text.strip()))
+                            has_link = True
+                    if not has_link:
+                        for guid in item.xpath("./*[local-name()='guid']"):
+                            is_permalink = guid.get("isPermaLink", "true").lower()
+                            if (
+                                is_permalink == "true"
+                                and guid.text
+                                and guid.text.strip().startswith("http")
+                            ):
+                                urls.append(guid.text.strip())
 
                 # Atom: <entry><link href="URL"/></entry>
                 for link in root.xpath("//*[local-name()='entry']/*[local-name()='link']"):
@@ -869,12 +881,6 @@ class DomainMapper:
                     if href:
                         urls.append(urljoin(base_url, href.strip()))
 
-                # RSS: <item><guid isPermaLink="true">URL</guid></item>
-                if not urls:
-                    for guid in root.xpath("//*[local-name()='item']/*[local-name()='guid']"):
-                        is_permalink = guid.get("isPermaLink", "true").lower()
-                        if is_permalink == "true" and guid.text and guid.text.strip().startswith("http"):
-                            urls.append(guid.text.strip())
             else:
                 import xml.etree.ElementTree as ET
                 root = ET.fromstring(xml_text)
