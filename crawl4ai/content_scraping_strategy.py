@@ -498,7 +498,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             return None
 
         # Process image variants
-        unique_urls = set()
+        variants_by_url = {}
         image_variants = []
         base_info = {
             "alt": alt,
@@ -510,12 +510,14 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
         }
 
         def add_variant(src: str, width: Optional[str] = None):
-            if src and not src.startswith("data:") and src not in unique_urls:
-                unique_urls.add(src)
-                variant = {**base_info, "src": src}
-                if width:
+            if src and not src.startswith("data:"):
+                variant = variants_by_url.get(src)
+                if variant is None:
+                    variant = {**base_info, "src": src}
+                    variants_by_url[src] = variant
+                    image_variants.append(variant)
+                if width and variant.get("width") is None:
                     variant["width"] = width
-                image_variants.append(variant)
 
         # Add variants from different sources
         add_variant(src)
