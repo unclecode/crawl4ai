@@ -759,7 +759,12 @@ class AsyncWebCrawler:
 
             # Use base_url from config (for raw: URLs), redirected_url, or original url
             effective_url = getattr(config, 'base_url', None) or kwargs.get('redirected_url') or url
-            links = quick_extract_links(html, effective_url)
+            links = quick_extract_links(
+                html,
+                effective_url,
+                preserve_https=getattr(config, 'preserve_https_for_internal_links', False),
+                original_scheme=kwargs.get('original_scheme'),
+            )
 
             return CrawlResult(
                 url=url,
