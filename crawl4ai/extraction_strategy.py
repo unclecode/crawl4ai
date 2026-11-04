@@ -716,10 +716,17 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 content = response.choices[0].message.content
                 blocks = None
 
-                if not content:
+                if not content or not content.strip():
                     finish_reason = getattr(response.choices[0], "finish_reason", "unknown")
-                    blocks = [{"index": 0, "error": True, "tags": ["error"],
-                               "content": f"LLM returned no content (finish_reason: {finish_reason})"}]
+                    # Do not let success normalization overwrite this error below.
+                    return [
+                        {
+                            "index": ix,
+                            "error": True,
+                            "tags": ["error"],
+                            "content": f"LLM returned no content (finish_reason: {finish_reason})",
+                        }
+                    ]
                 elif self.force_json_response:
                     blocks = json.loads(_strip_markdown_fences(content))
                     if isinstance(blocks, dict):
@@ -919,10 +926,17 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 content = response.choices[0].message.content
                 blocks = None
 
-                if not content:
+                if not content or not content.strip():
                     finish_reason = getattr(response.choices[0], "finish_reason", "unknown")
-                    blocks = [{"index": 0, "error": True, "tags": ["error"],
-                               "content": f"LLM returned no content (finish_reason: {finish_reason})"}]
+                    # Do not let success normalization overwrite this error below.
+                    return [
+                        {
+                            "index": ix,
+                            "error": True,
+                            "tags": ["error"],
+                            "content": f"LLM returned no content (finish_reason: {finish_reason})",
+                        }
+                    ]
                 elif self.force_json_response:
                     blocks = json.loads(_strip_markdown_fences(content))
                     if isinstance(blocks, dict):
