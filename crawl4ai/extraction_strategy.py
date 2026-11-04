@@ -2299,7 +2299,9 @@ class JsonLxmlExtractionStrategy(JsonElementExtractionStrategy):
     def _get_element_html(self, element) -> str:
         """Get HTML string representation of element"""
         try:
-            return self.etree.tostring(element, encoding='unicode', method='html')
+            return self.etree.tostring(
+                element, encoding="unicode", method="html", with_tail=False
+            )
         except Exception as e:
             if self.verbose:
                 print(f"Error serializing HTML: {e}")
@@ -2505,7 +2507,7 @@ class JsonXPathExtractionStrategy(JsonElementExtractionStrategy):
         return "".join(element.xpath(".//text()")).strip()
 
     def _get_element_html(self, element) -> str:
-        return etree.tostring(element, encoding="unicode")
+        return etree.tostring(element, encoding="unicode", with_tail=False)
 
     def _get_element_attribute(self, element, attribute: str):
         return element.get(attribute)
