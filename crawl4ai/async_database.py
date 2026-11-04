@@ -485,6 +485,10 @@ class AsyncDatabaseManager:
             "extracted_content": (result.extracted_content or "", "extracted"),
             "screenshot": (result.screenshot or "", "screenshots"),
         }
+        # Failed crawls carry no markdown; the model's text fields are required.
+        empty_markdown = MarkdownGenerationResult(
+            raw_markdown="", markdown_with_citations="", references_markdown=""
+        ).model_dump_json()
 
         try:
             if isinstance(result.markdown, StringCompatibleMarkdown):
@@ -504,19 +508,13 @@ class AsyncDatabaseManager:
                     "markdown",
                 )
             else:
-                content_map["markdown"] = (
-                    MarkdownGenerationResult().model_dump_json(),
-                    "markdown",
-                )
+                content_map["markdown"] = (empty_markdown, "markdown")
         except Exception as e:
             self.logger.warning(
                 message=f"Error processing markdown content: {str(e)}", tag="WARNING"
             )
             # Fallback to empty markdown result
-            content_map["markdown"] = (
-                MarkdownGenerationResult().model_dump_json(),
-                "markdown",
-            )
+            content_map["markdown"] = (empty_markdown, "markdown")
 
         content_hashes = {}
         for field, (content, content_type) in content_map.items():
