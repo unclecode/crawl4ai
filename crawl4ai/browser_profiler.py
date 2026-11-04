@@ -448,6 +448,15 @@ class BrowserProfiler:
             else:
                 browser_config.extra_args = portable_profile_args
             
+        if browser_config.service_workers == "block":
+            # The profile browser is started by ManagedBrowser and reuses its
+            # default context, so a block would be silently ignored. Checked on
+            # the resolved config, so set_defaults() overrides count too.
+            raise ValueError(
+                "service_workers='block' is not supported by create_profile(): "
+                "the profile browser reuses its default context."
+            )
+
         # Generate profile name if not provided
         if not profile_name:
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1015,6 +1024,13 @@ class BrowserProfiler:
             debugging_port=debugging_port,
             verbose=True
         )
+        if browser_config.service_workers == "block":
+            # Same as create_profile(): ManagedBrowser reuses its default context,
+            # so a block would be silently ignored.
+            raise ValueError(
+                "service_workers='block' is not supported when launching a standalone browser: "
+                "it reuses its default context."
+            )
         
         # Create managed browser instance
         managed_browser = ManagedBrowser(
