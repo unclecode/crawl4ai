@@ -1157,7 +1157,8 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
                 nested_element = nested_elements[0] if nested_elements else None
                 return (
                     self._extract_item(nested_element, field["fields"])
-                    if nested_element
+                    # `is not None`: an lxml element with no children is falsy
+                    if nested_element is not None
                     else {}
                 )
 
