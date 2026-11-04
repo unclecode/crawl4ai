@@ -228,7 +228,10 @@ class TestSSRFSourceCoverage(unittest.TestCase):
             idx = source.index(f"async def {handler}")
             nxt = source.find("\nasync def ", idx + 1)
             body = source[idx: nxt if nxt != -1 else len(source)]
-            self.assertIn("_normalize_and_validate_seeds(", body,
+            # Called directly, or in a worker thread (it resolves DNS, #2423).
+            self.assertTrue(
+                "_normalize_and_validate_seeds(" in body
+                or "to_thread(_normalize_and_validate_seeds," in body,
                 f"{handler} must validate its seed URLs via _normalize_and_validate_seeds")
 
     def test_default_browser_config_pins_egress(self):
