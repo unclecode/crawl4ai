@@ -21,5 +21,5 @@ jobs:
           # a Docker Hub access token with Read, Write, Delete rights (needed to edit the description)
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: unclecode/crawl4ai
-          short-description: "Open-source web crawler for LLMs and AI agents. Self-host this server, or use Crawl4AI Cloud."
+          short-description: "Hosted web crawler API for LLMs: Crawl4AI Cloud. Prefer to self-host? Run this open-source server."
           readme-filepath: deploy/docker/DOCKERHUB.md
