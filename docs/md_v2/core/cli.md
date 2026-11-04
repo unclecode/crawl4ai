@@ -31,8 +31,8 @@ crwl https://example.com
 # Get markdown output
 crwl https://example.com -o markdown
 
-# Verbose JSON output with cache bypass
-crwl https://example.com -o json -v --bypass-cache
+# Full crawl result as JSON with cache bypass, written to a file
+crwl https://example.com -o all -O result.json -v --bypass-cache
 
 # See usage examples
 crwl --example
@@ -230,19 +230,24 @@ crwl https://example.com -f filter_bm25.yml -o markdown-fit
 
 ## Output Formats
 
-- `all` - Full crawl result including metadata
-- `json` - Extracted structured data (when using extraction)
+- `all` - Full crawl result as formatted JSON, including HTML, markdown, and metadata (default)
+- `json` - Extracted structured data only (requires an extraction strategy)
 - `markdown` / `md` - Raw markdown output
 - `markdown-fit` / `md-fit` - Filtered markdown for better readability
 
+Use `-O <file>` to write the output to a file instead of the terminal.
+
+> **Note:** `-o json` prints only the extracted data, so it needs an extraction strategy (`-j` or `-e`, optionally with `-s`). Without one, the CLI exits with an error. Use `-o all` (the default) for the full crawl result as JSON.
+
 ## Complete Examples
 
-1. Basic Extraction:
+1. Full Crawl Result as JSON:
 ```bash
 crwl https://example.com \
     -B browser.yml \
     -C crawler.yml \
-    -o json
+    -o all \
+    -O result.json
 ```
 
 2. Structured Data Extraction:

@@ -11,8 +11,8 @@ crwl https://example.com
 # Get markdown output
 crwl https://example.com -o markdown
 
-# JSON output with cache bypass
-crwl https://example.com -o json --bypass-cache
+# Full crawl result as JSON with cache bypass, written to a file
+crwl https://example.com -o all -O result.json --bypass-cache
 
 # Verbose mode with specific browser settings
 crwl https://example.com -b "headless=false,viewport_width=1280" -v

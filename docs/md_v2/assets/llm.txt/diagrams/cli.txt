@@ -360,7 +360,7 @@ timeline
         Error Handling   : Debug authentication issues
     
     section Production Phase
-        Automated Crawls : crwl URL -p profile -o json
+        Automated Crawls : crwl URL -p profile -o all -O result.json
         Batch Processing : Multiple URLs with same profile
         Monitoring       : Check profile validity
         Maintenance      : Update profiles as needed
