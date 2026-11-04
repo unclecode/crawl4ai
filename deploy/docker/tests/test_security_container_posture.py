@@ -46,8 +46,9 @@ class TestDockerfile:
             stripped = line.strip()
             if stripped.startswith("#"):
                 continue
-            assert not re.match(r"EXPOSE\s+.*\b6379\b", stripped), \
-                "redis port 6379 must not be EXPOSEd"
+            assert not re.match(
+                r"EXPOSE\s+.*\b6379\b", stripped
+            ), "redis port 6379 must not be EXPOSEd"
 
     def test_app_dir_root_owned_readonly(self, dockerfile):
         assert "chown -R root:root ${APP_HOME}" in dockerfile
@@ -66,9 +67,32 @@ class TestDockerfile:
             dockerfile,
             re.DOTALL,
         )
-        assert cache_copy, "Dockerfile must copy Playwright artifacts into appuser's cache"
+        assert (
+            cache_copy
+        ), "Dockerfile must copy Playwright artifacts into appuser's cache"
         assert "chromium-*" in cache_copy.group("artifacts")
         assert "chromium_headless_shell-*" in cache_copy.group("artifacts")
+
+    def test_build_artifacts_removed_before_layer_commit(self, dockerfile):
+        layer = re.search(
+            r"^RUN crawl4ai-setup(?P<body>(?:(?!^[A-Z]+\s).)*)",
+            dockerfile,
+            re.MULTILINE | re.DOTALL,
+        )
+        assert layer, "Dockerfile must run crawl4ai-setup"
+        positions = []
+        for command in (
+            "playwright install --with-deps chromium",
+            "crawl4ai-doctor",
+            "cp -r /root/.cache/ms-playwright/chromium-*",
+            "rm -rf /root/.cache/ms-playwright",
+            "-name '*.core' -delete",
+        ):
+            assert command in layer.group(
+                "body"
+            ), f"{command} must run in the crawl4ai-setup layer"
+            positions.append(layer.group("body").index(command))
+        assert positions == sorted(positions), "Docker build steps must remain ordered"
 
     def test_runs_as_non_root(self, dockerfile):
         assert re.search(r"^USER\s+appuser", dockerfile, re.MULTILINE)
