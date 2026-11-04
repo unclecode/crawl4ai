@@ -1202,12 +1202,15 @@ class BrowserProfiler:
         os.makedirs(user_data_dir, exist_ok=True)
         
         # Create managed browser instance
-        managed_browser = ManagedBrowser(
+        browser_config = BrowserConfig(
             browser_type=browser_type,
             user_data_dir=user_data_dir,
             headless=headless,
+            debugging_port=debugging_port,
+        )
+        managed_browser = ManagedBrowser(
+            browser_config=browser_config,
             logger=self.logger,
-            debugging_port=debugging_port
         )
         
         try:
