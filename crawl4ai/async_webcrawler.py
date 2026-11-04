@@ -30,6 +30,7 @@ from .async_crawler_strategy import (
     AsyncCrawlResponse,
 )
 from .cache_context import CacheMode, CacheContext
+from .source_receipt import attach_source_receipt
 from .markdown_generation_strategy import (
     DefaultMarkdownGenerator,
     MarkdownGenerationStrategy,
@@ -275,6 +276,7 @@ class AsyncWebCrawler:
                 screenshot_data = None
                 pdf_data = None
                 extracted_content = None
+                source_fetched_at = None
                 start_time = time.perf_counter()
 
                 # Try to get cached result if appropriate
@@ -477,6 +479,7 @@ class AsyncWebCrawler:
                                     tag="FETCH",
                                 )
 
+                                source_fetched_at = time.time()
                                 crawl_result = await self.aprocess_html(
                                     url=url, html=html,
                                     extracted_content=extracted_content,
@@ -571,6 +574,7 @@ class AsyncWebCrawler:
                             _crawl_stats["fallback_fetch_used"] = True
                             try:
                                 _fallback_html = await _fallback_fn(url)
+                                source_fetched_at = time.time()
                                 if _fallback_html:
                                     _sanitized_html = sanitize_input_encode(_fallback_html)
                                     try:
@@ -681,6 +685,9 @@ class AsyncWebCrawler:
                         tag="COMPLETE",
                     )
 
+                    if config.source_receipt:
+                        attach_source_receipt(crawl_result, config, fetched_at=source_fetched_at)
+
                     # Update cache if appropriate
                     if cache_context.should_write() and not bool(cached_result):
                         await async_db_manager.acache_url(crawl_result)
@@ -702,6 +709,8 @@ class AsyncWebCrawler:
                     # For raw: URLs, don't fall back to the raw HTML string as redirected_url
                     is_raw_url = url.startswith("raw:") or url.startswith("raw://")
                     cached_result.redirected_url = cached_result.redirected_url or (None if is_raw_url else url)
+                    if config.source_receipt:
+                        attach_source_receipt(cached_result, config)
                     return CrawlResultContainer(cached_result)
 
             except Exception as e:
