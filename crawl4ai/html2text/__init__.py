@@ -165,6 +165,31 @@ class HTML2Text(html.parser.HTMLParser):
         if s:
             self.lastWasNL = s[-1] == "\n"
 
+    def drop_empty_stress(self, mark: str) -> bool:
+        """Take back an opening emphasis marker that ended up with nothing inside.
+
+        ``handle_data`` strips whitespace-only content inside a stressed tag, so
+        ``foo<b> </b>bar`` reaches the closing tag with the opening ``**`` as the
+        last thing written and no content after it. Emitting the closing marker
+        would leave an empty ``****`` in the output, and between two stressed runs
+        it drops the only space separating two words: ``<b>a</b><b> </b><b>b</b>``
+        came out as ``**a********b**``. Remove the marker and keep the whitespace
+        it stood for instead.
+        """
+        if not mark or not self.outtextlist:
+            return False
+        if self.outtextlist[-1] not in (mark, " " + mark):
+            return False
+
+        self.outtextlist.pop()
+        self.preceding_stressed = False
+        # A separator this marker carried itself went out with it, so only text
+        # already ending in whitespace counts as separated.
+        previous = self.outtextlist[-1] if self.outtextlist else ""
+        if not (previous and previous[-1] in string.whitespace):
+            self.space = True
+        return True
+
     def finish(self) -> str:
         self.close()
 
@@ -442,7 +467,8 @@ class HTML2Text(html.parser.HTMLParser):
             else:
                 emphasis = self.emphasis_mark
 
-            self.o(emphasis)
+            if start or not self.drop_empty_stress(self.emphasis_mark):
+                self.o(emphasis)
             if start:
                 self.stressed = True
 
@@ -465,7 +491,8 @@ class HTML2Text(html.parser.HTMLParser):
             else:
                 strong = self.strong_mark
 
-            self.o(strong)
+            if start or not self.drop_empty_stress(self.strong_mark):
+                self.o(strong)
             if start:
                 self.stressed = True
 
@@ -476,7 +503,8 @@ class HTML2Text(html.parser.HTMLParser):
             else:
                 strike = "~~"
 
-            self.o(strike)
+            if start or not self.drop_empty_stress("~~"):
+                self.o(strike)
             if start:
                 self.stressed = True
 
