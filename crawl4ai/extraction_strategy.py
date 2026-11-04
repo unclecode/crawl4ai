@@ -25,6 +25,7 @@ from .utils import (
     split_and_parse_json_objects,
     sanitize_input_encode,
     merge_chunks,
+    count_words,
 )
 from .models import * # noqa: F403
 
@@ -429,7 +430,7 @@ class CosineStrategy(ExtractionStrategy):
             # Concatenate texts for analysis
             full_text = " ".join(texts)
             # Count words
-            word_count = len(full_text.split())
+            word_count = count_words(full_text)
 
             # Keep clusters with word count above the threshold
             if word_count >= self.word_count_threshold:

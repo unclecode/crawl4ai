@@ -25,6 +25,7 @@ from .utils import (
     extract_metadata_using_lxml,
     extract_page_context,
     calculate_link_intrinsic_score,
+    count_words,
 )
 from lxml import etree
 from lxml import html as lhtml
@@ -587,7 +588,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
 
             text_content = (el.text_content() or "").strip()
             if (
-                len(text_content.split()) < word_count_threshold
+                count_words(text_content) < word_count_threshold
                 and not el.getchildren()
             ):
                 parent = el.getparent()

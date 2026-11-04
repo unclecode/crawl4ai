@@ -51,6 +51,51 @@ from urllib.parse import (
 import inspect
 
 
+# Characters of scripts that are written without spaces between words, each of
+# which counts as one word: Han ideographs (Extensions A-I and the compatibility
+# forms), Hiragana, Katakana (half-width, phonetic extensions, Kana
+# Supplement/Extended-A/B and Small Kana Extension) and the iteration/closing
+# marks U+3005-U+3007. CJK punctuation (U+3000-U+303F) is not in the set.
+# Hangul and full-width Latin letters/digits are not in the set either: they
+# are counted like any other whitespace-separated text.
+_CJK_RANGES = (
+    "\u3005-\u3007\u3041-\u3096\u309d-\u309f\u30a1-\u30fa\u30fc-\u30ff"
+    "\u31f0-\u31ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f"
+    "\U0001aff0-\U0001b16f"
+    "\U00020000-\U0002a6df\U0002a700-\U0002ee5f\U0002f800-\U0002fa1f"
+    "\U00030000-\U000323af"
+)
+_CJK_CHAR_RE = re.compile(f"[{_CJK_RANGES}]")
+_NON_CJK_RUN_RE = re.compile(f"[^\\s{_CJK_RANGES}]+")
+
+
+def count_cjk_chars(text: str) -> int:
+    """Number of characters in ``text`` that count as one word each (see ``count_words``)."""
+    return len(_CJK_CHAR_RE.findall(text))
+
+
+def count_words(text: str) -> int:
+    """Count words in ``text`` for the ``*_word_threshold`` settings.
+
+    Whitespace-separated runs count as one word each, exactly like
+    ``len(text.split())``. Chinese and Japanese are written without spaces, so
+    a whole paragraph would otherwise count as a single word; every CJK
+    character (see ``_CJK_RANGES``) therefore counts as one word on its own,
+    the way most word counters treat CJK text. Between CJK characters, a run of
+    any other characters (Latin, digits, Hangul, ...) is one word if it
+    contains a letter or digit, so the ``。`` or ``,`` after a sentence is not a
+    word. Text with no CJK character gives the same result as
+    ``len(text.split())``.
+    """
+    if not text:
+        return 0
+    if not _CJK_CHAR_RE.search(text):
+        return len(text.split())
+    return count_cjk_chars(text) + sum(
+        1 for run in _NON_CJK_RUN_RE.findall(text) if any(ch.isalnum() for ch in run)
+    )
+
+
 # Monkey patch to fix wildcard handling in urllib.robotparser.
 # Python 3.14 rewrote robotparser with native wildcard, '$' and RFC 9309
 # longest-match support, and its applies_to returns a match *length* used to
