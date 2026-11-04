@@ -369,41 +369,44 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
+            # Gather all monitoring data
+            monitor = get_monitor()
+
+            data = {
+                "timestamp": asyncio.get_event_loop().time(),
+                "health": await monitor.get_health_summary(),
+                "requests": {
+                    "active": monitor.get_active_requests(),
+                    "completed": monitor.get_completed_requests(limit=10)
+                },
+                "browsers": await monitor.get_browser_list(),
+                "timeline": {
+                    "memory": monitor.get_timeline_data("memory", "5m"),
+                    "requests": monitor.get_timeline_data("requests", "5m"),
+                    "browsers": monitor.get_timeline_data("browsers", "5m")
+                },
+                "janitor": monitor.get_janitor_log(limit=10),
+                "errors": monitor.get_errors_log(limit=10)
+            }
+
             try:
-                # Gather all monitoring data
-                monitor = get_monitor()
-
-                data = {
-                    "timestamp": asyncio.get_event_loop().time(),
-                    "health": await monitor.get_health_summary(),
-                    "requests": {
-                        "active": monitor.get_active_requests(),
-                        "completed": monitor.get_completed_requests(limit=10)
-                    },
-                    "browsers": await monitor.get_browser_list(),
-                    "timeline": {
-                        "memory": monitor.get_timeline_data("memory", "5m"),
-                        "requests": monitor.get_timeline_data("requests", "5m"),
-                        "browsers": monitor.get_timeline_data("browsers", "5m")
-                    },
-                    "janitor": monitor.get_janitor_log(limit=10),
-                    "errors": monitor.get_errors_log(limit=10)
-                }
-
-                # Send update to client
                 await websocket.send_json(data)
-
-                # Wait 2 seconds before next update
-                await asyncio.sleep(2)
-
             except WebSocketDisconnect:
                 logger.info("WebSocket client disconnected")
                 break
-            except Exception as e:
-                logger.error(f"WebSocket error: {e}", exc_info=True)
-                await asyncio.sleep(2)  # Continue trying
+            except RuntimeError as e:
+                if "websocket.close" in str(e):
+                    logger.info("WebSocket already closed")
+                    break
+                raise
+
+            await asyncio.sleep(2)
+
+    except WebSocketDisconnect:
+        logger.info("WebSocket client disconnected")
 
     except Exception as e:
         logger.error(f"WebSocket connection error: {e}", exc_info=True)
+
     finally:
         logger.info("WebSocket connection closed")
