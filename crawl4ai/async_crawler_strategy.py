@@ -30,6 +30,7 @@ import aiohttp
 import chardet
 from aiohttp.client import ClientTimeout
 from urllib.parse import quote, urlparse
+from urllib.request import url2pathname
 from types import MappingProxyType
 import contextlib
 from functools import partial
@@ -487,7 +488,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Fast path: return HTML directly without browser interaction
             if url.startswith("file://"):
                 # Process local file
-                local_file_path = url[7:]  # Remove 'file://' prefix
+                local_file_path = _file_url_to_path(url)
                 if not os.path.exists(local_file_path):
                     raise FileNotFoundError(f"Local file not found: {local_file_path}")
                 with open(local_file_path, "r", encoding="utf-8") as f:
@@ -731,7 +732,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 if is_local_content:
                     # Load local content using set_content() instead of network navigation
                     if url.startswith("file://"):
-                        local_file_path = url[7:]  # Remove 'file://' prefix
+                        local_file_path = _file_url_to_path(url)
                         if not os.path.exists(local_file_path):
                             raise FileNotFoundError(f"Local file not found: {local_file_path}")
                         with open(local_file_path, "r", encoding="utf-8") as f:
@@ -2452,6 +2453,23 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 # HTTP Crawler Strategy
 ####################################################################################################
 
+def _file_url_to_path(url: str) -> str:
+    """Return the local path a ``file://`` URL points to.
+
+    ``f"file://{path}"`` (the form the docs use) is kept as-is when that file
+    exists. Otherwise the URL is decoded as a standard file URL, as built by
+    ``Path.as_uri()``: percent-encoded, and on Windows with a slash before the
+    drive letter (``file:///C:/Users/...``).
+    """
+    path = url[7:]  # Remove 'file://' prefix
+    if os.path.exists(path):
+        return path
+    parsed = urlparse(url)
+    if parsed.netloc not in ("", "localhost"):
+        return path
+    return url2pathname(parsed.path)
+
+
 def _safe_download_filepath(downloads_path: str, filename: str) -> str:
     """Resolve a download destination confined to ``downloads_path``.
 
@@ -2884,7 +2902,7 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
             
         try:
             if scheme == 'file':
-                return await self._handle_file(parsed.path)
+                return await self._handle_file(_file_url_to_path(url))
             elif scheme == 'raw':
                 # Don't use parsed.path - urlparse truncates at '#' which is common in CSS
                 # Strip prefix directly: "raw://" (6 chars) or "raw:" (4 chars)
