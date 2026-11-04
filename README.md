@@ -4,7 +4,7 @@
 
 **[Get a free API key](https://crawl4ai.com/?ref=readme)** · 1,000 free credits every month. No credit card required.
 
-[Try a URL in the playground](https://crawl4ai.com/?ref=readme-playground#playground) · [Set up Crawl4AI Cloud in Claude Code, Cursor, or Codex](https://crawl4ai.com/llms.txt)
+[Try a URL in the playground](https://crawl4ai.com/?ref=readme-playground#playground) · [Set up Crawl4AI Cloud in Claude Code, Cursor, or Codex](https://crawl4ai.com/llms.txt?ref=readme-llms)
 
 This repository is home to the Apache-2.0 crawler that powers Crawl4AI Cloud. [Run it yourself](#run-crawl4ai-yourself) with Python or Docker.
 
@@ -28,7 +28,7 @@ This repository is home to the Apache-2.0 crawler that powers Crawl4AI Cloud. [R
 
 Hosted API base URL: `https://api.crawl4ai.com`.
 
-[Cloud API reference](https://api.crawl4ai.com/docs) · [Agent setup and MCP](https://crawl4ai.com/llms.txt)
+[Cloud API reference](https://api.crawl4ai.com/docs) · [Agent setup and MCP](https://crawl4ai.com/llms.txt?ref=readme-llms)
 
 Set `CRAWL4AI_KEY` to your API key, then scrape a page as Markdown:
 
