@@ -586,7 +586,7 @@ A heartfelt thanks to our individual supporters! Every contribution helps us kee
 [Discord](https://discord.gg/jP8KfhDhyN) · [X @unclecode](https://x.com/unclecode) · [GitHub @unclecode](https://github.com/unclecode) · hello@crawl4ai.com
 
 - **Building crawlers or AI agents for a living?** DM me on X. I want to work with people like you, and we are hiring.
-- **From a company?** We have an enterprise offer and we tailor it to your business. See our [security and compliance page](https://gate.crawl4ai.com/security/) for current details. Write to hello@crawl4ai.com.
+- **From a company?** We have an enterprise offer and we tailor it to your business. See our [security and compliance page](https://crawl4ai.com/security) for current details. Write to hello@crawl4ai.com.
 
 <p align="center">
   <a href="https://github.com/unclecode/crawl4ai/network/members"><img src="https://img.shields.io/github/forks/unclecode/crawl4ai?style=social" alt="GitHub Forks"/></a>
