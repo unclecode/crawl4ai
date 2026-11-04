@@ -1,6 +1,4 @@
-# Crawl4AI
-
-<a href="https://trendshift.io/repositories/11716" target="_blank"><img src="https://trendshift.io/api/badge/repositories/11716" alt="unclecode%2Fcrawl4ai | Trendshift" width="140"/></a>
+<h1><a href="https://trendshift.io/repositories/11716" target="_blank"><img align="right" src="https://trendshift.io/api/badge/repositories/11716" alt="unclecode%2Fcrawl4ai | Trendshift" width="130"/></a>Crawl4AI</h1>
 
 **Crawl4AI Cloud is a hosted web scraping, extraction, and search API for AI agents and data pipelines.** Turn pages into clean Markdown for RAG, extract structured JSON, or search the live web with one API key. Crawl4AI runs the browsers and manages the proxies.
 
