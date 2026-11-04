@@ -253,7 +253,13 @@ def attach_mcp(
                     tg.start_soon(mcp.run, c2s_recv, write_stream, init_opts)
                     tg.start_soon(_sse_init_gate, read_stream, c2s_send)
 
-    app.routes.append(Route(f"{base}/sse", endpoint=_MCPSseApp()))
+    # `methods` must be explicit: for a class-based ASGI endpoint, Starlette's
+    # Route otherwise leaves `self.methods = None`, which matches *any* HTTP
+    # method. A client probing this URL with POST (e.g. an MCP client trying
+    # the Streamable HTTP transport before falling back to SSE) would then be
+    # routed into the SSE handshake instead of getting a fast 405, and hang
+    # until its own client-side timeout.
+    app.routes.append(Route(f"{base}/sse", endpoint=_MCPSseApp(), methods=["GET"]))
     app.routes.append(Mount(f"{base}/messages", app=sse.handle_post_message))
 
     # ── schema endpoint ───────────────────────────────────────
