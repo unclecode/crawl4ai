@@ -40,8 +40,7 @@ Images are multi-arch (`amd64`, `arm64`). Tags: `latest`, or a version such as `
 - Source and issues: [github.com/unclecode/crawl4ai](https://github.com/unclecode/crawl4ai)
 - Hosted API docs: [crawl4ai.com/docs](https://crawl4ai.com/docs?ref=dockerhub)
 
-| Want this without the ops work? [Try Crawl4AI Cloud](https://crawl4ai.com/?ref=dockerhub-cta). |
-| --- |
+> **Want this without the ops work? [Try Crawl4AI Cloud](https://crawl4ai.com/?ref=dockerhub-cta).**
 
 ---
 
