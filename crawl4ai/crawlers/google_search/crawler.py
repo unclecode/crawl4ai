@@ -19,7 +19,7 @@ class GoogleSearchCrawler(BaseCrawler):
     def __init__(self):
         super().__init__()
         self.js_script = (Path(__file__).parent /
-                          "script.js").read_text()
+                          "script.js").read_text(encoding="utf-8")
 
     async def run(self, url="", query: str = "", search_type: str = "text", schema_cache_path = None, **kwargs) -> str:
         """Crawl Google Search results for a query"""

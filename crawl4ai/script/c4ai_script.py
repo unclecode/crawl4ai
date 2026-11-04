@@ -348,7 +348,7 @@ class Compiler:
             if isinstance(c,Cmd) and c.op=="INCLUDE":
                 p=(self.root/c.args[0]).resolve()
                 if p in seen: raise ValueError(f"Circular include {p}")
-                seen.add(p); out+=self._parse_with_includes(p.read_text(),seen)
+                seen.add(p); out+=self._parse_with_includes(p.read_text(encoding="utf-8"),seen)
             else: out.append(c)
         return out
 
@@ -648,7 +648,7 @@ def compile_file(path: pathlib.Path) -> List[str]:
     Returns:
         List of JavaScript command strings
     """
-    return compile_string(path.read_text(), root=path.parent)
+    return compile_string(path.read_text(encoding="utf-8"), root=path.parent)
 
 def compile_lines(lines: List[str], *, root: Union[pathlib.Path, None] = None) -> List[str]:
     """Compile C4A-Script from list of lines to JavaScript.

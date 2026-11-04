@@ -51,7 +51,7 @@ def get_global_config() -> dict:
         config_dir.mkdir(parents=True, exist_ok=True)
         return {}
         
-    with open(config_file) as f:
+    with open(config_file, encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
 
 def save_global_config(config: dict):
@@ -138,7 +138,7 @@ def load_config_file(path: Optional[str]) -> dict:
         return {}
     
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             if path.endswith((".yaml", ".yml")):
                 return yaml.safe_load(f)
             return json.load(f)
