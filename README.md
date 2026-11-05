@@ -15,6 +15,10 @@ This repository is home to the Apache-2.0 crawler that powers Crawl4AI Cloud. [R
   </picture>
 </a>
 
+<p align="center">
+  <b>English</b> · <a href="README.zh.md">简体中文</a>
+</p>
+
 <div align="center">
 
 [![GitHub Stars](https://img.shields.io/github/stars/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/stargazers)
