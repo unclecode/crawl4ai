@@ -358,10 +358,6 @@ class AsyncDatabaseManager:
                         else:
                             row_dict[field] = {}
 
-                if isinstance(row_dict["markdown"], Dict):
-                    if row_dict["markdown"].get("raw_markdown"):
-                        row_dict["markdown"] = row_dict["markdown"]["raw_markdown"]
-
                 # Parse downloaded_files
                 try:
                     row_dict["downloaded_files"] = (
@@ -488,8 +484,9 @@ class AsyncDatabaseManager:
 
         try:
             if isinstance(result.markdown, StringCompatibleMarkdown):
+                # The str-compatible wrapper still carries the other Markdown variants.
                 content_map["markdown"] = (
-                    result.markdown,
+                    result.markdown.model_dump_json(),
                     "markdown",
                 )
             elif isinstance(result.markdown, MarkdownGenerationResult):
