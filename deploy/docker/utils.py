@@ -111,7 +111,9 @@ def _deep_merge(base: dict, override: dict) -> dict:
 
 def load_config() -> Dict:
     """Load and return application configuration with environment variable overrides."""
-    config_path = Path(__file__).parent / "config.yml"
+    config_path = Path(os.environ.get(
+        "CRAWL4AI_CONFIG", str(Path(__file__).parent / "config.yml")
+    ))
     with open(config_path, "r") as config_file:
         user_config = yaml.safe_load(config_file) or {}
 
