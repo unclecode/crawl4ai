@@ -256,6 +256,24 @@ def _parse_head(src: str) -> Dict[str, Any]:
         info["lang"] = lang_match.group(1)
     return info
 
+
+async def _get_until_done(queue: asyncio.Queue, done: asyncio.Event) -> Optional[Any]:
+    if not queue.empty():
+        return queue.get_nowait()
+    getter = asyncio.ensure_future(queue.get())
+    waiter = asyncio.ensure_future(done.wait())
+    try:
+        await asyncio.wait({getter, waiter}, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        waiter.cancel()
+        if not getter.done():
+            getter.cancel()
+        await asyncio.gather(getter, waiter, return_exceptions=True)
+    if getter.cancelled():
+        return None
+    return getter.result()
+
+
 # ────────────────────────────────────────────────────────────────────────── class
 
 
@@ -481,14 +499,8 @@ class AsyncUrlSeeder:
                 if queue.empty() and producer_done.is_set():
                     # self._log("debug", "Worker exiting: queue empty and producer done.", tag="URL_SEED")
                     break
-                try:
-                    # Increased timeout slightly
-                    url = await asyncio.wait_for(queue.get(), 5)
-                except asyncio.TimeoutError:
-                    continue  # Keep checking queue and producer_done status
-                except Exception as e:
-                    self._log("error", "Worker failed to get URL from queue: {error}", params={
-                              "error": str(e)}, tag="URL_SEED")
+                url = await _get_until_done(queue, producer_done)
+                if url is None:
                     continue
 
                 if max_urls > 0 and len(res_list) >= max_urls:
