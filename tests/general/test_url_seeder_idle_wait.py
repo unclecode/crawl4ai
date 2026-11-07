@@ -9,6 +9,7 @@ from crawl4ai import AsyncUrlSeeder, SeedingConfig
 def _stub_seeder(seeder: AsyncUrlSeeder, urls: list[str]) -> None:
     async def from_sitemaps(domain, pattern, force=False):
         for url in urls:
+            await asyncio.sleep(0.05)
             yield url
 
     async def validate(url, res_list, *args, **kwargs):
