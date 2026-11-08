@@ -68,6 +68,28 @@ def unwrap_orphaned_noscript(html: str) -> str:
     return NOSCRIPT_CLOSE_REGEX.sub("", NOSCRIPT_OPEN_REGEX.sub("", html))
 
 
+def remove_element_preserving_tail(element) -> None:
+    """Remove an element without dropping the text that follows it.
+
+    lxml stores the text after an element as that element's ``tail``, and
+    ``remove()`` discards it together with the element. Elements such as
+    ``style``, ``link``, ``meta`` and ``noscript`` can sit inside a paragraph
+    with real body text after them, so the tail moves to the previous
+    sibling's tail, or to the parent's text when there is no sibling.
+    """
+    parent = element.getparent()
+    if parent is None:
+        return
+    tail = element.tail
+    if tail:
+        prev = element.getprevious()
+        if prev is not None:
+            prev.tail = (prev.tail or "") + tail
+        else:
+            parent.text = (parent.text or "") + tail
+    parent.remove(element)
+
+
 # Function to parse srcset
 def parse_srcset(s: str) -> List[Dict]:
     if not s:
@@ -823,11 +845,10 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 except Exception:
                     pass
 
-            # Remove script and style tags
+            # Remove style/link/meta/noscript tags, keeping the text after them
             for tag in ["style", "link", "meta", "noscript"]:
                 for element in body.xpath(f".//{tag}"):
-                    if element.getparent() is not None:
-                        element.getparent().remove(element)
+                    remove_element_preserving_tail(element)
                         
             # Handle script separately
             for element in body.xpath(f".//script"):
