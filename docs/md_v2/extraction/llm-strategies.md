@@ -34,6 +34,36 @@ Crawl4AI uses a “provider string” (e.g., `"openai/gpt-4o"`, `"ollama/llama2.
 
 This means you **aren’t locked** into a single LLM vendor. Switch or experiment easily.
 
+### Using an OpenAI-compatible gateway
+
+Any endpoint that speaks the OpenAI API works with the `openai/` prefix plus `base_url`. For example, [TeamoRouter](https://teamorouter.com) serves DeepSeek, Qwen, Kimi, GLM, GPT and Gemini models behind one key, and Claude through an Anthropic-compatible endpoint:
+
+```python
+# OpenAI-compatible models: keep the "openai/" prefix and point base_url at /v1
+llm_config = LLMConfig(
+    provider="openai/deepseek-v4-flash",
+    api_token=os.getenv("TEAMOROUTER_API_KEY"),
+    base_url="https://api.teamorouter.com/v1",
+)
+
+# Claude models: use the "anthropic/" prefix and the root URL (no /v1)
+llm_config = LLMConfig(
+    provider="anthropic/claude-haiku-4-5",
+    api_token=os.getenv("TEAMOROUTER_API_KEY"),
+    base_url="https://api.teamorouter.com",
+)
+```
+
+To send extra HTTP headers with each LLM request (for example, an attribution header that a gateway asks for), pass them to the underlying LiteLLM call through `extra_args`:
+
+```python
+llm_strategy = LLMExtractionStrategy(
+    llm_config=llm_config,
+    instruction="...",
+    extra_args={"extra_headers": {"X-Client-Source": "crawl4ai-teamorouter"}},
+)
+```
+
 ---
 
 ## 3. How LLM Extraction Works
