@@ -681,8 +681,14 @@ class AsyncWebCrawler:
                         tag="COMPLETE",
                     )
 
-                    # Update cache if appropriate
-                    if cache_context.should_write() and not bool(cached_result):
+                    # Update cache if appropriate. A cached row is replayed as a
+                    # success, so failed or partial (no markdown) results stay out.
+                    if (
+                        cache_context.should_write()
+                        and not bool(cached_result)
+                        and crawl_result.success
+                        and crawl_result.markdown is not None
+                    ):
                         await async_db_manager.acache_url(crawl_result)
 
                     return CrawlResultContainer(crawl_result)
