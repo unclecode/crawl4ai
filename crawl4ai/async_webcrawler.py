@@ -23,7 +23,7 @@ from .chunking_strategy import *  # noqa: F403
 from .chunking_strategy import IdentityChunking
 from .content_filter_strategy import *  # noqa: F403
 from .extraction_strategy import *  # noqa: F403
-from .extraction_strategy import NoExtractionStrategy
+from .extraction_strategy import LLMExtractionStrategy, NoExtractionStrategy
 from .async_crawler_strategy import (
     AsyncCrawlerStrategy,
     AsyncPlaywrightCrawlerStrategy,
@@ -685,12 +685,13 @@ class AsyncWebCrawler:
                     )
 
                     # Update cache if appropriate. A cached row is replayed as a
-                    # success, so failed or partial (no markdown) results stay out.
+                    # success, so failed or incomplete processing stays out.
                     if (
                         cache_context.should_write()
                         and not bool(cached_result)
                         and crawl_result.success
                         and crawl_result.markdown is not None
+                        and not crawl_result._processing_failed
                     ):
                         await async_db_manager.acache_url(crawl_result)
 
@@ -899,6 +900,8 @@ class AsyncWebCrawler:
             )
         )
 
+        processing_failed = getattr(markdown_result, "_generation_failed", False)
+
         # Log processing completion — reflect actual content outcome
         self.logger.url_status(
             url=_url,
@@ -959,6 +962,14 @@ class AsyncWebCrawler:
                     config.extraction_strategy.run, url, sections
                 )
                 
+            if isinstance(config.extraction_strategy, LLMExtractionStrategy) and any(
+                isinstance(block, dict)
+                and block.get("error") is True
+                and block.get("tags") == ["error"]
+                for block in extracted_content
+            ):
+                processing_failed = True
+
             extracted_content = json.dumps(
                 extracted_content, indent=4, default=str, ensure_ascii=False
             )
@@ -976,7 +987,7 @@ class AsyncWebCrawler:
             cleaned_html = fast_format_html(cleaned_html)
 
         # Return complete crawl result
-        return CrawlResult(
+        result = CrawlResult(
             url=url,
             html=html,
             fit_html=fit_html,
@@ -992,6 +1003,8 @@ class AsyncWebCrawler:
             success=True,
             error_message="",
         )
+        result._processing_failed = processing_failed
+        return result
 
     async def arun_many(
         self,
