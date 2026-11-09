@@ -434,8 +434,10 @@ class ManagedBrowser:
             try:
                 # For builtin browsers that should persist, we should check if it's a detached process
                 # Only terminate if we have proper control over the process
-                if not self.browser_process.poll():
-                    # Process is still running
+                # poll() returns None while the process runs and its exit code once it is gone,
+                # so an exited process must be recognised by the value being None -- `not poll()`
+                # is also true for a clean exit code of 0.
+                if self.browser_process.poll() is None:
                     self.browser_process.terminate()
                     # Wait for process to end gracefully
                     for _ in range(10):  # 10 attempts, 100ms each
