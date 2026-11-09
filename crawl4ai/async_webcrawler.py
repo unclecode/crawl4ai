@@ -280,6 +280,9 @@ class AsyncWebCrawler:
                 # Try to get cached result if appropriate
                 if cache_context.should_read():
                     cached_result = await async_db_manager.aget_cached_url(url)
+                    # Older versions could store failed crawls; treat them as a miss
+                    if cached_result and not cached_result.success:
+                        cached_result = None
 
                 # Smart Cache: Validate cache freshness if enabled
                 if cached_result and config.check_cache_freshness:

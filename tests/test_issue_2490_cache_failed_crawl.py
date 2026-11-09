@@ -161,6 +161,26 @@ async def test_cache_write_handles_result_without_markdown(cache):
     assert (await cache.aget_cached_url(url)).html == "<p>x</p>"
 
 
-def test_markdown_result_defaults_to_empty():
-    empty = MarkdownGenerationResult()
-    assert (empty.raw_markdown, empty.markdown_with_citations, empty.references_markdown) == ("", "", "")
+@pytest.mark.asyncio
+async def test_row_with_empty_markdown_is_a_miss(cache):
+    url = "https://example.invalid/empty-markdown"
+    empty = MarkdownGenerationResult(raw_markdown="", markdown_with_citations="", references_markdown="")
+    await cache.acache_url(CrawlResult(url=url, html="<p>x</p>", success=True, markdown=empty))
+
+    assert await cache.aget_cached_url(url) is None
+
+
+@pytest.mark.asyncio
+async def test_failed_row_from_older_version_is_recrawled(cache, site):
+    markdown = MarkdownGenerationResult(raw_markdown="blocked", markdown_with_citations="", references_markdown="")
+    await cache.acache_url(
+        CrawlResult(url=site.url(), html="<p>blocked</p>", success=False, markdown=markdown, error_message="Blocked")
+    )
+    site.up()
+
+    fresh = await crawl(site.url())
+    assert fresh.success and fresh.cache_status == "miss"
+    assert "real page text" in fresh.markdown
+
+    replay = await crawl(site.url())
+    assert replay.cache_status == "hit" and "real page text" in replay.markdown

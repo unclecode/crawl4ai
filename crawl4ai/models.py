@@ -118,9 +118,9 @@ class DispatchResult(BaseModel):
     error_message: str = ""
 
 class MarkdownGenerationResult(BaseModel):
-    raw_markdown: str = ""
-    markdown_with_citations: str = ""
-    references_markdown: str = ""
+    raw_markdown: str
+    markdown_with_citations: str
+    references_markdown: str
     fit_markdown: Optional[str] = None
     fit_html: Optional[str] = None
 
