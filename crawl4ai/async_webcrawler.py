@@ -280,6 +280,9 @@ class AsyncWebCrawler:
                 # Try to get cached result if appropriate
                 if cache_context.should_read():
                     cached_result = await async_db_manager.aget_cached_url(url)
+                    # Older versions could store failed crawls; treat them as a miss
+                    if cached_result and not cached_result.success:
+                        cached_result = None
 
                 # Smart Cache: Validate cache freshness if enabled
                 if cached_result and config.check_cache_freshness:
@@ -681,8 +684,14 @@ class AsyncWebCrawler:
                         tag="COMPLETE",
                     )
 
-                    # Update cache if appropriate
-                    if cache_context.should_write() and not bool(cached_result):
+                    # Update cache if appropriate. A cached row is replayed as a
+                    # success, so failed or partial (no markdown) results stay out.
+                    if (
+                        cache_context.should_write()
+                        and not bool(cached_result)
+                        and crawl_result.success
+                        and crawl_result.markdown is not None
+                    ):
                         await async_db_manager.acache_url(crawl_result)
 
                     return CrawlResultContainer(crawl_result)
