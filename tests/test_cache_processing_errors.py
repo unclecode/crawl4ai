@@ -151,3 +151,53 @@ def test_llm_error_is_retried_instead_of_replayed(site, cache, monkeypatch):
             await async_db_manager.cleanup()
 
     asyncio.run(run())
+
+
+def test_error_shaped_extracted_data_is_cacheable(site, cache, monkeypatch):
+    data = {"error": True, "tags": ["error"], "content": "a ticket's data"}
+    calls = 0
+
+    async def completion(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return SimpleNamespace(
+            usage=SimpleNamespace(
+                completion_tokens=1,
+                prompt_tokens=2,
+                total_tokens=3,
+                completion_tokens_details=None,
+                prompt_tokens_details=None,
+            ),
+            choices=[
+                SimpleNamespace(message=SimpleNamespace(content=json.dumps(data)))
+            ],
+        )
+
+    monkeypatch.setattr(utils, "aperform_completion_with_backoff", completion)
+    strategy = LLMExtractionStrategy(
+        llm_config=LLMConfig(
+            provider="openai/unused",
+            api_token="test-token",
+            base_url="http://127.0.0.1:9",
+        )
+    )
+
+    async def run():
+        await async_db_manager.ainit_db()
+        await async_db_manager.update_db_schema()
+        try:
+            async with AsyncWebCrawler(
+                crawler_strategy=AsyncHTTPCrawlerStrategy(), verbose=False
+            ) as crawler:
+                result = await crawl(crawler, site, extraction_strategy=strategy)
+                assert result.cache_status == "miss"
+                assert json.loads(result.extracted_content) == [data]
+
+                replay = await crawl(crawler, site, extraction_strategy=strategy)
+                assert replay.cache_status == "hit"
+                assert replay.extracted_content == result.extracted_content
+                assert calls == 1
+        finally:
+            await async_db_manager.cleanup()
+
+    asyncio.run(run())

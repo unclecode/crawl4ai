@@ -23,7 +23,7 @@ from .chunking_strategy import *  # noqa: F403
 from .chunking_strategy import IdentityChunking
 from .content_filter_strategy import *  # noqa: F403
 from .extraction_strategy import *  # noqa: F403
-from .extraction_strategy import LLMExtractionStrategy, NoExtractionStrategy
+from .extraction_strategy import NoExtractionStrategy, _LLMExtractionError
 from .async_crawler_strategy import (
     AsyncCrawlerStrategy,
     AsyncPlaywrightCrawlerStrategy,
@@ -962,11 +962,8 @@ class AsyncWebCrawler:
                     config.extraction_strategy.run, url, sections
                 )
                 
-            if isinstance(config.extraction_strategy, LLMExtractionStrategy) and any(
-                isinstance(block, dict)
-                and block.get("error") is True
-                and block.get("tags") == ["error"]
-                for block in extracted_content
+            if isinstance(extracted_content, list) and any(
+                isinstance(block, _LLMExtractionError) for block in extracted_content
             ):
                 processing_failed = True
 
