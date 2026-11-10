@@ -1617,6 +1617,79 @@ class BrowserManager:
                 )
             return None
 
+
+    async def _new_page_cancel_safe(self, context):
+        """
+        Create a page, shielding the Playwright call so a CancelledError
+        cannot orphan a page that finishes after the caller is cancelled.
+        """
+        task = asyncio.create_task(context.new_page())
+        try:
+            return await asyncio.shield(task)
+        except asyncio.CancelledError:
+            # Caller was cancelled. If Playwright still finishes the page,
+            # close it so it is not orphaned; if it is still running, cancel it.
+            if task.done():
+                if task.cancelled():
+                    raise
+                exc = task.exception()
+                if exc is not None:
+                    raise
+                page = task.result()
+                try:
+                    await page.close()
+                except Exception:
+                    pass
+            else:
+                task.cancel()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
+            raise
+        except Exception:
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
+            elif not task.cancelled() and task.exception() is None:
+                try:
+                    await task.result().close()
+                except Exception:
+                    pass
+            raise
+
+    async def _release_unreturned_context_acquire(
+        self, config_signature: str, page=None
+    ):
+        """
+        Undo a get_page() acquisition that never returned to the caller.
+
+        Decrements the context refcount and closes any page we created.
+        Must not raise — used from BaseException cleanup paths.
+        """
+        if page is not None:
+            try:
+                self._page_to_sig.pop(page, None)
+            except Exception:
+                pass
+            try:
+                await page.close()
+            except Exception:
+                pass
+        if config_signature is None:
+            return
+        try:
+            async with self._contexts_lock:
+                if config_signature in self._context_refcounts:
+                    self._context_refcounts[config_signature] = max(
+                        0, self._context_refcounts[config_signature] - 1
+                    )
+        except Exception:
+            pass
+
     async def get_page(self, crawlerRunConfig: CrawlerRunConfig):
         """
         Get a page for the given session ID, creating a new one if needed.
@@ -1628,6 +1701,7 @@ class BrowserManager:
             (page, context): The Page and its BrowserContext
         """
         self._cleanup_expired_sessions()
+        pending_acquire = None  # (config_signature, page) while acquire is unreturned
 
         # If a session_id is provided and we already have it, reuse that page + context
         if crawlerRunConfig.session_id and crawlerRunConfig.session_id in self.sessions:
@@ -1662,25 +1736,28 @@ class BrowserManager:
                     )
                     self._context_last_used[config_signature] = time.monotonic()
 
-                # Close evicted context OUTSIDE lock
-                if to_close is not None:
-                    try:
-                        await to_close.close()
-                    except Exception:
-                        pass
-
-                # Always create a new page for each crawl (isolation for navigation)
+                # Always create a new page for each crawl (isolation for navigation).
+                # pending_acquire keeps the refcount until the common return path
+                # successfully hands the page to the caller (covers cancel during bump).
+                page = None
+                pending_acquire = (config_signature, None)
                 try:
-                    page = await context.new_page()
-                except Exception:
-                    async with self._contexts_lock:
-                        if config_signature in self._context_refcounts:
-                            self._context_refcounts[config_signature] = max(
-                                0, self._context_refcounts[config_signature] - 1
-                            )
+                    # Close evicted context OUTSIDE lock
+                    if to_close is not None:
+                        try:
+                            await to_close.close()
+                        except Exception:
+                            pass
+                        to_close = None
+                    page = await self._new_page_cancel_safe(context)
+                    pending_acquire = (config_signature, page)
+                    await self._apply_stealth_to_page(page)
+                    self._page_to_sig[page] = config_signature
+                except BaseException:
+                    await self._release_unreturned_context_acquire(
+                        pending_acquire[0], pending_acquire[1]
+                    )
                     raise
-                await self._apply_stealth_to_page(page)
-                self._page_to_sig[page] = config_signature
             elif self.config.storage_state:
                 tmp_context = await self.create_browser_context(crawlerRunConfig)
                 ctx = self.default_context        # default context, one window only
@@ -1762,37 +1839,74 @@ class BrowserManager:
                 )
                 self._context_last_used[config_signature] = time.monotonic()
 
-            # Close evicted context OUTSIDE lock
-            if to_close is not None:
-                try:
-                    await to_close.close()
-                except Exception:
-                    pass
-
-            # Create a new page from the chosen context
+            # Create a new page from the chosen context.
+            # Hold the acquire until we successfully return so cancellation
+            # during new_page / stealth / recycle cannot leak the refcount.
+            page = None
+            acquired = True
             try:
-                page = await context.new_page()
-            except Exception:
-                async with self._contexts_lock:
-                    if config_signature in self._context_refcounts:
-                        self._context_refcounts[config_signature] = max(
-                            0, self._context_refcounts[config_signature] - 1
-                        )
-                raise
-            await self._apply_stealth_to_page(page)
-            self._page_to_sig[page] = config_signature
+                if to_close is not None:
+                    try:
+                        await to_close.close()
+                    except Exception:
+                        pass
+                    to_close = None
+                page = await self._new_page_cancel_safe(context)
+                await self._apply_stealth_to_page(page)
+                self._page_to_sig[page] = config_signature
 
-        # If a session_id is specified, store this session so we can reuse later
-        if crawlerRunConfig.session_id:
-            self.sessions[crawlerRunConfig.session_id] = (context, page, time.time())
+                # If a session_id is specified, store this session so we can reuse later
+                if crawlerRunConfig.session_id:
+                    self.sessions[crawlerRunConfig.session_id] = (context, page, time.time())
 
-        self._pages_served += 1
+                self._pages_served += 1
 
-        # Check if browser recycle threshold is hit — bump version for next requests
-        # This happens AFTER incrementing counter so concurrent requests see correct count
-        await self._maybe_bump_browser_version()
+                # Check if browser recycle threshold is hit — bump version for next requests
+                # Non-blocking: if too many old versions are draining, defer the bump.
+                await self._maybe_bump_browser_version()
+                acquired = False  # caller owns release via release_page_async
+                return page, context
+            finally:
+                if acquired:
+                    # Never returned — drop session bookkeeping if we set it.
+                    if (
+                        crawlerRunConfig.session_id
+                        and crawlerRunConfig.session_id in self.sessions
+                    ):
+                        sess = self.sessions.get(crawlerRunConfig.session_id)
+                        if sess is not None and sess[1] is page:
+                            self.sessions.pop(crawlerRunConfig.session_id, None)
+                    await self._release_unreturned_context_acquire(
+                        config_signature, page
+                    )
 
-        return page, context
+        # Managed-browser paths above that did not early-return still land here.
+        # pending_acquire is set only for the isolated-context path (refcount tracking).
+        try:
+            # If a session_id is specified, store this session so we can reuse later
+            if crawlerRunConfig.session_id:
+                self.sessions[crawlerRunConfig.session_id] = (context, page, time.time())
+
+            self._pages_served += 1
+
+            # Check if browser recycle threshold is hit — bump version for next requests
+            # Non-blocking: if too many old versions are draining, defer the bump.
+            await self._maybe_bump_browser_version()
+
+            pending_acquire = None  # handed off to caller
+            return page, context
+        finally:
+            if pending_acquire is not None:
+                if (
+                    crawlerRunConfig.session_id
+                    and crawlerRunConfig.session_id in self.sessions
+                ):
+                    sess = self.sessions.get(crawlerRunConfig.session_id)
+                    if sess is not None and sess[1] is page:
+                        self.sessions.pop(crawlerRunConfig.session_id, None)
+                await self._release_unreturned_context_acquire(
+                    pending_acquire[0], pending_acquire[1]
+                )
 
     async def kill_session(self, session_id: str):
         """
@@ -1866,108 +1980,96 @@ class BrowserManager:
 
         New requests automatically get a new browser (via new signature).
         Old browser drains naturally and gets cleaned up when refcount hits 0.
+
+        Never blocks inside get_page(): if too many old versions are still
+        draining, opportunistically drop entries whose refcount is already 0
+        and otherwise defer the bump to a later request. Blocking here was the
+        second half of the Docker recycle deadlock in #2419 — cancelled waits
+        leaked context refcounts and permanently filled the pending drain.
         """
         if not self._should_recycle():
             return
 
-        # Safety cap: wait if too many old browsers are draining
-        while True:
-            async with self._pending_cleanup_lock:
-                # Re-check threshold under lock (another request may have bumped already)
-                if not self._should_recycle():
-                    return
+        idle_sigs = []
+        old_version = None
 
-                # Check safety cap
-                if len(self._pending_cleanup) >= self._max_pending_browsers:
+        async with self._pending_cleanup_lock:
+            # Re-check threshold under lock (another request may have bumped already)
+            if not self._should_recycle():
+                return
+
+            # Opportunistically clear drained (refcount 0) pending entries so a
+            # full drain queue does not permanently block recycling.
+            if len(self._pending_cleanup) >= self._max_pending_browsers:
+                drained = [
+                    s
+                    for s in list(self._pending_cleanup.keys())
+                    if self._context_refcounts.get(s, 0) == 0
+                ]
+                for sig in drained:
+                    self._pending_cleanup.pop(sig, None)
+                if drained:
+                    # Close drained contexts outside this lock below.
+                    idle_sigs.extend(drained)
                     if self.logger:
                         self.logger.debug(
-                            message="Waiting for old browser to drain (pending: {count})",
+                            message="Cleared {count} drained pending entries before recycle",
                             tag="BROWSER",
-                            params={"count": len(self._pending_cleanup)},
+                            params={"count": len(drained)},
                         )
-                    self._cleanup_slot_available.clear()
-                    # Release lock and wait
-                else:
-                    # We have a slot — do the bump inside this lock hold
-                    old_version = self._browser_version
-                    active_sigs = []
-                    idle_sigs = []
-                    async with self._contexts_lock:
-                        for sig in list(self._context_refcounts.keys()):
-                            if self._context_refcounts.get(sig, 0) > 0:
-                                active_sigs.append(sig)
-                            else:
-                                idle_sigs.append(sig)
+                    if len(self._pending_cleanup) < self._max_pending_browsers:
+                        self._cleanup_slot_available.set()
 
-                    if self.logger:
-                        self.logger.info(
-                            message="Bumping browser version {old} -> {new} after {count} pages ({active} active, {idle} idle sigs)",
-                            tag="BROWSER",
-                            params={
-                                "old": old_version,
-                                "new": old_version + 1,
-                                "count": self._pages_served,
-                                "active": len(active_sigs),
-                                "idle": len(idle_sigs),
-                            },
-                        )
+            if len(self._pending_cleanup) >= self._max_pending_browsers:
+                if self.logger:
+                    self.logger.debug(
+                        message="Deferring browser recycle; pending drain full ({count})",
+                        tag="BROWSER",
+                        params={"count": len(self._pending_cleanup)},
+                    )
+                # Fall through to close any drained contexts we collected, then return.
+            else:
+                # We have a slot — do the bump inside this lock hold
+                old_version = self._browser_version
+                active_sigs = []
+                bump_idle = []
+                async with self._contexts_lock:
+                    for sig in list(self._context_refcounts.keys()):
+                        if self._context_refcounts.get(sig, 0) > 0:
+                            active_sigs.append(sig)
+                        else:
+                            bump_idle.append(sig)
 
-                    # Only add sigs with active crawls to pending cleanup.
-                    # Sigs with refcount 0 are cleaned up immediately below
-                    # to avoid them being stuck in _pending_cleanup forever
-                    # (no future release would trigger their cleanup).
-                    done_event = asyncio.Event()
-                    for sig in active_sigs:
-                        self._pending_cleanup[sig] = {
-                            "version": old_version,
-                            "done": done_event,
-                        }
+                if self.logger:
+                    self.logger.info(
+                        message="Bumping browser version {old} -> {new} after {count} pages ({active} active, {idle} idle sigs)",
+                        tag="BROWSER",
+                        params={
+                            "old": old_version,
+                            "new": old_version + 1,
+                            "count": self._pages_served,
+                            "active": len(active_sigs),
+                            "idle": len(bump_idle),
+                        },
+                    )
 
-                    # Bump version — new get_page() calls will create new contexts
-                    self._browser_version += 1
-                    self._pages_served = 0
+                # Only add sigs with active crawls to pending cleanup.
+                # Sigs with refcount 0 are cleaned up immediately below
+                # to avoid them being stuck in _pending_cleanup forever
+                # (no future release would trigger their cleanup).
+                done_event = asyncio.Event()
+                for sig in active_sigs:
+                    self._pending_cleanup[sig] = {
+                        "version": old_version,
+                        "done": done_event,
+                    }
 
-                    # Clean up idle sigs immediately (outside pending_cleanup_lock below)
-                    break  # exit while loop to do cleanup outside locks
+                # Bump version — new get_page() calls will create new contexts
+                self._browser_version += 1
+                self._pages_served = 0
+                idle_sigs.extend(bump_idle)
 
-            # Safety cap path: wait for a cleanup slot, then retry.
-            # Timeout prevents permanent deadlock if stuck entries never drain.
-            try:
-                await asyncio.wait_for(
-                    self._cleanup_slot_available.wait(), timeout=30.0
-                )
-            except asyncio.TimeoutError:
-                # Force-clean any pending entries that have refcount 0
-                # (they're stuck and will never drain naturally)
-                async with self._pending_cleanup_lock:
-                    stuck_sigs = [
-                        s for s in list(self._pending_cleanup.keys())
-                        if self._context_refcounts.get(s, 0) == 0
-                    ]
-                    for sig in stuck_sigs:
-                        self._pending_cleanup.pop(sig, None)
-                    if stuck_sigs:
-                        if self.logger:
-                            self.logger.warning(
-                                message="Force-cleaned {count} stuck pending entries after timeout",
-                                tag="BROWSER",
-                                params={"count": len(stuck_sigs)},
-                            )
-                        # Clean up the stuck contexts
-                        for sig in stuck_sigs:
-                            async with self._contexts_lock:
-                                context = self.contexts_by_config.pop(sig, None)
-                                self._context_refcounts.pop(sig, None)
-                                self._context_last_used.pop(sig, None)
-                            if context is not None:
-                                try:
-                                    await context.close()
-                                except Exception:
-                                    pass
-                        if len(self._pending_cleanup) < self._max_pending_browsers:
-                            self._cleanup_slot_available.set()
-
-        # Reached via break — clean up idle sigs immediately (outside locks)
+        # Close idle / drained contexts outside locks
         for sig in idle_sigs:
             async with self._contexts_lock:
                 context = self.contexts_by_config.pop(sig, None)
@@ -1978,12 +2080,13 @@ class BrowserManager:
                     await context.close()
                 except Exception:
                     pass
-        if idle_sigs and self.logger:
+        if idle_sigs and self.logger and old_version is not None:
             self.logger.debug(
                 message="Immediately cleaned up {count} idle contexts from version {version}",
                 tag="BROWSER",
                 params={"count": len(idle_sigs), "version": old_version},
             )
+
 
     async def _maybe_cleanup_old_browser(self, sig: str):
         """Clean up an old browser's context if its refcount hit 0 and it's pending cleanup."""
