@@ -1,4 +1,5 @@
 import sys
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
 import pytest
@@ -35,6 +36,9 @@ class DummyResponse:
     def text(self):
         return self._content.decode("utf-8")
 
+    async def aiter_bytes(self):
+        yield self._content
+
 
 class DummyAsyncClient:
     def __init__(self, response_map):
@@ -45,6 +49,10 @@ class DummyAsyncClient:
         if callable(payload):
             payload = payload()
         return DummyResponse(url, payload)
+
+    @asynccontextmanager
+    async def stream(self, method, url, **kwargs):
+        yield await self.get(url, **kwargs)
 
 
 @pytest.mark.asyncio
