@@ -327,7 +327,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                         kwargs.get("exclude_external_links", False)
                         or link_base_domain in exclude_domains
                     ):
-                        link.getparent().remove(link)
+                        link.drop_tree()
                         continue
 
                     if normalized_href not in external_links_dict:
@@ -355,9 +355,8 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 kwargs.get("exclude_external_images", False)
                 and is_external_url(src, base_domain)
             ):
-                parent = img.getparent()
-                if parent is not None:
-                    parent.remove(img)
+                if img.getparent() is not None:
+                    img.drop_tree()
                 continue
 
             # Otherwise, process the image as usual.
@@ -391,17 +390,17 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
         # Clean up unwanted elements
         if kwargs.get("remove_forms", False):
             for form in element.xpath(".//form"):
-                form.getparent().remove(form)
+                form.drop_tree()
 
         if excluded_tags := kwargs.get("excluded_tags", []):
             for tag in excluded_tags:
                 for elem in element.xpath(f".//{tag}"):
-                    elem.getparent().remove(elem)
+                    elem.drop_tree()
 
         if excluded_selector := kwargs.get("excluded_selector", ""):
             try:
                 for elem in element.cssselect(excluded_selector):
-                    elem.getparent().remove(elem)
+                    elem.drop_tree()
             except Exception:
                 pass  # Invalid selector
 
@@ -699,13 +698,15 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             if kwargs.get("exclude_all_images", False):
                 for img in body.xpath('//img'):
                     if img.getparent() is not None:
-                        img.getparent().remove(img)
+                        img.drop_tree()
 
             # Add comment removal
             if kwargs.get("remove_comments", False):
                 comments = body.xpath("//comment()")
                 for comment in comments:
-                    comment.getparent().remove(comment)
+                    # A comment outside <html> has no parent
+                    if comment.getparent() is not None:
+                        comment.drop_tree()
 
             # Handle tag-based removal first
             excluded_tags = set(kwargs.get("excluded_tags", []) or [])
@@ -713,7 +714,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 for tag in excluded_tags:
                     for element in body.xpath(f".//{tag}"):
                         if element.getparent() is not None:
-                            element.getparent().remove(element)
+                            element.drop_tree()
 
             # Handle CSS selector-based exclusion
             excluded_selector = kwargs.get("excluded_selector", "")
@@ -721,7 +722,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 try:
                     for element in body.cssselect(excluded_selector):
                         if element.getparent() is not None:
-                            element.getparent().remove(element)
+                            element.drop_tree()
                 except Exception as e:
                     self._log(
                         "error", f"Error with excluded CSS selector: {str(e)}", "SCRAPE"
@@ -823,31 +824,12 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 except Exception:
                     pass
 
-            # Remove script and style tags
-            for tag in ["style", "link", "meta", "noscript"]:
+            # Remove script and style tags. drop_tree() keeps the text after
+            # each one (its .tail), which remove() would throw away.
+            for tag in ["style", "link", "meta", "noscript", "script"]:
                 for element in body.xpath(f".//{tag}"):
                     if element.getparent() is not None:
-                        element.getparent().remove(element)
-                        
-            # Handle script separately
-            for element in body.xpath(f".//script"):
-                parent = element.getparent()
-                if parent is not None:
-                    tail = element.tail  # Get the tail text
-                    if tail:
-                        prev = element.getprevious()  # Get the previous sibling node
-                        if prev is not None:
-                            if prev.tail:
-                                prev.tail += tail 
-                            else:
-                                prev.tail = tail
-                        else:
-                            if parent.text:
-                                parent.text += tail
-                            else:
-                                parent.text = tail
-                    parent.remove(element)  # Delete the element
-
+                        element.drop_tree()
 
             # Handle social media and domain exclusions
             kwargs["exclude_domains"] = set(kwargs.get("exclude_domains", []))
@@ -862,7 +844,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             if kwargs.get("remove_forms", False):
                 for form in body.xpath(".//form"):
                     if form.getparent() is not None:
-                        form.getparent().remove(form)
+                        form.drop_tree()
 
             # Process content
             media = {"images": [], "videos": [], "audios": [], "tables": []}
