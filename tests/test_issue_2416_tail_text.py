@@ -72,6 +72,15 @@ def test_nested_excluded_tags_keep_outer_tail(strategy):
     assert "Before  after it." in result["cleaned_html"]
 
 
+@pytest.mark.parametrize("wrap", ["<p>{}</p>", "<pre>{}</pre>"], ids=["fenced", "inside_pre"])
+def test_text_after_mermaid_svg_is_kept(strategy, wrap):
+    svg = '<svg id="mermaid-1"><text>NodeA</text></svg>'
+    body = wrap.format(f"Before {svg} after it.")
+    result = strategy._scrap(URL, f"<html><body>{body}</body></html>")
+    assert "NodeA" in result["cleaned_html"]
+    assert "after it." in result["cleaned_html"]
+
+
 def test_comment_outside_html_does_not_break_remove_comments(strategy):
     html = "<!-- top --><html><body><p>Before <!-- c --> after it.</p></body></html><!-- end -->"
     result = strategy._scrap(URL, html, remove_comments=True)

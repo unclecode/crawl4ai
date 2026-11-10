@@ -808,9 +808,6 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                         # the label text without the SVG markup noise.
                         placeholder = lhtml.Element("span")
                         placeholder.text = "\n".join(labels)
-                        parent = svg.getparent()
-                        if parent is not None:
-                            parent.replace(svg, placeholder)
                     else:
                         # Build a fenced code block that survives markdown conversion
                         placeholder = lhtml.Element("pre")
@@ -818,9 +815,12 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                         code = etree.SubElement(placeholder, "code")
                         code.set("class", "language-mermaid")
                         code.text = f"%% {diagram_type} diagram\n" + "\n".join(labels)
-                        parent = svg.getparent()
-                        if parent is not None:
-                            parent.replace(svg, placeholder)
+
+                    # replace() drops the SVG's tail, so carry it over
+                    placeholder.tail = svg.tail
+                    parent = svg.getparent()
+                    if parent is not None:
+                        parent.replace(svg, placeholder)
                 except Exception:
                     pass
 
