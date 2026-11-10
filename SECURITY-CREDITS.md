@@ -34,4 +34,4 @@ We thank the following security researchers for their responsible disclosure:
 | arpe1618 | GitHub: [arpe1618](https://github.com/arpe1618) | Browser context (cookies, storage, service workers) shared between API callers on the Docker server (0.9.6) | 2026-10-19 |
 | Vijhn Austin | GitHub: [VijhnAustin](https://github.com/VijhnAustin) | ReDoS gate bypass via list-form schema field type, an incomplete fix of GHSA-j843 (0.9.6) | 2026-10-25 |
 | Daniel Ruf | GitHub: [weaverant](https://github.com/weaverant) | Vulnerable Brotli decoder (CVE-2026-111497) in the brotli dependency range and in the Node.js bundled with the Playwright and patchright drivers in the Docker image (0.9.6) | 2026-10-25 |
-| ucsurf | Email report ([uc.surf](https://uc.surf)) | Unbounded sitemap index following in AsyncUrlSeeder and DomainMapper (cycles, nesting, gzip bombs) (0.9.6) | 2026-11-10 |
+| Ugur Celik | GitHub: [ucsurf](https://github.com/ucsurf) | Unbounded sitemap index following in AsyncUrlSeeder and DomainMapper (cycles, nesting, gzip bombs) (0.9.6) | 2026-11-10 |
