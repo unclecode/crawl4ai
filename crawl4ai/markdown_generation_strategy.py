@@ -5,7 +5,7 @@ from .html2text import CustomHTML2Text
 # from .types import RelevantContentFilter
 from .content_filter_strategy import RelevantContentFilter
 import re
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 # Pre-compile the regex pattern
 LINK_PATTERN = re.compile(r'!?\[((?:[^\[\]]|\[(?:[^\[\]]|\[[^\]]*\])*\])*)\]\(((?:[^()\s]|\([^()]*\))*)(?:\s+"([^"]*)")?\)')
@@ -16,10 +16,12 @@ def fast_urljoin(base: str, url: str) -> str:
     if url.startswith(("http://", "https://", "mailto:", "//")):
         return url
     if url.startswith("/"):
-        # Handle absolute paths
-        if base.endswith("/"):
-            return base[:-1] + url
-        return base + url
+        # Root-relative paths resolve against the origin, not against the page path:
+        # "/about" on ".../blog/post" is ".../about", never ".../blog/post/about".
+        parts = urlsplit(base)
+        if parts.scheme and parts.netloc:
+            return f"{parts.scheme}://{parts.netloc}{url}"
+        return url
     return urljoin(base, url)
 
 
