@@ -594,8 +594,18 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False):
             return None
 
         # Get constructor signature
-        sig = inspect.signature(obj.__class__.__init__)
-        params = sig.parameters
+        # A subclass whose __init__ only forwards *args/**kwargs (e.g.
+        # DFSDeepCrawlStrategy) has no named parameters to read back; use the
+        # nearest class in the MRO that has some.
+        params = inspect.signature(obj.__class__.__init__).parameters
+        for klass in obj.__class__.__mro__:
+            klass_params = inspect.signature(klass.__init__).parameters
+            if any(
+                name != "self" and p.kind not in (p.VAR_POSITIONAL, p.VAR_KEYWORD)
+                for name, p in klass_params.items()
+            ):
+                params = klass_params
+                break
 
         # Get current values
         current_values = {}
@@ -608,7 +618,14 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False):
             # Only include if different from default, considering empty values
             if not (is_empty_value(value) and is_empty_value(param.default)):
                 if value != param.default and not ignore_default_value:
-                    current_values[name] = to_serializable_dict(value)
+                    serialized = to_serializable_dict(value)
+                    # An object that cannot be deserialized (a Logger, a callable)
+                    # serializes to None. Leave the field out instead of sending
+                    # an explicit null: the server rejects some of these fields
+                    # (e.g. `logger` on deep crawl strategies) even when null.
+                    if serialized is None and value is not None:
+                        continue
+                    current_values[name] = serialized
         
         # Don't serialize private __slots__ - they're internal implementation details
         # not constructor parameters. This was causing URLPatternFilter to fail
