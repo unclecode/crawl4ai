@@ -256,6 +256,18 @@ class DefaultTableExtraction(TableExtractionStrategy):
 
         return [[text or "" for text in row] for row in grid if row]
 
+    @staticmethod
+    def _own_rows(table: etree.Element, rows: List[etree.Element]) -> List[etree.Element]:
+        """Drop rows that belong to a table nested inside a cell of ``table``."""
+        own = []
+        for tr in rows:
+            ancestor = tr.getparent()
+            while ancestor is not None and ancestor.tag != "table":
+                ancestor = ancestor.getparent()
+            if ancestor is table:
+                own.append(tr)
+        return own
+
     def extract_table_data(self, table: etree.Element) -> Dict[str, Any]:
         """
         Extract structured data from a table element.
@@ -279,9 +291,11 @@ class DefaultTableExtraction(TableExtractionStrategy):
         # Extract headers with colspan handling
         headers = []
         implicit_header_row = None
-        thead_rows = table.xpath(".//thead/tr")
+        thead_rows = self._own_rows(table, table.xpath(".//thead/tr"))
         if thead_rows:
-            header_cells = thead_rows[0].xpath(".//th")
+            # Direct children only: a nested table in a header cell must not
+            # contribute cells. <td> is accepted too, as in the implicit case.
+            header_cells = thead_rows[0].xpath("./th|./td")
             for cell in header_cells:
                 text = cell.text_content().strip()
                 colspan = int(cell.get("colspan", 1))
@@ -291,14 +305,16 @@ class DefaultTableExtraction(TableExtractionStrategy):
             first_row = table.xpath(".//tr[1]")
             if first_row:
                 implicit_header_row = first_row[0]
-                for cell in implicit_header_row.xpath(".//th|.//td"):
+                for cell in implicit_header_row.xpath("./th|./td"):
                     text = cell.text_content().strip()
                     colspan = int(cell.get("colspan", 1))
                     headers.extend([text] * colspan)
         
         # Extract rows, laying each cell into a grid so colspan/rowspan land in
         # the columns they actually cover and <th> row headers are kept (#2258).
-        body_rows = table.xpath(".//tr[not(ancestor::thead)]")
+        body_rows = self._own_rows(
+            table, table.xpath(".//tr[not(ancestor::thead)]")
+        )
         # A first row made only of <th> is the header, so don't repeat it as
         # data. A first row mixing <th scope="row"> with <td> is a key/value
         # data row and must stay.
