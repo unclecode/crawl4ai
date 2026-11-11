@@ -446,7 +446,7 @@ class StatisticalStrategy(CrawlStrategy):
         link_text = ' '.join(filter(None, [
             link.text or '',
             link.title or '',
-            link.head_data.get('meta', {}).get('title', '') if link.head_data else '',
+            link.head_data.get('title', '') if link.head_data else '',
             link.head_data.get('meta', {}).get('description', '') if link.head_data else '',
             link.head_data.get('meta', {}).get('keywords', '') if link.head_data else ''
         ])).lower()
@@ -479,8 +479,8 @@ class StatisticalStrategy(CrawlStrategy):
             link.text or '',
             link.title or '',
             link.head_data.get('title', '') if link.head_data else '',
-            link.head_data.get('description', '') if link.head_data else '',
-            link.head_data.get('keywords', '') if link.head_data else ''
+            link.head_data.get('meta', {}).get('description', '') if link.head_data else '',
+            link.head_data.get('meta', {}).get('keywords', '') if link.head_data else ''
         ])).lower()
         
         link_terms = set(self._tokenize(link_text))
