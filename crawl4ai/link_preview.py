@@ -93,7 +93,7 @@ class LinkPreview:
         
         if not filtered_urls:
             self._log("info", "No links matched filtering criteria")
-            return links
+            return self._merge_head_data(links, [], config)
         
         self._log("info", "Extracting head content for {count} filtered links",
                   params={"count": len(filtered_urls)})
