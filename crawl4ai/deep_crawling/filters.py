@@ -93,27 +93,35 @@ class FilterChain:
         self.stats._counters[0] += 1  # Total processed URLs
 
         tasks = []
-        for f in self.filters:
-            result = f.apply(url)
+        try:
+            for f in self.filters:
+                result = f.apply(url)
 
-            if inspect.isawaitable(result):
-                tasks.append(result)  # Collect async tasks
-            elif not result:  # Sync rejection
-                self.stats._counters[2] += 1  # Sync rejected
-                return False
+                if inspect.isawaitable(result):
+                    tasks.append(asyncio.ensure_future(result))
+                elif not result:  # Sync rejection
+                    self.stats._counters[2] += 1  # Sync rejected
+                    return False
 
-        if tasks:
-            results = await asyncio.gather(*tasks)
+            if tasks:
+                results = await asyncio.gather(*tasks)
 
-            # Count how many filters rejected
-            rejections = results.count(False)
-            self.stats._counters[2] += rejections
+                # Count how many filters rejected
+                rejections = results.count(False)
+                self.stats._counters[2] += rejections
 
-            if not all(results):
-                return False  # Stop early if any filter rejected
+                if not all(results):
+                    return False  # Stop early if any filter rejected
 
-        self.stats._counters[1] += 1  # Passed
-        return True
+            self.stats._counters[1] += 1  # Passed
+            return True
+        finally:
+            # Rejection, exceptions, and cancellation must not leave filters running.
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
 
 
 class URLPatternFilter(URLFilter):
