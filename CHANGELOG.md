@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `crawl4ai-setup` no longer points to Crawl4AI Cloud when the browser install fails. It retries the browser without `--with-deps` (which needs root on Linux), prints the exact command for the system libraries, and exits with code 1 instead of printing "completed". The cloud banner at the end shows only after a successful setup.
 - `crawl4ai-doctor` exits with code 1 when its test crawl fails, counts a blocked page as a failure, and shows no cloud banner.
 - The cloud banner and the blocked line state the current free offer: 1,000 free credits every month.
+- `PDFContentScrapingStrategy` has a total download and parse time limit, `max_pdf_seconds` (default 300). Before, a server that sent bytes slowly could keep a PDF scrape running long after the request timed out. Set `max_pdf_seconds=0` to turn the limit off. A subclass that overrides `_get_pdf_path` must now accept a second `check` argument. Thanks to [prassu017](https://github.com/prassu017) (#2461).
 
 ### Crawl4AI Cloud
 

@@ -447,6 +447,17 @@ def test_read_timeout_never_exceeds_total_budget():
     assert requests.calls[0][1]["timeout"][1] <= 30
 
 
+def test_timeouts_shrink_to_the_time_left_in_the_budget():
+    strategy = _strategy()
+    requests = FakeRequests([FakeResponse(200, {}, [b"%PDF"])])
+
+    strategy._fetch_with_redirect_checks(
+        requests, "https://public.example/doc.pdf", check=lambda: 5
+    )
+
+    assert requests.calls[0][1]["timeout"] == (5, 5)
+
+
 def test_slow_parse_aborts_past_total_budget(tmp_path, monkeypatch):
     import time
 
@@ -480,7 +491,10 @@ def test_slow_parse_aborts_past_total_budget(tmp_path, monkeypatch):
     assert len(parsed) < 50, "queued pages must not keep parsing after the budget"
 
 
-@pytest.mark.parametrize("sent, expected", [(10**9, 300), (0, 300), (None, 300), (30, 30)])
+@pytest.mark.parametrize(
+    "sent, expected",
+    [(10**9, 300), (0, 300), (None, 300), (30, 30), (30.5, 30.5), (float("nan"), 300), (True, 300)],
+)
 def test_untrusted_body_cannot_raise_its_time_budget(sent, expected):
     from crawl4ai.async_configs import _clamp_untrusted
 
