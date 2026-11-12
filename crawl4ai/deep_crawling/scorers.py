@@ -29,7 +29,7 @@ class ScoringStats:
     def __init__(self):
         self._urls_scored = 0
         self._total_score = 0.0
-        self._min_score = None  # Lazy initialization
+        self._min_score = None  # Initialized by the first observed score
         self._max_score = None
     
     def update(self, score: float) -> None:
@@ -37,29 +37,22 @@ class ScoringStats:
         self._urls_scored += 1
         self._total_score += score
         
-        # Lazy min/max tracking - only if actually accessed
-        if self._min_score is not None:
-            if score < self._min_score:
-                self._min_score = score
-        if self._max_score is not None:
-            if score > self._max_score:
-                self._max_score = score
+        if self._min_score is None or score < self._min_score:
+            self._min_score = score
+        if self._max_score is None or score > self._max_score:
+            self._max_score = score
                 
     def get_average(self) -> float:
         """Direct calculation instead of property"""
         return self._total_score / self._urls_scored if self._urls_scored else 0.0
     
     def get_min(self) -> float:
-        """Lazy min calculation"""
-        if self._min_score is None:
-            self._min_score = self._total_score / self._urls_scored if self._urls_scored else 0.0
-        return self._min_score
+        """Return the lowest observed score, or zero before any updates."""
+        return self._min_score if self._min_score is not None else 0.0
         
     def get_max(self) -> float:
-        """Lazy max calculation"""
-        if self._max_score is None:
-            self._max_score = self._total_score / self._urls_scored if self._urls_scored else 0.0
-        return self._max_score
+        """Return the highest observed score, or zero before any updates."""
+        return self._max_score if self._max_score is not None else 0.0
 class URLScorer(ABC):
     __slots__ = ('_weight', '_stats')
     
