@@ -139,8 +139,11 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
         result.processing_time = time() - start_time
         return result
 
-    def process_batch(self, pdf_path: Path) -> PDFProcessResult:
-        """Like process() but processes PDF pages in parallel batches"""
+    def process_batch(self, pdf_path: Path, check=None) -> PDFProcessResult:
+        """Like process() but processes PDF pages in parallel batches.
+
+        `check`, if given, runs before each page and raises to abort the parse.
+        """
         # Import inside method to allow dependency to be optional
         try:
             from pypdf import PdfReader
@@ -180,6 +183,8 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
                     image_dir = Path(self._temp_dir)
 
             def process_page_safely(page_num: int):
+                if check:
+                    check()
                 # Each thread opens its own file handle
                 with pdf_path.open('rb') as file:
                     thread_reader = PdfReader(file)
