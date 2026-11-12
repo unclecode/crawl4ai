@@ -3067,6 +3067,24 @@ def optimize_html(html_str, threshold=200):
     
     return lxml.html.tostring(root, encoding='unicode', pretty_print=False)
 
+_HEAD_CLOSE_RE = re.compile(rb"</head\s*>", re.IGNORECASE)
+
+
+def _head_section_of(content: bytes) -> bytes:
+    """Return the head of a partially read document, closed only if it was.
+
+    Streaming stops as soon as the head is complete, so a returned buffer either
+    ends at a real ``</head>`` (any case and whitespace) or is the whole
+    document because the page has no head close tag at all. Appending a
+    synthetic ``</head>`` in the second case would report body markup as head
+    metadata.
+    """
+    match = _HEAD_CLOSE_RE.search(content)
+    if match is None:
+        return content
+    return content[: match.end()]
+
+
 class HeadPeekr:
     @staticmethod
     async def fetch_head_section(url, timeout=0.3):
@@ -3079,17 +3097,18 @@ class HeadPeekr:
             async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.get(url, headers=headers, follow_redirects=True)
                 
-                # Handle redirects explicitly by using the final URL
+                # Handle redirects explicitly by using the final URL. A final URL
+                # can itself redirect again, so keep following them here too.
                 if response.url != url:
                     url = str(response.url)
-                    response = await client.get(url, headers=headers)
+                    response = await client.get(url, headers=headers, follow_redirects=True)
                 
                 content = b""
                 async for chunk in response.aiter_bytes():
                     content += chunk
-                    if b"</head>" in content:
-                        break  # Stop after detecting </head>
-                return content.split(b"</head>")[0] + b"</head>"
+                    if _HEAD_CLOSE_RE.search(content):
+                        break  # Stop after detecting the head close tag
+                return _head_section_of(content)
         except (httpx.HTTPError, gaierror) :
             return None
 
