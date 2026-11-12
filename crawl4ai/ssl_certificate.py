@@ -95,7 +95,7 @@ class SSLCertificate(dict):
                         "serial_number": hex(x509.get_serial_number()),
                         "not_before": x509.get_notBefore(), # Keep as bytes initially, _decode handles it
                         "not_after": x509.get_notAfter(),   # Keep as bytes initially
-                        "fingerprint": x509.digest("sha256").hex(), # hex() is already string
+                        "fingerprint": x509.digest("sha256").decode("ascii").replace(":", "").lower(),
                         "signature_algorithm": x509.get_signature_algorithm(), # Keep as bytes
                         "raw_cert": base64.b64encode(cert_binary), # Base64 is bytes, _decode handles it
                     }
