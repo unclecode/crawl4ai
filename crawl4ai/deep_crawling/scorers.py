@@ -260,7 +260,9 @@ class ContentTypeScorer(URLScorer):
         
         # Split into exact vs regex matchers for performance
         for pattern, score in type_weights.items():
-            if pattern.startswith('.') and pattern.endswith('$'):
+            # Only literal extensions can use the lookup; keep regex operators
+            # such as optional characters, groups, and wildcards in the fallback.
+            if re.fullmatch(r'\.[a-zA-Z0-9]+\$', pattern):
                 ext = pattern[1:-1]
                 self._exact_types[ext] = score
             else:
