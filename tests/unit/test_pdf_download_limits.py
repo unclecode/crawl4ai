@@ -88,6 +88,7 @@ class FakeRequests:
     def __init__(self, responses):
         self._responses = list(responses)
         self.calls = []
+        self.headers = {}
 
     def get(self, url, **kwargs):
         self.calls.append((url, kwargs))
@@ -113,6 +114,48 @@ def _strategy(**kwargs):
 
 
 # ── destination validation (SSRF) ──────────────────────────────────────
+
+
+def test_pdf_fetch_identifies_crawler_without_replacing_other_headers():
+    from crawl4ai.__version__ import __version__
+
+    requests = FakeRequests([FakeResponse()])
+    requests.headers["Accept"] = "application/pdf"
+    response = _strategy()._fetch_with_redirect_checks(
+        requests, "https://public.example/doc.pdf"
+    )
+
+    assert response.status_code == 200
+    assert requests.headers == {
+        "Accept": "application/pdf",
+        "User-Agent": f"Crawl4AI/{__version__} (+https://github.com/unclecode/crawl4ai)",
+    }
+
+
+def test_pdf_redirects_keep_the_versioned_crawler_identity(monkeypatch):
+    monkeypatch.setattr(pdf_module, "__version__", "99.0.0", raising=False)
+    requests = FakeRequests(
+        [
+            FakeResponse(302, {"location": "/target.pdf"}),
+            FakeResponse(),
+        ]
+    )
+    seen = []
+    get = requests.get
+
+    def record_headers(url, **kwargs):
+        seen.append(dict(requests.headers))
+        return get(url, **kwargs)
+
+    monkeypatch.setattr(requests, "get", record_headers)
+    _strategy()._fetch_with_redirect_checks(requests, "https://public.example/doc.pdf")
+
+    assert (
+        seen
+        == [{"User-Agent": "Crawl4AI/99.0.0 (+https://github.com/unclecode/crawl4ai)"}]
+        * 2
+    )
+    assert [kwargs["allow_redirects"] for _, kwargs in requests.calls] == [False, False]
 
 
 def test_redirect_target_is_validated_and_blocked():
