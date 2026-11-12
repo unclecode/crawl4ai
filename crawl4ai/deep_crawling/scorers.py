@@ -229,11 +229,7 @@ class PathDepthScorer(URLScorer):
 
     @lru_cache(maxsize=10000)  # Cache the whole calculation
     def _calculate_score(self, url: str) -> float:
-        pos = url.find('/', url.find('://') + 3)
-        if pos == -1:
-            depth = 0
-        else:
-            depth = self._quick_depth(url[pos:])
+        depth = self._quick_depth(urlparse(url).path)
             
         # Use lookup table for common distances
         distance = depth - self._optimal_depth
@@ -286,20 +282,22 @@ class ContentTypeScorer(URLScorer):
         Returns:
             Extension without dot, or empty string if none found
         """
-        pos = url.rfind('.')
+        # Only the final path segment carries a file extension.
+        filename = urlparse(url).path.rsplit('/', 1)[-1]
+        pos = filename.rfind('.')
         if pos == -1:
             return ''
         
         # Find first non-alphanumeric char after extension
-        end = len(url)
-        for i in range(pos + 1, len(url)):
-            c = url[i]
+        end = len(filename)
+        for i in range(pos + 1, len(filename)):
+            c = filename[i]
             # Stop at query string, fragment, path param or any non-alphanumeric
             if c in '?#;' or not c.isalnum():
                 end = i
                 break
                 
-        return url[pos + 1:end].lower()
+        return filename[pos + 1:end].lower()
 
     @lru_cache(maxsize=10000)
     def _calculate_score(self, url: str) -> float:
@@ -469,29 +467,9 @@ class DomainAuthorityScorer(URLScorer):
         Returns:
             Lowercase domain without port
         """
-        # Find domain start
-        start = url.find('://') 
-        if start == -1:
-            start = 0
-        else:
-            start += 3
-            
-        # Find domain end
-        end = url.find('/', start)
-        if end == -1:
-            end = url.find('?', start)
-            if end == -1:
-                end = url.find('#', start)
-                if end == -1:
-                    end = len(url)
-                    
-        # Extract domain and remove port
-        domain = url[start:end]
-        port_idx = domain.rfind(':')
-        if port_idx != -1:
-            domain = domain[:port_idx]
-            
-        return domain.lower()
+        # Preserve support for schemeless hosts while excluding userinfo and ports.
+        parsed = urlparse(url if '://' in url else '//' + url)
+        return parsed.hostname or ''
 
     @lru_cache(maxsize=10000)
     def _calculate_score(self, url: str) -> float:
