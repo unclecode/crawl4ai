@@ -688,6 +688,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 self.llm_config.api_token,
                 base_url=self.llm_config.base_url,
                 json_response=self.force_json_response,
+                provider_config=self.llm_config.provider_config,
                 extra_args=self.extra_args,
                 base_delay=self.llm_config.backoff_base_delay,
                 max_attempts=self.llm_config.backoff_max_attempts,
@@ -891,6 +892,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 self.llm_config.api_token,
                 base_url=self.llm_config.base_url,
                 json_response=self.force_json_response,
+                provider_config=self.llm_config.provider_config,
                 extra_args=self.extra_args,
                 base_delay=self.llm_config.backoff_base_delay,
                 max_attempts=self.llm_config.backoff_max_attempts,
@@ -1602,6 +1604,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
                 json_response=True,
                 api_token=llm_config.api_token,
                 base_url=llm_config.base_url,
+                provider_config=llm_config.provider_config,
             )
             if usage is not None:
                 usage.completion_tokens += response.usage.completion_tokens
@@ -1919,6 +1922,7 @@ In this scenario, use your best judgment to generate the schema. You need to exa
                     json_response=True,
                     api_token=llm_config.api_token,
                     base_url=llm_config.base_url,
+                    provider_config=llm_config.provider_config,
                     messages=messages,
                     extra_args=kwargs,
                 )
