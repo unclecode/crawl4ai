@@ -1233,7 +1233,14 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
     def _extract_list_item(self, element, fields):
         item = {}
         for field in fields:
-            value = self._extract_single_field(element, field)
+            field_element = element
+            if "source" in field:
+                field_element = self._resolve_source(element, field["source"])
+            value = (
+                self._extract_single_field(field_element, field)
+                if field_element is not None
+                else field.get("default")
+            )
             if value is not None:
                 item[field["name"]] = value
         return item
