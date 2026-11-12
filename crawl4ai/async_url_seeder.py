@@ -1003,7 +1003,7 @@ class AsyncUrlSeeder:
 
     async def _iter_sitemap_content(self, url: str, content: bytes):
         """Parse sitemap from already-fetched content."""
-        data = gzip.decompress(content) if url.endswith(".gz") else content
+        data = gzip.decompress(content) if content[:2] == b"\x1f\x8b" else content
         base_url = url
 
         def _normalize_loc(raw: Optional[str]) -> Optional[str]:
@@ -1124,7 +1124,7 @@ class AsyncUrlSeeder:
                       params={"url": url, "error": str(e)}, tag="URL_SEED")
             return
 
-        data = gzip.decompress(r.content) if url.endswith(".gz") else r.content
+        data = gzip.decompress(r.content) if r.content[:2] == b"\x1f\x8b" else r.content
         base_url = str(r.url)
 
         def _normalize_loc(raw: Optional[str]) -> Optional[str]:
