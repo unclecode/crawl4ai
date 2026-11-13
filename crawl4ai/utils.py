@@ -2303,7 +2303,7 @@ def normalize_url(
         # Only preserve HTTPS for same-domain links (not protocol-relative URLs)
         # Protocol-relative URLs (//example.com) should follow the base URL's scheme
         if (parsed_full.scheme == 'http' and 
-            parsed_full.netloc == parsed_base.netloc and
+            parsed_full.netloc.lower() == parsed_base.netloc.lower() and
             not href.strip().startswith('//')):
             full_url = full_url.replace('http://', 'https://', 1)
 
@@ -2375,7 +2375,7 @@ def normalize_url_for_deep_crawl(href, base_url, preserve_https=False, original_
         # Only preserve HTTPS for same-domain links (not protocol-relative URLs)
         # Protocol-relative URLs (//example.com) should follow the base URL's scheme
         if (parsed_full.scheme == 'http' and 
-            parsed_full.netloc == parsed_base.netloc and
+            parsed_full.netloc.lower() == parsed_base.netloc.lower() and
             not href.strip().startswith('//')):
             full_url = full_url.replace('http://', 'https://', 1)
     
@@ -2433,7 +2433,7 @@ def efficient_normalize_url_for_deep_crawl(href, base_url, preserve_https=False,
         # Only preserve HTTPS for same-domain links (not protocol-relative URLs)
         # Protocol-relative URLs (//example.com) should follow the base URL's scheme
         if (parsed_full.scheme == 'http' and 
-            parsed_full.netloc == parsed_base.netloc and
+            parsed_full.netloc.lower() == parsed_base.netloc.lower() and
             not href.strip().startswith('//')):
             full_url = full_url.replace('http://', 'https://', 1)
     
@@ -2456,7 +2456,12 @@ def efficient_normalize_url_for_deep_crawl(href, base_url, preserve_https=False,
 
 
 
-def quick_extract_links(html: str, base_url: str) -> Dict[str, List[Dict[str, str]]]:
+def quick_extract_links(
+    html: str,
+    base_url: str,
+    preserve_https: bool = False,
+    original_scheme: Optional[str] = None,
+) -> Dict[str, List[Dict[str, str]]]:
     """
     Fast link extraction for prefetch mode.
     Only extracts <a href> tags - no media, no cleaning, no heavy processing.
@@ -2464,6 +2469,8 @@ def quick_extract_links(html: str, base_url: str) -> Dict[str, List[Dict[str, st
     Args:
         html: Raw HTML string
         base_url: Base URL for resolving relative links
+        preserve_https: Upgrade same-host http:// links when original_scheme is https
+        original_scheme: Scheme of the URL that was requested
 
     Returns:
         {"internal": [{"href": "...", "text": "..."}], "external": [...]}
@@ -2478,6 +2485,7 @@ def quick_extract_links(html: str, base_url: str) -> Dict[str, List[Dict[str, st
     # base_domain stays anchored to the real page origin so internal/external
     # classification is correct even when a <base> tag points elsewhere.
     base_domain = get_base_domain(base_url)
+    page_url = base_url
 
     # Honor <head><base href> for relative-URL resolution (#752). The full LXML
     # scraping path does this; the prefetch quick path (used by scan/site) must
@@ -2502,7 +2510,13 @@ def quick_extract_links(html: str, base_url: str) -> Dict[str, List[Dict[str, st
             continue
 
         # Normalize URL
-        normalized = normalize_url_for_deep_crawl(href, base_url)
+        # Resolve against <base>, but check same-host against the page itself:
+        # a <base> on another host must not turn its links into same-host links.
+        normalized = normalize_url_for_deep_crawl(
+            urljoin(base_url, href), page_url,
+            preserve_https=preserve_https and not href.startswith("//"),
+            original_scheme=original_scheme,
+        )
         if not normalized or normalized in seen:
             continue
         seen.add(normalized)
