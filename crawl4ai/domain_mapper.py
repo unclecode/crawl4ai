@@ -857,17 +857,40 @@ class DomainMapper:
             if LXML:
                 parser = etree.XMLParser(recover=True)
                 root = etree.fromstring(xml_text.encode("utf-8", "replace"), parser=parser)
+            else:
+                import xml.etree.ElementTree as ET
 
+                root = ET.fromstring(xml_text)
+
+            namespace, separator, root_name = root.tag.rpartition("}")
+            namespace += separator
+            if root_name in ("feed", "entry") and namespace in (
+                "{http://www.w3.org/2005/Atom}",
+                "{http://purl.org/atom/ns#}",
+                "",
+            ):
+                # Match Atom entries and links by expanded name before any RSS fallback.
+                entry_tag = f"{namespace}entry"
+                link_tag = f"{namespace}link"
+                if root_name == "entry":
+                    entries = [root] if LXML else []
+                else:
+                    entries = root.findall(entry_tag)
+                for entry in entries:
+                    links = entry.findall(link_tag)
+                    if not LXML:
+                        links = links[:1]
+                    for link in links:
+                        href = link.get("href")
+                        if href:
+                            urls.append(urljoin(base_url, href.strip()))
+                return urls
+
+            if LXML:
                 # RSS: <item><link>URL</link></item>
                 for link in root.xpath("//*[local-name()='item']/*[local-name()='link']"):
                     if link.text and link.text.strip():
                         urls.append(urljoin(base_url, link.text.strip()))
-
-                # Atom: <entry><link href="URL"/></entry>
-                for link in root.xpath("//*[local-name()='entry']/*[local-name()='link']"):
-                    href = link.get("href")
-                    if href:
-                        urls.append(urljoin(base_url, href.strip()))
 
                 # RSS: <item><guid isPermaLink="true">URL</guid></item>
                 if not urls:
@@ -876,8 +899,6 @@ class DomainMapper:
                         if is_permalink == "true" and guid.text and guid.text.strip().startswith("http"):
                             urls.append(guid.text.strip())
             else:
-                import xml.etree.ElementTree as ET
-                root = ET.fromstring(xml_text)
                 for elem in root.iter():
                     if "}" in elem.tag:
                         elem.tag = elem.tag.split("}")[1]
@@ -886,13 +907,6 @@ class DomainMapper:
                     link = item.find("link")
                     if link is not None and link.text:
                         urls.append(urljoin(base_url, link.text.strip()))
-
-                for entry in root.findall(".//entry"):
-                    link = entry.find("link")
-                    if link is not None:
-                        href = link.get("href")
-                        if href:
-                            urls.append(urljoin(base_url, href.strip()))
         except Exception:
             pass
         return urls
