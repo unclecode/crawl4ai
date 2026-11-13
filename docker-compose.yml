@@ -9,6 +9,8 @@ x-base-config: &base-config
   environment:
     # Auth token passthrough from the host shell (overwrites .llm.env).
     - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-}
+    # Deep crawling over the API (off unless set to true in the shell or .env).
+    - CRAWL4AI_ALLOW_DEEP_CRAWL=${CRAWL4AI_ALLOW_DEEP_CRAWL:-false}
     # Uncomment to set default environment variables (will overwrite .llm.env)
     # - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     # - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}

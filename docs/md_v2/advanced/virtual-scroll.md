@@ -293,7 +293,7 @@ If the container isn't found, crawling continues normally without virtual scroll
 
 ## Complete Example
 
-See our [comprehensive example](/docs/examples/virtual_scroll_example.py) that demonstrates:
+See our [comprehensive example](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/virtual_scroll_example.py) that demonstrates:
 - Twitter-like feeds
 - Instagram grids  
 - Traditional infinite scroll

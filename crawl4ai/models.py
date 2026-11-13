@@ -123,6 +123,7 @@ class MarkdownGenerationResult(BaseModel):
     references_markdown: str
     fit_markdown: Optional[str] = None
     fit_html: Optional[str] = None
+    _generation_failed: bool = PrivateAttr(default=False)
 
     def __str__(self):
         return self.raw_markdown
@@ -133,14 +134,22 @@ class CrawlResult(BaseModel):
     fit_html: Optional[str] = None
     success: bool
     cleaned_html: Optional[str] = None
-    media: Dict[str, List[Dict]] = {}
-    links: Dict[str, List[Dict]] = {}
+    # The keys a scraped page gets (arun moves media's "tables" to .tables), so
+    # a result built without them -- robots.txt refusal, a failed fetch --
+    # keeps the shape.
+    media: Dict[str, List[Dict]] = Field(
+        default_factory=lambda: {"images": [], "videos": [], "audios": []}
+    )
+    links: Dict[str, List[Dict]] = Field(
+        default_factory=lambda: {"internal": [], "external": []}
+    )
     downloaded_files: Optional[List[str]] = None
     js_execution_result: Optional[Dict[str, Any]] = None
     screenshot: Optional[str] = None
     pdf: Optional[bytes] = None
     mhtml: Optional[str] = None
     _markdown: Optional[MarkdownGenerationResult] = PrivateAttr(default=None)
+    _processing_failed: bool = PrivateAttr(default=False)
     extracted_content: Optional[str] = None
     metadata: Optional[dict] = None
     error_message: Optional[str] = None

@@ -162,10 +162,23 @@ class TestDefaultDeployIsSafe:
             "default config launches Chromium with --no-sandbox"
         )
 
-    def test_tls_verification_not_disabled(self, effective_browser_args):
-        """TLS verification must not be disabled by default."""
-        assert "--ignore-certificate-errors" not in effective_browser_args
-        assert "--allow-insecure-localhost" not in effective_browser_args
+    def test_tls_verification_not_disabled(self, effective_browser_args, server_module):
+        """TLS verification must not be disabled by default.
+
+        Checks the flags Chromium is really launched with, not only
+        config.yml: the library adds its own launch flags on every path."""
+        from crawl4ai import BrowserConfig
+        from crawl4ai.browser_manager import BrowserManager, ManagedBrowser
+
+        for bc in (server_module.get_default_browser_config(), BrowserConfig()):
+            launched = (
+                list(effective_browser_args)
+                + BrowserManager(browser_config=bc)._build_browser_args()["args"]
+                + ManagedBrowser.build_browser_flags(bc)
+            )
+            assert "--ignore-certificate-errors" not in launched
+            assert "--ignore-certificate-errors-spki-list" not in launched
+            assert "--allow-insecure-localhost" not in launched
 
     # ───────────────────────── R7: deploy posture ─────────────────────────
 

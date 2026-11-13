@@ -16,6 +16,7 @@ import pytest
 
 from crawl4ai import egress_policy
 from crawl4ai.async_url_seeder import AsyncUrlSeeder
+from crawl4ai.cache_validator import CacheValidator
 from crawl4ai.utils import RobotsParser
 
 PROXY = "http://127.0.0.1:9"  # discard port; nothing here connects
@@ -137,6 +138,35 @@ def test_robots_fetch_no_longer_disables_tls_verification(monkeypatch, tmp_path)
     asyncio.run(parser.can_fetch("https://example.com/x", "bot"))
 
     assert calls[0][1].get("ssl", None) is None
+
+
+# ── cache freshness check ──────────────────────────────────────────────
+
+
+def _validator_client():
+    v = CacheValidator()
+    return v, asyncio.run(v._get_client())
+
+
+def test_cache_validator_client_has_no_proxy_by_default():
+    v, client = _validator_client()
+    try:
+        assert _proxy_transport(client) is None
+    finally:
+        asyncio.run(v.close())
+
+
+def test_cache_validator_client_uses_installed_proxy():
+    """check_cache_freshness is untrusted-allowlisted, so this fetch is
+    caller-controlled and must go through the egress proxy like the others."""
+    egress_policy.set_egress_proxy(PROXY)
+    v, client = _validator_client()
+    try:
+        transport = _proxy_transport(client)
+        assert transport is not None
+        assert transport._pool._http2 is True
+    finally:
+        asyncio.run(v.close())
 
 
 # ── untrusted LinkPreviewConfig clamps ─────────────────────────────────

@@ -271,7 +271,7 @@ config = CrawlerRunConfig(
 - Use `virtual_scroll_config` when content is **replaced** during scroll (Twitter, Instagram)
 - Use `scan_full_page` when content is **appended** during scroll (traditional infinite scroll)
 
-See [Virtual Scroll documentation](../../advanced/virtual-scroll.md) for detailed examples.
+See [Virtual Scroll documentation](../advanced/virtual-scroll.md) for detailed examples.
 
 ---
 

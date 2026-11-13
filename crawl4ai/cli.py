@@ -175,7 +175,7 @@ def show_examples():
     crwl https://example.com -o markdown
 
     # Verbose JSON output with cache bypass
-    crwl https://example.com -o json -v --bypass-cache
+    crwl https://example.com -o all -v --bypass-cache
 
 2️⃣  Using Config Files:
     # Using browser and crawler configs
@@ -516,7 +516,7 @@ async def crawl_with_profile_cli(profile_path, url):
     # Ask for output format
     output_format = Prompt.ask(
         "[cyan]Output format[/cyan]",
-        choices=["all", "json", "markdown", "md", "title"],
+        choices=["all", "markdown", "md", "title"],
         default="markdown"
     )
     
@@ -1021,9 +1021,9 @@ def cdp_cmd(user_data_dir: Optional[str], port: int, browser_type: str, headless
 @click.option("--schema", "-s", type=click.Path(exists=True), help="JSON schema for extraction")
 @click.option("--browser", "-b", type=str, callback=parse_key_values, help="Browser parameters as key1=value1,key2=value2")
 @click.option("--crawler", "-c", type=str, callback=parse_key_values, help="Crawler parameters as key1=value1,key2=value2")
-@click.option("--output", "-o", type=click.Choice(["all", "json", "markdown", "md", "markdown-fit", "md-fit"]), default="all")
+@click.option("--output", "-o", type=click.Choice(["all", "json", "markdown", "md", "markdown-fit", "md-fit"]), default="all", help="json = extracted data only (needs -j or -e). Use 'all' (default) for the full crawl result.")
 @click.option("--output-file", "-O", type=click.Path(), help="Output file path (default: stdout)")
-@click.option("--bypass-cache", "-bc", is_flag=True, default=True, help="Bypass cache when crawling")
+@click.option("--bypass-cache", "-bc", is_flag=True, default=False, help="Bypass cache when crawling (the default unless -c cache_mode=... is set)")
 @click.option("--question", "-q", help="Ask a question about the crawled content")
 @click.option("--verbose", "-v", is_flag=True)
 @click.option("--profile", "-p", help="Use a specific browser profile (by name)")
@@ -1204,6 +1204,12 @@ Always return valid, properly formatted JSON."""
         else:
             ensure_ascii = config.get("JSON_ENSURE_ASCII", USER_SETTINGS["JSON_ENSURE_ASCII"]["default"])
 
+        if output == "json" and not question and crawler_cfg.extraction_strategy is None:
+            raise click.UsageError(
+                "-o json needs an extraction strategy (-j or -e). "
+                "Use -o all for the full crawl result."
+            )
+
         # Run crawler
         result : CrawlResult = anyio.run(
             run_crawler,
@@ -1242,7 +1248,6 @@ Always return valid, properly formatted JSON."""
                 else:
                     click.echo(json.dumps(main_result.model_dump(), indent=2, ensure_ascii=ensure_ascii))
             elif output == "json":
-                print(main_result.extracted_content)
                 extracted_items = json.loads(main_result.extracted_content)
                 click.echo(json.dumps(extracted_items, indent=2, ensure_ascii=ensure_ascii))
 
@@ -1292,6 +1297,8 @@ Always return valid, properly formatted JSON."""
                     else:
                         f.write(main_result.markdown.fit_markdown)
             
+    except click.ClickException:
+        raise
     except Exception as e:
         raise click.ClickException(str(e))
 
@@ -1579,8 +1586,8 @@ def shrink_cmd(profile_name: str, level: str, dry_run: bool):
 @click.option("--schema", "-s", type=click.Path(exists=True), help="JSON schema for extraction")
 @click.option("--browser", "-b", type=str, callback=parse_key_values, help="Browser parameters as key1=value1,key2=value2")
 @click.option("--crawler", "-c", type=str, callback=parse_key_values, help="Crawler parameters as key1=value1,key2=value2")
-@click.option("--output", "-o", type=click.Choice(["all", "json", "markdown", "md", "markdown-fit", "md-fit"]), default="all")
-@click.option("--bypass-cache", is_flag=True, default=True, help="Bypass cache when crawling")
+@click.option("--output", "-o", type=click.Choice(["all", "json", "markdown", "md", "markdown-fit", "md-fit"]), default="all", help="json = extracted data only (needs -j or -e). Use 'all' (default) for the full crawl result.")
+@click.option("--bypass-cache", is_flag=True, default=False, help="Bypass cache when crawling (the default unless -c cache_mode=... is set)")
 @click.option("--question", "-q", help="Ask a question about the crawled content")
 @click.option("--verbose", "-v", is_flag=True)
 @click.option("--profile", "-p", help="Use a specific browser profile (by name)")

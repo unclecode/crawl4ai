@@ -9,6 +9,12 @@ from lxml import html
 import json
 from typing import Union
 
+# Matches the Chromium bundled with current Playwright; bump it with Playwright.
+DEFAULT_USER_AGENT = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36"
+)
+
 class UAGen(ABC):
    @abstractmethod
    def generate(self, 
@@ -17,7 +23,7 @@ class UAGen(ABC):
                min_version: float = 0.0,
                platforms: Optional[Union[str, List[str]]] = None,
                pct_threshold: Optional[float] = None,
-               fallback: str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36") -> Union[str, Dict]:
+               fallback: str = DEFAULT_USER_AGENT) -> Union[str, Dict]:
        pass
    
    @staticmethod
@@ -56,7 +62,7 @@ class UAGen(ABC):
 
         elif "firefox" in browsers:
             # Firefox doesn't typically send Sec-CH-UA
-            return '""'
+            return ""
 
         elif "safari" in browsers:
             # Safari's format for client hints
@@ -75,7 +81,7 @@ class ValidUAGenerator(UAGen):
                min_version: float = 0.0,
                platforms: Optional[Union[str, List[str]]] = None,
                pct_threshold: Optional[float] = None,
-               fallback: str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36") -> str:
+               fallback: str = DEFAULT_USER_AGENT) -> str:
        
        self.ua = UserAgent(
            browsers=browsers or ['Chrome', 'Firefox', 'Edge'],
@@ -112,7 +118,7 @@ class OnlineUAGenerator(UAGen):
                min_version: float = 0.0,
                platforms: Optional[Union[str, List[str]]] = None, 
                pct_threshold: Optional[float] = None,
-               fallback: str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36") -> Dict:
+               fallback: str = DEFAULT_USER_AGENT) -> Dict:
        
        if not self.agents:
            self._fetch_agents()
@@ -404,7 +410,7 @@ class UserAgentGenerator():
 
         elif "firefox" in browsers:
             # Firefox doesn't typically send Sec-CH-UA
-            return '""'
+            return ""
 
         elif "safari" in browsers:
             # Safari's format for client hints

@@ -989,4 +989,4 @@ async with AsyncWebCrawler() as crawler:
     print(result.markdown)
 ```
 
-This reference covers all available C4A-Script commands and patterns. For interactive learning, try the [tutorial](../examples/c4a_script/tutorial/) or [live demo](https://docs.crawl4ai.com/c4a-script/demo).
+This reference covers all available C4A-Script commands and patterns. For interactive learning, try the [tutorial](https://github.com/unclecode/crawl4ai/tree/main/docs/examples/c4a_script/tutorial) or [live demo](https://docs.crawl4ai.com/apps/c4a-script/).

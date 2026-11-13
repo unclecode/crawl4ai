@@ -31,7 +31,7 @@ A comprehensive web-based tutorial for learning and experimenting with C4A-Scrip
    http://localhost:8000
    ```
 
-**🌐 Try Online**: [Live Demo](https://docs.crawl4ai.com/c4a-script/demo)
+**🌐 Try Online**: [Live Demo](https://docs.crawl4ai.com/apps/c4a-script/)
 
 ### 2. Try Your First Script
 
@@ -363,9 +363,9 @@ Enable detailed logging by setting `DEBUG = True` in `assets/app.js`
 
 ## 📚 Additional Resources
 
-- **[C4A-Script Documentation](../../core/c4a-script.md)** - Complete language guide
-- **[API Reference](../../api/c4a-script-reference.md)** - Detailed command documentation
-- **[Live Demo](https://docs.crawl4ai.com/c4a-script/demo)** - Try without installation
+- **[C4A-Script Documentation](../../md_v2/core/c4a-script.md)** - Complete language guide
+- **[API Reference](../../md_v2/api/c4a-script-reference.md)** - Detailed command documentation
+- **[Live Demo](https://docs.crawl4ai.com/apps/c4a-script/)** - Try without installation
 - **[Example Scripts](../)** - More automation examples
 
 ## 🤝 Contributing

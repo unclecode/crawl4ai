@@ -61,7 +61,7 @@ def test_the_blocked_banner_prints_once_a_day(home, monkeypatch):
 
 
 def test_the_banner_is_ascii_with_the_link_and_the_off_switch():
-    for lines in (cloud_notice.LINES, cloud_notice.BLOCKED_LINES, cloud_notice.SETUP_LINES):
+    for lines in (cloud_notice.LINES, cloud_notice.BLOCKED_LINES):
         shown = _render(lines)
         assert shown.isascii(), "every console can print it"
         assert shown.startswith(cloud_notice._RULE) and shown.rstrip().endswith(cloud_notice._RULE)

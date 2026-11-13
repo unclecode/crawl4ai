@@ -5,6 +5,7 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 
 from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy_lxml import PruningContentFilterLXML
 
 
 @pytest.fixture
@@ -63,7 +64,52 @@ def mixed_content_html():
     """
 
 
+@pytest.fixture
+def nested_inline_html():
+    return """<html><body><article>
+    <p>After the Meiji Restoration, the imperial capital in Kyoto was moved to Edo, and the city was renamed Tokyo
+    (<abbr title="literal translation">lit.</abbr> <span class="gloss-quot">'</span><span class="gloss-text">
+    <a href="/wiki/Capital_of_Japan">Eastern Capital</a></span><span class="gloss-quot">'</span>).
+    The city was greatly damaged by the 1923 earthquake and rebuilt in the following decades.</p>
+    <p>Tokyo (<span title="Japanese-language text"><span lang="ja">東京</span></span>) is the capital of Japan
+    and one of the most populous cities in the world, with a population of about fourteen million.</p>
+    </article></body></html>"""
+
+
 class TestPruningContentFilter:
+    @pytest.mark.parametrize(
+        "filter_class",
+        [PruningContentFilter, PruningContentFilterLXML],
+        ids=["bs4", "lxml"],
+    )
+    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
+    def test_pruning_preserves_nested_inline_content_in_kept_paragraphs(
+        self, nested_inline_html, filter_class
+    ):
+        contents = filter_class().filter_content(nested_inline_html)
+        actual = " ".join(contents)
+
+        assert "Eastern Capital" in actual
+        assert "東京" in actual
+
+    @pytest.mark.parametrize(
+        "filter_class",
+        [PruningContentFilter, PruningContentFilterLXML],
+        ids=["bs4", "lxml"],
+    )
+    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
+    def test_pruning_still_drops_promo_links_and_citation_markers(self, filter_class):
+        html = """<html><body><div>
+        <p>The council approved the new budget on Tuesday.<sup class="reference"><a href="#cite-1">[1]</a></sup>
+        The debate was about road repairs, school funding and the library expansion plan for next year.</p>
+        <span class="ad"><span>Advertisement</span></span><span class="promo"><a href="/subscribe">Subscribe now</a></span>
+        </div></body></html>"""
+        actual = " ".join(filter_class().filter_content(html))
+
+        assert "library expansion plan" in actual
+        assert "Subscribe now" not in actual
+        assert "[1]" not in actual
+
     def test_basic_pruning(self, basic_html):
         """Test basic content pruning functionality"""
         filter = PruningContentFilter(min_word_threshold=5)

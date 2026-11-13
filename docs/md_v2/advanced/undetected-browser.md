@@ -1,5 +1,14 @@
 # Undetected Browser Mode
 
+!!! tip "No browser to patch"
+    [Crawl4AI Cloud](https://crawl4ai.com/?ref=docs-stealth) picks the right way to fetch each page, a real browser included, and gets past the usual bot checks for you. 1,000 free credits every month, no card. [Get a key →](https://crawl4ai.com/?ref=docs-stealth)
+
+    ```bash
+    curl -X POST https://api.crawl4ai.com/scrape \
+      -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
+      -d '{"url": "https://example.com", "format": "md"}'
+    ```
+
 ## Overview
 
 Crawl4AI offers two powerful anti-bot features to help you access websites with bot detection:

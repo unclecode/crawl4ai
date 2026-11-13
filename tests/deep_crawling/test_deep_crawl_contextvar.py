@@ -17,6 +17,10 @@ import pytest
 import asyncio
 from unittest.mock import MagicMock, AsyncMock
 
+from aiohttp import web
+
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
 from crawl4ai.deep_crawling.base_strategy import DeepCrawlDecorator
 
 
@@ -338,3 +342,60 @@ class TestConcurrentRequests:
             assert len(results) == 2
 
         assert decorator.deep_crawl_active.get() == False
+
+
+# ============================================================================
+# Tests: Streaming early break (end-to-end regression)
+# ============================================================================
+
+PAGES = 5
+
+
+async def serve_page(request):
+    """Serve the start page linking to PAGES subpages; subpages link nowhere."""
+    links = "".join(f'<a href="/p{i}">p{i}</a>' for i in range(PAGES)) if request.path == "/" else ""
+    return web.Response(text=f"<html><body>{links}<p>{'text ' * 200}</p></body></html>", content_type="text/html")
+
+
+async def stream_deep_crawl(crawler, url, stop_after=None):
+    """Stream a BFS deep crawl, optionally breaking early without closing the generator."""
+    config = CrawlerRunConfig(deep_crawl_strategy=BFSDeepCrawlStrategy(max_depth=1), stream=True)
+    pages = []
+    async for result in await crawler.arun(url, config=config):
+        pages.append(result.url)
+        if stop_after and len(pages) == stop_after:
+            break  # e.g. the caller restarts the crawl with another browser config
+    return pages
+
+
+class TestStreamEarlyBreakRegression:
+    """A stream abandoned early must not poison the next crawl."""
+
+    @pytest.mark.asyncio
+    async def test_stream_stopped_early_next_crawl_returns_all_pages(self):
+        """
+        End-to-end reproduction of issue #2380:
+        Break out of a streamed deep crawl early (leaving the generator
+        suspended, NOT closed), then start a fresh crawl on the same crawler.
+        Before the fix the leftover deep_crawl_active flag made the new arun()
+        fall through to a single-page crawl, so it returned only the start page.
+        """
+        app = web.Application()
+        app.router.add_get("/{tail:.*}", serve_page)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        await web.TCPSite(runner, "127.0.0.1", 0).start()
+        url = f"http://127.0.0.1:{runner.addresses[0][1]}/"
+
+        try:
+            async with AsyncWebCrawler() as crawler:
+                full_crawl = await stream_deep_crawl(crawler, url)
+                assert len(full_crawl) == PAGES + 1
+
+                stopped_early = await stream_deep_crawl(crawler, url, stop_after=2)
+                assert len(stopped_early) == 2
+
+                next_crawl = await stream_deep_crawl(crawler, url)
+                assert len(next_crawl) == PAGES + 1, "next crawl returned only the start page"
+        finally:
+            await runner.cleanup()

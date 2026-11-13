@@ -60,7 +60,7 @@ A set of **options** (passed as a dict) allows you to customize precisely how HT
 
 ### 2.2 Link Citations & References
 
-By default, the generator can convert `<a href="...">` elements into `[text][1]` citations, then place the actual links at the bottom of the document. This is handy for research workflows that demand references in a structured manner.
+By default, the generator can convert `<a>` link elements into `[text][1]` citations, then place the actual links at the bottom of the document. This is handy for research workflows that demand references in a structured manner.
 
 ### 2.3 Optional Content Filters
 

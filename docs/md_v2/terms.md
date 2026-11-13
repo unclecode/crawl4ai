@@ -18,7 +18,7 @@ You must be at least 16 years old, or the age of digital consent in your jurisdi
 
 ## 2. Plans, credits, and billing
 
-The Service is offered as a freemium model with paid plans. Each plan defines a daily credit limit, rate limits, storage allowance, and feature set. Current plans are listed at [crawl4ai.com/pricing](https://crawl4ai.com/pricing).
+The Service is offered as a freemium model with paid plans. Each plan defines a daily credit limit, rate limits, storage allowance, and feature set. Current plans are listed at [crawl4ai.com/#pricing](https://crawl4ai.com/#pricing).
 
 **Billing.** Paid plans are billed in advance on a recurring basis (monthly or annual). All fees are exclusive of taxes, which you are responsible for. Payment is processed through Stripe.
 

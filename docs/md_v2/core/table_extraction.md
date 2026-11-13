@@ -801,7 +801,6 @@ config = CrawlerRunConfig(
 
 ## See Also
 
-- [Extraction Strategies](extraction-strategies.md) - Overview of all extraction strategies
+- [Extraction Strategies](../extraction/no-llm-strategies.md) - Overview of all extraction strategies
 - [Content Selection](content-selection.md) - Using CSS selectors and filters
-- [Performance Optimization](../optimization/performance-tuning.md) - Speed up extraction
-- [Examples](../examples/table_extraction_example.py) - Complete working examples
+- [Examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/table_extraction_example.py) - Complete working examples

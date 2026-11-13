@@ -4546,7 +4546,8 @@ extracted = json.loads(data["results"][0]["extracted_content"])
 
 ```bash
 # Add Crawl4AI as MCP provider to Claude Code
-claude mcp add --transport sse c4ai-sse http://localhost:11235/mcp/sse
+claude mcp add --transport sse c4ai-sse http://localhost:11235/mcp/sse \
+  --header "Authorization: Bearer $CRAWL4AI_API_TOKEN"
 
 # List MCP providers
 claude mcp list

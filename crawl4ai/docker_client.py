@@ -3,6 +3,8 @@ import httpx
 import json
 from urllib.parse import urljoin
 import asyncio
+import base64
+import warnings
 
 from .async_configs import BrowserConfig, CrawlerRunConfig
 from .models import CrawlResult
@@ -34,7 +36,8 @@ class Crawl4aiDockerClient:
         timeout: float = 30.0,
         verify_ssl: bool = True,
         verbose: bool = True,
-        log_file: Optional[str] = None
+        log_file: Optional[str] = None,
+        api_token: Optional[str] = None
     ):
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
@@ -44,7 +47,10 @@ class Crawl4aiDockerClient:
             verify=verify_ssl,
             headers={"Content-Type": "application/json"}
         )
-        self._token: Optional[str] = None
+        # The server's CRAWL4AI_API_TOKEN, sent as a Bearer token on every request.
+        self._token: Optional[str] = api_token
+        if self._token:
+            self._http_client.headers["Authorization"] = f"Bearer {self._token}"
 
     async def authenticate(self, email: str) -> None:
         """Authenticate with the server and store the token."""
@@ -76,7 +82,7 @@ class Crawl4aiDockerClient:
         urls: List[str],
         browser_config: Optional[BrowserConfig] = None,
         crawler_config: Optional[CrawlerRunConfig] = None,
-        hooks: Optional[Union[Dict[str, Callable], Dict[str, str]]] = None,
+        hooks: Optional[Union[List[Dict[str, Any]], Dict[str, Callable], Dict[str, str]]] = None,
         hooks_timeout: int = 30
     ) -> Dict[str, Any]:
         """Prepare request data from configs."""
@@ -89,8 +95,10 @@ class Crawl4aiDockerClient:
             "crawler_config": crawler_config.dump() if crawler_config else {}
         }
 
-        # Handle hooks if provided
-        if hooks:
+        if hooks and isinstance(hooks, list):
+            request_data["hooks"] = {"hooks": hooks, "timeout": hooks_timeout}
+        elif hooks:
+            # Legacy inline hook code; not executed by 0.9+ servers
             # Check if hooks are already strings or need conversion
             if any(callable(v) for v in hooks.values()):
                 # Convert function objects to strings
@@ -105,6 +113,17 @@ class Crawl4aiDockerClient:
             }
 
         return request_data
+
+    @staticmethod
+    def _to_result(data: Dict[str, Any]) -> CrawlResult:
+        """Build a CrawlResult, decoding the base64 PDF the server sends."""
+        pdf = data.get("pdf")
+        if isinstance(pdf, str):
+            try:
+                data["pdf"] = base64.b64decode(pdf, validate=True)
+            except ValueError:
+                pass
+        return CrawlResult(**data)
 
     async def _request(self, method: str, endpoint: str, **kwargs) -> httpx.Response:
         """Make an HTTP request with error handling."""
@@ -128,7 +147,7 @@ class Crawl4aiDockerClient:
         urls: List[str],
         browser_config: Optional[BrowserConfig] = None,
         crawler_config: Optional[CrawlerRunConfig] = None,
-        hooks: Optional[Union[Dict[str, Callable], Dict[str, str]]] = None,
+        hooks: Optional[Union[List[Dict[str, Any]], Dict[str, Callable], Dict[str, str]]] = None,
         hooks_timeout: int = 30
     ) -> Union[CrawlResult, List[CrawlResult], AsyncGenerator[CrawlResult, None]]:
         """
@@ -139,21 +158,19 @@ class Crawl4aiDockerClient:
             browser_config: Browser configuration
             crawler_config: Crawler configuration
             hooks: Optional hooks - can be either:
-                   - Dict[str, Callable]: Function objects that will be converted to strings
-                   - Dict[str, str]: Already stringified hook code
+                   - List[Dict]: Declarative hooks, each {"action": ..., "params": {...}}
+                     (actions are listed by the server's GET /hooks/info)
+                   - Dict[str, Callable] or Dict[str, str]: Legacy inline hook code,
+                     only executed by servers older than 0.9
             hooks_timeout: Timeout in seconds for each hook execution (1-120)
 
         Returns:
             Single CrawlResult, list of results, or async generator for streaming
 
-        Example with function hooks:
-            >>> async def my_hook(page, context, **kwargs):
-            ...     await page.set_viewport_size({"width": 1920, "height": 1080})
-            ...     return page
-            >>>
+        Example with declarative hooks:
             >>> result = await client.crawl(
             ...     ["https://example.com"],
-            ...     hooks={"on_page_context_created": my_hook}
+            ...     hooks=[{"action": "block_resources", "params": {"resource_types": ["image"]}}]
             ... )
         """
         await self._check_server()
@@ -167,6 +184,8 @@ class Crawl4aiDockerClient:
             async def stream_results() -> AsyncGenerator[CrawlResult, None]:
                 async with self._http_client.stream("POST", f"{self.base_url}/crawl/stream", json=data) as response:
                     response.raise_for_status()
+                    if hooks_warning := response.headers.get("X-Hooks-Warning"):
+                        warnings.warn(hooks_warning, stacklevel=2)
                     async for line in response.aiter_lines():
                         if line.strip():
                             result = json.loads(line)
@@ -177,7 +196,7 @@ class Crawl4aiDockerClient:
                             if result.get("status") == "completed":
                                 continue
                             else:
-                                yield CrawlResult(**result)
+                                yield self._to_result(result)
             return stream_results()
 
         response = await self._request("POST", "/crawl", json=data, timeout=hooks_timeout)
@@ -185,7 +204,11 @@ class Crawl4aiDockerClient:
         if not result_data.get("success", False):
             raise RequestError(f"Crawl failed: {result_data.get('msg', 'Unknown error')}")
 
-        results = [CrawlResult(**r) for r in result_data.get("results", [])]
+        hooks_warning = (result_data.get("hooks") or {}).get("warning")
+        if hooks_warning:
+            warnings.warn(hooks_warning, stacklevel=2)
+
+        results = [self._to_result(r) for r in result_data.get("results", [])]
         self.logger.success(f"Crawl completed with {len(results)} results", tag="CRAWL")
         return results[0] if len(results) == 1 else results
 

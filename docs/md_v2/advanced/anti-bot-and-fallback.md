@@ -2,6 +2,15 @@
 
 When crawling sites protected by anti-bot systems (Akamai, Cloudflare, PerimeterX, DataDome, Imperva, etc.), requests often get blocked with CAPTCHAs, 403 responses, or empty pages. Crawl4AI provides a layered retry and fallback system that automatically detects blocking and escalates through multiple strategies until content is retrieved.
 
+!!! tip "Hard sites? One Cloud call"
+    [Crawl4AI Cloud](https://crawl4ai.com/?ref=docs-antibot) runs the detection, retries and fallbacks for you, on its own browsers and addresses: send a URL, get clean Markdown. 1,000 free credits every month, no card. [Get a key →](https://crawl4ai.com/?ref=docs-antibot)
+
+    ```bash
+    curl -X POST https://api.crawl4ai.com/scrape \
+      -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
+      -d '{"url": "https://example.com", "format": "md"}'
+    ```
+
 ## How Detection Works
 
 After each crawl attempt, Crawl4AI inspects the HTTP status code and HTML content for known anti-bot signals:
