@@ -66,12 +66,12 @@ if sys.version_info < (3, 14):
 
     def patched_applies_to(self, filename):
        # Handle wildcards in paths
-       if '*' in self.path or '%2A' in self.path or self.path in ("*", "%2A"):
+       if '*' in self.path or '%2A' in self.path or self.path in ("*", "%2A") or self.path.endswith('%24'):
            pattern = self.path.replace('%2A', '*')
            pattern = re.escape(pattern).replace('\\*', '.*')
            pattern = '^' + pattern
-           if pattern.endswith('\\$'):
-               pattern = pattern[:-2] + '$'
+           if pattern.endswith('%24'):
+               pattern = pattern[:-3] + '$'
            try:
                return bool(re.match(pattern, filename))
            except re.error:
