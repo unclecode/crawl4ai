@@ -725,8 +725,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
 
                 if not content:
                     finish_reason = getattr(response.choices[0], "finish_reason", "unknown")
-                    blocks = [{"index": 0, "error": True, "tags": ["error"],
-                               "content": f"LLM returned no content (finish_reason: {finish_reason})"}]
+                    blocks = [_LLMExtractionError(0, f"LLM returned no content (finish_reason: {finish_reason})")]
                 elif self.force_json_response:
                     blocks = json.loads(_strip_markdown_fences(content))
                     if isinstance(blocks, dict):
@@ -912,8 +911,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
 
                 if not content:
                     finish_reason = getattr(response.choices[0], "finish_reason", "unknown")
-                    blocks = [{"index": 0, "error": True, "tags": ["error"],
-                               "content": f"LLM returned no content (finish_reason: {finish_reason})"}]
+                    blocks = [_LLMExtractionError(0, f"LLM returned no content (finish_reason: {finish_reason})")]
                 elif self.force_json_response:
                     blocks = json.loads(_strip_markdown_fences(content))
                     if isinstance(blocks, dict):

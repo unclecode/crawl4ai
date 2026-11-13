@@ -1,5 +1,6 @@
 import asyncio
 import json
+from pathlib import Path
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
@@ -7,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from crawl4ai import AsyncWebCrawler, CacheMode, CrawlerRunConfig, utils
+from crawl4ai import AsyncWebCrawler, CacheMode, CrawlerRunConfig, extraction_strategy, utils
 from crawl4ai.async_configs import LLMConfig
 from crawl4ai.async_crawler_strategy import AsyncHTTPCrawlerStrategy
 from crawl4ai.async_database import async_db_manager
@@ -201,3 +202,63 @@ def test_error_shaped_extracted_data_is_cacheable(site, cache, monkeypatch):
             await async_db_manager.cleanup()
 
     asyncio.run(run())
+
+
+def test_empty_llm_content_is_retried_instead_of_replayed(site, cache, monkeypatch):
+    calls = 0
+
+    async def completion(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return SimpleNamespace(
+            usage=SimpleNamespace(
+                completion_tokens=1,
+                prompt_tokens=2,
+                total_tokens=3,
+                completion_tokens_details=None,
+                prompt_tokens_details=None,
+            ),
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content=None if calls == 1 else '[{"answer":"ok"}]'
+                    ),
+                    finish_reason="length",
+                )
+            ],
+        )
+
+    monkeypatch.setattr(utils, "aperform_completion_with_backoff", completion)
+    strategy = LLMExtractionStrategy(
+        llm_config=LLMConfig(
+            provider="openai/unused",
+            api_token="test-token",
+            base_url="http://127.0.0.1:9",
+        ),
+        force_json_response=True,
+    )
+
+    async def run():
+        await async_db_manager.ainit_db()
+        await async_db_manager.update_db_schema()
+        try:
+            async with AsyncWebCrawler(
+                crawler_strategy=AsyncHTTPCrawlerStrategy(), verbose=False
+            ) as crawler:
+                failed = await crawl(crawler, site, extraction_strategy=strategy)
+                assert "LLM returned no content" in failed.extracted_content
+
+                retried = await crawl(crawler, site, extraction_strategy=strategy)
+                assert retried.cache_status == "miss"
+                assert json.loads(retried.extracted_content)[0]["answer"] == "ok"
+                assert calls == 2
+        finally:
+            await async_db_manager.cleanup()
+
+    asyncio.run(run())
+
+
+def test_llm_error_blocks_all_use_the_marker():
+    # A plain {"error": True, ...} dict would be cached as a success (#2520).
+    source = Path(extraction_strategy.__file__).read_text(encoding="utf-8")
+    assert '"error": True' not in source
