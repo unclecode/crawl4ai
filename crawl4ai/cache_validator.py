@@ -236,24 +236,33 @@ class CacheValidator:
                 chunks = []
                 total_bytes = 0
                 max_bytes = 65536
+                head_closed = False
 
                 async for chunk in response.aiter_bytes(4096):
                     chunks.append(chunk)
                     total_bytes += len(chunk)
 
-                    content = b''.join(chunks)
-                    # Check for </head> (case insensitive)
-                    if b'</head>' in content.lower() or b'</HEAD>' in content:
+                    # Check for </head> (case insensitive) in the decoded text
+                    if b'</head>' in b''.join(chunks).lower():
+                        head_closed = True
                         break
                     if total_bytes >= max_bytes:
                         break
 
+                content = b''.join(chunks)
                 html = content.decode('utf-8', errors='replace')
 
                 # Extract just the head section
                 head_end = html.lower().find('</head>')
                 if head_end != -1:
                     html = html[:head_end + 7]
+
+                # Without a closing tag the buffer is a truncated prefix of the
+                # document, not the head. Fingerprinting it would compare body
+                # markup with a stored head fingerprint and report every such
+                # page as stale, so report "no head" and let the caller decide.
+                if not head_closed and head_end == -1:
+                    return None, etag, last_modified
 
                 return html, etag, last_modified
 
