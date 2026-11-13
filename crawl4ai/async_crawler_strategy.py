@@ -557,15 +557,18 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 )
                 ua_changed = True
 
-        # Keep sec-ch-ua in sync whenever the UA changed
+        # Keep sec-ch-ua in sync whenever the UA changed; a user-set value is left alone
         if ua_changed:
+            headers = self.browser_config.headers
+            auto_hint = headers.get("sec-ch-ua") in (None, self.browser_config.browser_hint)
             self.browser_config.browser_hint = UAGen.generate_client_hints(
                 self.browser_config.user_agent
             )
-            if self.browser_config.browser_hint:
-                self.browser_config.headers["sec-ch-ua"] = self.browser_config.browser_hint
-            else:
-                self.browser_config.headers.pop("sec-ch-ua", None)
+            if auto_hint:
+                if self.browser_config.browser_hint:
+                    headers["sec-ch-ua"] = self.browser_config.browser_hint
+                else:
+                    headers.pop("sec-ch-ua", None)
 
         # Get page for session
         page, context = await self.browser_manager.get_page(crawlerRunConfig=config)

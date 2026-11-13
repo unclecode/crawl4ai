@@ -139,3 +139,21 @@ async def test_per_run_user_agent_sends_no_empty_sec_ch_ua(server):
     headers = _headers(seen)
     assert headers["user-agent"] == "MyBot/1.0"
     assert headers.get("sec-ch-ua", "x") != ""
+
+
+@pytest.mark.asyncio
+async def test_per_run_user_agent_updates_auto_sec_ch_ua(server):
+    url, seen = server
+    run = CrawlerRunConfig(cache_mode=CacheMode.BYPASS, user_agent=DEFAULT_USER_AGENT.replace("158", "150"))
+    await _crawl(url, BrowserConfig(headless=True), run)
+    assert _headers(seen)["sec-ch-ua"].startswith('"Chromium";v="150"')
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("run_ua", ["MyBot/1.0", DEFAULT_USER_AGENT.replace("158", "150")])
+async def test_per_run_user_agent_keeps_user_sec_ch_ua(server, run_ua):
+    url, seen = server
+    custom = '"Custom";v="1"'
+    run = CrawlerRunConfig(cache_mode=CacheMode.BYPASS, user_agent=run_ua)
+    await _crawl(url, BrowserConfig(headless=True, headers={"sec-ch-ua": custom}), run)
+    assert _headers(seen)["sec-ch-ua"] == custom
