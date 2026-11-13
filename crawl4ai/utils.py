@@ -763,17 +763,33 @@ def split_and_parse_json_objects(json_string):
     if json_string.startswith("[") and json_string.endswith("]"):
         json_string = json_string[1:-1].strip()
 
-    # Split the string into segments that look like individual JSON objects
+    # Split the string into segments that look like individual JSON objects.
+    # Braces inside string values must not move the depth counter: a value such as
+    # `{"snippet": "if (x) { y() }"}` or a lone `}` in text used to close the object
+    # early, which dropped the rest of the payload.
     segments = []
     depth = 0
     start_index = 0
+    in_string = False
+    escaped = False
 
     for i, char in enumerate(json_string):
-        if char == "{":
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+
+        if char == '"':
+            in_string = True
+        elif char == "{":
             if depth == 0:
                 start_index = i
             depth += 1
-        elif char == "}":
+        elif char == "}" and depth > 0:
             depth -= 1
             if depth == 0:
                 segments.append(json_string[start_index : i + 1])
