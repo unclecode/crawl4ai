@@ -530,6 +530,13 @@ class CosineStrategy(ExtractionStrategy):
 #######################################################
 # Strategies using LLM-based extraction for text data #
 #######################################################
+class _LLMExtractionError(dict):
+    """A library-generated failure block with the existing serialized shape."""
+
+    def __init__(self, index: int, content: str):
+        super().__init__(index=index, error=True, tags=["error"], content=content)
+
+
 class LLMExtractionStrategy(ExtractionStrategy):
     """
     A strategy that uses an LLM to extract meaningful content from the HTML.
@@ -744,9 +751,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 parsed, unparsed = split_and_parse_json_objects(raw_content)
                 blocks = parsed
                 if unparsed:
-                    blocks.append(
-                        {"index": 0, "error": True, "tags": ["error"], "content": unparsed}
-                    )
+                    blocks.append(_LLMExtractionError(0, unparsed))
 
             if self.verbose:
                 print(
@@ -762,14 +767,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
             if self.verbose:
                 print(f"[LOG] Error in LLM extraction: {e}")
             # Add error information to extracted_content
-            return [
-                {
-                    "index": ix,
-                    "error": True,
-                    "tags": ["error"],
-                    "content": str(e),
-                }
-            ]
+            return [_LLMExtractionError(ix, str(e))]
 
     def _merge(self, documents, chunk_token_threshold, overlap) -> List[str]:
         """
@@ -829,14 +827,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
                         if self.verbose:
                             print(f"Error in thread execution: {e}")
                         # Add error information to extracted_content
-                        extracted_content.append(
-                            {
-                                "index": 0,
-                                "error": True,
-                                "tags": ["error"],
-                                "content": str(e),
-                            }
-                        )
+                        extracted_content.append(_LLMExtractionError(0, str(e)))
 
         return extracted_content
 
@@ -943,9 +934,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 parsed, unparsed = split_and_parse_json_objects(raw_content)
                 blocks = parsed
                 if unparsed:
-                    blocks.append(
-                        {"index": 0, "error": True, "tags": ["error"], "content": unparsed}
-                    )
+                    blocks.append(_LLMExtractionError(0, unparsed))
 
             if self.verbose:
                 print(
@@ -960,14 +949,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
         except Exception as e:
             if self.verbose:
                 print(f"[LOG] Error in LLM extraction: {e}")
-            return [
-                {
-                    "index": ix,
-                    "error": True,
-                    "tags": ["error"],
-                    "content": str(e),
-                }
-            ]
+            return [_LLMExtractionError(ix, str(e))]
 
     async def arun(self, url: str, sections: List[str]) -> List[Dict[str, Any]]:
         """
@@ -1004,14 +986,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
             if isinstance(result, Exception):
                 if self.verbose:
                     print(f"Error in async extraction: {result}")
-                extracted_content.append(
-                    {
-                        "index": 0,
-                        "error": True,
-                        "tags": ["error"],
-                        "content": str(result),
-                    }
-                )
+                extracted_content.append(_LLMExtractionError(0, str(result)))
             else:
                 extracted_content.extend(result)
 
