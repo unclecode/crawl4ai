@@ -16,6 +16,10 @@ import asyncio
 import inspect
 
 
+# Upper bound on the per-filter verdict cache, matching the lru_cache it replaces.
+_PATTERN_CACHE_SIZE = 10000
+
+
 @dataclass
 class FilterStats:
     __slots__ = ("_counters",)
@@ -128,6 +132,7 @@ class URLPatternFilter(URLFilter):
         "_domain_patterns",
         "_path_patterns",
         "_reverse",
+        "_cache",
     )
 
     PATTERN_TYPES = {
@@ -157,6 +162,7 @@ class URLPatternFilter(URLFilter):
         self._simple_prefixes = set()
         self._domain_patterns = []
         self._path_patterns = []
+        self._cache = {}
 
         for pattern in patterns:
             pattern_type = self._categorize_pattern(pattern)
@@ -215,24 +221,44 @@ class URLPatternFilter(URLFilter):
                 pattern if isinstance(pattern, Pattern) else re.compile(pattern)
             )
 
-    @lru_cache(maxsize=10000)
     def apply(self, url: str) -> bool:
+        # Stats are updated for every call, outside the cache: a cached verdict still
+        # describes a URL the caller asked about.
+        matched = self._matches(url)
+        result = not matched if self._reverse else matched
+        # Record the verdict the caller sees, so `reverse=True` counts a flipped
+        # match as rejected rather than as passed.
+        self._update_stats(result)
+        return result
+
+    def _matches(self, url: str) -> bool:
+        """Return the raw (pre-``reverse``) verdict for ``url``, memoised per instance.
+
+        The cache lives on the instance rather than on the function so a filter that
+        goes out of scope is collected; a module-level ``lru_cache`` keyed on ``self``
+        would keep every filter instance alive for the life of the process.
+        """
+        cached = self._cache.get(url)
+        if cached is None:
+            cached = self._match(url)
+            if len(self._cache) >= _PATTERN_CACHE_SIZE:
+                self._cache.clear()
+            self._cache[url] = cached
+        return cached
+
+    def _match(self, url: str) -> bool:
         url_path = urlparse(url).path
 
         # Quick suffix check (*.html)
         if self._simple_suffixes:
             if url_path.split("/")[-1].split(".")[-1] in self._simple_suffixes:
-                result = True
-                self._update_stats(result)
-                return not result if self._reverse else result
+                return True
 
         # Domain check
         if self._domain_patterns:
             for pattern in self._domain_patterns:
                 if pattern.match(url):
-                    result = True
-                    self._update_stats(result)
-                    return not result if self._reverse else result
+                    return True
 
         # Prefix check (/foo/* or https://domain/foo/*)
         if self._simple_prefixes:
@@ -241,20 +267,14 @@ class URLPatternFilter(URLFilter):
                 match_against = url if '://' in prefix else url_path
                 if match_against.startswith(prefix):
                     if len(match_against) == len(prefix) or match_against[len(prefix)] in ['/', '?', '#']:
-                        result = True
-                        self._update_stats(result)
-                        return not result if self._reverse else result
+                        return True
 
         # Complex patterns
         if self._path_patterns:
             if any(p.search(url) for p in self._path_patterns):
-                result = True
-                self._update_stats(result)
-                return not result if self._reverse else result
+                return True
 
-        result = False
-        self._update_stats(result)
-        return not result if self._reverse else result
+        return False
 
 
 class ContentTypeFilter(URLFilter):
