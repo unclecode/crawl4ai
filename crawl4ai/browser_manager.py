@@ -135,6 +135,9 @@ class ManagedBrowser:
             flags.append(f"--proxy-server={config.proxy}")
         elif config.proxy_config:
             flags.append(f"--proxy-server={config.proxy_config.server}")
+        # Context-level user_agent does not reach service workers; the launch flag does.
+        if config.user_agent:
+            flags.append(f"--user-agent={config.user_agent}")
         # dedupe
         return apply_sandbox_policy(list(dict.fromkeys(flags)))
 
@@ -1179,6 +1182,10 @@ class BrowserManager:
                 ]
             )
 
+        # Context-level user_agent does not reach service workers; the launch flag does.
+        if self.config.user_agent:
+            args.append(f"--user-agent={self.config.user_agent}")
+
         if self.config.extra_args:
             args.extend(self.config.extra_args)
 
@@ -1274,10 +1281,9 @@ class BrowserManager:
 
         # Handle user agent and browser hints
         if self.config.user_agent:
-            combined_headers = {
-                "User-Agent": self.config.user_agent,
-                "sec-ch-ua": self.config.browser_hint,
-            }
+            combined_headers = {"User-Agent": self.config.user_agent}
+            if self.config.browser_hint:
+                combined_headers["sec-ch-ua"] = self.config.browser_hint
             combined_headers.update(self.config.headers)
             await context.set_extra_http_headers(combined_headers)
 

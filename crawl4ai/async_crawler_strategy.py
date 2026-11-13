@@ -562,7 +562,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             self.browser_config.browser_hint = UAGen.generate_client_hints(
                 self.browser_config.user_agent
             )
-            self.browser_config.headers["sec-ch-ua"] = self.browser_config.browser_hint
+            if self.browser_config.browser_hint:
+                self.browser_config.headers["sec-ch-ua"] = self.browser_config.browser_hint
+            else:
+                self.browser_config.headers.pop("sec-ch-ua", None)
 
         # Get page for session
         page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
@@ -578,10 +581,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         try:
             # Push updated UA + sec-ch-ua to the page so the server sees them
             if ua_changed:
-                combined_headers = {
-                    "User-Agent": self.browser_config.user_agent,
-                    "sec-ch-ua": self.browser_config.browser_hint,
-                }
+                combined_headers = {"User-Agent": self.browser_config.user_agent}
+                if self.browser_config.browser_hint:
+                    combined_headers["sec-ch-ua"] = self.browser_config.browser_hint
                 combined_headers.update(self.browser_config.headers)
                 await page.set_extra_http_headers(combined_headers)
 
