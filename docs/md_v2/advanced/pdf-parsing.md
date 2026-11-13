@@ -98,6 +98,7 @@ When initializing `PDFContentScrapingStrategy`, you can configure its behavior u
 -   **`save_images_locally: bool = False`**: If `True` (and `extract_images` is also `True`), extracted images will be saved to disk in the `image_save_dir`. If `False`, image data might be available in another form (e.g., base64, depending on the underlying processor) but not saved as separate files by this strategy.
 -   **`image_save_dir: str = None`**: Specifies the directory where extracted images should be saved if `save_images_locally` is `True`. If `None`, a default or temporary directory might be used.
 -   **`batch_size: int = 4`**: Defines how many PDF pages are processed in a single batch. This can be useful for managing memory when dealing with very large PDF documents.
+-   **`max_pdf_seconds: float = 300`**: The total time allowed to download and parse one PDF. When it runs out, the scrape stops with an error and the temporary file is removed. Set it to `0` for no limit. The Docker server caps it at 300 for untrusted requests.
 -   **`logger: AsyncLogger = None`**: An optional `AsyncLogger` instance for logging.
 
 ### Key Methods and Their Behavior
@@ -116,8 +117,8 @@ When initializing `PDFContentScrapingStrategy`, you can configure its behavior u
         -   `metadata`: A dictionary holding PDF metadata (e.g., title, author, num_pages).
 -   **`async ascrap(self, url: str, html: str, **kwargs) -> ScrapingResult`**:
     -   The asynchronous version of `scrap`. Under the hood, it typically runs the synchronous `scrap` method in a separate thread using `asyncio.to_thread` to avoid blocking the event loop.
--   **`_get_pdf_path(self, url: str) -> str`**:
-    -   A private helper method to manage PDF file access. If the `url` is remote (http/https), it downloads the PDF to a temporary local file and returns its path. If `url` indicates a local file (`file://` or a direct path), it resolves and returns the local path.
+-   **`_get_pdf_path(self, url: str, check=None) -> str`**:
+    -   A private helper method to manage PDF file access. If the `url` is remote (http/https), it downloads the PDF to a temporary local file and returns its path. If `url` indicates a local file (`file://` or a direct path), it resolves and returns the local path. `check` is the `max_pdf_seconds` budget callable, run on every downloaded chunk; a subclass that overrides this method must accept it.
 
 ### Example Usage
 ```python
