@@ -66,9 +66,11 @@ class SSLCertificate(dict):
         """
         cert_info_raw = None # Variable to hold the fetched dict
         try:
-            hostname = urlparse(url).netloc
-            if ":" in hostname:
-                hostname = hostname.split(":")[0]
+            parsed = urlparse(url)
+            hostname = parsed.hostname
+            if not hostname:
+                raise ValueError("Certificate URL must include a hostname")
+            port = parsed.port if parsed.port is not None else 443
 
             context = ssl.create_default_context()
             # Set check_hostname to False and verify_mode to CERT_NONE temporarily
@@ -76,7 +78,7 @@ class SSLCertificate(dict):
             # context.check_hostname = False
             # context.verify_mode = ssl.CERT_NONE
 
-            with socket.create_connection((hostname, 443), timeout=timeout) as sock:
+            with socket.create_connection((hostname, port), timeout=timeout) as sock:
                 with context.wrap_socket(sock, server_hostname=hostname) as ssock:
                     cert_binary = ssock.getpeercert(binary_form=True)
                     if not cert_binary:
