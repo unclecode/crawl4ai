@@ -277,7 +277,9 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             if base_element:
                 base_href = base_element[0].get("href", "").strip()
                 if base_href:
-                    url = base_href
+                    # <base href> may be relative to the page URL; resolve it so
+                    # links stay absolute, like the no-<base> path.
+                    url = urljoin(url, base_href)
         except Exception as e:
             self._log("error", f"Error extracting base URL: {str(e)}", "SCRAPE")
             pass
