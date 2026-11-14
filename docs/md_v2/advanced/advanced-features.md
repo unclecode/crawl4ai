@@ -110,7 +110,7 @@ if __name__ == "__main__":
 - Exporting a PDF is more reliable for very long pages. Crawl4AI automatically converts the first PDF page into an image if you request both.  
 
 **Relevant Parameters**  
-- **`pdf=True`**: Exports the current page as a PDF (base64-encoded in `result.pdf`).  
+- **`pdf=True`**: Exports the current page as PDF bytes in `result.pdf`; write them directly to a binary file.
 - **`screenshot=True`**: Creates a screenshot (base64-encoded in `result.screenshot`).  
 - **`scroll_delay`**: Controls the delay (seconds) between scroll steps when taking a full-page screenshot of a tall page. Defaults to `0.2`. Increase for pages with slow-loading assets.  
 - **`scan_full_page`** or advanced hooking can further refine how the crawler captures content.
@@ -302,13 +302,15 @@ if __name__ == "__main__":
 
 Here’s a snippet that combines multiple “advanced” features (proxy, PDF, screenshot, SSL, custom headers, and session reuse) into one run. Normally, you’d tailor each setting to your project’s needs.
 
+Replace the proxy credentials and target URL with your own, and use a storage-state file exported after signing in. Headers and storage state belong in `BrowserConfig`; capture options belong in `CrawlerRunConfig`.
+
 ```python
-import os, asyncio
+import asyncio
 from base64 import b64decode
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 
 async def main():
-    # 1. Browser config with proxy + headless
+    # 1. Browser config with proxy, headers, and saved session state
     browser_cfg = BrowserConfig(
         proxy_config={
             "server": "http://proxy.example.com:8080",
@@ -316,16 +318,16 @@ async def main():
             "password": "mypass",
         },
         headless=True,
+        headers={"Accept-Language": "en-US,en;q=0.8"},
+        storage_state="my_storage.json",  # Reuse session from a previous sign-in
     )
 
-    # 2. Crawler config with PDF, screenshot, SSL, custom headers, and ignoring caches
+    # 2. Crawler config with PDF, screenshot, SSL, and ignoring caches
     crawler_cfg = CrawlerRunConfig(
         pdf=True,
         screenshot=True,
         fetch_ssl_certificate=True,
         cache_mode=CacheMode.BYPASS,
-        headers={"Accept-Language": "en-US,en;q=0.8"},
-        storage_state="my_storage.json",  # Reuse session from a previous sign-in
         verbose=True,
     )
 
@@ -342,7 +344,7 @@ async def main():
             # Save PDF & screenshot
             if result.pdf:
                 with open("result.pdf", "wb") as f:
-                    f.write(b64decode(result.pdf))
+                    f.write(result.pdf)
             if result.screenshot:
                 with open("result.png", "wb") as f:
                     f.write(b64decode(result.screenshot))
