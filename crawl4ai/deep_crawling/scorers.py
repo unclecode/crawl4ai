@@ -90,6 +90,14 @@ class URLScorer(ABC):
 
 class CompositeScorer(URLScorer):
     __slots__ = ('_scorers', '_normalize', '_weights_array', '_score_array')
+
+    @property
+    def scorers(self) -> List[URLScorer]:
+        return list(self._scorers)
+
+    @property
+    def normalize(self) -> bool:
+        return self._normalize
     
     def __init__(self, scorers: List[URLScorer], normalize: bool = True):
         """Initialize composite scorer combining multiple scoring strategies.
@@ -159,6 +167,14 @@ class CompositeScorer(URLScorer):
 
 class KeywordRelevanceScorer(URLScorer):
     __slots__ = ('_weight', '_stats', '_keywords', '_case_sensitive')
+
+    @property
+    def keywords(self) -> List[str]:
+        return list(self._keywords)
+
+    @property
+    def case_sensitive(self) -> bool:
+        return self._case_sensitive
     
     def __init__(self, keywords: List[str], weight: float = 1.0, case_sensitive: bool = False):
         super().__init__(weight=weight)
@@ -189,6 +205,10 @@ class KeywordRelevanceScorer(URLScorer):
 
 class PathDepthScorer(URLScorer):
     __slots__ = ('_weight', '_stats', '_optimal_depth')  # Remove _url_cache
+
+    @property
+    def optimal_depth(self) -> int:
+        return self._optimal_depth
     
     def __init__(self, optimal_depth: int = 3, weight: float = 1.0):
         super().__init__(weight=weight)
@@ -332,6 +352,10 @@ class ContentTypeScorer(URLScorer):
 class FreshnessScorer(URLScorer):
     __slots__ = ('_weight', '_date_pattern', '_current_year')
 
+    @property
+    def current_year(self) -> int:
+        return self._current_year
+
     def __init__(self, weight: float = 1.0, current_year: int = 2024):
         """Initialize freshness scorer.
         
@@ -413,6 +437,14 @@ class FreshnessScorer(URLScorer):
 
 class DomainAuthorityScorer(URLScorer):
     __slots__ = ('_weight', '_domain_weights', '_default_weight', '_top_domains')
+
+    @property
+    def domain_weights(self) -> Dict[str, float]:
+        return dict(self._domain_weights)
+
+    @property
+    def default_weight(self) -> float:
+        return self._default_weight
     
     def __init__(
         self,
