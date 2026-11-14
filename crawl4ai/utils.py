@@ -1584,16 +1584,21 @@ def extract_metadata_using_lxml(html, doc=None):
     # Strip and assign title
     metadata["title"] = title.strip() if title else None
 
+    # Standard metadata names are ASCII case-insensitive in HTML.
+    lowercase_name = (
+        'translate(@name, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")'
+    )
+
     # Meta description - using XPath with multiple attribute conditions
-    description = head.xpath('.//meta[@name="description"]/@content')
+    description = head.xpath(f'.//meta[{lowercase_name}="description"]/@content')
     metadata["description"] = description[0].strip() if description else None
 
     # Meta keywords
-    keywords = head.xpath('.//meta[@name="keywords"]/@content')
+    keywords = head.xpath(f'.//meta[{lowercase_name}="keywords"]/@content')
     metadata["keywords"] = keywords[0].strip() if keywords else None
 
     # Meta author
-    author = head.xpath('.//meta[@name="author"]/@content')
+    author = head.xpath(f'.//meta[{lowercase_name}="author"]/@content')
     metadata["author"] = author[0].strip() if author else None
 
     # Open Graph metadata - using starts-with() for performance
