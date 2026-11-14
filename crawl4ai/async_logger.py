@@ -6,6 +6,7 @@ import sys
 from datetime import datetime
 from urllib.parse import unquote
 from rich.console import Console
+from rich.markup import escape
 from rich.text import Text
 from .utils import create_box_message
 
@@ -205,17 +206,20 @@ class AsyncLogger(AsyncLoggerBase):
         if level.value < self.log_level.value:
             return
 
-        # avoid conflict with rich formatting
-        parsed_message = message.replace("[", "[[").replace("]", "]]")
+        # Escape brackets so rich prints them instead of reading them as markup
+        parsed_message = escape(message)
         if params:
+            params = {
+                key: escape(value) if isinstance(value, str) else value
+                for key, value in params.items()
+            }
             # FIXME: If there are formatting strings in floating point format, 
             # this may result in colors and boxes not being applied properly.
             # such as {value:.2f}, the value is 0.23333 format it to 0.23,
             # but we replace("0.23333", "[color]0.23333[/color]")
             formatted_message = parsed_message.format(**params)
             for key, value in params.items():
-                # value_str may discard `[` and `]`, so we need to replace it. 
-                value_str = str(value).replace("[", "[[").replace("]", "]]")
+                value_str = str(value)
                 # check is need apply color
                 if colors and key in colors:
                     color_str = f"[{colors[key]}]{value_str}[/{colors[key]}]"
