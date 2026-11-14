@@ -1275,8 +1275,11 @@ class AsyncWebCrawler:
                 base_directory=self.crawl4ai_folder,
             )
 
-        mapper_config = config.clone(**kwargs) if config and kwargs else (
-            config or DomainMapperConfig(**kwargs) if kwargs else DomainMapperConfig()
-        )
+        if config is None:
+            mapper_config = DomainMapperConfig(**kwargs)
+        elif kwargs:
+            mapper_config = config.clone(**kwargs)
+        else:
+            mapper_config = config
 
         return await self._domain_mapper.scan(domain, mapper_config)
