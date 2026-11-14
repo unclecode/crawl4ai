@@ -187,10 +187,12 @@ def _match(url: str, pattern: str) -> bool:
 def _parse_head(src: str) -> Dict[str, Any]:
     if LXML:
         try:
+            parser = None
             if isinstance(src, str):
-                # strip Unicode, let lxml decode
+                # Keep the known encoding of already-decoded Unicode text.
                 src = src.encode("utf-8", "replace")
-            doc = lxml_html.fromstring(src)
+                parser = lxml_html.HTMLParser(encoding="utf-8")
+            doc = lxml_html.fromstring(src, parser=parser)
         except (ValueError, etree.ParserError):
             return {}        # malformed, bail gracefully
         info: Dict[str, Any] = {
