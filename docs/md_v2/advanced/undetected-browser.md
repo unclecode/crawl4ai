@@ -277,8 +277,7 @@ The adapter handles:
 2. **Use Reasonable Delays**: Don't rush through pages
    ```python
    crawler_config = CrawlerRunConfig(
-       wait_time=3.0,  # Wait 3 seconds after page load
-       delay_before_return_html=2.0  # Additional delay
+       delay_before_return_html=3.0  # Wait 3 seconds before returning HTML
    )
    ```
 
@@ -362,7 +361,7 @@ Try combining with other features:
 crawler_config = CrawlerRunConfig(
     simulate_user=True,  # Add user simulation
     magic=True,  # Enable magic mode
-    wait_time=5.0,  # Longer waits
+    delay_before_return_html=5.0,  # Longer waits
 )
 ```
 
