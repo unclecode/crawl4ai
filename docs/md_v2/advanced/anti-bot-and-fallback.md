@@ -157,6 +157,8 @@ With this setup, each round tries the datacenter proxy first, then the residenti
 
 When all browser-based attempts fail, call a custom async function as a last resort. This function receives the URL and must return raw HTML as a string. The returned HTML is processed through the normal pipeline (markdown generation, extraction, etc.).
 
+The fallback also runs after a fetch exception when `max_retries=0`; no extra browser retry is required. Caller-provided `raw:` HTML does not invoke the fetch fallback.
+
 This is useful when you have access to a scraping API, a pre-fetched cache, or any other source of HTML.
 
 ```python
