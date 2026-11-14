@@ -210,8 +210,9 @@ Below is an example using **open-source** style (no token) and closed-source:
 import os
 import json
 import asyncio
+from typing import Dict
 from pydantic import BaseModel, Field
-from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LLMConfig
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig
 from crawl4ai import LLMExtractionStrategy
 
 class OpenAIModelFee(BaseModel):
