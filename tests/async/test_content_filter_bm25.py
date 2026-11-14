@@ -138,6 +138,21 @@ class TestBM25ContentFilter:
         assert "style=" not in cleaned_content, "Should remove style attributes"
         assert "<script" not in cleaned_content, "Should remove script tags"
 
+    def test_multi_valued_attributes(self):
+        """Multi-valued attributes like rel are written as space-separated values"""
+        html = """
+        <html><body>
+            <p>Python sorting guide: read the <a href="/docs" rel="nofollow noopener">sorting docs</a>
+            before sorting Python lists.</p>
+            <p>Unrelated paragraph about gardening tomatoes in summer weather.</p>
+            <p>Another unrelated paragraph about cooking pasta with fresh basil.</p>
+        </body></html>
+        """
+        filter = BM25ContentFilter(user_query="python sorting", bm25_threshold=0.1)
+        contents = " ".join(filter.filter_content(html))
+
+        assert 'rel="nofollow noopener"' in contents
+
     def test_large_content(self):
         """Test handling of large content blocks"""
         large_html = f"""

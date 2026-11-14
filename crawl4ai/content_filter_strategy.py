@@ -361,6 +361,9 @@ class RelevantContentFilter(ABC):
             # Add cleaned attributes
             attrs = {k: v for k, v in elem.attrs.items() if k not in unwanted_attrs}
             for key, value in attrs.items():
+                # BeautifulSoup keeps multi-valued attributes like rel as lists
+                if isinstance(value, list):
+                    value = " ".join(value)
                 builder.append(f' {key}="{value}"')
 
             builder.append(">")
