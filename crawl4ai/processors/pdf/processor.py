@@ -1,5 +1,4 @@
 import logging
-import re
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
@@ -443,9 +442,18 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
             except ImportError:
                 raise ImportError("pypdf is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
 
-        meta = reader.metadata or {}
-        created = self._parse_pdf_date(meta.get('/CreationDate', ''))
-        modified = self._parse_pdf_date(meta.get('/ModDate', ''))
+        meta = reader.metadata
+        created = modified = None
+        if meta is not None:
+            try:
+                created = meta.creation_date
+            except ValueError:
+                pass
+            try:
+                modified = meta.modification_date
+            except ValueError:
+                pass
+        meta = meta or {}
         
         return PDFMetadata(
             title=meta.get('/Title'),
@@ -457,23 +465,6 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
             encrypted=reader.is_encrypted,
             file_size=pdf_path.stat().st_size
         )
-
-    def _parse_pdf_date(self, date_str: str) -> Optional[datetime]:
-        try:
-            match = re.match(r'D:(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})', date_str)
-            if not match:
-                return None
-                
-            return datetime(
-                year=int(match[1]),
-                month=int(match[2]),
-                day=int(match[3]),
-                hour=int(match[4]),
-                minute=int(match[5]),
-                second=int(match[6])
-            )
-        except:
-            return None
 
 # Usage example
 if __name__ == "__main__":
