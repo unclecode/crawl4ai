@@ -68,9 +68,12 @@ def test_amap_domain_builds_config_from_kwargs(tmp_path):
     )
 
     actual = mapper.scan.await_args.args[1]
-    assert actual.to_dict() == DomainMapperConfig(
-        source="feed", max_urls=4, include_subdomains=False
-    ).to_dict()
+    assert (
+        actual.to_dict()
+        == DomainMapperConfig(
+            source="feed", max_urls=4, include_subdomains=False
+        ).to_dict()
+    )
 
 
 def test_amap_domain_creates_fresh_default_configs(tmp_path):
