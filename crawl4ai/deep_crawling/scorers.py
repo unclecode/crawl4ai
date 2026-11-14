@@ -286,13 +286,22 @@ class ContentTypeScorer(URLScorer):
         Returns:
             Extension without dot, or empty string if none found
         """
-        pos = url.rfind('.')
+        # Ignore URL suffixes and dots before the final slash-delimited segment.
+        end = len(url)
+        for delimiter in "?#":
+            boundary = url.find(delimiter, 0, end)
+            if boundary != -1:
+                end = boundary
+        start = url.rfind("/", 0, end) + 1
+        params = url.find(";", start, end)
+        if params != -1:
+            end = params
+        pos = url.rfind(".", start, end)
         if pos == -1:
             return ''
         
         # Find first non-alphanumeric char after extension
-        end = len(url)
-        for i in range(pos + 1, len(url)):
+        for i in range(pos + 1, end):
             c = url[i]
             # Stop at query string, fragment, path param or any non-alphanumeric
             if c in '?#;' or not c.isalnum():
