@@ -24,6 +24,7 @@ import os
 import pathlib
 import re
 import time
+from contextlib import aclosing
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
@@ -436,8 +437,9 @@ class AsyncUrlSeeder:
         async def gen():
             if "sitemap" in sources:
                 self._log("debug", "Fetching from sitemaps...", tag="URL_SEED")
-                async for u in self._from_sitemaps(domain, pattern, force):
-                    yield u
+                async with aclosing(self._from_sitemaps(domain, pattern, force)) as urls:
+                    async for u in urls:
+                        yield u
             if "cc" in sources:
                 self._log("debug", "Fetching from Common Crawl...",
                           tag="URL_SEED")
@@ -454,21 +456,22 @@ class AsyncUrlSeeder:
 
         async def producer():
             try:
-                async for u in gen():
-                    try:
-                        if u in seen:
-                            self._log("debug", "Skipping duplicate URL: {url}",
-                                      params={"url": u}, tag="URL_SEED")
+                async with aclosing(gen()) as urls:
+                    async for u in urls:
+                        try:
+                            if u in seen:
+                                self._log("debug", "Skipping duplicate URL: {url}",
+                                          params={"url": u}, tag="URL_SEED")
+                                continue
+                            if stop_event.is_set():
+                                self._log(
+                                    "info", "Producer stopping due to max_urls limit.", tag="URL_SEED")
+                                break
+                            seen.add(u)
+                            await queue.put(u)  # Will block if queue is full, providing backpressure
+                        except UnicodeEncodeError:
+                            # Skip URLs that cause encoding errors (e.g. on Windows)
                             continue
-                        if stop_event.is_set():
-                            self._log(
-                                "info", "Producer stopping due to max_urls limit.", tag="URL_SEED")
-                            break
-                        seen.add(u)
-                        await queue.put(u)  # Will block if queue is full, providing backpressure
-                    except UnicodeEncodeError:
-                        # Skip URLs that cause encoding errors (e.g. on Windows)
-                        continue
             except Exception as e:
                 self._log("error", "Producer encountered an error: {error}", params={
                           "error": str(e)}, tag="URL_SEED")
@@ -529,8 +532,18 @@ class AsyncUrlSeeder:
         workers = [asyncio.create_task(worker(results))
                    for _ in range(concurrency)]
 
-        # Wait for all workers to finish
-        await asyncio.gather(prod_task, *workers)
+        tasks = [prod_task, *workers]
+        seeding = asyncio.gather(*tasks)
+        try:
+            # Keep caller cancellation from returning before the producer has
+            # closed its nested sitemap iterators.
+            await asyncio.shield(seeding)
+        except (asyncio.CancelledError, Exception):
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(seeding, *tasks, return_exceptions=True)
+            raise
         await queue.join()  # Ensure all queued items are processed
 
         self._log("info", "Finished URL seeding for {domain}. Total URLs: {count}",
@@ -957,21 +970,18 @@ class AsyncUrlSeeder:
         # Step 3: Fetch fresh URLs
         discovered_urls = []
 
-        if sitemap_url and sitemap_content:
+        if sitemap_url:
             self._log("info", "Found sitemap at {url}", params={"url": sitemap_url}, tag="URL_SEED")
-
-            # Parse sitemap (reuse content we already fetched)
-            async for u in self._iter_sitemap_content(sitemap_url, sitemap_content):
-                discovered_urls.append(u)
-                if _match(u, pattern):
-                    yield u
-        elif sitemap_url:
-            # We have a sitemap URL but no content (fetch failed earlier), try again
-            self._log("info", "Found sitemap at {url}", params={"url": sitemap_url}, tag="URL_SEED")
-            async for u in self._iter_sitemap(sitemap_url):
-                discovered_urls.append(u)
-                if _match(u, pattern):
-                    yield u
+            stream = (
+                self._iter_sitemap_content(sitemap_url, sitemap_content)
+                if sitemap_content
+                else self._iter_sitemap(sitemap_url)
+            )
+            async with aclosing(stream) as urls:
+                async for u in urls:
+                    discovered_urls.append(u)
+                    if _match(u, pattern):
+                        yield u
         else:
             # Fallback: robots.txt
             robots = f"https://{host}/robots.txt"
@@ -982,10 +992,11 @@ class AsyncUrlSeeder:
                                      for l in r.text.splitlines()
                                      if l.lower().startswith("sitemap:")]
                     for sm in sitemap_lines:
-                        async for u in self._iter_sitemap(sm):
-                            discovered_urls.append(u)
-                            if _match(u, pattern):
-                                yield u
+                        async with aclosing(self._iter_sitemap(sm)) as urls:
+                            async for u in urls:
+                                discovered_urls.append(u)
+                                if _match(u, pattern):
+                                    yield u
                 else:
                     self._log("warning", "robots.txt unavailable for {d} HTTP{c}",
                               params={"d": domain, "c": r.status_code}, tag="URL_SEED")
@@ -1078,31 +1089,9 @@ class AsyncUrlSeeder:
             self._log("info", "Processing sitemap index with {count} sub-sitemaps",
                       params={"count": len(sub_sitemaps)}, tag="URL_SEED")
 
-            queue_size = min(50000, len(sub_sitemaps) * 1000)
-            result_queue = asyncio.Queue(maxsize=queue_size)
-            completed_count = 0
-            total_sitemaps = len(sub_sitemaps)
-
-            async def process_subsitemap(sitemap_url: str):
-                try:
-                    async for u in self._iter_sitemap(sitemap_url):
-                        await result_queue.put(u)
-                except Exception as e:
-                    self._log("error", "Error processing sub-sitemap {url}: {error}",
-                              params={"url": sitemap_url, "error": str(e)}, tag="URL_SEED")
-                finally:
-                    await result_queue.put(None)
-
-            tasks = [asyncio.create_task(process_subsitemap(sm)) for sm in sub_sitemaps]
-
-            while completed_count < total_sitemaps:
-                item = await result_queue.get()
-                if item is None:
-                    completed_count += 1
-                else:
-                    yield item
-
-            await asyncio.gather(*tasks, return_exceptions=True)
+            async with aclosing(self._iter_subsitemaps(sub_sitemaps)) as urls:
+                async for u in urls:
+                    yield u
         else:
             for u in regular_urls:
                 yield u
@@ -1242,45 +1231,56 @@ class AsyncUrlSeeder:
             self._log("info", "Processing sitemap index with {count} sub-sitemaps in parallel",
                       params={"count": len(sub_sitemaps)}, tag="URL_SEED")
 
-            # Create a bounded queue for results to prevent RAM issues
-            # For sitemap indexes, use a larger queue as we expect many URLs
-            queue_size = min(50000, len(sub_sitemaps) * 1000)  # Estimate 1000 URLs per sitemap
-            result_queue = asyncio.Queue(maxsize=queue_size)
-            completed_count = 0
-            total_sitemaps = len(sub_sitemaps)
+            async with aclosing(self._iter_subsitemaps(sub_sitemaps)) as urls:
+                async for u in urls:
+                    yield u
+        else:
+            # Regular sitemap - yield URLs directly
+            for u in regular_urls:
+                yield u
 
-            async def process_subsitemap(sitemap_url: str):
-                try:
-                    self._log(
-                        "debug", "Processing sub-sitemap: {url}", params={"url": sitemap_url}, tag="URL_SEED")
-                    # Recursively process sub-sitemap
-                    async for u in self._iter_sitemap(sitemap_url):
-                        await result_queue.put(u)  # Will block if queue is full
-                except Exception as e:
-                    self._log("error", "Error processing sub-sitemap {url}: {error}",
-                              params={"url": sitemap_url, "error": str(e)}, tag="URL_SEED")
-                finally:
-                    # Put sentinel to signal completion
+    async def _iter_subsitemaps(self, sitemap_urls: List[str]):
+        result_queue = asyncio.Queue(maxsize=min(50000, len(sitemap_urls) * 1000))
+        closing = False
+
+        async def process_subsitemap(sitemap_url: str):
+            try:
+                self._log(
+                    "debug",
+                    "Processing sub-sitemap: {url}",
+                    params={"url": sitemap_url},
+                    tag="URL_SEED",
+                )
+                async with aclosing(self._iter_sitemap(sitemap_url)) as urls:
+                    async for url in urls:
+                        await result_queue.put(url)
+            except Exception as e:
+                self._log(
+                    "error",
+                    "Error processing sub-sitemap {url}: {error}",
+                    params={"url": sitemap_url, "error": str(e)},
+                    tag="URL_SEED",
+                )
+            finally:
+                # A closed iterator no longer has a reader for a full queue.
+                if not closing:
                     await result_queue.put(None)
 
-            # Start all tasks
-            tasks = [asyncio.create_task(process_subsitemap(sm))
-                     for sm in sub_sitemaps]
-
-            # Yield results as they come in
-            while completed_count < total_sitemaps:
+        tasks = [asyncio.create_task(process_subsitemap(url)) for url in sitemap_urls]
+        completed_count = 0
+        try:
+            while completed_count < len(tasks):
                 item = await result_queue.get()
                 if item is None:
                     completed_count += 1
                 else:
                     yield item
-
-            # Ensure all tasks are done
+        finally:
+            closing = True
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
-        else:
-            # Regular sitemap - yield URLs directly
-            for u in regular_urls:
-                yield u
 
     # ─────────────────────────────── validate helpers
     async def _validate(self, url: str, res_list: List[Dict[str, Any]], live: bool,
