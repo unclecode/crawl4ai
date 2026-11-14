@@ -178,7 +178,8 @@ class PinningProxy:
             await self._reply(client_writer, _BAD)
             return
         try:
-            pin = resolve_and_pin(f"https://{host}:{port_s}")
+            # getaddrinfo blocks: resolve off the event loop, or every lookup stalls the server.
+            pin = await asyncio.to_thread(resolve_and_pin, f"https://{host}:{port_s}")
         except EgressBlocked:
             await self._reply(client_writer, _BLOCKED)
             return
@@ -204,7 +205,7 @@ class PinningProxy:
             return
         port = sp.port or 80
         try:
-            pin = resolve_and_pin(f"http://{sp.hostname}:{port}")
+            pin = await asyncio.to_thread(resolve_and_pin, f"http://{sp.hostname}:{port}")
         except EgressBlocked:
             await self._reply(client_writer, _BLOCKED)
             return
