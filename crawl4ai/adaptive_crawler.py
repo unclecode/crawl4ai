@@ -1418,10 +1418,11 @@ class AdaptiveCrawler:
                     # Update knowledge base
                     self.state.knowledge_base.extend(new_results)
                     
-                    # Update crawled URLs and pending links
-                    for result, (link, _) in zip(new_results, to_crawl):
+                    # Update crawled URLs and pending links. Failed crawls are not in
+                    # new_results, so it does not line up with to_crawl.
+                    for result in new_results:
                         if result:
-                            self.state.crawled_urls.add(link.href)
+                            self.state.crawled_urls.add(result.url)
                             # Extract links from result - handle both dict and Links object formats
                             if hasattr(result, 'links') and result.links:
                                 new_links = []
