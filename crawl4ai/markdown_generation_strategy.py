@@ -133,6 +133,9 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
             )
             last_end = match.end()
 
+        if not link_map:
+            return markdown, ""
+
         parts.append(markdown[last_end:])
         converted_text = "".join(parts)
 
