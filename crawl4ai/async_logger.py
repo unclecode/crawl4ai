@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Optional, Dict, Any, List
+import logging
+from logging.handlers import RotatingFileHandler
 import os
 import sys
 from datetime import datetime
@@ -8,6 +10,50 @@ from urllib.parse import unquote
 from rich.console import Console
 from rich.text import Text
 from .utils import create_box_message
+
+
+LOG_FILE_MAX_BYTES = 10 * 1024 * 1024
+LOG_FILE_BACKUP_COUNT = 3
+
+_file_handlers: Dict[str, RotatingFileHandler] = {}
+
+
+def _get_file_handler(log_file: str) -> RotatingFileHandler:
+    """Return the process-wide rotating handler for ``log_file``.
+
+    One handler per path is shared by every logger in the process, so several
+    ``AsyncWebCrawler`` instances writing to the same ``crawler.log`` rotate it
+    once instead of each renaming it out from under the others. Rotation across
+    *processes* is not coordinated, same as the standard library's
+    ``RotatingFileHandler``.
+    """
+    path = os.path.abspath(log_file)
+    handler = _file_handlers.get(path)
+    if handler is None:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        handler = RotatingFileHandler(
+            path,
+            maxBytes=LOG_FILE_MAX_BYTES,
+            backupCount=LOG_FILE_BACKUP_COUNT,
+            encoding="utf-8",
+        )
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        _file_handlers[path] = handler
+    return handler
+
+
+def _write_line(handler: RotatingFileHandler, line: str) -> None:
+    """Write one already-formatted line through ``handler``, rotating if needed."""
+    record = logging.LogRecord(
+        name="crawl4ai",
+        level=logging.INFO,
+        pathname="",
+        lineno=0,
+        msg=line,
+        args=None,
+        exc_info=None,
+    )
+    handler.handle(record)
 
 
 class LogLevel(Enum):
@@ -125,7 +171,8 @@ class AsyncLogger(AsyncLoggerBase):
         Initialize the logger.
 
         Args:
-            log_file: Optional file path for logging
+            log_file: Optional file path for logging. The file is rotated at
+                10 MB and 3 rotated copies (``crawler.log.1`` ...) are kept.
             log_level: Minimum log level to display
             tag_width: Width for tag formatting
             icons: Custom icons for different tags
@@ -150,9 +197,7 @@ class AsyncLogger(AsyncLoggerBase):
         # width; this only lifts the non-TTY fallback cap.
         self.console = console if console is not None else Console(stderr=True, width=200)
 
-        # Create log file directory if needed
-        if log_file:
-            os.makedirs(os.path.dirname(os.path.abspath(log_file)), exist_ok=True)
+        self._file_handler = _get_file_handler(log_file) if log_file else None
 
     def _format_tag(self, tag: str) -> str:
         """Format a tag with consistent width."""
@@ -172,12 +217,11 @@ class AsyncLogger(AsyncLoggerBase):
 
     def _write_to_file(self, message: str):
         """Write a message to the log file if configured."""
-        if self.log_file:
+        if self._file_handler is not None:
             text = Text.from_markup(message)
             plain_text = text.plain
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-            with open(self.log_file, "a", encoding="utf-8") as f:
-                f.write(f"[{timestamp}] {plain_text}\n")
+            _write_line(self._file_handler, f"[{timestamp}] {plain_text}")
 
     def _log(
         self,
@@ -343,16 +387,16 @@ class AsyncFileLogger(AsyncLoggerBase):
         Initialize the file logger.
 
         Args:
-            log_file: File path for logging
+            log_file: File path for logging. The file is rotated at 10 MB and
+                3 rotated copies are kept.
         """
         self.log_file = log_file
-        os.makedirs(os.path.dirname(os.path.abspath(log_file)), exist_ok=True)
+        self._file_handler = _get_file_handler(log_file)
 
     def _write_to_file(self, level: str, message: str, tag: str):
         """Write a message to the log file."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-        with open(self.log_file, "a", encoding="utf-8") as f:
-            f.write(f"[{timestamp}] [{level}] [{tag}] {message}\n")
+        _write_line(self._file_handler, f"[{timestamp}] [{level}] [{tag}] {message}")
 
     def debug(self, message: str, tag: str = "DEBUG", **kwargs):
         """Log a debug message to file."""
