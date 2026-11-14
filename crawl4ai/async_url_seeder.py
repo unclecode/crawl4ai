@@ -378,7 +378,8 @@ class AsyncUrlSeeder:
         domain : str
             The domain to fetch URLs for (e.g., "example.com")
         config : SeedingConfig
-            Configuration object containing all seeding parameters
+            Configuration object containing all seeding parameters.
+            Its concurrency must be positive.
         """
         # Extract parameters from config
         pattern = config.pattern or "*"
@@ -386,6 +387,8 @@ class AsyncUrlSeeder:
         live_check = config.live_check
         extract_head = config.extract_head
         concurrency = config.concurrency
+        if concurrency <= 0:
+            raise ValueError("concurrency must be positive")
         head_timeout = 5  # Default timeout for HEAD requests
         hits_per_sec = config.hits_per_sec
         self.force = config.force  # Store force flag as instance attribute
@@ -614,7 +617,7 @@ class AsyncUrlSeeder:
         config : SeedingConfig, optional
             Configuration object. If None, uses default settings for head extraction
         concurrency : int, default=10
-            Number of concurrent requests
+            Positive number of concurrent requests
         timeout : int, default=5
             Timeout for each request in seconds
             
@@ -623,6 +626,9 @@ class AsyncUrlSeeder:
         List[Dict[str, Any]]
             List of dictionaries containing url, status, head_data, and optional relevance_score
         """
+        if concurrency <= 0:
+            raise ValueError("concurrency must be positive")
+
         # Create default config if none provided
         if config is None:
             # Import here to avoid circular imports
