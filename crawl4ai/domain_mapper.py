@@ -247,7 +247,7 @@ class DomainMapper:
                   params={"domain": base_domain, "sources": config.source})
 
         # ── Phase 1: Host Discovery ──────────────────────────────────────
-        hosts = await self._discover_hosts(base_domain, sources, config)
+        hosts, wayback_urls = await self._discover_hosts(base_domain, sources, config)
         self._log("info", "Discovered {count} live hosts",
                   params={"count": len(hosts)})
 
@@ -260,7 +260,9 @@ class DomainMapper:
         all_results: List[Dict[str, Any]] = []
         scan_tasks = []
         for host in hosts:
-            scan_tasks.append(self._scan_host(host, base_domain, sources, config))
+            scan_tasks.append(
+                self._scan_host(host, base_domain, sources, config, wayback_urls)
+            )
 
         host_results = await asyncio.gather(*scan_tasks, return_exceptions=True)
         for i, result in enumerate(host_results):
@@ -304,9 +306,10 @@ class DomainMapper:
 
     async def _discover_hosts(
         self, base_domain: str, sources: Set[str], config: "DomainMapperConfig"
-    ) -> Set[str]:
+    ) -> Tuple[Set[str], List[str]]:
         """Discover all subdomains/hosts under base_domain."""
         hosts: Set[str] = {base_domain}
+        wayback_urls: List[str] = []
 
         # When include_subdomains is False, skip all subdomain discovery
         # and only scan the exact domain provided
@@ -314,7 +317,7 @@ class DomainMapper:
             self._log("info", "Subdomain discovery disabled, scanning only {domain}",
                       params={"domain": base_domain})
             validated = await self._validate_hosts(hosts, config)
-            return validated
+            return validated, wayback_urls
 
         discovery_tasks = []
 
@@ -349,6 +352,8 @@ class DomainMapper:
                     self._log("warning", "{source} discovery failed: {err}",
                               params={"source": name, "err": str(result)})
                 else:
+                    if name == "wayback":
+                        result, wayback_urls = result
                     self._log("info", "{source} discovered {count} hosts: {hosts}",
                               params={"source": name, "count": len(result),
                                       "hosts": ", ".join(sorted(result)[:10])})
@@ -356,7 +361,7 @@ class DomainMapper:
 
         # Validate all hosts are actually alive
         validated = await self._validate_hosts(hosts, config)
-        return validated
+        return validated, wayback_urls
 
     async def _discover_via_crt(self, base_domain: str, config: "DomainMapperConfig") -> Set[str]:
         """Discover subdomains via Certificate Transparency logs (crt.sh)."""
@@ -388,11 +393,12 @@ class DomainMapper:
             self._log("warning", "crt.sh query failed: {err}", params={"err": str(e)})
         return hosts
 
-    async def _discover_via_wayback(self, base_domain: str, config: "DomainMapperConfig") -> Set[str]:
-        """Discover hosts from Wayback Machine CDX API."""
+    async def _discover_via_wayback(
+        self, base_domain: str, config: "DomainMapperConfig"
+    ) -> Tuple[Set[str], List[str]]:
+        """Discover hosts and their URLs from the Wayback Machine CDX API."""
         hosts: Set[str] = set()
-        # Also store URLs for later use in Phase 2
-        self._wayback_urls: List[str] = []
+        urls: List[str] = []
         params = {
             "url": f"*.{base_domain}/*",
             "output": "text",
@@ -405,19 +411,19 @@ class DomainMapper:
                 WAYBACK_CDX_URL, params=params, timeout=30, follow_redirects=True
             )
             if resp.status_code != 200:
-                return hosts
+                return hosts, urls
             for line in resp.text.strip().splitlines():
                 url = line.strip()
                 if not url:
                     continue
-                self._wayback_urls.append(url)
+                urls.append(url)
                 parsed = urlparse(url)
                 host = parsed.netloc.lower().split(":")[0]
                 if host and (host == base_domain or host.endswith(f".{base_domain}")):
                     hosts.add(host)
         except Exception as e:
             self._log("warning", "Wayback CDX query failed: {err}", params={"err": str(e)})
-        return hosts
+        return hosts, urls
 
     async def _discover_via_cc(self, base_domain: str, config: "DomainMapperConfig") -> Set[str]:
         """Extract unique hostnames from Common Crawl results."""
@@ -504,7 +510,12 @@ class DomainMapper:
     # ════════════════════════════════════════════════════════════════════════
 
     async def _scan_host(
-        self, host: str, base_domain: str, sources: Set[str], config: "DomainMapperConfig"
+        self,
+        host: str,
+        base_domain: str,
+        sources: Set[str],
+        config: "DomainMapperConfig",
+        wayback_urls: List[str],
     ) -> List[Dict[str, Any]]:
         """Run all enabled sources against a single host."""
         results: List[Dict[str, Any]] = []
@@ -602,18 +613,19 @@ class DomainMapper:
                     })
 
         # Add Wayback URLs that belong to this host
-        if "wayback" in sources and hasattr(self, "_wayback_urls"):
-            for url in self._wayback_urls:
-                parsed = urlparse(url)
-                url_host = parsed.netloc.lower().split(":")[0]
-                if url_host == host:
-                    results.append({
+        for url in wayback_urls:
+            parsed = urlparse(url)
+            url_host = parsed.netloc.lower().split(":")[0]
+            if url_host == host:
+                results.append(
+                    {
                         "url": url,
                         "host": host,
                         "source": "wayback",
                         "status": "valid",
                         "head_data": {},
-                    })
+                    }
+                )
 
         return results
 
