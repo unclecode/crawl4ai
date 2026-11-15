@@ -14,13 +14,13 @@ from pathlib import Path
 import pytest
 import yaml
 
-from crawl4ai import BrowserConfig
-
 ROOT = Path(__file__).resolve().parents[2]
 DOCKER_DIR = ROOT / "deploy" / "docker"
 sys.path.insert(0, str(DOCKER_DIR))
 
 pool = pytest.importorskip("crawler_pool", reason="docker server deps not installed")
+
+from crawl4ai import BrowserConfig  # noqa: E402  (after importorskip so missing deps skip)
 
 
 def test_config_enables_recycling():
