@@ -339,7 +339,6 @@ Thanks to our contributors and the entire community for feedback and bug reports
 - [Full Documentation](https://docs.crawl4ai.com)
 - [GitHub Repository](https://github.com/unclecode/crawl4ai)
 - [Discord Community](https://discord.gg/crawl4ai)
-- [Feature Demo](https://github.com/unclecode/crawl4ai/blob/main/docs/releases_review/demo_v0.7.3.py)
 
 ---
 
