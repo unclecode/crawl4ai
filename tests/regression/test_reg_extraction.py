@@ -33,6 +33,42 @@ except (ImportError, ModuleNotFoundError):
     HAS_COSINE = False
 
 
+@pytest.mark.parametrize(
+    ("strategy_class", "base_selector", "nested_selector"),
+    [
+        (JsonCssExtractionStrategy, "div.entry", "a"),
+        (JsonLxmlExtractionStrategy, "div.entry", "a"),
+        (JsonXPathExtractionStrategy, "//div[@class='entry']", ".//a"),
+    ],
+)
+def test_nested_field_extracts_leaf_element(
+    strategy_class, base_selector, nested_selector
+):
+    schema = {
+        "baseSelector": base_selector,
+        "fields": [
+            {
+                "name": "link",
+                "selector": nested_selector,
+                "type": "nested",
+                "fields": [
+                    {"name": "label", "type": "text"},
+                    {"name": "href", "type": "attribute", "attribute": "href"},
+                ],
+            }
+        ],
+    }
+    html = (
+        '<div class="entry"><a href="/details">Read more</a></div>'
+        '<div class="entry"></div>'
+    )
+
+    assert strategy_class(schema).extract("https://example.invalid/", html) == [
+        {"link": {"label": "Read more", "href": "/details"}},
+        {"link": {}},
+    ]
+
+
 # ---------------------------------------------------------------------------
 # JsonCssExtractionStrategy
 # ---------------------------------------------------------------------------
