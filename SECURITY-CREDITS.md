@@ -36,3 +36,4 @@ We thank the following security researchers for their responsible disclosure:
 | Daniel Ruf | GitHub: [weaverant](https://github.com/weaverant) | Vulnerable Brotli decoder (CVE-2026-111497) in the brotli dependency range and in the Node.js bundled with the Playwright and patchright drivers in the Docker image (0.9.6) | 2026-10-25 |
 | Soham | Email report | Memory exhaustion on the Docker server via unchecked DefaultMarkdownGenerator options reaching html2text internal state (0.9.6) | 2026-11-02 |
 | Ugur Celik | GitHub: [ucsurf](https://github.com/ucsurf) | Unbounded sitemap index following in AsyncUrlSeeder and DomainMapper (cycles, nesting, gzip bombs) (0.9.6) | 2026-11-10 |
+| TheCyberMessi | GitHub: [TheCyberMessi](https://github.com/TheCyberMessi) | TLS certificate fetch blocking the Docker server's event loop (0.9.6) | 2026-11-17 |

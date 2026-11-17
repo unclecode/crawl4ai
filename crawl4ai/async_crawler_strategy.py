@@ -709,7 +709,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Get SSL certificate information if requested and URL is HTTPS
             ssl_cert = None
             if config.fetch_ssl_certificate:
-                ssl_cert = SSLCertificate.from_url(url)
+                # Blocking socket + TLS handshake: keep it off the event loop, which
+                # also runs the server and its in-process egress proxy.
+                ssl_cert = await asyncio.to_thread(SSLCertificate.from_url, url)
 
             # Set up download handling
             if self.browser_config.accept_downloads:
