@@ -155,8 +155,10 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping link discovery")
             return
 
-        # Get internal links and, if enabled, external links.
-        links = result.links.get("internal", [])
+        # Get internal links and, if enabled, external links. Copy the list:
+        # ``+=`` below must not append external links to the caller's
+        # ``result.links["internal"]``.
+        links = list(result.links.get("internal", []))
         if self.include_external:
             links += result.links.get("external", [])
 
