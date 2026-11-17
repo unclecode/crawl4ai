@@ -26,6 +26,7 @@ from crawl4ai import (
     LLMConfig
 )
 from crawl4ai.async_configs import Provenance, UntrustedConfigError
+from crawl4ai.async_crawler_strategy import request_hooks
 from hook_registry import build_declarative_hooks, HookValidationError
 from llm_broker import LLMProviderNotAllowed
 from crawl4ai.utils import perform_completion_with_backoff
@@ -53,16 +54,18 @@ def _enqueue_job(background_tasks, factory, principal=None):
         )
 
 
-def _attach_declarative_hooks(crawler, hooks_config: dict) -> dict:
-    """Build and attach server-authored hooks from declarative specs.
+def _attach_declarative_hooks(hooks_config: Optional[dict]) -> dict:
+    """Build server-authored hooks from declarative specs and scope them to this
+    request. The crawler strategy is pooled and shared between callers, so the
+    hooks go in the request_hooks ContextVar, never on the strategy; a request
+    without hooks sets {} so it runs none.
 
     Raises HookValidationError on an unknown action / invalid params, which the
     handlers map to HTTP 400.
     """
-    specs = hooks_config.get("hooks", []) or []
-    hooks = build_declarative_hooks(specs)
-    for hook_point, fn in hooks.items():
-        crawler.crawler_strategy.set_hook(hook_point, fn)
+    specs = (hooks_config or {}).get("hooks", []) or []
+    hooks = build_declarative_hooks(specs) if specs else {}
+    request_hooks.set(hooks)
     return {"status": "success", "attached": list(hooks.keys())}
 from crawl4ai.content_filter_strategy import (
     PruningContentFilter,
@@ -714,10 +717,9 @@ async def handle_crawl_request(
         else:
             crawler = await get_crawler(browser_config)
         
-        # Attach declarative hooks if provided
-        hooks_status = {}
+        # Scope declarative hooks to this request ({} when none were sent)
+        hooks_status = _attach_declarative_hooks(hooks_config)
         if hooks_config:
-            hooks_status = _attach_declarative_hooks(crawler, hooks_config)
             logger.info(f"Hooks attachment status: {hooks_status['status']}")
         
         base_config = config["crawler"]["base_config"]
@@ -941,9 +943,9 @@ async def handle_stream_crawl_request(
         else:
             crawler = await get_crawler(browser_config)
 
-        # Attach declarative hooks if provided
+        # Scope declarative hooks to this request ({} when none were sent)
+        hooks_status = _attach_declarative_hooks(hooks_config)
         if hooks_config:
-            hooks_status = _attach_declarative_hooks(crawler, hooks_config)
             logger.info(f"Hooks attachment status for streaming: {hooks_status['status']}")
             hooks_info = {'status': hooks_status}
 

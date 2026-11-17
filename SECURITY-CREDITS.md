@@ -39,3 +39,4 @@ We thank the following security researchers for their responsible disclosure:
 | TheCyberMessi | GitHub: [TheCyberMessi](https://github.com/TheCyberMessi) | TLS certificate fetch blocking the Docker server's event loop (0.9.6) | 2026-11-17 |
 | TheCyberMessi | GitHub: [TheCyberMessi](https://github.com/TheCyberMessi) | Unbounded screenshot_wait_for holding every browser page on the Docker server (0.9.6) | 2026-11-17 |
 | TheCyberMessi | GitHub: [TheCyberMessi](https://github.com/TheCyberMessi) | Request body-size limit skipped for chunked bodies on the Docker server (0.9.6) | 2026-11-17 |
+| TheCyberMessi | GitHub: [TheCyberMessi](https://github.com/TheCyberMessi) | Declarative hooks kept on the pooled crawler and run on later callers' crawls on the Docker server (0.9.6) | 2026-11-17 |
