@@ -214,3 +214,58 @@ def test_no_untrusted_schema_reaches_re_search(monkeypatch):
             pass  # a malformed step may fail in other ways; only the regex matters
         assert not ran, (strategy, steps)
     assert accepted > 50  # the sweep really exercised accepted shapes
+
+
+# ── DefaultMarkdownGenerator options ──────────────────────────────────
+# Every key reaches html2text's update_params, which setattr()s it. Internal
+# state such as the blockquote depth turns a tiny page into gigabytes.
+
+
+def _md(options, provenance=Provenance.UNTRUSTED):
+    return _load({"markdown_generator": {
+        "type": "DefaultMarkdownGenerator", "params": {"options": options},
+    }}, provenance)
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"blockquote": 1_000_000_000},       # internal counter: the report
+        {"outtextlist": []},                 # internal state
+        {"handle": None},                    # a method
+        {"ul_item_mark": "x" * 1_000_000},   # string repeated per list item
+        {"ignore_links": "yes"},             # wrong type for a real option
+        {"body_width": 10**12},              # out of range
+        {"body_width": True},
+        "not a dict",
+    ],
+)
+def test_untrusted_markdown_options_rejected(options):
+    with pytest.raises(UntrustedConfigError):
+        _md(options)
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"ignore_links": True},
+        {"ignore_images": True, "escape_html": False, "body_width": 80},
+        {"skip_internal_links": True, "citations": True, "body_width": None},
+        {},
+    ],
+)
+def test_untrusted_markdown_options_allowed(options):
+    cfg = _md(options)
+    assert cfg.markdown_generator.options == options
+
+
+def test_trusted_markdown_options_untouched():
+    cfg = _md({"blockquote": 3}, Provenance.TRUSTED)
+    assert cfg.markdown_generator.options == {"blockquote": 3}
+
+
+def test_untrusted_markdown_output_stays_small():
+    cfg = _md({"ignore_links": True, "body_width": 0})
+    html = "".join(f"<p>{c}</p>" for c in "abcdefghijklmnopqrst")
+    md = cfg.markdown_generator.generate_markdown(input_html=html, base_url="https://x")
+    assert len(md.raw_markdown) < 1000

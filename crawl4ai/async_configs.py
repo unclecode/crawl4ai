@@ -331,6 +331,21 @@ _MAX_PDF_REDIRECTS = 5   # the class default
 _MAX_LINK_PREVIEW_LINKS = 100      # the class default
 _MAX_LINK_PREVIEW_CONCURRENCY = 10  # the class default
 _MAX_LINK_PREVIEW_TIMEOUT_S = 10    # seconds here, not ms
+_MAX_MARKDOWN_BODY_WIDTH = 10_000
+
+# html2text options an untrusted body may set on DefaultMarkdownGenerator.
+# update_params() setattr()s every key, so anything else reaches html2text's
+# internal state (the blockquote depth turns a tiny page into gigabytes).
+# Booleans only, plus body_width; string options are repeated per element.
+_UNTRUSTED_MARKDOWN_BOOL_OPTIONS = {
+    "ignore_links", "ignore_images", "ignore_emphasis", "ignore_mailto_links",
+    "ignore_tables", "bypass_tables", "escape_html", "escape_snob",
+    "skip_internal_links", "inline_links", "protect_links", "single_line_break",
+    "mark_code", "include_sup_sub", "images_as_html", "images_to_alt",
+    "images_with_size", "use_automatic_links", "hide_strikethrough",
+    "wrap_links", "wrap_list_items", "wrap_tables", "pad_tables",
+    "links_each_paragraph", "handle_code_in_pre", "citations",
+}
 
 
 def _max_timeout_ms() -> int:
@@ -479,6 +494,28 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
             if f in params:
                 v = params[f]
                 params[f] = cap if not isinstance(v, int) or v <= 0 else min(v, cap)
+    elif type_name == "DefaultMarkdownGenerator" and "options" in params:
+        options = params["options"]
+        # SDK clients send the dict wrapped: {"type": "dict", "value": {...}}
+        if isinstance(options, dict) and options.get("type") == "dict" and "value" in options:
+            options = options["value"]
+        if options is not None and not isinstance(options, dict):
+            raise UntrustedConfigError(
+                "DefaultMarkdownGenerator options must be a dict in an untrusted request"
+            )
+        for key, value in (options or {}).items():
+            if key == "body_width":
+                ok = value is None or (
+                    isinstance(value, int) and not isinstance(value, bool)
+                    and 0 <= value <= _MAX_MARKDOWN_BODY_WIDTH
+                )
+            else:
+                ok = key in _UNTRUSTED_MARKDOWN_BOOL_OPTIONS and isinstance(value, bool)
+            if not ok:
+                raise UntrustedConfigError(
+                    f"DefaultMarkdownGenerator option '{key}'={value!r} is not "
+                    "permitted from an untrusted request"
+                )
     return params
 
 
