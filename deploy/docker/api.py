@@ -685,6 +685,7 @@ async def handle_crawl_request(
     start_time = time.time()
     mem_delta_mb = None
     peak_mem_mb = start_mem_mb
+    end_status = 499  # if no branch below sets one, the client went away (cancelled)
 
     try:
         urls = _normalize_and_validate_seeds(urls)
@@ -849,11 +850,13 @@ async def handle_crawl_request(
 
     except asyncio.TimeoutError:
         # Per-crawl wall-clock deadline exceeded.
+        end_status = 504
         raise HTTPException(status_code=504, detail="Crawl exceeded the time limit")
 
-    except HTTPException:
+    except HTTPException as e:
         # Deliberate status (e.g. 400 SSRF "URL blocked") must pass through
         # rather than be genericized to 500 by the handler below.
+        end_status = e.status_code
         raise
 
     except Exception as e:
@@ -882,6 +885,16 @@ async def handle_crawl_request(
             })
         )
     finally:
+        # Every exit ends the monitor record; track_request_end ignores one
+        # already ended. Without this, rejected requests stayed "active" forever.
+        try:
+            from monitor import get_monitor
+            await get_monitor().track_request_end(
+                request_id, success=False, status_code=end_status,
+                error=f"request ended with HTTP {end_status}",
+            )
+        except Exception:
+            pass
         if crawler:
             if is_pdf_crawl:
                 await crawler.close()  # not pooled; release_crawler would be a no-op
