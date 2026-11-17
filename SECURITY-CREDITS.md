@@ -37,3 +37,4 @@ We thank the following security researchers for their responsible disclosure:
 | Soham | Email report | Memory exhaustion on the Docker server via unchecked DefaultMarkdownGenerator options reaching html2text internal state (0.9.6) | 2026-11-02 |
 | Ugur Celik | GitHub: [ucsurf](https://github.com/ucsurf) | Unbounded sitemap index following in AsyncUrlSeeder and DomainMapper (cycles, nesting, gzip bombs) (0.9.6) | 2026-11-10 |
 | TheCyberMessi | GitHub: [TheCyberMessi](https://github.com/TheCyberMessi) | TLS certificate fetch blocking the Docker server's event loop (0.9.6) | 2026-11-17 |
+| TheCyberMessi | GitHub: [TheCyberMessi](https://github.com/TheCyberMessi) | Unbounded screenshot_wait_for holding every browser page on the Docker server (0.9.6) | 2026-11-17 |

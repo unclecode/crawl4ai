@@ -322,7 +322,7 @@ UNTRUSTED_FIELD_ALLOWLIST = {
 # Upper bounds applied to attacker-influenced quantities after filtering.
 _DEFAULT_MAX_TIMEOUT_MS = 60_000
 _MAX_SCROLL_STEPS = 1000
-_MAX_DELAY_SECONDS = 60  # ceiling for delay_before_return_html / mean_delay / max_range
+_MAX_DELAY_SECONDS = 60  # ceiling for the untrusted delay fields (_delay_defaults below)
 _MAX_VIEWPORT = 4000
 _MAX_PDF_BYTES = 100 * 1024 * 1024
 _MAX_PDF_PAGES = 2000
@@ -411,11 +411,13 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
             return min(_DEFAULT_MAX_TIMEOUT_MS, ceiling)
         return min(int(v), ceiling)
 
-    # delay_before_return_html is held with a browser page open; mean_delay and
-    # max_range seed the arun_many rate limiter. All three are seconds, not ms,
-    # so they get their own cap rather than reusing the ms timeout ceiling.
+    # delay_before_return_html and screenshot_wait_for are held with a browser
+    # page open; mean_delay and max_range seed the arun_many rate limiter. All
+    # are seconds, not ms, so they get their own cap rather than reusing the ms
+    # timeout ceiling.
     _delay_defaults = {
         "delay_before_return_html": 0.1,
+        "screenshot_wait_for": None,
         "mean_delay": 0.1,
         "max_range": 0.3,
     }
