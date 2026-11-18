@@ -250,6 +250,14 @@ class UserAgentGenerator():
             "Safari/601.5.17",
         ]
 
+        # Safari's own release, sent as "Version/<release> Safari/605.1.15"
+        self.safari_release_versions = [
+            "Version/17.1",
+            "Version/17.0",
+            "Version/16.6",
+            "Version/16.5",
+        ]
+
         # Added Firefox versions
         self.firefox_versions = [
             "Firefox/119.0",
@@ -302,6 +310,38 @@ class UserAgentGenerator():
 
         return browser_stack
 
+    def get_browser_tokens(self, browser_type: str) -> List[str]:
+        """
+        Get the tokens a real browser of this type sends after the platform.
+
+        Example for Edge:
+            AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.2151.97
+
+        Args:
+            browser_type: 'chrome', 'edge', 'safari', or 'firefox'
+
+        Returns:
+            List[str]: The engine and version tokens, in order.
+        """
+        chromium = [self.rendering_engines["chrome_webkit"], "(KHTML, like Gecko)"]
+        if browser_type == "chrome":
+            return chromium + [random.choice(self.chrome_versions), "Safari/537.36"]
+        if browser_type == "edge":
+            # Edge reports the Chromium it is built on, with the same major version
+            edge = random.choice(self.edge_versions)
+            major = edge.split("/")[1].split(".")[0]
+            return chromium + [f"Chrome/{major}.0.0.0", "Safari/537.36", edge]
+        if browser_type == "safari":
+            return [
+                self.rendering_engines["safari_webkit"],
+                "(KHTML, like Gecko)",
+                random.choice(self.safari_release_versions),
+                "Safari/605.1.15",
+            ]
+        if browser_type == "firefox":
+            return [self.rendering_engines["gecko"][0], random.choice(self.firefox_versions)]
+        raise ValueError(f"Unsupported browser type: {browser_type}")
+
     def generate(
         self,
         device_type: Optional[Literal["desktop", "mobile"]] = None,
@@ -318,10 +358,14 @@ class UserAgentGenerator():
             os_type: 'windows', 'macos', 'linux', 'android', 'ios'
             device_brand: Specific device brand
             browser_type: 'chrome', 'edge', 'safari', or 'firefox'
-            num_browsers: Number of browser specifications (1-3)
+            num_browsers: Number of browser specifications (1-3), used only
+                when browser_type is not given
         """
         # Get platform string
         platform = self.get_random_platform(device_type, os_type, device_brand)
+
+        if browser_type:
+            return " ".join(["Mozilla/5.0", platform, *self.get_browser_tokens(browser_type)])
 
         # Start with Mozilla
         components = ["Mozilla/5.0", platform]
