@@ -122,6 +122,8 @@ def test_key_value_first_row_is_not_mistaken_for_a_header():
     <tr><th scope="row">Food</th><td>Apple pie</td></tr>
     <tr><th scope="row">Drink</th><td>Apple cider</td></tr>
     </table>""")
+    assert tables[0]["headers"] == ["Column 1", "Column 2"]
+    assert not tables[0]["metadata"]["has_headers"]
     assert tables[0]["rows"] == [["Food", "Apple pie"], ["Drink", "Apple cider"]]
 
 
@@ -160,3 +162,33 @@ def test_invalid_span_attribute_counts_as_one():
     <tr><td colspan="-3">e</td><td>f</td></tr>
     </tbody></table>""")
     assert tables[0]["rows"] == [["a", "b"], ["c", "d"], ["e", "f"]]
+
+
+def test_scoped_row_header_does_not_limit_later_row_width():
+    tables = _extract("""
+        <table><tbody>
+        <tr><th scope="ROW">Food</th><td>Apple pie</td></tr>
+        <tr><th scope="row">Drink</th><td>Apple cider</td><td>cold</td></tr>
+        </tbody></table>
+        """)
+    assert tables[0]["headers"] == ["Column 1", "Column 2", "Column 3"]
+    assert tables[0]["rows"] == [
+        ["Food", "Apple pie", ""],
+        ["Drink", "Apple cider", "cold"],
+    ]
+    assert tables[0]["metadata"]["column_count"] == 3
+
+
+def test_scoped_rowgroup_header_stays_in_the_data_grid():
+    tables = _extract("""
+        <table><tbody>
+        <tr><th scope="rowgroup" rowspan="2">Fruit</th><td>Apple</td></tr>
+        <tr><td>Orange</td><td>Blood orange</td></tr>
+        </tbody></table>
+        """)
+    assert tables[0]["headers"] == ["Column 1", "Column 2", "Column 3"]
+    assert tables[0]["rows"] == [
+        ["Fruit", "Apple", ""],
+        ["Fruit", "Orange", "Blood orange"],
+    ]
+    assert not tables[0]["metadata"]["has_headers"]
