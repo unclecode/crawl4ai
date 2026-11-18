@@ -183,7 +183,44 @@ if __name__ == "__main__":
 
 ---
 
-## 3.1 Flattening Shadow DOM
+## 3.1 Following Frameset Redirects
+
+Some legacy sites use HTML4 `<frameset>` tags to wrap their entire content in a single full-viewport frame — effectively a redirect to another URL. Without handling this, `page.content()` returns only the empty frameset shell (often just a few hundred bytes), which triggers false-positive antibot detection.
+
+By default, `follow_frames=True` detects this pattern and automatically navigates to the child frame's URL so the entire crawl pipeline (JS execution, overlay removal, screenshots, HTML capture) operates on the real content:
+
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+
+async def main():
+    config = CrawlerRunConfig(
+        # Enabled by default — shown here for clarity
+        follow_frames=True
+    )
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(
+            url="https://www.variosolar.de/",
+            config=config
+        )
+        print(result.success)         # True
+        print(result.redirected_url)  # https://www.varioself.de/bauweise/varioenergy/
+        print(len(result.html))       # ~29000 (full page content)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+> **Note:** `follow_frames` handles `<frameset>`/`<frame>` (legacy full-page wrappers), while `process_iframes` handles `<iframe>` (embedded widgets within a page). These are distinct HTML constructs with different semantics.
+
+If you need the raw frameset HTML for inspection, disable it:
+```python
+config = CrawlerRunConfig(follow_frames=False)
+```
+
+---
+
+## 3.2 Flattening Shadow DOM
 
 Sites built with **Web Components** (Stencil, Lit, Shoelace, Angular Elements, etc.) render content inside [Shadow DOM](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_shadow_DOM) — an encapsulated sub-tree that is invisible to normal page serialization. The browser renders it on screen, but `page.content()` never includes it.
 
