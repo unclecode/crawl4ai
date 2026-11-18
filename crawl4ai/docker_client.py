@@ -1,7 +1,6 @@
 from typing import List, Optional, Union, AsyncGenerator, Dict, Any, Callable
 import httpx
 import json
-from urllib.parse import urljoin
 import asyncio
 import base64
 import warnings
@@ -52,9 +51,12 @@ class Crawl4aiDockerClient:
         if self._token:
             self._http_client.headers["Authorization"] = f"Bearer {self._token}"
 
+    def _url(self, endpoint: str) -> str:
+        return f"{self.base_url}/{endpoint.lstrip('/')}"
+
     async def authenticate(self, email: str) -> None:
         """Authenticate with the server and store the token."""
-        url = urljoin(self.base_url, "/token")
+        url = self._url("/token")
         try:
             self.logger.info(f"Authenticating with email: {email}", tag="AUTH")
             response = await self._http_client.post(url, json={"email": email})
@@ -71,7 +73,7 @@ class Crawl4aiDockerClient:
     async def _check_server(self) -> None:
         """Check if server is reachable, raising an error if not."""
         try:
-            await self._http_client.get(urljoin(self.base_url, "/health"))
+            await self._http_client.get(self._url("/health"))
             self.logger.success(f"Connected to {self.base_url}", tag="READY")
         except httpx.RequestError as e:
             self.logger.error(f"Server unreachable: {str(e)}", tag="ERROR")
@@ -127,7 +129,7 @@ class Crawl4aiDockerClient:
 
     async def _request(self, method: str, endpoint: str, **kwargs) -> httpx.Response:
         """Make an HTTP request with error handling."""
-        url = urljoin(self.base_url, endpoint)
+        url = self._url(endpoint)
         try:
             response = await self._http_client.request(method, url, **kwargs)
             response.raise_for_status()
@@ -137,9 +139,14 @@ class Crawl4aiDockerClient:
         except httpx.RequestError as e:
             raise ConnectionError(f"Failed to connect: {str(e)}")
         except httpx.HTTPStatusError as e:
-            error_msg = (e.response.json().get("detail", str(e)) 
-                        if "application/json" in e.response.headers.get("content-type", "") 
-                        else str(e))
+            error_msg = str(e)
+            if "application/json" in e.response.headers.get("content-type", ""):
+                try:
+                    payload = e.response.json()
+                    if isinstance(payload, dict):
+                        error_msg = payload.get("detail", str(e))
+                except ValueError:
+                    pass
             raise RequestError(f"Server error {e.response.status_code}: {error_msg}")
 
     async def crawl(
@@ -182,7 +189,7 @@ class Crawl4aiDockerClient:
 
         if is_streaming:
             async def stream_results() -> AsyncGenerator[CrawlResult, None]:
-                async with self._http_client.stream("POST", f"{self.base_url}/crawl/stream", json=data) as response:
+                async with self._http_client.stream("POST", self._url("/crawl/stream"), json=data) as response:
                     response.raise_for_status()
                     if hooks_warning := response.headers.get("X-Hooks-Warning"):
                         warnings.warn(hooks_warning, stacklevel=2)
@@ -199,7 +206,8 @@ class Crawl4aiDockerClient:
                                 yield self._to_result(result)
             return stream_results()
 
-        response = await self._request("POST", "/crawl", json=data, timeout=hooks_timeout)
+        request_timeout = max(self.timeout, hooks_timeout) if hooks else self.timeout
+        response = await self._request("POST", "/crawl", json=data, timeout=request_timeout)
         result_data = response.json()
         if not result_data.get("success", False):
             raise RequestError(f"Crawl failed: {result_data.get('msg', 'Unknown error')}")
