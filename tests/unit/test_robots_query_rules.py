@@ -111,6 +111,26 @@ def test_wildcard_rules_work_on_every_python(path, expected, tmp_path):
     assert _can_fetch(rules, path, tmp_path) is expected
 
 
+@pytest.mark.parametrize(
+    "path, expected",
+    [
+        ("/report.pdf", False),
+        ("/deep/report.pdf", False),
+        ("/report.pdf.html", True),
+        ("/report.pdf?download=1", True),
+    ],
+)
+def test_end_anchor_rules_work_on_every_python(path, expected, tmp_path):
+    rules = "User-agent: *\nDisallow: /*.pdf$\n"
+    assert _can_fetch(rules, path, tmp_path) is expected
+
+
+@pytest.mark.parametrize("path, expected", [("/", True), ("/page", False)])
+def test_end_anchor_without_wildcard(path, expected, tmp_path):
+    rules = "User-agent: *\nAllow: /$\nDisallow: /\n"
+    assert _can_fetch(rules, path, tmp_path) is expected
+
+
 @pytest.mark.skipif(
     sys.version_info < (3, 14),
     reason="longest-match Allow precedence only exists in the 3.14+ stdlib parser",
