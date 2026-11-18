@@ -271,13 +271,16 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
         base_domain = kwargs.get("base_domain", get_base_domain(url))
         exclude_domains = set(kwargs.get("exclude_domains", []))
 
-        # Process links
+        # Process links. Resolve against <base href>, but keep the page URL for
+        # the same-host check so a <base> on another host is not treated as the page's host.
+        page_url = url
+        base_url = url
         try:
             base_element = element.xpath("//head/base[@href]")
             if base_element:
                 base_href = base_element[0].get("href", "").strip()
                 if base_href:
-                    url = base_href
+                    base_url = urljoin(page_url, base_href)
         except Exception as e:
             self._log("error", f"Error extracting base URL: {str(e)}", "SCRAPE")
             pass
@@ -289,8 +292,8 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
 
             try:
                 normalized_href = normalize_url(
-                    href, url,
-                    preserve_https=kwargs.get('preserve_https_for_internal_links', False),
+                    urljoin(base_url, href), page_url,
+                    preserve_https=kwargs.get('preserve_https_for_internal_links', False) and not href.startswith("//"),
                     original_scheme=kwargs.get('original_scheme')
                 )
                 link_data = {
