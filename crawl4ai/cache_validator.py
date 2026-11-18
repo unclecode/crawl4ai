@@ -13,13 +13,17 @@ Validation Strategy:
 5. Otherwise → cache is STALE, need full recrawl
 """
 
-import httpx
+import re
 from dataclasses import dataclass
-from typing import Optional, Tuple
 from enum import Enum
+from typing import Optional, Tuple
+
+import httpx
 
 from .egress_policy import proxy_url
 from .utils import compute_head_fingerprint
+
+_HEAD_CLOSE_RE = re.compile(rb"</head\s*>", re.IGNORECASE)
 
 
 class CacheValidationResult(Enum):
@@ -236,34 +240,28 @@ class CacheValidator:
                 chunks = []
                 total_bytes = 0
                 max_bytes = 65536
-                head_closed = False
 
                 async for chunk in response.aiter_bytes(4096):
                     chunks.append(chunk)
                     total_bytes += len(chunk)
 
-                    # Check for </head> (case insensitive) in the decoded text
-                    if b'</head>' in b''.join(chunks).lower():
-                        head_closed = True
+                    # HTML permits whitespace before the closing angle bracket.
+                    if _HEAD_CLOSE_RE.search(b"".join(chunks)):
                         break
                     if total_bytes >= max_bytes:
                         break
 
-                content = b''.join(chunks)
-                html = content.decode('utf-8', errors='replace')
-
-                # Extract just the head section
-                head_end = html.lower().find('</head>')
-                if head_end != -1:
-                    html = html[:head_end + 7]
+                content = b"".join(chunks)
+                head_match = _HEAD_CLOSE_RE.search(content)
 
                 # Without a closing tag the buffer is a truncated prefix of the
                 # document, not the head. Fingerprinting it would compare body
                 # markup with a stored head fingerprint and report every such
                 # page as stale, so report "no head" and let the caller decide.
-                if not head_closed and head_end == -1:
+                if head_match is None:
                     return None, etag, last_modified
 
+                html = content[: head_match.end()].decode("utf-8", errors="replace")
                 return html, etag, last_modified
 
         except Exception:

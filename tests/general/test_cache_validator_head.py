@@ -3,6 +3,7 @@
 import asyncio
 
 import httpx
+import pytest
 
 from crawl4ai.cache_validator import CacheValidator
 
@@ -36,6 +37,18 @@ def test_close_tag_is_case_insensitive():
     body = b"<html><HEAD><title>x</title></HEAD><body><p>body</p></body></html>"
     html, _, _ = _fetch_head(body)
     assert html == "<html><HEAD><title>x</title></HEAD>"
+
+
+@pytest.mark.parametrize("close_tag", [b"</head >", b"</HEAD\n>"])
+def test_close_tag_allows_whitespace_before_the_angle_bracket(close_tag):
+    body = (
+        b"<html><head><title>x</title>"
+        + close_tag
+        + b"<body><p>body</p></body></html>"
+    )
+    html, _, _ = _fetch_head(body)
+    expected = b"<html><head><title>x</title>" + close_tag
+    assert html == expected.decode()
 
 
 def test_document_without_head_close_tag_reports_no_head():
