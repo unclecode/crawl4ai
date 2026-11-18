@@ -321,7 +321,7 @@ class UserAgentGenerator():
         components = ["Mozilla/5.0", platform]
 
         # Add browser stack
-        browser_stack = self.get_browser_stack(num_browsers)
+        browser_stack = [random.choice({"chrome": self.chrome_versions, "firefox": self.firefox_versions, "safari": self.safari_versions, "edge": self.edge_versions}[browser_type])] if browser_type else self.get_browser_stack(num_browsers)
 
         # Add appropriate legacy token based on browser stack
         if "Firefox" in str(browser_stack) or browser_type == "firefox":
