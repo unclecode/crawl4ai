@@ -2256,6 +2256,16 @@ def fast_format_html(html_string):
 
 
 
+def _lowercase_host(netloc: str) -> str:
+    """Lowercase the host of a netloc, leaving any userinfo as written.
+
+    A host is case-insensitive, but the `user:password` part in front of it is
+    not: lowercasing the whole netloc rewrites credentials taken from a URL.
+    """
+    userinfo, separator, hostport = netloc.rpartition('@')
+    return f"{userinfo}{separator}{hostport.lower()}"
+
+
 def normalize_url(
     href: str,
     base_url: str,
@@ -2311,7 +2321,7 @@ def normalize_url(
     parsed = urlparse(full_url)
 
     # ── netloc ──
-    netloc = parsed.netloc.lower()
+    netloc = _lowercase_host(parsed.netloc)
 
     # ── path ──
     # Strip duplicate slashes and trailing "/" (except root)
@@ -2383,7 +2393,7 @@ def normalize_url_for_deep_crawl(href, base_url, preserve_https=False, original_
     parsed = urlparse(full_url)
     
     # Convert hostname to lowercase
-    netloc = parsed.netloc.lower()
+    netloc = _lowercase_host(parsed.netloc)
     
     # Remove fragment entirely
     fragment = ''
@@ -2445,7 +2455,7 @@ def efficient_normalize_url_for_deep_crawl(href, base_url, preserve_https=False,
     # 2. Remove fragment
     normalized = urlunparse((
         parsed.scheme,
-        parsed.netloc.lower(),
+        _lowercase_host(parsed.netloc),
         parsed.path or '/',  # Preserve trailing slash
         parsed.params,
         parsed.query,
