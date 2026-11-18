@@ -2205,7 +2205,7 @@ def format_html(html_string):
         str: The prettified HTML string.
     """
 
-    soup = BeautifulSoup(html_string, "lxml.parser")
+    soup = BeautifulSoup(html_string, "lxml")
     return soup.prettify()
 
 
