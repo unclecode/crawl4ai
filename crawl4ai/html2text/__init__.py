@@ -320,7 +320,7 @@ class HTML2Text(html.parser.HTMLParser):
         if tag == "base" and start:
             href = attrs.get("href")
             if href:
-                self.baseurl = href
+                self.baseurl = urlparse.urljoin(self.baseurl, href)
 
         # first thing inside the anchor tag is another tag
         # that produces some output
@@ -1104,13 +1104,9 @@ class CustomHTML2Text(HTML2Text):
                 setattr(self, key, value)
 
     def handle_tag(self, tag, attrs, start):
-        # Handle <base> tag to update base URL for relative links
-        # Must be handled before preserved tags since <base> is in <head>
+        # Let the parent class handle <base> (it updates the base URL for
+        # relative links). Must run before preserved tags since <base> is in <head>
         if tag == "base" and start:
-            href = attrs.get("href") if attrs else None
-            if href:
-                self.baseurl = href
-            # Also let parent class handle it
             return super().handle_tag(tag, attrs, start)
 
         # Handle preserved tags

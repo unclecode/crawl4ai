@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional, List
 import json
 import asyncio
+from urllib.parse import urljoin
 
 # from contextlib import nullcontext, asynccontextmanager
 from contextlib import asynccontextmanager
@@ -889,8 +890,10 @@ class AsyncWebCrawler:
         # This ensures relative URLs resolve correctly even with cleaned_html.
         base_url = params.get("base_url") or params.get("redirected_url") or url
         base_tag_match = re.search(r'<base\s[^>]*href\s*=\s*["\']([^"\']+)["\']', html, re.IGNORECASE)
-        if base_tag_match:
-            base_url = base_tag_match.group(1)
+        # Skip it when the markdown input still has the tag: html2text applies
+        # it itself, and applying a relative <base> twice doubles its path.
+        if base_tag_match and not re.search(r'<base\s', markdown_input_html, re.IGNORECASE):
+            base_url = urljoin(base_url, base_tag_match.group(1))
 
         markdown_result: MarkdownGenerationResult = (
             markdown_generator.generate_markdown(
