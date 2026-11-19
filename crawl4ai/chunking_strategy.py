@@ -188,8 +188,23 @@ class SlidingWindowChunking(ChunkingStrategy):
 
         Args:
             window_size (int): The size of the sliding window in words.
-            step (int): The step size for sliding the window in words.
+            step (int): The step size for sliding the window in words. It must be
+                positive and no larger than ``window_size``: a larger step leaves
+                the words between two windows in no chunk at all, and a
+                non-positive step never advances.
+
+        Raises:
+            ValueError: If ``window_size`` or ``step`` is out of range.
         """
+        if window_size < 1:
+            raise ValueError(f"window_size must be at least 1, got {window_size}")
+        if step < 1:
+            raise ValueError(f"step must be at least 1, got {step}")
+        if step > window_size:
+            raise ValueError(
+                f"step ({step}) cannot exceed window_size ({window_size}): "
+                "the gap between consecutive windows would be dropped from every chunk"
+            )
         self.window_size = window_size
         self.step = step
 
@@ -200,12 +215,13 @@ class SlidingWindowChunking(ChunkingStrategy):
         if len(words) <= self.window_size:
             return [text]
 
-        for i in range(0, len(words) - self.window_size + 1, self.step):
-            chunk = " ".join(words[i : i + self.window_size])
+        last_start = 0
+        for last_start in range(0, len(words) - self.window_size + 1, self.step):
+            chunk = " ".join(words[last_start : last_start + self.window_size])
             chunks.append(chunk)
 
         # Handle the last chunk if it doesn't align perfectly
-        if i + self.window_size < len(words):
+        if last_start + self.window_size < len(words):
             chunks.append(" ".join(words[-self.window_size :]))
 
         return chunks
