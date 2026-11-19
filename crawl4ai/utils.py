@@ -1856,7 +1856,9 @@ def perform_completion_with_backoff(
     import litellm
     litellm.drop_params = True  # Auto-drop unsupported params (e.g., temperature for O-series/GPT-5)
 
-    extra_args = {"temperature": 0.01, "api_key": api_token, "base_url": base_url}
+    # No default temperature: reasoning models (GPT-5, gpt-6-luna) reject anything
+    # but 1, and litellm can't drop it for models it doesn't know. Set it in extra_args.
+    extra_args = {"api_key": api_token, "base_url": base_url}
     if json_response:
         extra_args["response_format"] = {"type": "json_object"}
 
@@ -1949,7 +1951,9 @@ async def aperform_completion_with_backoff(
     import asyncio
     litellm.drop_params = True  # Auto-drop unsupported params (e.g., temperature for O-series/GPT-5)
 
-    extra_args = {"temperature": 0.01, "api_key": api_token, "base_url": base_url}
+    # No default temperature: reasoning models (GPT-5, gpt-6-luna) reject anything
+    # but 1, and litellm can't drop it for models it doesn't know. Set it in extra_args.
+    extra_args = {"api_key": api_token, "base_url": base_url}
     if json_response:
         extra_args["response_format"] = {"type": "json_object"}
 

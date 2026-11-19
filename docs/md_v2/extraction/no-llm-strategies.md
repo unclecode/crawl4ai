@@ -499,7 +499,7 @@ async def extract_with_generated_pattern():
         
         # Configure LLM
         llm_config = LLMConfig(
-            provider="openai/gpt-4o-mini",
+            provider="openai/gpt-6-luna",
             api_token="env:OPENAI_API_KEY",
         )
         
@@ -724,7 +724,7 @@ html = """
 css_schema = JsonCssExtractionStrategy.generate_schema(
     html,
     schema_type="css",
-    llm_config = LLMConfig(provider="openai/gpt-4o",api_token="your-openai-token")
+    llm_config = LLMConfig(provider="openai/gpt-6-luna",api_token="your-openai-token")
 )
 
 # Option 2: Using Ollama (open source, no token needed)
@@ -896,7 +896,7 @@ schema = JsonCssExtractionStrategy.generate_schema(
     html=combined_html,
     query=query,
     schema_type="CSS",
-    llm_config=LLMConfig(provider="openai/gpt-4o", api_token="your-token")
+    llm_config=LLMConfig(provider="openai/gpt-6-luna", api_token="your-token")
 )
 
 # The generated schema will use stable selectors like:

@@ -395,7 +395,7 @@ async def main():
         cache_mode=CacheMode.BYPASS,
         extraction_strategy=LLMExtractionStrategy(
             # any provider LiteLLM supports, e.g. "ollama/llama3.3" with api_token="no-token"
-            llm_config=LLMConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY")),
+            llm_config=LLMConfig(provider="openai/gpt-6-luna", api_token=os.getenv("OPENAI_API_KEY")),
             schema=ModelFee.model_json_schema(),
             extraction_type="schema",
             instruction="Extract every model name with its input and output token fee.",
