@@ -122,7 +122,7 @@ ANTHROPIC_API_KEY=your-anthropic-key
 # GEMINI_API_TOKEN=your-gemini-token
 
 # Optional: Global LLM settings
-# LLM_PROVIDER=openai/gpt-4o-mini
+# LLM_PROVIDER=openai/gpt-6-luna
 # LLM_TEMPERATURE=0.7
 # LLM_BASE_URL=https://api.custom.com/v1
 
@@ -283,7 +283,7 @@ The Docker setup now supports flexible LLM provider configuration through a hier
    LLM_BASE_URL=https://api.proxy.com/v1
    ```
 
-4. **Config File Default**: Falls back to `config.yml` (default: `openai/gpt-4o-mini`)
+4. **Config File Default**: Falls back to `config.yml` (default: `openai/gpt-6-luna`)
 
 The system automatically selects the appropriate API key based on the provider. LiteLLM handles finding the correct environment variable for each provider (e.g., OPENAI_API_KEY for OpenAI, GEMINI_API_TOKEN for Google Gemini, etc.).
 
@@ -736,7 +736,7 @@ Submit an asynchronous LLM extraction job with optional webhook notification.
 {
   "url": "https://example.com/article",
   "q": "Extract the article title, author, publication date, and main points",
-  "provider": "openai/gpt-4o-mini",
+  "provider": "openai/gpt-6-luna",
   "schema": "{\"title\": \"string\", \"author\": \"string\", \"date\": \"string\", \"points\": [\"string\"]}",
   "cache": false,
   "webhook_config": {
@@ -937,7 +937,7 @@ def submit_llm_job_with_webhook():
         json={
             "url": "https://example.com/article",
             "q": "Extract the article title, author, and main points",
-            "provider": "openai/gpt-4o-mini",
+            "provider": "openai/gpt-6-luna",
             "webhook_config": {
                 "webhook_url": "https://your-app.com/webhook/llm-complete",
                 "webhook_data_in_payload": True,
@@ -2065,7 +2065,7 @@ app:
 
 # Default LLM Configuration
 llm:
-  provider: "openai/gpt-4o-mini"  # Can be overridden by LLM_PROVIDER env var
+  provider: "openai/gpt-6-luna"  # Can be overridden by LLM_PROVIDER env var
   # api_key: sk-...  # If you pass the API key directly (not recommended)
   # temperature and base_url are controlled via environment variables or request parameters
 

@@ -120,7 +120,7 @@ config = AdaptiveConfig(
     ),
     # Query model — used for chat completion (query expansion)
     query_llm_config=LLMConfig(
-        provider='openai/gpt-4o-mini',
+        provider='openai/gpt-6-luna',
         api_token='your-api-key'
     )
 )
@@ -133,7 +133,7 @@ config = AdaptiveConfig(
         'api_token': 'your-api-key'
     },
     query_llm_config={
-        'provider': 'openai/gpt-4o-mini',
+        'provider': 'openai/gpt-6-luna',
         'api_token': 'your-api-key'
     }
 )
@@ -141,7 +141,7 @@ config = AdaptiveConfig(
 
 > **Note:** The embedding strategy makes two types of API calls that need different model types:
 > - **Embedding calls** (text → vector) require an embedding model like `text-embedding-3-small`
-> - **Query expansion** (chat completion) requires a chat model like `gpt-4o-mini`
+> - **Query expansion** (chat completion) requires a chat model like `gpt-6-luna`
 >
 > Use `embedding_llm_config` for the embedding model and `query_llm_config` for the chat model. If `query_llm_config` is not set, it falls back to `embedding_llm_config` for backward compatibility.
 
