@@ -365,6 +365,10 @@ class ContentTypeFilter(URLFilter):
     @lru_cache(maxsize=1000)
     def _extract_extension(url: str) -> str:
         """Extracts file extension from a URL."""
+        # Drop the query string and fragment, otherwise "page.html?v=2" would
+        # report the extension as "html?v=2".
+        url = url.split("#", 1)[0].split("?", 1)[0]
+
         # Remove scheme (http://, https://) if present
         if "://" in url:
             url = url.split("://", 1)[-1]  # Get everything after '://'
