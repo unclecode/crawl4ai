@@ -2090,7 +2090,7 @@ def extract_blocks_batch(batch_data, provider="groq/llama3-70b-8192", api_token=
 
         messages.append([{"role": "user", "content": prompt_with_variables}])
 
-    responses = batch_completion(model=provider, messages=messages, temperature=0.01)
+    responses = batch_completion(model=provider, messages=messages)
 
     all_blocks = []
     for response in responses:
