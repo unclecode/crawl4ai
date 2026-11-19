@@ -19,6 +19,7 @@ If you self-host the Docker server, upgrade. If you use the library, upgrade too
 - **ReDoS bypass**: list-form schema `type` reached the regex step
 - **Brotli CVE-2026-111497**: new floors for `brotli`, `playwright`, and `patchright`
 - **Memory and DoS limits**: markdown options, chunked bodies, `screenshot_wait_for`, the TLS fetch, the monitor, and sitemap indexes
+- **New default LLM**: `openai/gpt-6-luna`, before OpenAI shuts down `gpt-4o` on 14 Jan 2027
 - **New options**: `dispatcher` and `batch_size` for deep crawls, `api_token` for the Docker client, `max_pdf_seconds` for PDFs
 - **Bug fixes**: the Chromium channel, user agents, the cache, scraping, robots.txt, and the Docker client
 
@@ -98,6 +99,12 @@ Credit: Siyang Wu ([LeoWSY-hashblue](https://github.com/LeoWSY-hashblue)).
 
 - PDF `batch_size` and `max_redirects` in untrusted bodies are clamped to their class defaults, 4 and 5.
 
+## New default LLM provider
+
+OpenAI shuts down `gpt-4o` and `gpt-4o-mini` on 14 Jan 2027. After that, LLM extraction with the defaults would fail. The default provider is now `openai/gpt-6-luna`, and the CLI, `LLMTableExtraction`, the adaptive crawler, and the Docker config use it too. The shut-down `o1` and `o3-mini` entries are removed.
+
+`gpt-6-luna` accepts only the default temperature, so LLM calls no longer send `temperature=0.01`. If you use another model and want the old, steadier output, pass `extra_args={"temperature": 0.01}`. (#2585, issue #2584)
+
 ## New options
 
 - **Deep crawl dispatcher**: `BFSDeepCrawlStrategy` and `BestFirstCrawlingStrategy` take a `dispatcher`, and `BestFirstCrawlingStrategy` takes a `batch_size` (default 10). (#2246, thanks @yashikam19)
@@ -130,7 +137,7 @@ Credit: Siyang Wu ([LeoWSY-hashblue](https://github.com/LeoWSY-hashblue)).
 
 ## Breaking changes
 
-**Library:** the minimum versions are now `playwright>=1.64.1`, `patchright>=1.64.2`, and `brotli>=1.2.1`. Run `crawl4ai-setup` after you upgrade.
+**Library:** the minimum versions are now `playwright>=1.64.1`, `patchright>=1.64.2`, and `brotli>=1.2.1`. Run `crawl4ai-setup` after you upgrade. LLM calls no longer send `temperature=0.01` by default; `extra_args={"temperature": 0.01}` restores it.
 
 **Docker server, untrusted request bodies:** list-form schema `type` values with a `regex` step, `browser_mode`, and unknown `DefaultMarkdownGenerator` options are refused with 400. `screenshot_wait_for` is capped at 60 seconds. Chunked bodies over `limits.max_body_bytes` get 413. Monitor reads need an admin token. API callers no longer share browser cookies or storage.
 

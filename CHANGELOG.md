@@ -39,7 +39,7 @@ All reporters are credited in `SECURITY-CREDITS.md`. GitHub Security Advisories 
 
 ### Changed
 
-- The default LLM provider is now `openai/gpt-6-luna`, because OpenAI shuts down `gpt-4o` and `gpt-4o-mini` on 14 Jan 2027 (#2584). This applies to `LLMConfig`, the CLI, `LLMTableExtraction`, the adaptive crawler and the Docker server.
+- The default LLM provider is now `openai/gpt-6-luna`, because OpenAI shuts down `gpt-4o` and `gpt-4o-mini` on 14 Jan 2027 (#2584). This applies to `LLMConfig`, the CLI, `LLMTableExtraction`, the adaptive crawler and the Docker server. The shut-down `o1-mini`, `o1-preview`, `o3-mini`, and `o3-mini-high` entries are removed. (#2585)
 - LLM calls no longer send `temperature: 0.01` by default, because `gpt-6-luna` accepts only the default temperature. If you use another model and want the old, near-fixed output, pass `extra_args={"temperature": 0.01}` to your strategy.
 - `crawl4ai-setup` no longer points to Crawl4AI Cloud when the browser install fails. It retries the browser without `--with-deps` (which needs root on Linux), prints the exact command for the system libraries, and exits with code 1 instead of printing "completed". The cloud banner at the end shows only after a successful setup.
 - `crawl4ai-doctor` exits with code 1 when its test crawl fails, counts a blocked page as a failure, and shows no cloud banner.
@@ -88,6 +88,7 @@ All reporters are credited in `SECURITY-CREDITS.md`. GitHub Security Advisories 
 
 ### Breaking Changes
 
+- Library: LLM calls no longer send `temperature=0.01` by default, so output may vary slightly between runs. `extra_args={"temperature": 0.01}` restores it. (#2585)
 - Library: the minimum versions are now `playwright>=1.64.1`, `patchright>=1.64.2`, and `brotli>=1.2.1`.
 - Docker server, untrusted request bodies: list-form schema `type` values with a `regex` step, `browser_mode`, and unknown `DefaultMarkdownGenerator` options are refused with 400. `screenshot_wait_for` is capped at 60 seconds. Chunked bodies over `limits.max_body_bytes` get 413. Monitor reads need an admin token.
 - Docker server: API callers no longer share browser cookies or storage.
