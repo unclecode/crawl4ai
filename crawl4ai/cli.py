@@ -1053,7 +1053,7 @@ def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config:
             else:
                 console.print("[red]No profiles found. Create one with 'crwl profiles'[/red]")
             
-            return
+            sys.exit(1)
         
         # Include the profile in browser config
         if not browser:
