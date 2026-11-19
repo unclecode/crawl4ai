@@ -131,6 +131,8 @@ class AsyncDatabaseManager:
                 if task_id not in self.connection_pool:
                     try:
                         conn = await aiosqlite.connect(self.db_path, timeout=30.0)
+                        # Track the opened connection before setup can fail or be cancelled.
+                        self.connection_pool[task_id] = conn
                         await conn.execute("PRAGMA journal_mode = WAL")
                         await conn.execute("PRAGMA busy_timeout = 5000")
 
@@ -159,8 +161,6 @@ class AsyncDatabaseManager:
                                 raise ValueError(
                                     f"Database missing columns: {missing_columns}"
                                 )
-
-                        self.connection_pool[task_id] = conn
                     except Exception as e:
                         import sys
 
