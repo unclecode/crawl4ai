@@ -48,7 +48,11 @@ def _service_auth_headers() -> dict:
     the auth startup check already mandates for any real deployment.)
     """
     from auth import create_access_token
-    token = create_access_token({"sub": "mcp-service"}, scope="data")
+    from crawl4ai.browser_manager import browser_context_partition
+    # Carry the MCP caller's identity, or every MCP client would share one
+    # browser context partition (and one job owner) as "mcp-service".
+    sub = browser_context_partition.get() or "mcp-service"
+    token = create_access_token({"sub": sub}, scope="data")
     return {"Authorization": f"Bearer {token}"}
 
 

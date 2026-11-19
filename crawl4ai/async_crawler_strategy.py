@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+from contextvars import ContextVar
 import time
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Any, List, Union
@@ -33,6 +34,17 @@ from urllib.parse import quote, urlparse
 from types import MappingProxyType
 import contextlib
 from functools import partial
+
+# Hooks for the current crawl only. A server that shares one pooled strategy
+# between callers sets this per request (the Docker server sets the request's
+# declarative hooks, or {} for none). While it is set, only these hooks run and
+# the strategy's own set_hook() hooks are ignored, so one caller's hooks never
+# reach another caller's crawl. Unset (None), the plain-library case, keeps the
+# old behaviour.
+request_hooks: ContextVar[Optional[Dict[str, Callable]]] = ContextVar(
+    "crawl4ai_request_hooks", default=None
+)
+
 
 class AsyncCrawlerStrategy(ABC):
     """
@@ -200,7 +212,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Returns:
             The return value of the hook function, if any.
         """
-        hook = self.hooks.get(hook_type)
+        scoped = request_hooks.get()
+        hook = scoped.get(hook_type) if scoped is not None else self.hooks.get(hook_type)
         if hook:
             if asyncio.iscoroutinefunction(hook):
                 return await hook(*args, **kwargs)
@@ -715,7 +728,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Get SSL certificate information if requested and URL is HTTPS
             ssl_cert = None
             if config.fetch_ssl_certificate:
-                ssl_cert = SSLCertificate.from_url(url)
+                # Blocking socket + TLS handshake: keep it off the event loop, which
+                # also runs the server and its in-process egress proxy.
+                ssl_cert = await asyncio.to_thread(SSLCertificate.from_url, url)
 
             # Set up download handling
             if self.browser_config.accept_downloads:

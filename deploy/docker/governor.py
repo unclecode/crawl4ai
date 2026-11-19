@@ -45,10 +45,12 @@ class URLLengthFilter(URLFilter):
 
 
 class BodySizeLimitMiddleware:
-    """Reject HTTP requests whose declared Content-Length exceeds the limit.
+    """Reject HTTP requests whose body exceeds the limit with 413.
 
-    (Chunked/unknown-length bodies are additionally bounded at the transport by
-    gunicorn --limit-request-* in the hardened deployment.)
+    A declared Content-Length over the limit is refused before any byte is
+    read. Every body, declared or not (chunked), is also counted as it is
+    received and cut off once it passes the limit: gunicorn's --limit-request-*
+    flags bound the request line and headers, not the body.
     """
 
     def __init__(self, app, max_bytes: int = DEFAULT_MAX_BODY_BYTES):
@@ -56,17 +58,49 @@ class BodySizeLimitMiddleware:
         self.max_bytes = max_bytes
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] == "http":
-            for name, value in scope.get("headers", []):
-                if name == b"content-length":
-                    try:
-                        if int(value) > self.max_bytes:
-                            await self._reject(send)
-                            return
-                    except ValueError:
-                        pass
-                    break
-        await self.app(scope, receive, send)
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        for name, value in scope.get("headers", []):
+            if name == b"content-length":
+                try:
+                    if int(value) > self.max_bytes:
+                        await self._reject(send)
+                        return
+                except ValueError:
+                    pass
+                break
+
+        received = 0
+        started = False
+        rejected = False
+
+        # Over the limit: answer 413 ourselves and tell the app the client left,
+        # so it stops reading. An exception would not survive the way out:
+        # BaseHTTPMiddleware wraps it and FastAPI turns it into a 400.
+        async def counting_receive():
+            nonlocal received, rejected
+            if rejected:
+                return {"type": "http.disconnect"}
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_bytes:
+                    rejected = True
+                    if not started:
+                        await self._reject(send)
+                    return {"type": "http.disconnect"}
+            return message
+
+        async def guarded_send(message):
+            nonlocal started
+            if rejected:
+                return  # the 413 already went out; drop the app's own reply
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
+        await self.app(scope, counting_receive, guarded_send)
 
     async def _reject(self, send):
         body = json.dumps({"detail": "Request body too large"}).encode()

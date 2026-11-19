@@ -24,12 +24,14 @@ On success: the validated principal is attached at scope["state"]["principal"]
 from __future__ import annotations
 
 import json
+import uuid
 from typing import Callable, Dict, Iterable, Optional
 from urllib.parse import parse_qs
 
 import jwt
 
 from auth import constant_time_eq, decode_token
+from crawl4ai.browser_manager import browser_context_partition
 
 
 class AuthGateMiddleware:
@@ -68,7 +70,15 @@ class AuthGateMiddleware:
         # Expose the principal to downstream handlers/dependencies.
         state = scope.setdefault("state", {})
         state["principal"] = principal
-        await self.app(scope, receive, send)
+        # Pooled browser contexts are keyed by this, so one caller's cookies,
+        # storage and service workers never reach another caller's crawl. A
+        # principal without a sub gets a partition of its own.
+        partition = principal.get("sub") or f"anonymous-{uuid.uuid4()}"
+        token = browser_context_partition.set(str(partition))
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            browser_context_partition.reset(token)
 
     # ──────────────────────────── helpers ─────────────────────────────
     def _authenticate(self, scope) -> Optional[Dict]:

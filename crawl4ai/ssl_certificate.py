@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional
 from urllib.parse import urlparse
 import OpenSSL.crypto
 from pathlib import Path
+from .egress_policy import proxy_url
 
 # === Inherit from dict ===
 class SSLCertificate(dict):
@@ -59,6 +60,33 @@ class SSLCertificate(dict):
         return data
 
     @staticmethod
+    def _connect(host: str, port: int, timeout: int) -> socket.socket:
+        """Open a TCP connection to host:port, through the egress proxy if one
+        is installed (the Docker server), so the destination is resolved,
+        checked and pinned by the same rule as every other outbound fetch."""
+        proxy = proxy_url()
+        if not proxy:
+            return socket.create_connection((host, port), timeout=timeout)
+        p = urlparse(proxy)
+        sock = socket.create_connection((p.hostname, p.port), timeout=timeout)
+        try:
+            target = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+            sock.sendall(f"CONNECT {target} HTTP/1.1\r\nHost: {target}\r\n\r\n".encode())
+            reply = b""
+            while b"\r\n\r\n" not in reply:
+                chunk = sock.recv(1024)
+                if not chunk:
+                    break
+                reply += chunk
+            status = reply.split(b"\r\n", 1)[0].split()
+            if len(status) < 2 or status[1] != b"200":
+                raise ConnectionError(f"egress proxy refused CONNECT to {target}")
+        except BaseException:
+            sock.close()
+            raise
+        return sock
+
+    @staticmethod
     def from_url(url: str, timeout: int = 10) -> Optional["SSLCertificate"]:
         """
         Create SSLCertificate instance from a URL. Fetches cert info and initializes.
@@ -66,9 +94,11 @@ class SSLCertificate(dict):
         """
         cert_info_raw = None # Variable to hold the fetched dict
         try:
-            hostname = urlparse(url).netloc
-            if ":" in hostname:
-                hostname = hostname.split(":")[0]
+            # .hostname, never netloc: netloc keeps the userinfo, so
+            # https://127.0.0.1:443@example.com/ would dial 127.0.0.1.
+            parsed = urlparse(url)
+            hostname = parsed.hostname
+            port = parsed.port or 443
 
             context = ssl.create_default_context()
             # Set check_hostname to False and verify_mode to CERT_NONE temporarily
@@ -76,7 +106,7 @@ class SSLCertificate(dict):
             # context.check_hostname = False
             # context.verify_mode = ssl.CERT_NONE
 
-            with socket.create_connection((hostname, 443), timeout=timeout) as sock:
+            with SSLCertificate._connect(hostname, port, timeout) as sock:
                 with context.wrap_socket(sock, server_hostname=hostname) as ssock:
                     cert_binary = ssock.getpeercert(binary_form=True)
                     if not cert_binary:
