@@ -39,6 +39,8 @@ All reporters are credited in `SECURITY-CREDITS.md`. GitHub Security Advisories 
 
 ### Changed
 
+- The default LLM provider is now `openai/gpt-6-luna`, because OpenAI shuts down `gpt-4o` and `gpt-4o-mini` on 14 Jan 2027 (#2584). This applies to `LLMConfig`, the CLI, `LLMTableExtraction`, the adaptive crawler and the Docker server.
+- LLM calls no longer send `temperature: 0.01` by default, because `gpt-6-luna` accepts only the default temperature. If you use another model and want the old, near-fixed output, pass `extra_args={"temperature": 0.01}` to your strategy.
 - `crawl4ai-setup` no longer points to Crawl4AI Cloud when the browser install fails. It retries the browser without `--with-deps` (which needs root on Linux), prints the exact command for the system libraries, and exits with code 1 instead of printing "completed". The cloud banner at the end shows only after a successful setup.
 - `crawl4ai-doctor` exits with code 1 when its test crawl fails, counts a blocked page as a failure, and shows no cloud banner.
 - The cloud banner and the blocked line state the current free offer: 1,000 free credits every month.

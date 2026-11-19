@@ -66,7 +66,7 @@ def setup_llm_config() -> tuple[str, str]:
     
     if not provider:
         click.echo("\nNo default LLM provider configured.")
-        click.echo("Provider format: 'company/model' (e.g., 'openai/gpt-4o', 'anthropic/claude-3-sonnet')")
+        click.echo("Provider format: 'company/model' (e.g., 'openai/gpt-6-luna', 'anthropic/claude-3-sonnet')")
         click.echo("See available providers at: https://docs.litellm.ai/docs/providers")
         provider = click.prompt("Enter provider")
         

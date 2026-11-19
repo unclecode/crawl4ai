@@ -30,7 +30,7 @@ DEFAULT_CONFIG = {
         "timeout_keep_alive": 300,
     },
     "llm": {
-        "provider": "openai/gpt-4o-mini",
+        "provider": "openai/gpt-6-luna",
     },
     "redis": {
         "host": "localhost",

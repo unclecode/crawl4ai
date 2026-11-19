@@ -907,7 +907,7 @@ async def llm_endpoint(
     request: Request,
     url: str = Path(...),
     q: str = Query(...),
-    provider: Optional[str] = Query(None, description="LLM provider override, e.g. 'openai/gpt-4o-mini'"),
+    provider: Optional[str] = Query(None, description="LLM provider override, e.g. 'openai/gpt-6-luna'"),
     temperature: Optional[float] = Query(None, description="LLM temperature override"),
     _td: Dict = Depends(token_dep),
 ):
