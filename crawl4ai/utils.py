@@ -62,22 +62,56 @@ import sys
 if sys.version_info < (3, 14):
     from urllib.robotparser import RuleLine
 
+    # RobotFileParser.parse unquotes rule paths before RuleLine quotes them
+    # again, which collapses raw '*'/'$' and percent-encoded '%2A'/'%24' into
+    # the same '%2A'/'%24' tokens. Mark percent-encoded '%2A' and '%24' before
+    # parse() unquotes the line so they stay literal instead of acting as a
+    # wildcard or end anchor.
+    _LITERAL_STAR = "%EE%80%80"
+    _LITERAL_DOLLAR = "%EE%80%81"
+    original_parse = RobotFileParser.parse
     original_applies_to = RuleLine.applies_to
 
-    def patched_applies_to(self, filename):
-       # Handle wildcards in paths
-       if '*' in self.path or '%2A' in self.path or self.path in ("*", "%2A") or self.path.endswith('%24'):
-           pattern = self.path.replace('%2A', '*')
-           pattern = re.escape(pattern).replace('\\*', '.*')
-           pattern = '^' + pattern
-           if pattern.endswith('%24'):
-               pattern = pattern[:-3] + '$'
-           try:
-               return bool(re.match(pattern, filename))
-           except re.error:
-               return original_applies_to(self, filename)
-       return original_applies_to(self, filename)
+    def _escape_encoded_specials(line: str) -> str:
+        body, hash_sep, comment = line.partition("#")
+        key, sep, value = body.partition(":")
+        if sep and key.strip().lower() in ("allow", "disallow"):
+            value = re.sub(
+                r"%([0-9A-Fa-f]{2})",
+                lambda m: (
+                    "\ue000"
+                    if m.group(1).upper() == "2A"
+                    else ("\ue001" if m.group(1) == "24" else m.group(0))
+                ),
+                value,
+            )
+            return f"{key}:{value}" + (f"#{comment}" if hash_sep else "")
+        return line
 
+    def patched_parse(self, lines):
+        return original_parse(self, (_escape_encoded_specials(line) for line in lines))
+
+    def patched_applies_to(self, filename):
+        if "*" in self.path or "%2A" in self.path or self.path.endswith("%24"):
+            pattern = self.path.replace("%2A", "*")
+            pattern = "^" + re.escape(pattern).replace("\\*", ".*")
+            if pattern.endswith("%24"):
+                pattern = pattern[:-3] + "$"
+            pattern = pattern.replace(_LITERAL_STAR, "%2A").replace(
+                _LITERAL_DOLLAR, "%24"
+            )
+            try:
+                return bool(re.match(pattern, filename))
+            except re.error:
+                return original_applies_to(self, filename)
+        if _LITERAL_STAR in self.path or _LITERAL_DOLLAR in self.path:
+            path = self.path.replace(_LITERAL_STAR, "%2A").replace(
+                _LITERAL_DOLLAR, "%24"
+            )
+            return filename.startswith(path)
+        return original_applies_to(self, filename)
+
+    RobotFileParser.parse = patched_parse
     RuleLine.applies_to = patched_applies_to
 # Monkey patch ends
 
