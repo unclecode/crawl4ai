@@ -184,6 +184,41 @@ def _match(url: str, pattern: str) -> bool:
             or (canon.startswith("www.") and fnmatch.fnmatch(canon[4:], pattern)))
 
 
+async def _queue_get_or_done(
+    queue: asyncio.Queue[str],
+    producer_done: asyncio.Event,
+) -> Optional[str]:
+    """Wait for a queued URL or return when the producer is done."""
+    while True:
+        try:
+            return queue.get_nowait()
+        except asyncio.QueueEmpty:
+            if producer_done.is_set():
+                return None
+
+        queue_get = asyncio.create_task(queue.get())
+        producer_finished = asyncio.create_task(producer_done.wait())
+        try:
+            completed, _ = await asyncio.wait(
+                (queue_get, producer_finished),
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            if queue_get in completed:
+                return queue_get.result()
+            if queue_get.done() and not queue_get.cancelled():
+                return queue_get.result()
+
+            queue_get.cancel()
+            await asyncio.gather(queue_get, return_exceptions=True)
+            if not queue_get.cancelled():
+                return queue_get.result()
+        finally:
+            for task in (queue_get, producer_finished):
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(queue_get, producer_finished, return_exceptions=True)
+
+
 def _parse_head(src: str) -> Dict[str, Any]:
     if LXML:
         try:
@@ -478,18 +513,14 @@ class AsyncUrlSeeder:
 
         async def worker(res_list: List[Dict[str, Any]]):
             while True:
-                if queue.empty() and producer_done.is_set():
-                    # self._log("debug", "Worker exiting: queue empty and producer done.", tag="URL_SEED")
-                    break
                 try:
-                    # Increased timeout slightly
-                    url = await asyncio.wait_for(queue.get(), 5)
-                except asyncio.TimeoutError:
-                    continue  # Keep checking queue and producer_done status
+                    url = await _queue_get_or_done(queue, producer_done)
                 except Exception as e:
                     self._log("error", "Worker failed to get URL from queue: {error}", params={
                               "error": str(e)}, tag="URL_SEED")
                     continue
+                if url is None:
+                    break
 
                 if max_urls > 0 and len(res_list) >= max_urls:
                     self._log(
@@ -678,13 +709,9 @@ class AsyncUrlSeeder:
         async def worker(res_list: List[Dict[str, Any]]):
             """Worker to process URLs from the queue."""
             while True:
-                try:
-                    # Wait for URL or producer completion
-                    url = await asyncio.wait_for(queue.get(), timeout=1.0)
-                except asyncio.TimeoutError:
-                    if producer_done.is_set() and queue.empty():
-                        break
-                    continue
+                url = await _queue_get_or_done(queue, producer_done)
+                if url is None:
+                    break
                 
                 try:
                     # Use existing _validate method which handles head extraction, caching, etc.
