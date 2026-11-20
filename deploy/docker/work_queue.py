@@ -69,8 +69,11 @@ class WorkQueue:
             try:
                 # Run in the submitting request's context, not the worker's
                 # boot-time one, so per-request state such as the caller's
-                # browser context partition follows the job.
-                await asyncio.get_running_loop().create_task(factory(), context=ctx)
+                # browser context partition follows the job. create_task()
+                # copies the current context, so create it inside ctx.run()
+                # (create_task's context= argument needs Python 3.11).
+                loop = asyncio.get_running_loop()
+                await ctx.run(lambda: loop.create_task(factory()))
             except Exception:
                 logger.exception("background job failed")
             finally:
