@@ -427,7 +427,8 @@ async def main():
 You can also create your own custom scraping strategy by inheriting from `ContentScrapingStrategy`. The strategy must return a `ScrapingResult` object with the following structure:
 
 ```python
-from crawl4ai import ContentScrapingStrategy, ScrapingResult, MediaItem, Media, Link, Links
+from crawl4ai import ContentScrapingStrategy
+from crawl4ai.models import ScrapingResult, MediaItem, Media, Link, Links
 
 class CustomScrapingStrategy(ContentScrapingStrategy):
     def scrap(self, url: str, html: str, **kwargs) -> ScrapingResult:
