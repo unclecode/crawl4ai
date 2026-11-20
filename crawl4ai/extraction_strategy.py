@@ -2662,6 +2662,14 @@ class RegexExtractionStrategy(ExtractionStrategy):
         """
         super().__init__(input_format=input_format, **kwargs)
 
+        # Keep the constructor arguments: to_serializable_dict() reads them
+        # back by name, so without them CrawlerRunConfig.dump() (and the Docker
+        # client) sent this strategy with no patterns at all.
+        if custom is not None and not isinstance(custom, dict):
+            custom = list(custom)
+        self.pattern = pattern
+        self.custom = custom
+
         # 1️⃣  take only the requested built-ins
         merged: Dict[str, str] = {
             key: rx
