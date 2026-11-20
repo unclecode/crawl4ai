@@ -13,13 +13,17 @@ Validation Strategy:
 5. Otherwise → cache is STALE, need full recrawl
 """
 
-import httpx
+import re
 from dataclasses import dataclass
-from typing import Optional, Tuple
 from enum import Enum
+from typing import Optional, Tuple
+
+import httpx
 
 from .egress_policy import proxy_url
 from .utils import compute_head_fingerprint
+
+_HEAD_CLOSE_RE = re.compile(rb"</head\s*>", re.IGNORECASE)
 
 
 class CacheValidationResult(Enum):
@@ -241,20 +245,23 @@ class CacheValidator:
                     chunks.append(chunk)
                     total_bytes += len(chunk)
 
-                    content = b''.join(chunks)
-                    # Check for </head> (case insensitive)
-                    if b'</head>' in content.lower() or b'</HEAD>' in content:
+                    # HTML permits whitespace before the closing angle bracket.
+                    if _HEAD_CLOSE_RE.search(b"".join(chunks)):
                         break
                     if total_bytes >= max_bytes:
                         break
 
-                html = content.decode('utf-8', errors='replace')
+                content = b"".join(chunks)
+                head_match = _HEAD_CLOSE_RE.search(content)
 
-                # Extract just the head section
-                head_end = html.lower().find('</head>')
-                if head_end != -1:
-                    html = html[:head_end + 7]
+                # Without a closing tag the buffer is a truncated prefix of the
+                # document, not the head. Fingerprinting it would compare body
+                # markup with a stored head fingerprint and report every such
+                # page as stale, so report "no head" and let the caller decide.
+                if head_match is None:
+                    return None, etag, last_modified
 
+                html = content[: head_match.end()].decode("utf-8", errors="replace")
                 return html, etag, last_modified
 
         except Exception:
