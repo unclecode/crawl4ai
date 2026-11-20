@@ -9,6 +9,7 @@ import re
 import socket
 from typing import Dict, List, Optional
 from datetime import datetime, timezone
+from urllib.parse import urljoin
 
 import aiohttp
 from aiohttp.abc import AbstractResolver
@@ -144,6 +145,10 @@ class WebhookDeliveryService:
             if attempt < self.max_attempts - 1:
                 delay = min(self.initial_delay * (2 ** attempt), self.max_delay)
                 await asyncio.sleep(delay)
+
+        logger.error(
+            f"Webhook delivery failed after {self.max_attempts} attempts to {webhook_url}"
+        )
         return False
 
     async def _deliver(self, url: str, payload: Dict, headers: Dict[str, str]) -> int:
@@ -152,38 +157,47 @@ class WebhookDeliveryService:
         from egress_broker import resolve_and_pin, check_redirect, EgressBlocked, ALLOW_INSECURE_TLS
 
         current = url
-        for _hop in range(_MAX_WEBHOOK_REDIRECTS + 1):
-            try:
-                pin = resolve_and_pin(current)
-            except EgressBlocked as e:
-                raise _WebhookBlocked(str(e))
+        method = "POST"
+        req_headers = dict(headers)
+        try:
+            pin = resolve_and_pin(current)
+        except EgressBlocked as e:
+            raise _WebhookBlocked(str(e))
 
+        for _hop in range(_MAX_WEBHOOK_REDIRECTS + 1):
             connector = aiohttp.TCPConnector(resolver=_PinnedResolver(pin.host, pin.ip))
             ssl = None if not ALLOW_INSECURE_TLS else False
             timeout = aiohttp.ClientTimeout(total=self.timeout)
             async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
-                async with session.post(
-                    current, json=payload, headers=headers,
-                    allow_redirects=False, ssl=ssl,
+                async with session.request(
+                    method,
+                    current,
+                    json=payload if method == "POST" else None,
+                    headers=req_headers,
+                    allow_redirects=False,
+                    ssl=ssl,
                 ) as resp:
                     if resp.status in (301, 302, 303, 307, 308):
                         loc = resp.headers.get("Location")
                         if not loc:
                             return resp.status
+                        next_url = urljoin(current, loc)
                         # Re-validate every redirect hop before following it.
                         try:
-                            check_redirect(loc)
+                            pin = check_redirect(next_url)
                         except EgressBlocked as e:
                             raise _WebhookBlocked(f"redirect to blocked target: {e}")
-                        current = loc
+                        if resp.status == 303 and method != "GET":
+                            method = "GET"
+                            req_headers = {
+                                k: v
+                                for k, v in req_headers.items()
+                                if k.lower() != "content-type"
+                            }
+                        current = next_url
                         continue
                     return resp.status
         raise _WebhookBlocked("too many webhook redirects")
-
-        logger.error(
-            f"Webhook delivery failed after {self.max_attempts} attempts to {webhook_url}"
-        )
-        return False
 
     async def notify_job_completion(
         self,
