@@ -10,18 +10,11 @@ Chunking strategies are critical for dividing large texts into manageable parts,
 
 #### 1. Regex-Based Chunking
 Splits text based on regular expression patterns, useful for coarse segmentation.
+Matched capture groups contribute their text to the result. Unmatched optional groups are omitted.
 
 **Code Example**:
 ```python
-class RegexChunking:
-    def __init__(self, patterns=None):
-        self.patterns = patterns or [r'\n\n']  # Default pattern for paragraphs
-
-    def chunk(self, text):
-        paragraphs = [text]
-        for pattern in self.patterns:
-            paragraphs = [seg for p in paragraphs for seg in re.split(pattern, p)]
-        return paragraphs
+from crawl4ai.chunking_strategy import RegexChunking
 
 # Example Usage
 text = """This is the first paragraph.
