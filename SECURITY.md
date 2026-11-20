@@ -90,7 +90,7 @@ When using Crawl4AI as a Python library:
 
 All issues below are fixed in the version named. Advisories with a GHSA id are published under [Security Advisories](https://github.com/unclecode/crawl4ai/security/advisories). Full detail for every release is in [CHANGELOG.md](CHANGELOG.md); reporter credits are in [SECURITY-CREDITS.md](SECURITY-CREDITS.md).
 
-### Fixed in v0.9.6 (2026-11-19)
+### Fixed in v0.9.6 (2026-11-20)
 
 | ID | Severity | Component | Description | Fix |
 |----|----------|-----------|-------------|-----|

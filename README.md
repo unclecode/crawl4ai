@@ -115,7 +115,7 @@ claude mcp add --transport http crawl4ai https://api.crawl4ai.com/mcp \
 
 ## Run Crawl4AI yourself
 
-**Latest: [v0.9.6](https://github.com/unclecode/crawl4ai/releases/tag/v0.9.6) (19 Nov 2026)** · [all releases →](https://github.com/unclecode/crawl4ai/releases)
+**Latest: [v0.9.6](https://github.com/unclecode/crawl4ai/releases/tag/v0.9.6) (20 Nov 2026)** · [all releases →](https://github.com/unclecode/crawl4ai/releases)
 
 
 ```bash
