@@ -712,7 +712,9 @@ class PruningContentFilter(RelevantContentFilter):
 
         # Prune tree starting from body
         body = soup.find("body")
-        self._prune_tree(body)
+        if min_word_threshold is None:
+            min_word_threshold = self.min_word_threshold
+        self._prune_tree(body, min_word_threshold)
 
         # Extract remaining content as list of HTML strings
         content_blocks = []
@@ -745,12 +747,13 @@ class PruningContentFilter(RelevantContentFilter):
                 return True
         return False
 
-    def _prune_tree(self, node):
+    def _prune_tree(self, node, min_word_threshold: Optional[int]):
         """
         Prunes the tree starting from the given node.
 
         Args:
             node (Tag): The node from which the pruning starts.
+            min_word_threshold (Optional[int]): The effective minimum for this call.
         """
         if not node or not hasattr(node, "name") or node.name is None:
             return
@@ -775,7 +778,9 @@ class PruningContentFilter(RelevantContentFilter):
             "link_text_len": link_text_len,
         }
 
-        score = self._compute_composite_score(metrics, text_len, tag_len, link_text_len)
+        score = self._compute_composite_score(
+            metrics, text_len, tag_len, link_text_len, min_word_threshold
+        )
 
         if self.threshold_type == "fixed":
             should_remove = score < self.threshold
@@ -804,15 +809,17 @@ class PruningContentFilter(RelevantContentFilter):
             for child in children:
                 if in_sentence and child.name in self.inline_tags:
                     continue
-                self._prune_tree(child)
+                self._prune_tree(child, min_word_threshold)
 
-    def _compute_composite_score(self, metrics, text_len, tag_len, link_text_len):
+    def _compute_composite_score(
+        self, metrics, text_len, tag_len, link_text_len, min_word_threshold
+    ):
         """Computes the composite score"""
-        if self.min_word_threshold:
+        if min_word_threshold:
             # Get raw text from metrics node - avoid extra processing
             text = metrics["node"].get_text(strip=True)
             word_count = text.count(" ") + 1
-            if word_count < self.min_word_threshold:
+            if word_count < min_word_threshold:
                 return -1.0  # Guaranteed removal
         score = 0.0
         total_weight = 0.0
