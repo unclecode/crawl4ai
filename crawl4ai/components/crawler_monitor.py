@@ -2,7 +2,7 @@ import time
 import uuid
 import threading
 import psutil
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, Optional, List
 import threading
 from rich.console import Console
@@ -157,12 +157,14 @@ class TerminalUI:
         elif memory_status == "CRITICAL":
             memory_icon = "🔴"
         
-        # Get current memory usage
-        current_memory = psutil.Process().memory_info().rss / (1024 * 1024)  # MB
-        memory_percent = (current_memory / psutil.virtual_memory().total) * 100
-        
-        # Format runtime
-        runtime = self.monitor._format_time(time.time() - self.monitor.start_time if self.monitor.start_time else 0)
+        total_memory = psutil.virtual_memory().total
+        memory_percent = (
+            (psutil.Process().memory_info().rss / total_memory) * 100
+            if total_memory
+            else 0.0
+        )
+
+        runtime = self.monitor._format_time(summary["runtime"])
         
         # Create the status text
         status_text = Text()
@@ -304,7 +306,7 @@ class TerminalUI:
         
         # Add rows for each task
         for task_id, stats in sorted(
-            list(task_stats.items())[:display_count],
+            task_stats.items(),
             # Sort: 1. IN_PROGRESS first, 2. QUEUED, 3. COMPLETED/FAILED by recency
             key=lambda x: (
                 0 if x[1]['status'] == CrawlStatus.IN_PROGRESS.name else 
@@ -312,7 +314,7 @@ class TerminalUI:
                 2,
                 -1 * (x[1].get('end_time', 0) or 0)  # Most recent first
             )
-        ):
+        )[:display_count]:
             # Truncate task_id and URL for display
             short_id = task_id[:8]
             url = stats['url']
@@ -449,6 +451,7 @@ class CrawlerMonitor:
         """
         with self._lock:
             self.start_time = time.time()
+            self.end_time = None
             self.is_running = True
             
             # Start the terminal UI
@@ -571,11 +574,17 @@ class CrawlerMonitor:
             if memory_usage is not None:
                 task_stats["memory_usage"] = memory_usage
                 
-                # Update peak memory if necessary
-                current_percent = (memory_usage / psutil.virtual_memory().total) * 100
+                total_memory_mb = psutil.virtual_memory().total / (1024 * 1024)
+                current_percent = (
+                    (memory_usage / total_memory_mb) * 100 if total_memory_mb else 0.0
+                )
                 if current_percent > self.peak_memory_percent:
                     self.peak_memory_percent = current_percent
-                    self.peak_memory_time = time.time()
+                    self.peak_memory_time = (
+                        time.time() - self.start_time
+                        if self.start_time is not None
+                        else 0.0
+                    )
                 
             if peak_memory is not None:
                 task_stats["peak_memory"] = peak_memory
@@ -690,9 +699,11 @@ class CrawlerMonitor:
             - requeue_rate: Percentage of tasks requeued
         """
         with self._lock:
-            # Calculate runtime
             current_time = time.time()
-            runtime = current_time - (self.start_time or current_time)
+            end_time = self.end_time if self.end_time is not None else current_time
+            runtime = (
+                end_time - self.start_time if self.start_time is not None else 0.0
+            )
             
             # Calculate completion percentage
             completion_percentage = 0
@@ -765,8 +776,8 @@ class CrawlerMonitor:
         Returns:
             Formatted time string (e.g., "1:23:45")
         """
-        delta = timedelta(seconds=int(seconds))
-        hours, remainder = divmod(delta.seconds, 3600)
+        total_seconds = max(0, int(seconds))
+        hours, remainder = divmod(total_seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
         
         if hours > 0:
