@@ -23,10 +23,10 @@ In some cases, you need to extract **complex or unstructured** information from 
 You can use LLMConfig, to quickly configure multiple variations of LLMs and experiment with them to find the optimal one for your use case. You can read more about LLMConfig [here](/api/parameters).
 
 ```python
-llm_config = LLMConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY"))
+llm_config = LLMConfig(provider="openai/gpt-6-luna", api_token=os.getenv("OPENAI_API_KEY"))
 ```
 
-Crawl4AI uses a “provider string” (e.g., `"openai/gpt-4o"`, `"ollama/llama2.0"`, `"aws/titan"`) to identify your LLM. **Any** model that LiteLLM supports is fair game. You just provide:
+Crawl4AI uses a “provider string” (e.g., `"openai/gpt-6-luna"`, `"ollama/llama2.0"`, `"aws/titan"`) to identify your LLM. **Any** model that LiteLLM supports is fair game. You just provide:
 
 - **`provider`**: The `<provider>/<model_name>` identifier (e.g., `"openai/gpt-4"`, `"ollama/llama2"`, `"huggingface/google-flan"`, etc.).  
 - **`api_token`**: If needed (for OpenAI, HuggingFace, etc.); local models or Ollama might not require it.  
@@ -111,7 +111,7 @@ class Product(BaseModel):
 async def main():
     # 1. Define the LLM extraction strategy
     llm_strategy = LLMExtractionStrategy(
-        llm_config = LLMConfig(provider="openai/gpt-4o-mini", api_token=os.getenv('OPENAI_API_KEY')),
+        llm_config = LLMConfig(provider="openai/gpt-6-luna", api_token=os.getenv('OPENAI_API_KEY')),
         schema=Product.model_json_schema(), # Or use model_json_schema()
         extraction_type="schema",
         instruction="Extract all product objects with 'name' and 'price' from the content.",
@@ -308,7 +308,7 @@ If your site’s data is consistent or repetitive, consider [`JsonCssExtractionS
 **Next Steps**:
 
 1. **Experiment with Different Providers**  
-   - Try switching the `provider` (e.g., `"ollama/llama2"`, `"openai/gpt-4o"`, etc.) to see differences in speed, accuracy, or cost.  
+   - Try switching the `provider` (e.g., `"ollama/llama2"`, `"openai/gpt-6-luna"`, etc.) to see differences in speed, accuracy, or cost.  
    - Pass different `extra_args` like `temperature`, `top_p`, and `max_tokens` to fine-tune your results.
 
 2. **Performance Tuning**  

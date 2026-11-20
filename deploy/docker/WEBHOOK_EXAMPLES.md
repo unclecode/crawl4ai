@@ -177,7 +177,7 @@ curl -X POST http://localhost:11235/llm/job \
     "q": "Extract the article title, author, and publication date",
     "schema": "{\"type\": \"object\", \"properties\": {\"title\": {\"type\": \"string\"}, \"author\": {\"type\": \"string\"}, \"date\": {\"type\": \"string\"}}}",
     "cache": false,
-    "provider": "openai/gpt-4o-mini",
+    "provider": "openai/gpt-6-luna",
     "webhook_config": {
       "webhook_url": "https://myapp.com/webhooks/llm-complete",
       "webhook_data_in_payload": true
@@ -354,7 +354,7 @@ const crawlTaskId = await createCrawlJob({
 const llmTaskId = await createLLMJob({
   url: 'https://example.com/article',
   q: 'Extract the main points from this article',
-  provider: 'openai/gpt-4o-mini',
+  provider: 'openai/gpt-6-luna',
   webhook_config: {
     webhook_url: 'https://myapp.com/webhooks/llm-complete',
     webhook_data_in_payload: true,

@@ -1,10 +1,13 @@
 from pathlib import Path
 import asyncio
+import time
 from dataclasses import asdict
 from crawl4ai.async_logger import AsyncLogger
 from crawl4ai.async_crawler_strategy import AsyncCrawlerStrategy
-from crawl4ai.models import AsyncCrawlResponse, ScrapingResult 
+from urllib.parse import urljoin
+from crawl4ai.models import AsyncCrawlResponse, Link, Links, Media, MediaItem, ScrapingResult
 from crawl4ai.content_scraping_strategy import ContentScrapingStrategy
+from crawl4ai.utils import get_base_domain, is_external_url
 from .processor import NaivePDFProcessorStrategy  # Assuming your current PDF code is in pdf_processor.py
 
 # Default resource bounds for remote PDF fetches. These cap what an untrusted
@@ -13,6 +16,7 @@ from .processor import NaivePDFProcessorStrategy  # Assuming your current PDF co
 DEFAULT_MAX_PDF_BYTES = 100 * 1024 * 1024  # 100 MiB
 DEFAULT_MAX_PDF_PAGES = 2000
 DEFAULT_MAX_REDIRECTS = 5
+DEFAULT_MAX_PDF_SECONDS = 300  # total download + parse budget
 
 _REDIRECT_STATUSES = (301, 302, 303, 307, 308)
 
@@ -109,6 +113,7 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
                  max_pdf_bytes: int = DEFAULT_MAX_PDF_BYTES,
                  max_pdf_pages: int = DEFAULT_MAX_PDF_PAGES,
                  max_redirects: int = DEFAULT_MAX_REDIRECTS,
+                 max_pdf_seconds: float = DEFAULT_MAX_PDF_SECONDS,
                  logger: AsyncLogger = None,
                  url_validator=None):
         self.logger = logger
@@ -119,6 +124,7 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
         self.max_pdf_bytes = max_pdf_bytes
         self.max_pdf_pages = max_pdf_pages
         self.max_redirects = max_redirects
+        self.max_pdf_seconds = max_pdf_seconds
         self.pdf_processor = NaivePDFProcessorStrategy(
             save_images_locally=save_images_locally,
             extract_images=extract_images,
@@ -140,12 +146,13 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
         Returns:
             ScrapingResult: The scraped content.
         """
+        check = self._budget_check(url)
         # Download if URL or use local path
-        pdf_path = self._get_pdf_path(url)
+        pdf_path = self._get_pdf_path(url, check)
         try:
             # Process PDF
             # result = self.pdf_processor.process(Path(pdf_path))
-            result = self.pdf_processor.process_batch(Path(pdf_path))
+            result = self.pdf_processor.process_batch(Path(pdf_path), check=check)
             
             # Combine page HTML
             cleaned_html = f"""
@@ -158,28 +165,11 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
         </html>
         """
             
-            # Accumulate media and links with page numbers
-            media = {"images": []}
-            links = {"urls": []}
-            
-            for page in result.pages:
-                # Add page number to each image
-                for img in page.images:
-                    img["page"] = page.page_number
-                    media["images"].append(img)
-                
-                # Add page number to each link
-                for link in page.links:
-                    links["urls"].append({
-                        "url": link,
-                        "page": page.page_number
-                    })
-
             return ScrapingResult(
                 cleaned_html=cleaned_html,
                 success=True,
-                media=media,
-                links=links,
+                media=self._build_media(result.pages),
+                links=self._build_links(url, result.pages),
                 metadata=asdict(result.metadata)
             )
         finally:
@@ -192,6 +182,77 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
                 except Exception as e:
                     if self.logger:
                         self.logger.warning(f"Failed to cleanup temp file {pdf_path}: {e}")
+
+    @staticmethod
+    def _build_media(pages) -> Media:
+        """Turn the images of every page into ``Media``.
+
+        The processor reports an image saved to disk as ``{"path": ...}`` and
+        an inline one as ``{"data": ...}``. ``MediaItem`` has no ``path``
+        field, so the saved file's path goes into ``src``.
+        """
+        images = []
+        for page in pages:
+            for img in page.images:
+                images.append(
+                    MediaItem(
+                        src=img.get("path") or "",
+                        data=img.get("data") or "",
+                        format=img.get("format"),
+                        width=img.get("width"),
+                        type="image",
+                    )
+                )
+        return Media(images=images)
+
+    @staticmethod
+    def _build_links(url: str, pages) -> Links:
+        """Turn the URI annotations of every page into ``Links``.
+
+        ``Links`` only has ``internal`` and ``external`` lists of ``Link``
+        items, so the links are sorted against the PDF's own domain the way
+        the HTML scraper does it. A local PDF has no domain, so all of its
+        absolute links are external. A target that appears on several pages
+        is reported once, at its first occurrence.
+        """
+        is_remote = url.startswith(("http://", "https://"))
+        base_domain = get_base_domain(url) if is_remote else ""
+        internal = {}
+        external = {}
+
+        for page in pages:
+            for raw_href in page.links:
+                href = str(raw_href).strip()
+                if not href:
+                    continue
+                if is_remote:
+                    href = urljoin(url, href)
+                if href in internal or href in external:
+                    continue
+
+                if base_domain and not is_external_url(href, base_domain):
+                    internal[href] = Link(href=href, base_domain=base_domain)
+                else:
+                    external[href] = Link(href=href, base_domain=get_base_domain(href))
+
+        return Links(internal=list(internal.values()), external=list(external.values()))
+
+    def _budget_check(self, url: str):
+        """Return a callable that raises once max_pdf_seconds have elapsed.
+
+        scrap() runs synchronously, so a caller's asyncio deadline cannot stop
+        it; the budget is checked inside the download and parse loops instead.
+        """
+        if not self.max_pdf_seconds:
+            return None
+        deadline = time.monotonic() + self.max_pdf_seconds
+
+        def check():
+            if time.monotonic() > deadline:
+                raise TimeoutError(
+                    f"PDF from {url} exceeded max_pdf_seconds ({self.max_pdf_seconds}s)"
+                )
+        return check
 
     async def ascrap(self, url: str, html: str, **kwargs) -> ScrapingResult:
         # For simple cases, you can use the sync version
@@ -278,9 +339,11 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
             if _url_validator:
                 _url_validator(current)
 
-            # Connection timeout: 20s, Read timeout: 600s (for large PDFs)
+            # Connection timeout: 20s, Read timeout: 600s (for large PDFs),
+            # capped by the total budget so one stalled read cannot outlast it.
+            read_timeout = min(60 * 10, self.max_pdf_seconds or 60 * 10)
             response = session.get(
-                current, stream=True, timeout=(20, 60 * 10), allow_redirects=False
+                current, stream=True, timeout=(20, read_timeout), allow_redirects=False
             )
             is_redirect = response.status_code in _REDIRECT_STATUSES
             self._check_peer_ip(response, strict=not is_redirect)
@@ -302,7 +365,7 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
             f"Too many redirects (>{self.max_redirects}) downloading PDF from {url}"
         )
 
-    def _get_pdf_path(self, url: str) -> str:
+    def _get_pdf_path(self, url: str, check=None) -> str:
         if url.startswith(("http://", "https://")):
             import tempfile
             import requests
@@ -327,6 +390,8 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
                 with response:
                     with open(temp_file.name, 'wb') as f:
                         for chunk in response.iter_content(chunk_size=8192):
+                            if check:
+                                check()
                             downloaded += len(chunk)
                             if downloaded > self.max_pdf_bytes:
                                 raise RuntimeError(

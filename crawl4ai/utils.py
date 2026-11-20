@@ -62,22 +62,56 @@ import sys
 if sys.version_info < (3, 14):
     from urllib.robotparser import RuleLine
 
+    # RobotFileParser.parse unquotes rule paths before RuleLine quotes them
+    # again, which collapses raw '*'/'$' and percent-encoded '%2A'/'%24' into
+    # the same '%2A'/'%24' tokens. Mark percent-encoded '%2A' and '%24' before
+    # parse() unquotes the line so they stay literal instead of acting as a
+    # wildcard or end anchor.
+    _LITERAL_STAR = "%EE%80%80"
+    _LITERAL_DOLLAR = "%EE%80%81"
+    original_parse = RobotFileParser.parse
     original_applies_to = RuleLine.applies_to
 
-    def patched_applies_to(self, filename):
-       # Handle wildcards in paths
-       if '*' in self.path or '%2A' in self.path or self.path in ("*", "%2A"):
-           pattern = self.path.replace('%2A', '*')
-           pattern = re.escape(pattern).replace('\\*', '.*')
-           pattern = '^' + pattern
-           if pattern.endswith('\\$'):
-               pattern = pattern[:-2] + '$'
-           try:
-               return bool(re.match(pattern, filename))
-           except re.error:
-               return original_applies_to(self, filename)
-       return original_applies_to(self, filename)
+    def _escape_encoded_specials(line: str) -> str:
+        body, hash_sep, comment = line.partition("#")
+        key, sep, value = body.partition(":")
+        if sep and key.strip().lower() in ("allow", "disallow"):
+            value = re.sub(
+                r"%([0-9A-Fa-f]{2})",
+                lambda m: (
+                    "\ue000"
+                    if m.group(1).upper() == "2A"
+                    else ("\ue001" if m.group(1) == "24" else m.group(0))
+                ),
+                value,
+            )
+            return f"{key}:{value}" + (f"#{comment}" if hash_sep else "")
+        return line
 
+    def patched_parse(self, lines):
+        return original_parse(self, (_escape_encoded_specials(line) for line in lines))
+
+    def patched_applies_to(self, filename):
+        if "*" in self.path or "%2A" in self.path or self.path.endswith("%24"):
+            pattern = self.path.replace("%2A", "*")
+            pattern = "^" + re.escape(pattern).replace("\\*", ".*")
+            if pattern.endswith("%24"):
+                pattern = pattern[:-3] + "$"
+            pattern = pattern.replace(_LITERAL_STAR, "%2A").replace(
+                _LITERAL_DOLLAR, "%24"
+            )
+            try:
+                return bool(re.match(pattern, filename))
+            except re.error:
+                return original_applies_to(self, filename)
+        if _LITERAL_STAR in self.path or _LITERAL_DOLLAR in self.path:
+            path = self.path.replace(_LITERAL_STAR, "%2A").replace(
+                _LITERAL_DOLLAR, "%24"
+            )
+            return filename.startswith(path)
+        return original_applies_to(self, filename)
+
+    RobotFileParser.parse = patched_parse
     RuleLine.applies_to = patched_applies_to
 # Monkey patch ends
 
@@ -1822,7 +1856,9 @@ def perform_completion_with_backoff(
     import litellm
     litellm.drop_params = True  # Auto-drop unsupported params (e.g., temperature for O-series/GPT-5)
 
-    extra_args = {"temperature": 0.01, "api_key": api_token, "base_url": base_url}
+    # No default temperature: reasoning models (GPT-5, gpt-6-luna) reject anything
+    # but 1, and litellm can't drop it for models it doesn't know. Set it in extra_args.
+    extra_args = {"api_key": api_token, "base_url": base_url}
     if json_response:
         extra_args["response_format"] = {"type": "json_object"}
 
@@ -1915,7 +1951,9 @@ async def aperform_completion_with_backoff(
     import asyncio
     litellm.drop_params = True  # Auto-drop unsupported params (e.g., temperature for O-series/GPT-5)
 
-    extra_args = {"temperature": 0.01, "api_key": api_token, "base_url": base_url}
+    # No default temperature: reasoning models (GPT-5, gpt-6-luna) reject anything
+    # but 1, and litellm can't drop it for models it doesn't know. Set it in extra_args.
+    extra_args = {"api_key": api_token, "base_url": base_url}
     if json_response:
         extra_args["response_format"] = {"type": "json_object"}
 
@@ -2052,7 +2090,7 @@ def extract_blocks_batch(batch_data, provider="groq/llama3-70b-8192", api_token=
 
         messages.append([{"role": "user", "content": prompt_with_variables}])
 
-    responses = batch_completion(model=provider, messages=messages, temperature=0.01)
+    responses = batch_completion(model=provider, messages=messages)
 
     all_blocks = []
     for response in responses:
@@ -2205,7 +2243,7 @@ def format_html(html_string):
         str: The prettified HTML string.
     """
 
-    soup = BeautifulSoup(html_string, "lxml.parser")
+    soup = BeautifulSoup(html_string, "lxml")
     return soup.prettify()
 
 
@@ -2254,6 +2292,16 @@ def fast_format_html(html_string):
 
     return "\n".join(formatted)
 
+
+
+def _lowercase_host(netloc: str) -> str:
+    """Lowercase the host of a netloc, leaving any userinfo as written.
+
+    A host is case-insensitive, but the `user:password` part in front of it is
+    not: lowercasing the whole netloc rewrites credentials taken from a URL.
+    """
+    userinfo, separator, hostport = netloc.rpartition('@')
+    return f"{userinfo}{separator}{hostport.lower()}"
 
 
 def normalize_url(
@@ -2311,7 +2359,7 @@ def normalize_url(
     parsed = urlparse(full_url)
 
     # ── netloc ──
-    netloc = parsed.netloc.lower()
+    netloc = _lowercase_host(parsed.netloc)
 
     # ── path ──
     # Strip duplicate slashes and trailing "/" (except root)
@@ -2383,7 +2431,7 @@ def normalize_url_for_deep_crawl(href, base_url, preserve_https=False, original_
     parsed = urlparse(full_url)
     
     # Convert hostname to lowercase
-    netloc = parsed.netloc.lower()
+    netloc = _lowercase_host(parsed.netloc)
     
     # Remove fragment entirely
     fragment = ''
@@ -2445,7 +2493,7 @@ def efficient_normalize_url_for_deep_crawl(href, base_url, preserve_https=False,
     # 2. Remove fragment
     normalized = urlunparse((
         parsed.scheme,
-        parsed.netloc.lower(),
+        _lowercase_host(parsed.netloc),
         parsed.path or '/',  # Preserve trailing slash
         parsed.params,
         parsed.query,

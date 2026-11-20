@@ -19,26 +19,44 @@ class DeepCrawlDecorator:
         async def wrapped_arun(url: str, config: CrawlerRunConfig = None, **kwargs):
             # If deep crawling is already active, call the original method to avoid recursion.
             if config and config.deep_crawl_strategy and not self.deep_crawl_active.get():
-                token = self.deep_crawl_active.set(True)
-                # Await the arun call to get the actual result object.
-                result_obj = await config.deep_crawl_strategy.arun(
-                    crawler=self.crawler,
-                    start_url=url,
-                    config=config
-                )
                 if config.stream:
+                    result_obj = await config.deep_crawl_strategy.arun(
+                        crawler=self.crawler,
+                        start_url=url,
+                        config=config
+                    )
                     async def result_wrapper():
+                        token = self.deep_crawl_active.set(True)
                         try:
                             async for result in result_obj:
-                                yield result
+                                # While suspended at the yield, the flag must read
+                                # False in the consumer's context, so an arun() after
+                                # an early break starts a real crawl instead of
+                                # falling through to a single-page crawl.
+                                try:
+                                    self.deep_crawl_active.reset(token)
+                                except ValueError:
+                                    self.deep_crawl_active.set(False)
+                                try:
+                                    yield result
+                                finally:
+                                    token = self.deep_crawl_active.set(True)
                         finally:
                             self.deep_crawl_active.set(False)
+                            aclose = getattr(result_obj, "aclose", None)
+                            if aclose is not None:
+                                await aclose()
                     return result_wrapper()
                 else:
+                    token = self.deep_crawl_active.set(True)
                     try:
-                        return result_obj
+                        return await config.deep_crawl_strategy.arun(
+                            crawler=self.crawler,
+                            start_url=url,
+                            config=config
+                        )
                     finally:
-                        self.deep_crawl_active.set(False)
+                        self.deep_crawl_active.reset(token)
             return await original_arun(url, config=config, **kwargs)
         return wrapped_arun
 

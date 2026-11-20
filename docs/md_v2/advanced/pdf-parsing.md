@@ -112,7 +112,7 @@ When initializing `PDFContentScrapingStrategy`, you can configure its behavior u
     -   The extracted information is compiled into a `ScrapingResult` object:
         -   `cleaned_html`: Contains an HTML-like representation of the PDF, where each page's content is often wrapped in a `<div>` with page number information.
         -   `media`: A dictionary where `media["images"]` will contain information about extracted images if `extract_images` was `True`.
-        -   `links`: A dictionary where `links["urls"]` can contain URLs found within the PDF content.
+        -   `links`: The URI link annotations found in the PDF, as `Link` items in `links.internal` (same domain as the PDF URL) and `links.external` (other domains, or every absolute link of a local PDF). Each target is listed once.
         -   `metadata`: A dictionary holding PDF metadata (e.g., title, author, num_pages).
 -   **`async ascrap(self, url: str, html: str, **kwargs) -> ScrapingResult`**:
     -   The asynchronous version of `scrap`. Under the hood, it typically runs the synchronous `scrap` method in a separate thread using `asyncio.to_thread` to avoid blocking the event loop.

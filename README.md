@@ -115,7 +115,7 @@ claude mcp add --transport http crawl4ai https://api.crawl4ai.com/mcp \
 
 ## Run Crawl4AI yourself
 
-**Latest: [v0.9.5](https://github.com/unclecode/crawl4ai/releases/tag/v0.9.5) (14 Oct 2026)** · [all releases →](https://github.com/unclecode/crawl4ai/releases)
+**Latest: [v0.9.6](https://github.com/unclecode/crawl4ai/releases/tag/v0.9.6) (20 Nov 2026)** · [all releases →](https://github.com/unclecode/crawl4ai/releases)
 
 
 ```bash
@@ -395,7 +395,7 @@ async def main():
         cache_mode=CacheMode.BYPASS,
         extraction_strategy=LLMExtractionStrategy(
             # any provider LiteLLM supports, e.g. "ollama/llama3.3" with api_token="no-token"
-            llm_config=LLMConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY")),
+            llm_config=LLMConfig(provider="openai/gpt-6-luna", api_token=os.getenv("OPENAI_API_KEY")),
             schema=ModelFee.model_json_schema(),
             extraction_type="schema",
             instruction="Extract every model name with its input and output token fee.",

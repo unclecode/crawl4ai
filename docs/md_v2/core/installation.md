@@ -98,16 +98,18 @@ This step caches large models locally (if needed). **Only do this** if your wo
 
 ---
 
-## 5. Docker (Experimental)
+## 5. Docker
 
-We provide a **temporary** Docker approach for testing. **It’s not stable and may break** with future releases. We plan a major Docker revamp in a future stable version, 2025 Q1. If you still want to try:
+The Docker server needs a token. Without one it answers only inside its container.
 
 ```bash
-docker pull unclecode/crawl4ai:basic
-docker run -p 11235:11235 unclecode/crawl4ai:basic
+export CRAWL4AI_API_TOKEN="$(openssl rand -hex 32)"
+docker run -d -p 11235:11235 --name crawl4ai --shm-size=1g \
+  -e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN" \
+  unclecode/crawl4ai:latest
 ```
 
-You can then make POST requests to `http://localhost:11235/crawl` to perform crawls. **Production usage** is discouraged until our new Docker approach is ready (planned in Jan or Feb 2025).
+Send the token with every request (`Authorization: Bearer $CRAWL4AI_API_TOKEN`). For LLM keys, MCP and all settings, see the [Self-hosting guide](self-hosting.md).
 
 ---
 

@@ -123,6 +123,7 @@ class MarkdownGenerationResult(BaseModel):
     references_markdown: str
     fit_markdown: Optional[str] = None
     fit_html: Optional[str] = None
+    _generation_failed: bool = PrivateAttr(default=False)
 
     def __str__(self):
         return self.raw_markdown
@@ -148,6 +149,7 @@ class CrawlResult(BaseModel):
     pdf: Optional[bytes] = None
     mhtml: Optional[str] = None
     _markdown: Optional[MarkdownGenerationResult] = PrivateAttr(default=None)
+    _processing_failed: bool = PrivateAttr(default=False)
     extracted_content: Optional[str] = None
     metadata: Optional[dict] = None
     error_message: Optional[str] = None

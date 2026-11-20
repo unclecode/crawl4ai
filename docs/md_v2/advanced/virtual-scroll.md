@@ -221,7 +221,7 @@ config = CrawlerRunConfig(
         scroll_count=20
     ),
     extraction_strategy=LLMExtractionStrategy(
-        llm_config=LLMConfig(provider="openai/gpt-4o-mini"),
+        llm_config=LLMConfig(provider="openai/gpt-6-luna"),
         schema=schema
     )
 )

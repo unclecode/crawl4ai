@@ -27,6 +27,7 @@ from crawl4ai import (
     CrawlResult,
 )
 from crawl4ai.async_configs import Provenance, UntrustedConfigError
+from crawl4ai.async_crawler_strategy import request_hooks
 from hook_registry import build_declarative_hooks, HookValidationError
 from llm_broker import LLMProviderNotAllowed
 from crawl4ai.utils import perform_completion_with_backoff
@@ -54,16 +55,18 @@ def _enqueue_job(background_tasks, factory, principal=None):
         )
 
 
-def _attach_declarative_hooks(crawler, hooks_config: dict) -> dict:
-    """Build and attach server-authored hooks from declarative specs.
+def _attach_declarative_hooks(hooks_config: Optional[dict]) -> dict:
+    """Build server-authored hooks from declarative specs and scope them to this
+    request. The crawler strategy is pooled and shared between callers, so the
+    hooks go in the request_hooks ContextVar, never on the strategy; a request
+    without hooks sets {} so it runs none.
 
     Raises HookValidationError on an unknown action / invalid params, which the
     handlers map to HTTP 400.
     """
-    specs = hooks_config.get("hooks", []) or []
-    hooks = build_declarative_hooks(specs)
-    for hook_point, fn in hooks.items():
-        crawler.crawler_strategy.set_hook(hook_point, fn)
+    specs = (hooks_config or {}).get("hooks", []) or []
+    hooks = build_declarative_hooks(specs) if specs else {}
+    request_hooks.set(hooks)
     return {"status": "success", "attached": list(hooks.keys())}
 from crawl4ai.content_filter_strategy import (
     PruningContentFilter,
@@ -764,6 +767,7 @@ async def handle_crawl_request(
     start_time = time.time()
     mem_delta_mb = None
     peak_mem_mb = start_mem_mb
+    end_status = 499  # if no branch below sets one, the client went away (cancelled)
 
     try:
         urls, refused = _normalize_and_validate_seeds(urls)
@@ -808,10 +812,9 @@ async def handle_crawl_request(
         else:
             crawler = await get_crawler(browser_config)
 
-        # Attach declarative hooks if provided
-        hooks_status = {}
+        # Scope declarative hooks to this request ({} when none were sent)
+        hooks_status = _attach_declarative_hooks(hooks_config)
         if hooks_config:
-            hooks_status = _attach_declarative_hooks(crawler, hooks_config)
             logger.info(f"Hooks attachment status: {hooks_status['status']}")
 
         # Build the config(s) to pass to arun/arun_many
@@ -932,11 +935,13 @@ async def handle_crawl_request(
 
     except asyncio.TimeoutError:
         # Per-crawl wall-clock deadline exceeded.
+        end_status = 504
         raise HTTPException(status_code=504, detail="Crawl exceeded the time limit")
 
-    except HTTPException:
+    except HTTPException as e:
         # Deliberate status (e.g. 400 SSRF "URL blocked") must pass through
         # rather than be genericized to 500 by the handler below.
+        end_status = e.status_code
         raise
 
     except Exception as e:
@@ -965,6 +970,16 @@ async def handle_crawl_request(
             })
         )
     finally:
+        # Every exit ends the monitor record; track_request_end ignores one
+        # already ended. Without this, rejected requests stayed "active" forever.
+        try:
+            from monitor import get_monitor
+            await get_monitor().track_request_end(
+                request_id, success=False, status_code=end_status,
+                error=f"request ended with HTTP {end_status}",
+            )
+        except Exception:
+            pass
         if crawler:
             if is_pdf_crawl:
                 await crawler.close()  # not pooled; release_crawler would be a no-op
@@ -1041,9 +1056,9 @@ async def handle_stream_crawl_request(
         else:
             crawler = await get_crawler(browser_config)
 
-        # Attach declarative hooks if provided
+        # Scope declarative hooks to this request ({} when none were sent)
+        hooks_status = _attach_declarative_hooks(hooks_config)
         if hooks_config:
-            hooks_status = _attach_declarative_hooks(crawler, hooks_config)
             logger.info(f"Hooks attachment status for streaming: {hooks_status['status']}")
             hooks_info = {'status': hooks_status}
 

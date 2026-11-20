@@ -12,6 +12,7 @@ import re
 import json
 from .types import LLMConfig, create_llm_config
 from .utils import perform_completion_with_backoff, sanitize_html
+from .config import DEFAULT_PROVIDER
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
@@ -765,7 +766,7 @@ Your output must conform to the following JSON schema (OpenAPI 3.0 format):
         if not self.llm_config:
             # Use default configuration if not provided
             self.llm_config = create_llm_config(
-                provider=os.getenv("DEFAULT_PROVIDER", "openai/gpt-4o-mini"),
+                provider=os.getenv("DEFAULT_PROVIDER", DEFAULT_PROVIDER),
                 api_token=os.getenv("OPENAI_API_KEY"),
             )
         

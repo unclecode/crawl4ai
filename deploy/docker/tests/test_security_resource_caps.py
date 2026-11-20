@@ -30,6 +30,77 @@ class TestBodySizeLimit:
         assert r.status_code != 413
 
 
+    def test_oversize_chunked_body_413(self, stock_client, server_module):
+        # Report 2026-11 (docker-chunked-body-limit): a chunked body has no
+        # Content-Length, and the middleware only checked that header.
+        from auth import create_access_token
+        h = {"Authorization": f"Bearer {create_access_token({'sub': 'u@x.com'})}",
+             "Content-Type": "application/json"}
+
+        def body():
+            yield b'{"urls":["https://example.com"],"pad":"'
+            for _ in range(11):
+                yield b"a" * (1024 * 1024)
+            yield b'"}'
+
+        r = stock_client.post("/crawl", content=body(), headers=h)
+        assert r.status_code == 413, r.status_code
+
+
+def _run_limited(max_bytes, chunks, headers=()):
+    """Drive BodySizeLimitMiddleware with a body sent as `chunks`.
+    Returns (status, bytes the app read)."""
+    import asyncio
+    from governor import BodySizeLimitMiddleware
+
+    read = []
+
+    async def app(scope, receive, send):
+        while True:
+            m = await receive()
+            if m["type"] == "http.disconnect":
+                return
+            read.append(m.get("body", b""))
+            if not m.get("more_body"):
+                break
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    msgs = [{"type": "http.request", "body": c, "more_body": i < len(chunks) - 1}
+            for i, c in enumerate(chunks)]
+    sent = []
+
+    async def receive():
+        return msgs.pop(0)
+
+    async def send(m):
+        sent.append(m)
+
+    scope = {"type": "http", "headers": [(k.encode(), v.encode()) for k, v in headers]}
+    asyncio.run(BodySizeLimitMiddleware(app, max_bytes=max_bytes)(scope, receive, send))
+    status = next(m["status"] for m in sent if m["type"] == "http.response.start")
+    return status, sum(map(len, read))
+
+
+class TestBodySizeLimitCountsBytes:
+    def test_body_at_the_limit_passes(self):
+        assert _run_limited(10, [b"12345", b"67890"]) == (200, 10)
+
+    def test_unknown_length_over_the_limit_413(self):
+        status, read = _run_limited(10, [b"12345", b"67890", b"1"])
+        assert status == 413 and read <= 10
+
+    def test_many_small_chunks_413(self):
+        status, read = _run_limited(10, [b"x"] * 50)
+        assert status == 413 and read <= 10
+
+    def test_declared_length_that_lies_413(self):
+        status, _ = _run_limited(10, [b"x" * 16], headers=[("content-length", "4")])
+        assert status == 413
+
+    def test_declared_oversize_rejected_before_reading(self):
+        assert _run_limited(10, [b"x" * 16], headers=[("content-length", "16")]) == (413, 0)
+
 class TestDeepCrawlClamp:
     def test_infinite_max_pages_clamped(self):
         from governor import clamp_deep_crawl, DEFAULT_MAX_PAGES

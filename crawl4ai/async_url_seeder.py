@@ -68,6 +68,12 @@ COLLINFO_URL = "https://index.commoncrawl.org/collinfo.json"
 # INDEX_CACHE = CACHE_DIR / "latest_cc_index.txt" # REMOVED: now managed by __init__
 TTL = timedelta(days=7)  # Keeping this constant as it's a seeder-specific TTL
 
+# Bounds on following sitemap indexes. A seeded site controls its own sitemaps,
+# so cycles, endless index chains and gzip bombs must not stall or exhaust us.
+_SITEMAP_MAX_DEPTH = 5                  # index -> index nesting levels
+_SITEMAP_MAX_FILES = 10_000             # sitemaps fetched per discovery run
+_SITEMAP_MAX_BYTES = 50 * 1024 * 1024   # per sitemap, raw and inflated (sitemaps.org limit)
+
 _meta_rx = re.compile(
     r'<meta\s+(?:[^>]*?(?:name|property|http-equiv)\s*=\s*["\']?([^"\' >]+)[^>]*?content\s*=\s*["\']?([^"\' >]+)[^>]*?)\/?>',
     re.I)
@@ -77,6 +83,19 @@ _link_rx = re.compile(
     r'<link\s+[^>]*rel=["\']?([^"\' >]+)[^>]*href=["\']?([^"\' >]+)', re.I)
 
 # ────────────────────────────────────────────────────────────────────────── helpers
+
+
+def _inflate_sitemap(url: str, content: bytes) -> bytes:
+    """Return the sitemap XML, gunzipping gzip content, refusing anything over _SITEMAP_MAX_BYTES."""
+    if len(content) > _SITEMAP_MAX_BYTES:
+        raise ValueError(f"sitemap larger than {_SITEMAP_MAX_BYTES} bytes")
+    if content[:2] != b"\x1f\x8b":
+        return content
+    with gzip.GzipFile(fileobj=io.BytesIO(content)) as g:
+        data = g.read(_SITEMAP_MAX_BYTES + 1)
+    if len(data) > _SITEMAP_MAX_BYTES:
+        raise ValueError(f"sitemap inflates past {_SITEMAP_MAX_BYTES} bytes")
+    return data
 
 
 def _parse_sitemap_lastmod(xml_content: bytes) -> Optional[str]:
@@ -930,12 +949,10 @@ class AsyncUrlSeeder:
                     sitemap_url = resolved
                     # Fetch sitemap content to get lastmod
                     try:
-                        r = await self.client.get(sitemap_url, timeout=15, follow_redirects=True)
-                        if 200 <= r.status_code < 300:
-                            sitemap_content = r.content
-                            sitemap_lastmod = _parse_sitemap_lastmod(sitemap_content)
+                        _, sitemap_content = await self._fetch_sitemap_body(sitemap_url)
+                        sitemap_lastmod = _parse_sitemap_lastmod(sitemap_content)
                     except Exception:
-                        pass
+                        sitemap_content = None
                     break
             if sitemap_url:
                 break
@@ -956,19 +973,20 @@ class AsyncUrlSeeder:
 
         # Step 3: Fetch fresh URLs
         discovered_urls = []
+        seen: set = set()  # sitemaps fetched in this run, shared by every entry point below
 
         if sitemap_url and sitemap_content:
             self._log("info", "Found sitemap at {url}", params={"url": sitemap_url}, tag="URL_SEED")
 
             # Parse sitemap (reuse content we already fetched)
-            async for u in self._iter_sitemap_content(sitemap_url, sitemap_content):
+            async for u in self._iter_sitemap_content(sitemap_url, sitemap_content, _seen=seen):
                 discovered_urls.append(u)
                 if _match(u, pattern):
                     yield u
         elif sitemap_url:
             # We have a sitemap URL but no content (fetch failed earlier), try again
             self._log("info", "Found sitemap at {url}", params={"url": sitemap_url}, tag="URL_SEED")
-            async for u in self._iter_sitemap(sitemap_url):
+            async for u in self._iter_sitemap(sitemap_url, _seen=seen):
                 discovered_urls.append(u)
                 if _match(u, pattern):
                     yield u
@@ -982,7 +1000,7 @@ class AsyncUrlSeeder:
                                      for l in r.text.splitlines()
                                      if l.lower().startswith("sitemap:")]
                     for sm in sitemap_lines:
-                        async for u in self._iter_sitemap(sm):
+                        async for u in self._iter_sitemap(sm, _seen=seen):
                             discovered_urls.append(u)
                             if _match(u, pattern):
                                 yield u
@@ -1001,9 +1019,50 @@ class AsyncUrlSeeder:
             self._log("info", "Cached {count} URLs for {d}",
                       params={"count": len(discovered_urls), "d": domain}, tag="URL_SEED")
 
-    async def _iter_sitemap_content(self, url: str, content: bytes):
+    def _claim_sitemap(self, url: str, seen: set) -> bool:
+        """Record url as fetched in this run. False if already fetched or over budget."""
+        if url in seen:
+            return False
+        if len(seen) >= _SITEMAP_MAX_FILES:
+            self._log("warning", "Sitemap budget of {n} files reached, skipping {url}",
+                      params={"n": _SITEMAP_MAX_FILES, "url": url}, tag="URL_SEED")
+            return False
+        seen.add(url)
+        return True
+
+    def _may_follow_index(self, url: str, depth: int) -> bool:
+        if depth < _SITEMAP_MAX_DEPTH:
+            return True
+        self._log("warning", "Sitemap index {url} nested deeper than {d} levels, not followed",
+                  params={"url": url, "d": _SITEMAP_MAX_DEPTH}, tag="URL_SEED")
+        return False
+
+    async def _fetch_sitemap_body(self, url: str):
+        """GET a sitemap, streaming so no body past _SITEMAP_MAX_BYTES is ever held.
+
+        The cap applies after Content-Encoding is decoded. Returns (final_url, raw_bytes).
+        """
+        async with self.client.stream("GET", url, timeout=15, follow_redirects=True) as r:
+            r.raise_for_status()
+            body = bytearray()
+            async for chunk in r.aiter_bytes():
+                body += chunk
+                if len(body) > _SITEMAP_MAX_BYTES:
+                    raise ValueError(f"sitemap larger than {_SITEMAP_MAX_BYTES} bytes")
+            return str(r.url), bytes(body)
+
+    async def _iter_sitemap_content(self, url: str, content: bytes,
+                                    _seen: Optional[set] = None, _depth: int = 0):
         """Parse sitemap from already-fetched content."""
-        data = gzip.decompress(content) if url.endswith(".gz") else content
+        seen = set() if _seen is None else _seen
+        if not self._claim_sitemap(url, seen):
+            return
+        try:
+            data = _inflate_sitemap(url, content)
+        except Exception as e:
+            self._log("warning", "Refusing sitemap {url}: {error}",
+                      params={"url": url, "error": str(e)}, tag="URL_SEED")
+            return
         base_url = url
 
         def _normalize_loc(raw: Optional[str]) -> Optional[str]:
@@ -1075,6 +1134,8 @@ class AsyncUrlSeeder:
 
         # Process based on type
         if is_sitemap_index and sub_sitemaps:
+            if not self._may_follow_index(url, _depth):
+                return
             self._log("info", "Processing sitemap index with {count} sub-sitemaps",
                       params={"count": len(sub_sitemaps)}, tag="URL_SEED")
 
@@ -1085,7 +1146,7 @@ class AsyncUrlSeeder:
 
             async def process_subsitemap(sitemap_url: str):
                 try:
-                    async for u in self._iter_sitemap(sitemap_url):
+                    async for u in self._iter_sitemap(sitemap_url, _seen=seen, _depth=_depth + 1):
                         await result_queue.put(u)
                 except Exception as e:
                     self._log("error", "Error processing sub-sitemap {url}: {error}",
@@ -1107,10 +1168,13 @@ class AsyncUrlSeeder:
             for u in regular_urls:
                 yield u
 
-    async def _iter_sitemap(self, url: str):
+    async def _iter_sitemap(self, url: str, _seen: Optional[set] = None, _depth: int = 0):
+        seen = set() if _seen is None else _seen
+        if not self._claim_sitemap(url, seen):
+            return
         try:
-            r = await self.client.get(url, timeout=15, follow_redirects=True)
-            r.raise_for_status()
+            base_url, content = await self._fetch_sitemap_body(url)
+            data = _inflate_sitemap(url, content)
         except httpx.HTTPStatusError as e:
             self._log("warning", "Failed to fetch sitemap {url}: HTTP {status_code}",
                       params={"url": url, "status_code": e.response.status_code}, tag="URL_SEED")
@@ -1124,8 +1188,6 @@ class AsyncUrlSeeder:
                       params={"url": url, "error": str(e)}, tag="URL_SEED")
             return
 
-        data = gzip.decompress(r.content) if url.endswith(".gz") else r.content
-        base_url = str(r.url)
 
         def _normalize_loc(raw: Optional[str]) -> Optional[str]:
             if not raw:
@@ -1239,6 +1301,8 @@ class AsyncUrlSeeder:
 
         # Process based on type
         if is_sitemap_index and sub_sitemaps:
+            if not self._may_follow_index(url, _depth):
+                return
             self._log("info", "Processing sitemap index with {count} sub-sitemaps in parallel",
                       params={"count": len(sub_sitemaps)}, tag="URL_SEED")
 
@@ -1254,7 +1318,7 @@ class AsyncUrlSeeder:
                     self._log(
                         "debug", "Processing sub-sitemap: {url}", params={"url": sitemap_url}, tag="URL_SEED")
                     # Recursively process sub-sitemap
-                    async for u in self._iter_sitemap(sitemap_url):
+                    async for u in self._iter_sitemap(sitemap_url, _seen=seen, _depth=_depth + 1):
                         await result_queue.put(u)  # Will block if queue is full
                 except Exception as e:
                     self._log("error", "Error processing sub-sitemap {url}: {error}",

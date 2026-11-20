@@ -19,21 +19,15 @@ We take security vulnerabilities seriously. If you discover a security issue, pl
 
 **DO NOT** open a public GitHub issue for security vulnerabilities.
 
-Instead, please report via one of these methods:
+Instead, report it by email:
 
-1. **GitHub Security Advisories (Preferred)**
-   - Go to [Security Advisories](https://github.com/unclecode/crawl4ai/security/advisories)
-   - Click "New draft security advisory"
-   - Fill in the details
-
-2. **Email**
-   - Send details to: unclecode@crawl4ai.com (CC: nasrin@crawl4ai.com)
-   - Use subject: `[SECURITY] Brief description`
-   - Include:
-     - Description of the vulnerability
-     - Steps to reproduce
-     - Potential impact
-     - Any suggested fixes
+- Send details to: unclecode@crawl4ai.com (CC: nasrin@crawl4ai.com)
+- Use subject: `[SECURITY] Brief description`
+- Include:
+  - Description of the vulnerability
+  - Steps to reproduce
+  - Potential impact
+  - Any suggested fixes
 
 ### What to Expect
 
@@ -95,6 +89,22 @@ When using Crawl4AI as a Python library:
 ## Known Security Issues
 
 All issues below are fixed in the version named. Advisories with a GHSA id are published under [Security Advisories](https://github.com/unclecode/crawl4ai/security/advisories). Full detail for every release is in [CHANGELOG.md](CHANGELOG.md); reporter credits are in [SECURITY-CREDITS.md](SECURITY-CREDITS.md).
+
+### Fixed in v0.9.6 (2026-11-20)
+
+| ID | Severity | Component | Description | Fix |
+|----|----------|-----------|-------------|-----|
+| GHSA-qwxw-87g2-26vm | MEDIUM | Library + Docker API | SSRF via URL userinfo in the TLS certificate fetch bypasses the egress check (CWE-918) | Fetch dials the real host, through the egress proxy |
+| GHSA-9xxj-3r64-qw54 | MEDIUM | Docker API | One browser context shared between API clients, leaking cookies and site storage (CWE-488) | Each caller gets its own context; `browser_mode` refused from untrusted bodies |
+| GHSA-8696-2734-9jqw | MEDIUM | Docker API | ReDoS gate bypass via list-form schema field `type` (incomplete fix of GHSA-j843-8p47-rhxp) (CWE-1333) | List-form types with a `regex` step refused from untrusted bodies |
+| GHSA-phmg-6873-j3gj | HIGH | Library + Docker image | Vulnerable Brotli decoder (CVE-2026-111497) allowed by the dependency range and shipped in the Docker image (CWE-787) | Floors raised to `brotli>=1.2.1`, `playwright>=1.64.1`, `patchright>=1.64.2` |
+| GHSA-jfhw-vrxg-wpcw | MEDIUM | Docker API | Memory exhaustion via unchecked `DefaultMarkdownGenerator` options in untrusted bodies (CWE-915) | Untrusted bodies may set only known boolean options and `body_width` (max 10,000) |
+| GHSA-8x85-mx8f-wj4v | MEDIUM | Library | Unbounded sitemap index following in `AsyncUrlSeeder`: cycles, depth, gzip bombs (CWE-674) | Each sitemap followed once; max 5 levels, 10,000 files, 50 MB raw and inflated |
+| GHSA-x4gh-gvcx-p9gp | MEDIUM | Docker API | One caller's declarative hooks kept on the pooled crawler for later callers (CWE-668) | Hooks scoped to the request that sent them |
+| GHSA-3q59-v69g-m9vc | MEDIUM | Docker API | Request-size limit skipped chunked bodies (CWE-770) | Received bytes counted; 413 past `limits.max_body_bytes` |
+| GHSA-363x-fqh9-cvp2 | MEDIUM | Docker API | `fetch_ssl_certificate` blocked the event loop (CWE-400) | Fetch runs in a thread |
+| GHSA-2prc-jrcf-ccrm | LOW | Docker API | Rejected `/crawl` requests stayed in the active-request monitor forever (CWE-401) | Records end on every exit; monitor reads admin-only |
+| GHSA-7628-8pmq-4xhq | MEDIUM | Docker API | Unbounded `screenshot_wait_for` let 40 requests hold every browser page (CWE-770) | Capped at 60 seconds; `/screenshot` uses the untrusted loader |
 
 ### Fixed in v0.9.5 (2026-10-14)
 

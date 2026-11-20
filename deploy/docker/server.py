@@ -759,7 +759,12 @@ async def generate_screenshot(
     legacy_output_path = body.model_dump(include={"output_path"}).get("output_path")
     crawler = None
     try:
-        cfg = CrawlerRunConfig(screenshot=True, screenshot_wait_for=body.screenshot_wait_for, wait_for_images=body.wait_for_images)
+        # Untrusted load, so screenshot_wait_for gets the same cap as every other delay.
+        cfg = CrawlerRunConfig.load(
+            {"screenshot": True, "screenshot_wait_for": body.screenshot_wait_for,
+             "wait_for_images": body.wait_for_images},
+            provenance=Provenance.UNTRUSTED,
+        )
         crawler = await get_crawler(get_default_browser_config())
         results = await crawler.arun(url=body.url, config=cfg)
         if not results[0].success:
@@ -902,7 +907,7 @@ async def llm_endpoint(
     request: Request,
     url: str = Path(...),
     q: str = Query(...),
-    provider: Optional[str] = Query(None, description="LLM provider override, e.g. 'openai/gpt-4o-mini'"),
+    provider: Optional[str] = Query(None, description="LLM provider override, e.g. 'openai/gpt-6-luna'"),
     temperature: Optional[float] = Query(None, description="LLM temperature override"),
     _td: Dict = Depends(token_dep),
 ):

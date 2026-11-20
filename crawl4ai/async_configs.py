@@ -18,7 +18,7 @@ from .config import (
     SOCIAL_MEDIA_DOMAINS,
 )
 
-from .user_agent_generator import UAGen, ValidUAGenerator  # , OnlineUAGenerator
+from .user_agent_generator import UAGen, ValidUAGenerator, DEFAULT_USER_AGENT  # , OnlineUAGenerator
 from .extraction_strategy import ExtractionStrategy, LLMExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 
@@ -257,7 +257,10 @@ _SCHEMA_STRATEGIES = {
 
 def _has_regex_field(node) -> bool:
     if isinstance(node, dict):
-        return node.get("type") == "regex" or any(_has_regex_field(v) for v in node.values())
+        # The extractor also runs "type" as a list of steps (["text", "regex"]).
+        steps = node.get("type")
+        steps = steps if isinstance(steps, list) else [steps]
+        return "regex" in steps or any(_has_regex_field(v) for v in node.values())
     if isinstance(node, list):
         return any(_has_regex_field(v) for v in node)
     return False
@@ -333,16 +336,34 @@ UNTRUSTED_FIELD_ALLOWLIST = {
 # Upper bounds applied to attacker-influenced quantities after filtering.
 _DEFAULT_MAX_TIMEOUT_MS = 60_000
 _MAX_SCROLL_STEPS = 1000
-_MAX_DELAY_SECONDS = 60  # ceiling for delay_before_return_html / mean_delay / max_range
+_MAX_DELAY_SECONDS = 60  # ceiling for the untrusted delay fields (_delay_defaults below)
 _MAX_VIEWPORT = 4000
 _MAX_PDF_BYTES = 100 * 1024 * 1024
 _MAX_PDF_PAGES = 2000
+_MAX_PDF_SECONDS = 300
+_MAX_PDF_BATCH_SIZE = 4  # the class default; one thread per batch slot
+_MAX_PDF_REDIRECTS = 5   # the class default
 _MAX_LINK_PREVIEW_LINKS = 100      # the class default
 _MAX_LINK_PREVIEW_CONCURRENCY = 10  # the class default
 _MAX_LINK_PREVIEW_TIMEOUT_S = 10    # seconds here, not ms
 _MAX_DEEP_CRAWL_LIST = 100          # patterns, keywords, filters, scorers per object
 _MAX_DEEP_CRAWL_OBJECTS = 20        # filters and scorers in one strategy
 _MAX_DEEP_CRAWL_ITEMS = 200         # list and dict items (patterns, keywords, ...) in one strategy
+_MAX_MARKDOWN_BODY_WIDTH = 10_000
+
+# html2text options an untrusted body may set on DefaultMarkdownGenerator.
+# update_params() setattr()s every key, so anything else reaches html2text's
+# internal state (the blockquote depth turns a tiny page into gigabytes).
+# Booleans only, plus body_width; string options are repeated per element.
+_UNTRUSTED_MARKDOWN_BOOL_OPTIONS = {
+    "ignore_links", "ignore_images", "ignore_emphasis", "ignore_mailto_links",
+    "ignore_tables", "bypass_tables", "escape_html", "escape_snob",
+    "skip_internal_links", "inline_links", "protect_links", "single_line_break",
+    "mark_code", "include_sup_sub", "images_as_html", "images_to_alt",
+    "images_with_size", "use_automatic_links", "hide_strikethrough",
+    "wrap_links", "wrap_list_items", "wrap_tables", "pad_tables",
+    "links_each_paragraph", "handle_code_in_pre", "citations",
+}
 
 
 def _max_timeout_ms() -> int:
@@ -471,11 +492,13 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
             return min(_DEFAULT_MAX_TIMEOUT_MS, ceiling)
         return min(int(v), ceiling)
 
-    # delay_before_return_html is held with a browser page open; mean_delay and
-    # max_range seed the arun_many rate limiter. All three are seconds, not ms,
-    # so they get their own cap rather than reusing the ms timeout ceiling.
+    # delay_before_return_html and screenshot_wait_for are held with a browser
+    # page open; mean_delay and max_range seed the arun_many rate limiter. All
+    # are seconds, not ms, so they get their own cap rather than reusing the ms
+    # timeout ceiling.
     _delay_defaults = {
         "delay_before_return_html": 0.1,
+        "screenshot_wait_for": None,
         "mean_delay": 0.1,
         "max_range": 0.3,
     }
@@ -511,14 +534,32 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
         for f in ("viewport_width", "viewport_height"):
             if isinstance(params.get(f), int):
                 params[f] = max(1, min(params[f], _MAX_VIEWPORT))
+        # Every other mode is a managed browser, whose shared default context
+        # would put callers' cookies and storage in one place.
+        if "browser_mode" in params and params["browser_mode"] != "dedicated":
+            raise UntrustedConfigError(
+                "browser_mode other than 'dedicated' is not permitted from an untrusted request"
+            )
     elif type_name == "PDFContentScrapingStrategy":
         # This class has no field allowlist, so without clamping a body could
         # simply raise its own caps back to unbounded and re-open the DoS.
-        for f, cap in (("max_pdf_bytes", _MAX_PDF_BYTES), ("max_pdf_pages", _MAX_PDF_PAGES)):
+        for f, cap in (
+            ("max_pdf_bytes", _MAX_PDF_BYTES),
+            ("max_pdf_pages", _MAX_PDF_PAGES),
+            ("max_pdf_seconds", _MAX_PDF_SECONDS),
+        ):
             if f in params:
                 v = params[f]
                 # <=0 or non-int would read as "no limit"; pin to the cap.
                 params[f] = cap if not isinstance(v, int) or v <= 0 else min(v, cap)
+        # batch_size is the page pool's thread count; max_redirects is how many
+        # real requests one URL may trigger. Malformed values get the cap.
+        for f, cap, floor in (("batch_size", _MAX_PDF_BATCH_SIZE, 1),
+                              ("max_redirects", _MAX_PDF_REDIRECTS, 0)):
+            if f in params:
+                v = params[f]
+                ok = isinstance(v, int) and not isinstance(v, bool) and v >= floor
+                params[f] = min(v, cap) if ok else cap
         # Rasterizing every page is the most expensive thing this strategy can
         # do, and nothing about untrusted crawling needs it.
         params["extract_images"] = False
@@ -540,6 +581,28 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
             if f in params:
                 v = params[f]
                 params[f] = cap if not isinstance(v, int) or v <= 0 else min(v, cap)
+    elif type_name == "DefaultMarkdownGenerator" and "options" in params:
+        options = params["options"]
+        # SDK clients send the dict wrapped: {"type": "dict", "value": {...}}
+        if isinstance(options, dict) and options.get("type") == "dict" and "value" in options:
+            options = options["value"]
+        if options is not None and not isinstance(options, dict):
+            raise UntrustedConfigError(
+                "DefaultMarkdownGenerator options must be a dict in an untrusted request"
+            )
+        for key, value in (options or {}).items():
+            if key == "body_width":
+                ok = value is None or (
+                    isinstance(value, int) and not isinstance(value, bool)
+                    and 0 <= value <= _MAX_MARKDOWN_BODY_WIDTH
+                )
+            else:
+                ok = key in _UNTRUSTED_MARKDOWN_BOOL_OPTIONS and isinstance(value, bool)
+            if not ok:
+                raise UntrustedConfigError(
+                    f"DefaultMarkdownGenerator option '{key}'={value!r} is not "
+                    "permitted from an untrusted request"
+                )
     return params
 
 
@@ -1010,8 +1073,8 @@ class BrowserConfig:
                         Default: [].
         headers (dict): Extra HTTP headers to apply to all requests in this context.
                         Default: {}.
-        user_agent (str): Custom User-Agent string to use. Default: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                           "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36".
+        user_agent (str): Custom User-Agent string to use. An empty string keeps the browser's own
+                           User-Agent. Default: DEFAULT_USER_AGENT (a Linux Chrome User-Agent).
         user_agent_mode (str or None): Mode for generating the user agent (e.g., "random"). If None, use the provided
                                        user_agent as-is. Default: None.
         user_agent_generator_config (dict or None): Configuration for user agent generation if user_agent_mode is set.
@@ -1074,7 +1137,7 @@ class BrowserConfig:
             # "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) AppleWebKit/537.36 "
             # "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
             # "(KHTML, like Gecko) Chrome/116.0.5845.187 Safari/604.1 Edg/117.0.2045.47"
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36"
+            DEFAULT_USER_AGENT
         ),
         user_agent_mode: str = "",
         user_agent_generator_config: dict = {},
@@ -1166,7 +1229,8 @@ class BrowserConfig:
             pass
 
         self.browser_hint = UAGen.generate_client_hints(self.user_agent)
-        self.headers.setdefault("sec-ch-ua", self.browser_hint)
+        if self.browser_hint:
+            self.headers.setdefault("sec-ch-ua", self.browser_hint)
 
         # Set appropriate browser management flags based on browser_mode
         if self.browser_mode == "builtin":
@@ -1274,7 +1338,14 @@ class BrowserConfig:
     # Create a funciton returns dict of the object
     def dump(self) -> dict:
         # Serialize the object to a dictionary
-        return to_serializable_dict(self)
+        data = to_serializable_dict(self)
+        # __init__ re-adds the auto sec-ch-ua on load; drop it, the server rejects `headers`.
+        headers = data["params"].get("headers") if data else None
+        if isinstance(headers, dict) and headers["value"].get("sec-ch-ua") == self.browser_hint:
+            del headers["value"]["sec-ch-ua"]
+            if not headers["value"]:
+                del data["params"]["headers"]
+        return data
 
     @staticmethod
     def load(data: dict, provenance: "Provenance" = None) -> "BrowserConfig":
@@ -2398,6 +2469,8 @@ class CrawlerRunConfig():
             "disable_cache": self.disable_cache,
             "no_cache_read": self.no_cache_read,
             "no_cache_write": self.no_cache_write,
+            "check_cache_freshness": self.check_cache_freshness,
+            "cache_validation_timeout": self.cache_validation_timeout,
             "shared_data": self.shared_data,
             "wait_until": self.wait_until,
             "page_timeout": self.page_timeout,
@@ -2424,9 +2497,11 @@ class CrawlerRunConfig():
             "override_navigator": self.override_navigator,
             "magic": self.magic,
             "adjust_viewport_to_content": self.adjust_viewport_to_content,
+            "virtual_scroll_config": self.virtual_scroll_config,
             "screenshot": self.screenshot,
             "screenshot_wait_for": self.screenshot_wait_for,
             "screenshot_height_threshold": self.screenshot_height_threshold,
+            "force_viewport_screenshot": self.force_viewport_screenshot,
             "pdf": self.pdf,
             "capture_mhtml": self.capture_mhtml,
             "image_description_min_word_threshold": self.image_description_min_word_threshold,
@@ -2461,6 +2536,8 @@ class CrawlerRunConfig():
             "match_mode": self.match_mode,
             "experimental": self.experimental,
             "max_retries": self.max_retries,
+            "fallback_fetch_function": self.fallback_fetch_function,
+            "base_url": self.base_url,
         }
 
     def clone(self, **kwargs):

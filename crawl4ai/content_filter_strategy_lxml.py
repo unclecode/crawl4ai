@@ -192,8 +192,13 @@ class PruningContentFilterLXML(PruningContentFilter):
         stack = [body]
         while stack:
             node = stack.pop()
+            in_sentence = bool((node.text or "").strip()) or any(
+                (c.tail or "").strip() for c in node
+            )
             for child in list(node):
                 if not isinstance(child.tag, str):
+                    continue
+                if in_sentence and child.tag in self.inline_tags:
                     continue
                 child_metrics = metrics.get(child)
                 if child_metrics is None or self._should_remove(child, child_metrics, metrics):

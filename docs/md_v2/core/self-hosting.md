@@ -122,7 +122,7 @@ ANTHROPIC_API_KEY=your-anthropic-key
 # GEMINI_API_TOKEN=your-gemini-token
 
 # Optional: Global LLM settings
-# LLM_PROVIDER=openai/gpt-4o-mini
+# LLM_PROVIDER=openai/gpt-6-luna
 # LLM_TEMPERATURE=0.7
 # LLM_BASE_URL=https://api.custom.com/v1
 
@@ -283,7 +283,7 @@ The Docker setup now supports flexible LLM provider configuration through a hier
    LLM_BASE_URL=https://api.proxy.com/v1
    ```
 
-4. **Config File Default**: Falls back to `config.yml` (default: `openai/gpt-4o-mini`)
+4. **Config File Default**: Falls back to `config.yml` (default: `openai/gpt-6-luna`)
 
 The system automatically selects the appropriate API key based on the provider. LiteLLM handles finding the correct environment variable for each provider (e.g., OPENAI_API_KEY for OpenAI, GEMINI_API_TOKEN for Google Gemini, etc.).
 
@@ -421,7 +421,8 @@ You can add Crawl4AI as an MCP tool provider in Claude Code with a simple comman
 
 ```bash
 # Add the Crawl4AI server as an MCP provider
-claude mcp add --transport sse c4ai-sse http://localhost:11235/mcp/sse
+claude mcp add --transport sse c4ai-sse http://localhost:11235/mcp/sse \
+  --header "Authorization: Bearer $CRAWL4AI_API_TOKEN"
 
 # List all MCP providers to verify it was added
 claude mcp list
@@ -735,7 +736,7 @@ Submit an asynchronous LLM extraction job with optional webhook notification.
 {
   "url": "https://example.com/article",
   "q": "Extract the article title, author, publication date, and main points",
-  "provider": "openai/gpt-4o-mini",
+  "provider": "openai/gpt-6-luna",
   "schema": "{\"title\": \"string\", \"author\": \"string\", \"date\": \"string\", \"points\": [\"string\"]}",
   "cache": false,
   "webhook_config": {
@@ -936,7 +937,7 @@ def submit_llm_job_with_webhook():
         json={
             "url": "https://example.com/article",
             "q": "Extract the article title, author, and main points",
-            "provider": "openai/gpt-4o-mini",
+            "provider": "openai/gpt-6-luna",
             "webhook_config": {
                 "webhook_url": "https://your-app.com/webhook/llm-complete",
                 "webhook_data_in_payload": True,
@@ -2064,7 +2065,7 @@ app:
 
 # Default LLM Configuration
 llm:
-  provider: "openai/gpt-4o-mini"  # Can be overridden by LLM_PROVIDER env var
+  provider: "openai/gpt-6-luna"  # Can be overridden by LLM_PROVIDER env var
   # api_key: sk-...  # If you pass the API key directly (not recommended)
   # temperature and base_url are controlled via environment variables or request parameters
 
@@ -2198,7 +2199,7 @@ We're here to help you succeed with Crawl4AI! Here's how to get support:
 
 - 📖 Check our [full documentation](https://docs.crawl4ai.com)
 - 🐛 Found a bug? [Open an issue](https://github.com/unclecode/crawl4ai/issues)
-- 💬 Join our [Discord community](https://discord.gg/crawl4ai)
+- 💬 Join our [Discord community](https://discord.gg/jP8KfhDhyN)
 - ⭐ Star us on GitHub to show support!
 
 ## Summary

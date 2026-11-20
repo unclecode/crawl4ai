@@ -82,12 +82,15 @@ If errors occur, rerun `crawl4ai-doctor` or manually ensure Playwright is instal
 ```bash
 crawl4ai-download-models
 ```
-## 5. Docker (Experimental)
+## 5. Docker
+The Docker server needs a token. Without one it answers only inside its container.
 ```bash
-docker pull unclecode/crawl4ai:basic
-docker run -p 11235:11235 unclecode/crawl4ai:basic
+export CRAWL4AI_API_TOKEN="$(openssl rand -hex 32)"
+docker run -d -p 11235:11235 --name crawl4ai --shm-size=1g \
+  -e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN" \
+  unclecode/crawl4ai:latest
 ```
-You can then make POST requests to `http://localhost:11235/crawl` to perform crawls. **Production usage** is discouraged until our new Docker approach is ready (planned in Jan or Feb 2025).
+Send the token with every request (`Authorization: Bearer $CRAWL4AI_API_TOKEN`). For LLM keys, MCP and all settings, see the [Self-hosting guide](core/self-hosting.md).
 ## 6. Local Server Mode (Legacy)
 ## Summary
 1. **Install** with `pip install crawl4ai` and run `crawl4ai-setup`.
@@ -184,7 +187,7 @@ html = "<div class='product'><h2>Gaming Laptop</h2><span class='price'>$999.99</
 # Using OpenAI (requires API token)
 schema = JsonCssExtractionStrategy.generate_schema(
     html,
-    llm_config = LLMConfig(provider="openai/gpt-4o",api_token="your-openai-token")  # Required for OpenAI
+    llm_config = LLMConfig(provider="openai/gpt-6-luna",api_token="your-openai-token")  # Required for OpenAI
 )
 
 # Or using Ollama (open source, no token needed)
@@ -292,7 +295,7 @@ if __name__ == "__main__":
 
     asyncio.run(
         extract_structured_data_using_llm(
-            provider="openai/gpt-4o", api_token=os.getenv("OPENAI_API_KEY")
+            provider="openai/gpt-6-luna", api_token=os.getenv("OPENAI_API_KEY")
         )
     )
 ```
@@ -1593,7 +1596,7 @@ The `clone()` method:
 ### Key fields to note
 1. **`provider`**:  
 - Which LLM provider to use. 
-- Possible values are `"ollama/llama3","groq/llama3-70b-8192","groq/llama3-8b-8192", "openai/gpt-4o-mini" ,"openai/gpt-4o","openai/o1-mini","openai/o1-preview","openai/o3-mini","openai/o3-mini-high","anthropic/claude-3-haiku-20240307","anthropic/claude-3-opus-20240229","anthropic/claude-3-sonnet-20240229","anthropic/claude-3-5-sonnet-20240620","gemini/gemini-pro","gemini/gemini-1.5-pro","gemini/gemini-2.0-flash","gemini/gemini-2.0-flash-exp","gemini/gemini-2.0-flash-lite-preview-02-05","deepseek/deepseek-chat"`<br/>*(default: `"openai/gpt-4o-mini"`)*
+- Possible values are `"ollama/llama3","groq/llama3-70b-8192","groq/llama3-8b-8192", "openai/gpt-6-luna","anthropic/claude-3-haiku-20240307","anthropic/claude-3-opus-20240229","anthropic/claude-3-sonnet-20240229","anthropic/claude-3-5-sonnet-20240620","gemini/gemini-pro","gemini/gemini-1.5-pro","gemini/gemini-2.0-flash","gemini/gemini-2.0-flash-exp","gemini/gemini-2.0-flash-lite-preview-02-05","deepseek/deepseek-chat"`<br/>*(default: `"openai/gpt-6-luna"`)*
 2. **`api_token`**:  
     - Optional. When not provided explicitly, api_token will be read from environment variables based on provider. For example: If a gemini model is passed as provider then,`"GEMINI_API_KEY"` will be read from environment variables  
     - API token of LLM provider <br/> eg: `api_token = "gsk_1ClHGGJ7Lpn4WGybR7vNWGdyb3FY7zXEw3SCiy0BAVM9lL8CQv"`
@@ -1608,7 +1611,7 @@ The `clone()` method:
    - Because these plug into Crawl4AI’s retry helper, every LLM strategy automatically follows the pacing you define here.
 ```python
 llm_config = LLMConfig(
-    provider="openai/gpt-4o-mini",
+    provider="openai/gpt-6-luna",
     api_token=os.getenv("OPENAI_API_KEY"),
     backoff_base_delay=1, # optional
     backoff_max_attempts=5, # optional
@@ -1988,12 +1991,12 @@ run_config = CrawlerRunConfig(
 ## 3.1 Parameters
 | **Parameter**         | **Type / Default**                     | **What It Does**                                                                                                                     |
 |-----------------------|----------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| **`provider`**    | `"ollama/llama3","groq/llama3-70b-8192","groq/llama3-8b-8192", "openai/gpt-4o-mini" ,"openai/gpt-4o","openai/o1-mini","openai/o1-preview","openai/o3-mini","openai/o3-mini-high","anthropic/claude-3-haiku-20240307","anthropic/claude-3-opus-20240229","anthropic/claude-3-sonnet-20240229","anthropic/claude-3-5-sonnet-20240620","gemini/gemini-pro","gemini/gemini-1.5-pro","gemini/gemini-2.0-flash","gemini/gemini-2.0-flash-exp","gemini/gemini-2.0-flash-lite-preview-02-05","deepseek/deepseek-chat"`<br/>*(default: `"openai/gpt-4o-mini"`)* | Which LLM provider to use. 
+| **`provider`**    | `"ollama/llama3","groq/llama3-70b-8192","groq/llama3-8b-8192", "openai/gpt-6-luna","anthropic/claude-3-haiku-20240307","anthropic/claude-3-opus-20240229","anthropic/claude-3-sonnet-20240229","anthropic/claude-3-5-sonnet-20240620","gemini/gemini-pro","gemini/gemini-1.5-pro","gemini/gemini-2.0-flash","gemini/gemini-2.0-flash-exp","gemini/gemini-2.0-flash-lite-preview-02-05","deepseek/deepseek-chat"`<br/>*(default: `"openai/gpt-6-luna"`)* | Which LLM provider to use. 
 | **`api_token`**         |1.Optional. When not provided explicitly, api_token will be read from environment variables based on provider. For example: If a gemini model is passed as provider then,`"GEMINI_API_KEY"` will be read from environment variables  <br/> 2. API token of LLM provider <br/> eg: `api_token = "gsk_1ClHGGJ7Lpn4WGybR7vNWGdyb3FY7zXEw3SCiy0BAVM9lL8CQv"` <br/> 3. Environment variable - use with prefix "env:" <br/> eg:`api_token = "env: GROQ_API_KEY"`              | API token to use for the given provider 
 | **`base_url`**         |Optional. Custom API endpoint | If your provider has a custom endpoint
 ## 3.2 Example Usage
 ```python
-llm_config = LLMConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY"))
+llm_config = LLMConfig(provider="openai/gpt-6-luna", api_token=os.getenv("OPENAI_API_KEY"))
 ```
 ## 4. Putting It All Together
 - **Use** `BrowserConfig` for **global** browser settings: engine, headless, proxy, user agent.  
@@ -2319,7 +2322,7 @@ from crawl4ai.content_filter_strategy import LLMContentFilter
 async def main():
     # Initialize LLM filter with specific instruction
     filter = LLMContentFilter(
-        llm_config = LLMConfig(provider="openai/gpt-4o",api_token="your-api-token"), #or use environment variable
+        llm_config = LLMConfig(provider="openai/gpt-6-luna",api_token="your-api-token"), #or use environment variable
         instruction="""
         Focus on extracting the core educational content.
         Include:
@@ -4411,7 +4414,7 @@ async def extract_with_generated_pattern():
 
         # Configure LLM
         llm_config = LLMConfig(
-            provider="openai/gpt-4o-mini",
+            provider="openai/gpt-6-luna",
             api_token="env:OPENAI_API_KEY",
         )
 
@@ -4538,7 +4541,7 @@ html = """
 css_schema = JsonCssExtractionStrategy.generate_schema(
     html,
     schema_type="css", 
-    llm_config = LLMConfig(provider="openai/gpt-4o",api_token="your-openai-token")
+    llm_config = LLMConfig(provider="openai/gpt-6-luna",api_token="your-openai-token")
 )
 
 # Option 2: Using Ollama (open source, no token needed)
@@ -4595,9 +4598,9 @@ With Crawl4AI's LLM-free extraction strategies - `JsonCssExtractionStrategy`, `J
 ## 1. Why Use an LLM?
 ## 2. Provider-Agnostic via LiteLLM
 ```python
-llmConfig = LlmConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY"))
+llmConfig = LlmConfig(provider="openai/gpt-6-luna", api_token=os.getenv("OPENAI_API_KEY"))
 ```
-Crawl4AI uses a “provider string” (e.g., `"openai/gpt-4o"`, `"ollama/llama2.0"`, `"aws/titan"`) to identify your LLM. **Any** model that LiteLLM supports is fair game. You just provide:
+Crawl4AI uses a “provider string” (e.g., `"openai/gpt-6-luna"`, `"ollama/llama2.0"`, `"aws/titan"`) to identify your LLM. **Any** model that LiteLLM supports is fair game. You just provide:
 - **`provider`**: The `<provider>/<model_name>` identifier (e.g., `"openai/gpt-4"`, `"ollama/llama2"`, `"huggingface/google-flan"`, etc.).  
 - **`api_token`**: If needed (for OpenAI, HuggingFace, etc.); local models or Ollama might not require it.  
 - **`base_url`** (optional): If your provider has a custom endpoint.  
@@ -4657,7 +4660,7 @@ class Product(BaseModel):
 async def main():
     # 1. Define the LLM extraction strategy
     llm_strategy = LLMExtractionStrategy(
-        llm_config = LLMConfig(provider="openai/gpt-4o-mini", api_token=os.getenv('OPENAI_API_KEY')),
+        llm_config = LLMConfig(provider="openai/gpt-6-luna", api_token=os.getenv('OPENAI_API_KEY')),
         schema=Product.schema_json(), # Or use model_json_schema()
         extraction_type="schema",
         instruction="Extract all product objects with 'name' and 'price' from the content.",
@@ -4799,7 +4802,7 @@ if __name__ == "__main__":
 - Monitor token usage with `show_usage()`.
 If your site’s data is consistent or repetitive, consider [`JsonCssExtractionStrategy`](./no-llm-strategies.md) first for speed and simplicity. But if you need an **AI-driven** approach, `LLMExtractionStrategy` offers a flexible, multi-provider solution for extracting structured JSON from any website.
 1. **Experiment with Different Providers**  
-   - Try switching the `provider` (e.g., `"ollama/llama2"`, `"openai/gpt-4o"`, etc.) to see differences in speed, accuracy, or cost.  
+   - Try switching the `provider` (e.g., `"ollama/llama2"`, `"openai/gpt-6-luna"`, etc.) to see differences in speed, accuracy, or cost.  
    - Pass different `extra_args` like `temperature`, `top_p`, and `max_tokens` to fine-tune your results.
 2. **Performance Tuning**  
    - If pages are large, tweak `chunk_token_threshold`, `overlap_rate`, or `apply_chunking` to optimize throughput.  
