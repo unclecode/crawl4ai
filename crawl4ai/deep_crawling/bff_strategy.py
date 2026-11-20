@@ -310,7 +310,12 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             async for result in stream_gen:
                 results_by_url[result.url] = result
 
+            pending_batch = (
+                {item[2]: item for item in batch} if self._on_state_change else None
+            )
             for score, depth, url, parent_url in batch:
+                if pending_batch is not None:
+                    pending_batch.pop(url, None)
                 result = results_by_url.get(url)
                 if result is None:
                     continue
@@ -359,10 +364,14 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                     if self._on_state_change and self._queue_shadow is not None:
                         state = {
                             "strategy_type": "best_first",
-                            "visited": list(visited),
+                            # Dequeued siblings have not been processed yet.
+                            # Restore them as pending, not already visited.
+                            "visited": list(visited.difference(pending_batch)),
                             "queue_items": [
                                 {"score": s, "depth": d, "url": u, "parent_url": p}
-                                for s, d, u, p in self._queue_shadow
+                                for s, d, u, p in (
+                                    list(pending_batch.values()) + self._queue_shadow
+                                )
                             ],
                             "depths": depths,
                             "pages_crawled": self._pages_crawled,

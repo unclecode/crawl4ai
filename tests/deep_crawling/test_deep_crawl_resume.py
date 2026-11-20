@@ -267,6 +267,7 @@ class TestBFSResume:
     @pytest.mark.asyncio
     async def test_simulated_crash_mid_crawl(self):
         """Simulate crash at URL N, verify resume continues from pending URLs."""
+        # Leave room for every saved sibling and child; page caps are tested separately.
         crash_after = 3
         states_before_crash: List[Dict] = []
 
@@ -277,7 +278,7 @@ class TestBFSResume:
 
         strategy1 = BFSDeepCrawlStrategy(
             max_depth=2,
-            max_pages=10,
+            max_pages=20,
             on_state_change=capture_until_crash,
         )
 
@@ -302,7 +303,7 @@ class TestBFSResume:
 
         strategy2 = BFSDeepCrawlStrategy(
             max_depth=2,
-            max_pages=10,
+            max_pages=20,
             resume_state=last_state,
         )
 
