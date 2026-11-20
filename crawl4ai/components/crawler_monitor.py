@@ -159,8 +159,8 @@ class TerminalUI:
         
         # Get current memory usage
         current_memory = psutil.Process().memory_info().rss / (1024 * 1024)  # MB
-        memory_percent = (current_memory / psutil.virtual_memory().total) * 100
-        
+        memory_percent = (current_memory / (psutil.virtual_memory().total / (1024 * 1024))) * 100
+
         # Format runtime
         runtime = self.monitor._format_time(time.time() - self.monitor.start_time if self.monitor.start_time else 0)
         
@@ -572,11 +572,11 @@ class CrawlerMonitor:
                 task_stats["memory_usage"] = memory_usage
                 
                 # Update peak memory if necessary
-                current_percent = (memory_usage / psutil.virtual_memory().total) * 100
+                current_percent = (memory_usage / (psutil.virtual_memory().total / (1024 * 1024))) * 100
                 if current_percent > self.peak_memory_percent:
                     self.peak_memory_percent = current_percent
-                    self.peak_memory_time = time.time()
-                
+                    self.peak_memory_time = time.time() - self.start_time if self.start_time else 0.0
+
             if peak_memory is not None:
                 task_stats["peak_memory"] = peak_memory
             if error_message is not None:
@@ -754,26 +754,26 @@ class CrawlerMonitor:
             # Force an update of the UI
             if hasattr(self.terminal_ui, '_update_display'):
                 self.terminal_ui._update_display()
-    
+
     def _format_time(self, seconds: float) -> str:
         """
         Format time in hours:minutes:seconds.
-        
+
         Args:
             seconds: Time in seconds
-            
+
         Returns:
             Formatted time string (e.g., "1:23:45")
         """
-        delta = timedelta(seconds=int(seconds))
-        hours, remainder = divmod(delta.seconds, 3600)
+        total_seconds = max(0, int(seconds))
+        hours, remainder = divmod(total_seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
-        
+
         if hours > 0:
             return f"{hours}:{minutes:02}:{seconds:02}"
         else:
             return f"{minutes}:{seconds:02}"
-    
+
     def _calculate_estimated_completion(self) -> str:
         """
         Calculate estimated completion time based on current progress.
