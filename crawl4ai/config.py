@@ -44,6 +44,10 @@ WORD_TOKEN_RATE = 1.3
 # Threshold for the minimum number of word in a HTML tag to be considered
 MIN_WORD_THRESHOLD = 1
 IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD = 1
+# Maximum characters kept in an image/video/audio description. The description is
+# the text of the closest ancestor with text, which on many pages is a page-wide
+# wrapper; without a bound every media element carries a copy of the whole page.
+IMAGE_DESCRIPTION_MAX_LENGTH = 500
 
 IMPORTANT_ATTRS = ["src", "href", "alt", "title", "width", "height", "class", "id", "rowspan", "colspan"]
 ONLY_TEXT_ELIGIBLE_TAGS = [
