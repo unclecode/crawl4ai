@@ -53,7 +53,7 @@ def get_cloud_config() -> tuple[str, str]:
     """Get cloud API key and URL from config."""
     config = get_global_config()
     api_key = config.get("CLOUD_API_KEY")
-    api_url = config.get("CLOUD_API_URL", DEFAULT_CLOUD_API_URL)
+    api_url = (config.get("CLOUD_API_URL") or DEFAULT_CLOUD_API_URL).rstrip("/")
     return api_key, api_url
 
 
@@ -163,7 +163,7 @@ def auth_cmd(api_key: str, api_url: str, logout: bool, status: bool):
         sys.exit(1)
 
     # Validate the key by making a test request
-    test_url = api_url or config.get("CLOUD_API_URL", DEFAULT_CLOUD_API_URL)
+    test_url = (api_url or config.get("CLOUD_API_URL") or DEFAULT_CLOUD_API_URL).rstrip("/")
 
     console.print("\n[dim]Validating API key...[/dim]")
 
@@ -188,7 +188,7 @@ def auth_cmd(api_key: str, api_url: str, logout: bool, status: bool):
     # Save to config
     config["CLOUD_API_KEY"] = api_key
     if api_url:
-        config["CLOUD_API_URL"] = api_url
+        config["CLOUD_API_URL"] = api_url.rstrip("/")
     save_global_config(config)
 
     console.print("[green]Authentication successful![/green]")
@@ -281,21 +281,29 @@ def upload_cmd(profile_name: str, name: str, level: str, no_shrink: bool):
         # Step 3: Upload
         console.print("[dim][3/4] Uploading to cloud...[/dim]")
 
-        with open(tar_path, "rb") as f:
-            response = httpx.post(
-                f"{api_url}/v1/profiles",
-                headers={"X-API-Key": api_key},
-                files={"file": (f"{cloud_name}.tar.gz", f, "application/gzip")},
-                data={"name": cloud_name},
-                timeout=120.0
-            )
+        try:
+            with open(tar_path, "rb") as f:
+                response = httpx.post(
+                    f"{api_url}/v1/profiles",
+                    headers={"X-API-Key": api_key},
+                    files={"file": (f"{cloud_name}.tar.gz", f, "application/gzip")},
+                    data={"name": cloud_name},
+                    timeout=120.0
+                )
+        except httpx.RequestError as e:
+            console.print(f"[red]Connection error: {e}[/red]")
+            sys.exit(1)
 
         if response.status_code == 409:
             console.print(f"[red]Profile '{cloud_name}' already exists in cloud.[/red]")
             console.print("Use --name to specify a different name, or delete the existing profile first.")
             sys.exit(1)
         elif response.status_code == 400:
-            error = response.json().get("detail", "Unknown error")
+            try:
+                body = response.json()
+                error = body.get("detail", "Unknown error") if isinstance(body, dict) else body
+            except ValueError:
+                error = response.text or "Unknown error"
             console.print(f"[red]Upload rejected: {error}[/red]")
             sys.exit(1)
         elif response.status_code != 200:
@@ -427,11 +435,27 @@ def delete_cmd(profile_name_or_id: str, yes: bool):
         profiles = response.json().get("profiles", [])
 
         # Find matching profile
-        profile = None
-        for p in profiles:
-            if p["name"] == profile_name_or_id or p["id"] == profile_name_or_id or p["id"].startswith(profile_name_or_id):
-                profile = p
-                break
+        profile = next(
+            (p for p in profiles if p["id"] == profile_name_or_id),
+            None,
+        ) or next(
+            (p for p in profiles if p["name"] == profile_name_or_id),
+            None,
+        )
+        if not profile:
+            prefix_matches = [
+                p for p in profiles if p["id"].startswith(profile_name_or_id)
+            ]
+            if len(prefix_matches) > 1:
+                console.print(
+                    f"[red]Ambiguous profile ID prefix: {profile_name_or_id}[/red]"
+                )
+                console.print("\nMatching profiles:")
+                for p in prefix_matches:
+                    console.print(f"  - {p['name']} ({p['id']})")
+                sys.exit(1)
+            if len(prefix_matches) == 1:
+                profile = prefix_matches[0]
 
         if not profile:
             console.print(f"[red]Profile not found: {profile_name_or_id}[/red]")
