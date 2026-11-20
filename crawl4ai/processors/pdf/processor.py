@@ -427,9 +427,12 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
         if '/Annots' in page:
             try:
                 for annot in page['/Annots']:
-                    a = annot.get_object()
-                    if '/A' in a and '/URI' in a['/A']:
-                        links.append(a['/A']['/URI'])
+                    annotation = annot.get_object()
+                    if not isinstance(annotation, dict) or "/A" not in annotation:
+                        continue
+                    action = annotation["/A"]
+                    if isinstance(action, dict) and "/URI" in action:
+                        links.append(action["/URI"])
             except Exception as e:
                 print(f"Link error: {str(e)}")
         return links
