@@ -555,8 +555,8 @@ class ContentRelevanceFilter(URLFilter):
         """Weighted document construction"""
         return " ".join(
             [
-                fields["title"] * 3,  # Title weight
-                fields["meta"].get("description", "") * 2,
+                " ".join([fields["title"]] * 3),  # Title weight
+                " ".join([fields["meta"].get("description", "")] * 2),
                 fields["meta"].get("keywords", ""),
                 " ".join(fields["meta"].values()),
             ]
