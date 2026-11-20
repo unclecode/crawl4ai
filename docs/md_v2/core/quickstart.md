@@ -136,7 +136,7 @@ html = "<div class='product'><h2>Gaming Laptop</h2><span class='price'>$999.99</
 # Using OpenAI (requires API token)
 schema = JsonCssExtractionStrategy.generate_schema(
     html,
-    llm_config = LLMConfig(provider="openai/gpt-4o",api_token="your-openai-token")  # Required for OpenAI
+    llm_config = LLMConfig(provider="openai/gpt-6-luna",api_token="your-openai-token")  # Required for OpenAI
 )
 
 # Or using Ollama (open source, no token needed)
@@ -260,7 +260,7 @@ if __name__ == "__main__":
 
     asyncio.run(
         extract_structured_data_using_llm(
-            provider="openai/gpt-4o", api_token=os.getenv("OPENAI_API_KEY")
+            provider="openai/gpt-6-luna", api_token=os.getenv("OPENAI_API_KEY")
         )
     )
 ```

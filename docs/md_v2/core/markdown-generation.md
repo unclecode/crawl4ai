@@ -246,7 +246,7 @@ from crawl4ai.content_filter_strategy import LLMContentFilter
 async def main():
     # Initialize LLM filter with specific instruction
     filter = LLMContentFilter(
-        llm_config = LLMConfig(provider="openai/gpt-4o",api_token="your-api-token"), #or use environment variable
+        llm_config = LLMConfig(provider="openai/gpt-6-luna",api_token="your-api-token"), #or use environment variable
         instruction="""
         Focus on extracting the core educational content.
         Include:

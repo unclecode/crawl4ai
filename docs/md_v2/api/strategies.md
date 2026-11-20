@@ -224,7 +224,7 @@ async with AsyncWebCrawler() as crawler:
         label="price",
         html=html,
         query="Product prices in USD format",
-        llm_config=LLMConfig(provider="openai/gpt-4o-mini")
+        llm_config=LLMConfig(provider="openai/gpt-6-luna")
     )
     
     # Save pattern for reuse

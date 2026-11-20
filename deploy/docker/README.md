@@ -184,11 +184,11 @@ The Docker setup now supports flexible LLM provider configuration through three 
      "url": "https://example.com",
      "f": "llm",
      "q": "Summarize this page",
-     "provider": "openai/gpt-4o"
+     "provider": "openai/gpt-6-luna"
    }
    ```
 
-3. **Config File Default**: Falls back to `config.yml` (default: `openai/gpt-4o-mini`)
+3. **Config File Default**: Falls back to `config.yml` (default: `openai/gpt-6-luna`)
 
 The system automatically selects the appropriate API key based on the provider.
 
@@ -890,7 +890,7 @@ curl -X POST http://localhost:11235/llm/job \
   -d '{
     "url": "https://example.com/article",
     "q": "Extract the article title, author, and main points",
-    "provider": "openai/gpt-4o-mini",
+    "provider": "openai/gpt-6-luna",
     "webhook_config": {
       "webhook_url": "https://myapp.com/webhooks/llm-complete",
       "webhook_data_in_payload": true,
@@ -971,7 +971,7 @@ app:
 
 # Default LLM Configuration
 llm:
-  provider: "openai/gpt-4o-mini"  # Can be overridden by LLM_PROVIDER env var
+  provider: "openai/gpt-6-luna"  # Can be overridden by LLM_PROVIDER env var
   # api_key: sk-...  # If you pass the API key directly (not recommended)
 
 # Redis Configuration (Used by internal Redis server managed by supervisord)

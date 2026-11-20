@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional, List
 import json
 import asyncio
+from urllib.parse import urljoin
 
 # from contextlib import nullcontext, asynccontextmanager
 from contextlib import asynccontextmanager
@@ -23,7 +24,7 @@ from .chunking_strategy import *  # noqa: F403
 from .chunking_strategy import IdentityChunking
 from .content_filter_strategy import *  # noqa: F403
 from .extraction_strategy import *  # noqa: F403
-from .extraction_strategy import NoExtractionStrategy
+from .extraction_strategy import NoExtractionStrategy, _LLMExtractionError
 from .async_crawler_strategy import (
     AsyncCrawlerStrategy,
     AsyncPlaywrightCrawlerStrategy,
@@ -280,6 +281,9 @@ class AsyncWebCrawler:
                 # Try to get cached result if appropriate
                 if cache_context.should_read():
                     cached_result = await async_db_manager.aget_cached_url(url)
+                    # Older versions could store failed crawls; treat them as a miss
+                    if cached_result and not cached_result.success:
+                        cached_result = None
 
                 # Smart Cache: Validate cache freshness if enabled
                 if cached_result and config.check_cache_freshness:
@@ -681,8 +685,15 @@ class AsyncWebCrawler:
                         tag="COMPLETE",
                     )
 
-                    # Update cache if appropriate
-                    if cache_context.should_write() and not bool(cached_result):
+                    # Update cache if appropriate. A cached row is replayed as a
+                    # success, so failed or incomplete processing stays out.
+                    if (
+                        cache_context.should_write()
+                        and not bool(cached_result)
+                        and crawl_result.success
+                        and crawl_result.markdown is not None
+                        and not crawl_result._processing_failed
+                    ):
                         await async_db_manager.acache_url(crawl_result)
 
                     return CrawlResultContainer(crawl_result)
@@ -879,8 +890,10 @@ class AsyncWebCrawler:
         # This ensures relative URLs resolve correctly even with cleaned_html.
         base_url = params.get("base_url") or params.get("redirected_url") or url
         base_tag_match = re.search(r'<base\s[^>]*href\s*=\s*["\']([^"\']+)["\']', html, re.IGNORECASE)
-        if base_tag_match:
-            base_url = base_tag_match.group(1)
+        # Skip it when the markdown input still has the tag: html2text applies
+        # it itself, and applying a relative <base> twice doubles its path.
+        if base_tag_match and not re.search(r'<base\s', markdown_input_html, re.IGNORECASE):
+            base_url = urljoin(base_url, base_tag_match.group(1))
 
         markdown_result: MarkdownGenerationResult = (
             markdown_generator.generate_markdown(
@@ -889,6 +902,8 @@ class AsyncWebCrawler:
                 # html2text_options=kwargs.get('html2text', {})
             )
         )
+
+        processing_failed = getattr(markdown_result, "_generation_failed", False)
 
         # Log processing completion — reflect actual content outcome
         self.logger.url_status(
@@ -950,6 +965,11 @@ class AsyncWebCrawler:
                     config.extraction_strategy.run, url, sections
                 )
                 
+            if isinstance(extracted_content, list) and any(
+                isinstance(block, _LLMExtractionError) for block in extracted_content
+            ):
+                processing_failed = True
+
             extracted_content = json.dumps(
                 extracted_content, indent=4, default=str, ensure_ascii=False
             )
@@ -967,7 +987,7 @@ class AsyncWebCrawler:
             cleaned_html = fast_format_html(cleaned_html)
 
         # Return complete crawl result
-        return CrawlResult(
+        result = CrawlResult(
             url=url,
             html=html,
             fit_html=fit_html,
@@ -983,6 +1003,8 @@ class AsyncWebCrawler:
             success=True,
             error_message="",
         )
+        result._processing_failed = processing_failed
+        return result
 
     async def arun_many(
         self,

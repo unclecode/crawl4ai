@@ -738,9 +738,10 @@ class DomainMapper:
 
         # Use AsyncUrlSeeder's sitemap parsing
         seeder = await self._get_seeder()
+        seen: set = set()  # one sitemap budget for the whole host
         for sm_url in sitemap_urls:
             try:
-                async for u in seeder._iter_sitemap(sm_url):
+                async for u in seeder._iter_sitemap(sm_url, _seen=seen):
                     urls.append(u)
             except Exception as e:
                 self._log("warning", "Error parsing sitemap {url}: {err}",

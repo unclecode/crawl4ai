@@ -20,6 +20,7 @@ from pathlib import Path
 
 from crawl4ai.async_webcrawler import AsyncWebCrawler
 from crawl4ai.async_configs import CrawlerRunConfig, LinkPreviewConfig, LLMConfig
+from crawl4ai.config import DEFAULT_PROVIDER
 from crawl4ai.models import Link, CrawlResult
 import numpy as np
 
@@ -736,12 +737,12 @@ class EmbeddingStrategy(CrawlStrategy):
         These should be queries a user might ask when looking for similar information.
         Include different phrasings, related concepts, and specific aspects.
         
-        Return as a JSON array of strings."""
+        Return a JSON object of the form {{"queries": ["...", "..."]}}."""
         
         # Use a chat completion model for query generation
         llm_config_dict = self._get_query_llm_config_dict()
 
-        provider = llm_config_dict.get('provider', 'openai/gpt-4o-mini') if llm_config_dict else 'openai/gpt-4o-mini'
+        provider = llm_config_dict.get('provider', DEFAULT_PROVIDER) if llm_config_dict else DEFAULT_PROVIDER
         api_token = llm_config_dict.get('api_token') if llm_config_dict else None
         base_url = llm_config_dict.get('base_url') if llm_config_dict else None
 

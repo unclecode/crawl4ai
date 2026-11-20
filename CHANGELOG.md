@@ -5,13 +5,93 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.6] - 2026-11-20
+
+0.9.6 is a security release. It closes eleven coordinated-disclosure advisories. Nine are in the Docker server: one more SSRF path, a browser context and declarative hooks shared between API callers, a list-form bypass of the 0.9.5 ReDoS fix, unchecked markdown options, a request-size limit that skipped chunked bodies, a TLS fetch that blocked the event loop, an uncapped `screenshot_wait_for`, and a monitor leak. Two reach the library too: unbounded sitemap index following in the URL seeder, and dependency floors that allowed a vulnerable Brotli decoder. It also ships the bug fixes that landed on `develop` since 0.9.5. Users who self-host the Docker server should upgrade.
+
+GHSA ids are filled in when the advisories are drafted.
+
+### Security
+
+- **SSRF via URL userinfo in the TLS certificate fetch (CWE-918, medium)**: `fetch_ssl_certificate` read the host from the URL's netloc, userinfo included, so `https://127.0.0.1:443@public.example.com/` passed the destination check as `public.example.com` and dialled `127.0.0.1`. The fetch now dials the real host, through the egress proxy. Credit: Zachariah Mithani ([zachariah-mithani](https://github.com/zachariah-mithani)). (GHSA-qwxw-87g2-26vm)
+- **Browser context shared between API callers (CWE-488, medium)**: the Docker pool reused one Chromium context per run config, so cookies, storage, service workers, and the HTTP cache from one client's crawl were present in the next client's crawl. Each caller now gets its own context, and `browser_mode` is refused from untrusted bodies. Credit: [arpe1618](https://github.com/arpe1618). (GHSA-9xxj-3r64-qw54)
+- **ReDoS gate bypass via list-form schema `type` (CWE-1333, medium)**: the 0.9.5 fix for GHSA-j843-8p47-rhxp refused `"type": "regex"` but not `"type": ["text", "regex"]`, which runs the same regex step. List-form types with a `regex` step are now refused from untrusted bodies. Credit: Vijhn Austin ([VijhnAustin](https://github.com/VijhnAustin)). (GHSA-8696-2734-9jqw)
+- **Vulnerable Brotli decoder, CVE-2026-111497 (CWE-787, high)**: the dependency floors allowed `brotli` 1.1.0 and 1.2.0, and Playwright and patchright drivers that bundle an affected Node.js. A crawled server could send a crafted `br` response. The floors are now `brotli>=1.2.1`, `playwright>=1.64.1`, and `patchright>=1.64.2`. Affects the library and the Docker image. Credit: Daniel Ruf ([weaverant](https://github.com/weaverant)). (GHSA-phmg-6873-j3gj)
+- **Memory exhaustion via `DefaultMarkdownGenerator` options (CWE-915, medium)**: every key in `options` was set as an attribute on the html2text converter, including internal state, so a few hundred bytes could make the worker use gigabytes. Untrusted bodies may now set only known boolean options and `body_width` (capped at 10,000). Credit: Soham. (GHSA-jfhw-vrxg-wpcw)
+- **Unbounded sitemap index following (CWE-674, medium)**: `AsyncUrlSeeder` and `DomainMapper` followed sitemap indexes with no visited set, no depth limit, and no size limit, so a self-referencing index or a gzip bomb never ended. Sitemaps are now followed once each, at most 5 levels deep and 10,000 files per run, and each sitemap is capped at 50 MB raw and inflated. Library only; the Docker server does not expose the seeder. Credit: Ugur Celik ([ucsurf](https://github.com/ucsurf)). (GHSA-8x85-mx8f-wj4v)
+- **Declarative hooks kept on the pooled crawler (CWE-668, medium)**: with hooks enabled, one caller's hooks stayed on the shared crawler and ran on later callers' crawls, leaking headers and cookies. Hooks are now scoped to the request that sent them. Credit: [TheCyberMessi](https://github.com/TheCyberMessi). (GHSA-x4gh-gvcx-p9gp)
+- **Request-size limit skipped chunked bodies (CWE-770, medium)**: the body limit only read `Content-Length`, so a chunked request had no limit. The server now counts the bytes it receives and returns 413 past `limits.max_body_bytes`. Credit: [TheCyberMessi](https://github.com/TheCyberMessi). (GHSA-3q59-v69g-m9vc)
+- **TLS certificate fetch blocked the event loop (CWE-400, medium)**: `SSLCertificate.from_url` ran blocking socket calls on the event loop, so one host that never answers froze the whole server for about 10 seconds per request. It now runs in a thread. Credit: [TheCyberMessi](https://github.com/TheCyberMessi). (GHSA-363x-fqh9-cvp2)
+- **Rejected requests stayed in the monitor (CWE-401, low)**: a `/crawl` request that ended with an HTTP error or a timeout was never removed from the active-request monitor, so memory and `/monitor/requests` grew without limit. Records now end on every exit, and monitor reads are admin-only. Credit: [TheCyberMessi](https://github.com/TheCyberMessi). (GHSA-2prc-jrcf-ccrm)
+- **Unbounded `screenshot_wait_for` (CWE-770, medium)**: the 0.9.5 delay caps did not cover `screenshot_wait_for`, and `/screenshot` skipped the untrusted clamps, so 40 requests could hold every browser page. It is now capped at 60 seconds and `/screenshot` uses the untrusted loader. Credit: [TheCyberMessi](https://github.com/TheCyberMessi). (GHSA-7628-8pmq-4xhq)
+
+Hardening, no advisory (credit: Siyang Wu, [LeoWSY-hashblue](https://github.com/LeoWSY-hashblue)):
+
+- PDF `batch_size` and `max_redirects` in untrusted bodies are clamped to their class defaults (4 and 5).
+
+All reporters are credited in `SECURITY-CREDITS.md`. GitHub Security Advisories accompany this release.
+
+### Added
+
+- Deep crawl: `BFSDeepCrawlStrategy` and `BestFirstCrawlingStrategy` take a `dispatcher`, and `BestFirstCrawlingStrategy` takes a `batch_size` (default 10, as before). (#2246, discussion #2245, thanks @yashikam19)
+- Docker client: `Crawl4aiDockerClient(api_token=...)` sends `Authorization: Bearer <token>` on every request, for the 0.9 server's `CRAWL4AI_API_TOKEN`. (#2475, issue #2474, thanks @SohamKukreti)
+- PDF: `max_pdf_seconds` (default 300) is a total download and parse time budget. Untrusted bodies are clamped to 300. (#2461, issue #2460, thanks @prassu017)
 
 ### Changed
 
+- The default LLM provider is now `openai/gpt-6-luna`, because OpenAI shuts down `gpt-4o` and `gpt-4o-mini` on 14 Jan 2027 (#2584). This applies to `LLMConfig`, the CLI, `LLMTableExtraction`, the adaptive crawler and the Docker server. The shut-down `o1-mini`, `o1-preview`, `o3-mini`, and `o3-mini-high` entries are removed. (#2585)
+- LLM calls no longer send `temperature: 0.01` by default, because `gpt-6-luna` accepts only the default temperature. If you use another model and want the old, near-fixed output, pass `extra_args={"temperature": 0.01}` to your strategy.
 - `crawl4ai-setup` no longer points to Crawl4AI Cloud when the browser install fails. It retries the browser without `--with-deps` (which needs root on Linux), prints the exact command for the system libraries, and exits with code 1 instead of printing "completed". The cloud banner at the end shows only after a successful setup.
 - `crawl4ai-doctor` exits with code 1 when its test crawl fails, counts a blocked page as a failure, and shows no cloud banner.
 - The cloud banner and the blocked line state the current free offer: 1,000 free credits every month.
+- The default User-Agent is a current Chrome string with `(KHTML, like Gecko)`, and an empty `sec-ch-ua` header is never sent. (#2558, issue #2493)
+
+### Fixed
+
+**Crawler and core**
+
+- Browser: the default `chromium` channel is passed again on every OS, so headless runs use full Chromium instead of chrome-headless-shell, and HTTPS-only sites work. If the channel cannot launch, it retries once without it. (#2448, issue #2382)
+- `UserAgentGenerator.generate(browser_type=...)` honors the browser type and returns tokens a real browser of that type sends. (#2576, issue #2566)
+- `BrowserConfig.dump()` leaves out the auto-added `sec-ch-ua` header. (#2473, thanks @SohamKukreti)
+- `CrawlerRunConfig.clone()` keeps `fallback_fetch_function`, `base_url`, `force_viewport_screenshot`, and other fields. (#2385, thanks @Parsiffall1; #2447, issue #2379)
+- Deep crawl: breaking out of a streamed deep crawl early no longer turns the next deep crawl into a single-page crawl. (#2386, issue #2380, thanks @PiUnknown)
+- Cache: failed crawls, and results with a markdown or LLM extraction error, are not cached, so a good copy is kept and a later run retries. With `CacheMode.ENABLED` a failed crawl returns its own error, not a validation error. (#2519, issue #2490; #2523, thanks @GoldArowana; #2559, issue #2520)
+- Scraping: text after a removed element (inline `<link>`, `<style>`, `<noscript>`, excluded tags, images, links, forms, comments) is kept. (#2532, issue #2416)
+- `PruningContentFilter` keeps inline tags inside a kept sentence, so `fit_markdown` no longer loses words from the middle. (#2489, issue #2417)
+- Links and markdown: a relative `<base href>` is resolved against the page URL. (#2552, issue #2550, thanks @HhH666-ux; #2575)
+- `ContentTypeFilter` ignores query strings and fragments when it reads the extension. (#2555, issue #2554, thanks @HhH666-ux)
+- `normalize_url` lowercases only the host, not the userinfo. (#2530, issue #2529, thanks @Steve-20-ai)
+- `format_html` uses a parser name BeautifulSoup knows. (#2553, issue #2551, thanks @HhH666-ux)
+- robots.txt: rules ending in `$` work below Python 3.14, and percent-encoded `%24` and `%2A` stay literal. (#2545, issue #2544; #2578, issue #2577, thanks @adityajai119)
+- Seeder: gzipped sitemaps are detected by their content, not the URL. (#2542, thanks @adityajai119)
+- PDF: URI links are kept in `ScrapingResult.links`, and saved image paths are kept in `ScrapingResult.media`. (#2375, issue #2374, thanks @Hugo-DDT; #2470, issue #2469, thanks @michaelkillgta)
+
+**Docker client**
+
+- Declarative hooks are sent in the 0.9 format, and `crawl()` returns real PDF bytes. (#2485, issue #2483, thanks @SohamKukreti)
+- A `base_url` with a subpath is kept on every request, the client timeout is no longer overwritten by `hooks_timeout`, and non-dict JSON errors are handled. (#2580, issue #2579, thanks @adityajai119)
+
+**Docker server**
+
+- A pooled browser whose process died is replaced instead of being handed out again. (#2429, issue #842, thanks @eastwood-c and @greerso)
+
+### Documentation
+
+- Fixed broken links across the docs site, the dead Discord invite, the MCP auth header, the Docker guide for 0.9.5, and the security contacts. (#2487, #2434, thanks @SohamKukreti)
+- Stats dashboard updated to October 2026. (#2457, thanks @SohamKukreti)
+
+### Tests
+
+- `tests/unit/test_sitemap_bounds.py`, `tests/unit/test_dependency_floors.py`, `tests/unit/test_pdf_download_limits.py`, and `tests/unit/test_untrusted_field_sinks.py`: the library-side security fixes.
+- `deploy/docker/tests/test_security_context_partition.py`, `test_security_hook_scope.py`, `test_security_monitor_scope.py`, `test_security_screenshot_wait.py`, and `test_security_resource_caps.py`: the Docker server fixes.
+- Coverage for the cache, scraping, robots.txt, user agent, and Docker client fixes.
+
+### Breaking Changes
+
+- Library: LLM calls no longer send `temperature=0.01` by default, so output may vary slightly between runs. `extra_args={"temperature": 0.01}` restores it. (#2585)
+- Library: the minimum versions are now `playwright>=1.64.1`, `patchright>=1.64.2`, and `brotli>=1.2.1`.
+- Docker server, untrusted request bodies: list-form schema `type` values with a `regex` step, `browser_mode`, and unknown `DefaultMarkdownGenerator` options are refused with 400. `screenshot_wait_for` is capped at 60 seconds. Chunked bodies over `limits.max_body_bytes` get 413. Monitor reads need an admin token.
+- Docker server: API callers no longer share browser cookies or storage.
 
 ### Crawl4AI Cloud
 
