@@ -8,6 +8,7 @@ import requests
 from .config import (
     MIN_WORD_THRESHOLD,
     IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
+    IMAGE_DESCRIPTION_MAX_LENGTH,
     IMAGE_SCORE_THRESHOLD,
     ONLY_TEXT_ELIGIBLE_TAGS,
     IMPORTANT_ATTRS,
@@ -414,16 +415,37 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
         image_description_min_word_threshold = kwargs.get(
             "image_description_min_word_threshold", IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD
         )
+        max_length = kwargs.get(
+            "image_description_max_length", IMAGE_DESCRIPTION_MAX_LENGTH
+        )
         current = element
         while current is not None:
-            if (
-                current.text
-                and len(current.text_content().split())
-                >= image_description_min_word_threshold
-            ):
-                return current.text_content().strip()
+            if current.text:
+                # The closest ancestor with text is often a page-wide wrapper, so
+                # read at most `max_length` characters of it instead of its whole
+                # text_content(): one copy of the page per media element made
+                # memory and time grow as elements x page size.
+                text = self._bounded_text(current, max_length)
+                if len(text.split()) >= image_description_min_word_threshold:
+                    return text
             current = current.getparent()
         return None
+
+    @staticmethod
+    def _bounded_text(element: lhtml.HtmlElement, max_length: int) -> str:
+        """The element's text_content(), stripped and cut to `max_length` characters,
+        read only as far as needed."""
+        parts = []
+        size = 0
+        for chunk in element.itertext():
+            if not parts:
+                chunk = chunk.lstrip()
+            parts.append(chunk)
+            size += len(chunk)
+            # A little extra, so trailing whitespace does not eat the budget.
+            if size > max_length + 64:
+                break
+        return "".join(parts).strip()[:max_length].rstrip()
 
     def flatten_nested_elements(self, element: lhtml.HtmlElement) -> lhtml.HtmlElement:
         """Flatten nested elements of the same type in LXML tree"""
