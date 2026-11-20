@@ -154,13 +154,6 @@ class LinkPreview:
             self._log("debug", "After exclude patterns: {count} links remain",
                       params={"count": len(filtered_urls)})
         
-        # Limit number of links
-        max_links = link_config.max_links
-        if max_links > 0 and len(filtered_urls) > max_links:
-            filtered_urls = filtered_urls[:max_links]
-            self._log("debug", "Limited to {max_links} links",
-                      params={"max_links": max_links})
-        
         # Remove duplicates while preserving order
         seen = set()
         unique_urls = []
@@ -169,6 +162,13 @@ class LinkPreview:
                 seen.add(url)
                 unique_urls.append(url)
         
+        # Limit unique targets so repeated anchors do not consume preview slots.
+        max_links = link_config.max_links
+        if max_links > 0 and len(unique_urls) > max_links:
+            unique_urls = unique_urls[:max_links]
+            self._log("debug", "Limited to {max_links} links",
+                      params={"max_links": max_links})
+
         self._log("debug", "Final filtered URLs: {count} unique links",
                   params={"count": len(unique_urls)})
         
