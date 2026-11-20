@@ -29,67 +29,67 @@ GHSA ids are added when the advisories are published.
 
 ### Browser context shared between API callers
 
-**GHSA-TODO-2, CWE-488, medium.** Credit: [arpe1618](https://github.com/arpe1618).
+**GHSA-9xxj-3r64-qw54, CWE-488, medium.** Credit: [arpe1618](https://github.com/arpe1618).
 
 The Docker pool keys browsers by browser config, and inside a browser it reused one context per run config. Neither key includes the caller. Two clients that sent the same config, including no config at all, ran in the same Chromium context, so cookies, localStorage, IndexedDB, service workers, and the HTTP cache from one crawl were present in the next. Each caller now gets its own context, and `browser_mode` is refused from untrusted bodies.
 
 ### Declarative hooks kept on the pooled crawler
 
-**GHSA-TODO-7, CWE-668, medium.** Credit: [TheCyberMessi](https://github.com/TheCyberMessi).
+**GHSA-x4gh-gvcx-p9gp, CWE-668, medium.** Credit: [TheCyberMessi](https://github.com/TheCyberMessi).
 
 With `CRAWL4AI_HOOKS_ENABLED=true`, the hooks one client sent were set on the shared crawler and never removed. The next client on that crawler ran them too, so it could receive the `Authorization` header or session cookie an earlier client set. Hooks are now held per request.
 
 ### SSRF via URL userinfo in the TLS certificate fetch
 
-**GHSA-TODO-1, CWE-918, medium.** Credit: Zachariah Mithani ([zachariah-mithani](https://github.com/zachariah-mithani)).
+**GHSA-qwxw-87g2-26vm, CWE-918, medium.** Credit: Zachariah Mithani ([zachariah-mithani](https://github.com/zachariah-mithani)).
 
 The destination check reads `urlparse(url).hostname`, which drops the userinfo. The certificate fetch read the netloc and split it on the first `:`. So `https://127.0.0.1:443@public.example.com/` passed the check as `public.example.com` and the fetch connected to `127.0.0.1:443`. The fetch now dials the real host, through the egress proxy.
 
 ### ReDoS gate bypass via list-form schema type
 
-**GHSA-TODO-3, CWE-1333, medium.** Credit: Vijhn Austin ([VijhnAustin](https://github.com/VijhnAustin)).
+**GHSA-8696-2734-9jqw, CWE-1333, medium.** Credit: Vijhn Austin ([VijhnAustin](https://github.com/VijhnAustin)).
 
 The 0.9.5 fix for GHSA-j843-8p47-rhxp refused `"type": "regex"`. The schema strategies also accept a list of steps, such as `["text", "regex"]`, and run the `regex` step the same way. A list is never equal to `"regex"`, so it passed. List-form types with a `regex` step are now refused from untrusted bodies.
 
 ### Vulnerable Brotli decoder (CVE-2026-111497)
 
-**GHSA-TODO-4, CWE-787, high.** Credit: Daniel Ruf ([weaverant](https://github.com/weaverant)).
+**GHSA-phmg-6873-j3gj, CWE-787, high.** Credit: Daniel Ruf ([weaverant](https://github.com/weaverant)).
 
 CVE-2026-111497 is an out-of-bounds write in Google's Brotli decoder. Our floors allowed `brotli` 1.1.0 and 1.2.0, and Playwright and patchright drivers that bundle an affected Node.js. aiohttp decodes `br` responses with `brotli`, and the HTTP crawler asks for `br`, so the server being crawled could reach the decoder. The floors are now `brotli>=1.2.1`, `playwright>=1.64.1`, and `patchright>=1.64.2`.
 
 ### Memory exhaustion via DefaultMarkdownGenerator options
 
-**GHSA-TODO-5, CWE-915, medium.** Credit: Soham.
+**GHSA-jfhw-vrxg-wpcw, CWE-915, medium.** Credit: Soham.
 
 `DefaultMarkdownGenerator.options` reached `HTML2Text.update_params()`, which sets every key as an attribute, internal state included. `{"blockquote": 1000000000}` turned a tiny page into gigabytes of output. Untrusted bodies may now set only known boolean options and `body_width`, capped at 10,000.
 
 ### Unbounded sitemap index following
 
-**GHSA-TODO-6, CWE-674, medium.** Credit: Ugur Celik ([ucsurf](https://github.com/ucsurf)).
+**GHSA-8x85-mx8f-wj4v, CWE-674, medium.** Credit: Ugur Celik ([ucsurf](https://github.com/ucsurf)).
 
 `AsyncUrlSeeder` and `DomainMapper` followed every `<sitemap><loc>` in an index with no visited set, no depth limit, and no size limit. An index that lists itself never ended, and a small gzip file could inflate to hundreds of megabytes. Each sitemap is now fetched once, nesting stops at 5 levels, a run fetches at most 10,000 sitemaps, and each sitemap is capped at 50 MB raw and inflated. The Docker server does not expose the seeder.
 
 ### Request-size limit skipped chunked bodies
 
-**GHSA-TODO-8, CWE-770, medium.** Credit: [TheCyberMessi](https://github.com/TheCyberMessi).
+**GHSA-3q59-v69g-m9vc, CWE-770, medium.** Credit: [TheCyberMessi](https://github.com/TheCyberMessi).
 
 The body limit read only `Content-Length`. A chunked request has no such header, so the whole body reached the endpoint. The server now counts the bytes it receives and returns 413 past `limits.max_body_bytes`.
 
 ### TLS certificate fetch blocked the event loop
 
-**GHSA-TODO-9, CWE-400, medium.** Credit: [TheCyberMessi](https://github.com/TheCyberMessi).
+**GHSA-363x-fqh9-cvp2, CWE-400, medium.** Credit: [TheCyberMessi](https://github.com/TheCyberMessi).
 
 With `fetch_ssl_certificate`, the crawler ran a blocking connect and TLS handshake on the event loop. The Docker server runs one worker, so a host that never answers froze every request and health check for about 10 seconds. The fetch now runs in a thread.
 
 ### Uncapped screenshot_wait_for
 
-**GHSA-TODO-11, CWE-770, medium.** Credit: [TheCyberMessi](https://github.com/TheCyberMessi).
+**GHSA-7628-8pmq-4xhq, CWE-770, medium.** Credit: [TheCyberMessi](https://github.com/TheCyberMessi).
 
 The 0.9.5 delay caps did not cover `screenshot_wait_for`, and `POST /screenshot` built its config without the untrusted clamps. Forty requests, the default number of page permits, could hold every browser page. It is now capped at 60 seconds, and `/screenshot` uses the untrusted loader.
 
 ### Rejected requests stayed in the monitor
 
-**GHSA-TODO-10, CWE-401, low.** Credit: [TheCyberMessi](https://github.com/TheCyberMessi).
+**GHSA-2prc-jrcf-ccrm, CWE-401, low.** Credit: [TheCyberMessi](https://github.com/TheCyberMessi).
 
 A `/crawl` request that ended with an HTTP error or a timeout was never removed from the active-request monitor, so its memory and `/monitor/requests` grew without limit. Records now end on every exit, and monitor reads need an admin token.
 
