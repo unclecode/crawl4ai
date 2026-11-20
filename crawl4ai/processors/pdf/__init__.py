@@ -238,7 +238,8 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
         return Links(internal=list(internal.values()), external=list(external.values()))
 
     def _budget_check(self, url: str):
-        """Return a callable that raises once max_pdf_seconds have elapsed.
+        """Return a callable that raises once max_pdf_seconds have elapsed,
+        and otherwise returns the seconds left.
 
         scrap() runs synchronously, so a caller's asyncio deadline cannot stop
         it; the budget is checked inside the download and parse loops instead.
@@ -248,10 +249,12 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
         deadline = time.monotonic() + self.max_pdf_seconds
 
         def check():
-            if time.monotonic() > deadline:
+            left = deadline - time.monotonic()
+            if left <= 0:
                 raise TimeoutError(
                     f"PDF from {url} exceeded max_pdf_seconds ({self.max_pdf_seconds}s)"
                 )
+            return left
         return check
 
     async def ascrap(self, url: str, html: str, **kwargs) -> ScrapingResult:
@@ -317,7 +320,7 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
             response.close()
             raise
 
-    def _fetch_with_redirect_checks(self, requests, url: str):
+    def _fetch_with_redirect_checks(self, requests, url: str, check=None):
         """GET `url`, validating every hop against the injected destination policy.
 
         Redirects are followed by hand because requests would otherwise chase a
@@ -340,10 +343,12 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
                 _url_validator(current)
 
             # Connection timeout: 20s, Read timeout: 600s (for large PDFs),
-            # capped by the total budget so one stalled read cannot outlast it.
-            read_timeout = min(60 * 10, self.max_pdf_seconds or 60 * 10)
+            # both capped by the time left in the budget so a slow hop or one
+            # stalled read cannot outlast it.
+            left = check() if check else (self.max_pdf_seconds or 60 * 10)
             response = session.get(
-                current, stream=True, timeout=(20, read_timeout), allow_redirects=False
+                current, stream=True, timeout=(min(20, left), min(60 * 10, left)),
+                allow_redirects=False,
             )
             is_redirect = response.status_code in _REDIRECT_STATUSES
             self._check_peer_ip(response, strict=not is_redirect)
@@ -379,7 +384,7 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
                 if self.logger:
                     self.logger.info(f"Downloading PDF from {url}...")
 
-                response = self._fetch_with_redirect_checks(requests, url)
+                response = self._fetch_with_redirect_checks(requests, url, check)
 
                 # content-length is a hint only: it is attacker-controlled and
                 # may be absent or understated, so the running total is what

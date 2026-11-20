@@ -522,8 +522,9 @@ def _clamp_untrusted(type_name: str, params: dict) -> dict:
         ):
             if f in params:
                 v = params[f]
-                # <=0 or non-int would read as "no limit"; pin to the cap.
-                params[f] = cap if not isinstance(v, int) or v <= 0 else min(v, cap)
+                # <=0, NaN or the wrong type would read as "no limit"; pin to the cap.
+                ok = (int, float) if f == "max_pdf_seconds" else int
+                params[f] = cap if not isinstance(v, ok) or isinstance(v, bool) or not v > 0 else min(v, cap)
         # Rasterizing every page is the most expensive thing this strategy can
         # do, and nothing about untrusted crawling needs it.
         params["extract_images"] = False
