@@ -847,6 +847,7 @@ class ProxyConfig:
 
         Supported formats:
         - 'http://username:password@ip:port'
+        - 'http://username@ip:port'
         - 'http://ip:port'
         - 'socks5://ip:port'
         - 'ip:port:username:password'
@@ -855,15 +856,15 @@ class ProxyConfig:
         s = (proxy_str or "").strip()
         # URL with credentials
         if "@" in s and "://" in s:
-            auth_part, server_part = s.split("@", 1)
+            # The host follows the last "@": a password may itself contain "@"
+            auth_part, server_part = s.rsplit("@", 1)
             protocol, credentials = auth_part.split("://", 1)
-            if ":" in credentials:
-                username, password = credentials.split(":", 1)
-                return ProxyConfig(
-                    server=f"{protocol}://{server_part}",
-                    username=unquote(username),
-                    password=unquote(password),
-                )
+            username, sep, password = credentials.partition(":")
+            return ProxyConfig(
+                server=f"{protocol}://{server_part}",
+                username=unquote(username),
+                password=unquote(password) if sep else None,
+            )
         # URL without credentials (keep scheme)
         if "://" in s and "@" not in s:
             return ProxyConfig(server=s)
