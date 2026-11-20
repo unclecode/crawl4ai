@@ -194,16 +194,27 @@ class Crawl4aiDockerClient:
                     if hooks_warning := response.headers.get("X-Hooks-Warning"):
                         warnings.warn(hooks_warning, stacklevel=2)
                     async for line in response.aiter_lines():
-                        if line.strip():
-                            result = json.loads(line)
-                            if "error" in result:
-                                self.logger.error_status(url=result.get("url", "unknown"), error=result["error"])
-                                continue
-                            self.logger.url_status(url=result.get("url", "unknown"), success=True, timing=result.get("timing", 0.0))
-                            if result.get("status") == "completed":
-                                continue
-                            else:
-                                yield self._to_result(result)
+                        if not line.strip():
+                            continue
+                        frame = json.loads(line)
+                        status = frame.get("status")
+                        if status == "completed":
+                            continue
+                        if status == "error":
+                            message = frame.get("error", "Unknown error")
+                            raise RequestError(f"Crawl failed: {message}")
+                        if "error" in frame:
+                            self.logger.error_status(
+                                url=frame.get("url", "unknown"), error=frame["error"]
+                            )
+                            continue
+                        result = self._to_result(frame)
+                        self.logger.url_status(
+                            url=result.url,
+                            success=result.success,
+                            timing=frame.get("timing", 0.0),
+                        )
+                        yield result
             return stream_results()
 
         request_timeout = max(self.timeout, hooks_timeout) if hooks else self.timeout
