@@ -119,20 +119,23 @@ The `RateLimiter` integrates seamlessly with dispatchers like `MemoryAdaptiveDis
 The CrawlerMonitor provides real-time visibility into crawling operations:
 
 ```python
-from crawl4ai import CrawlerMonitor, DisplayMode
-monitor = CrawlerMonitor(
-    # Maximum rows in live display
-    max_visible_rows=15,          
+from crawl4ai import CrawlerMonitor
 
-    # DETAILED or AGGREGATED view
-    display_mode=DisplayMode.DETAILED  
+monitor = CrawlerMonitor(
+    refresh_rate=1.0,
+    enable_ui=True,
+    max_width=120,
 )
 ```
 
-**Display Modes**:
+**Monitor Settings**:
 
-1. **DETAILED**: Shows individual task status, memory usage, and timing
-2. **AGGREGATED**: Displays summary statistics and overall progress
+1. **`refresh_rate`** (`float`, default: `1.0`): Seconds between terminal dashboard updates.
+2. **`enable_ui`** (`bool`, default: `True`): Whether to display the interactive terminal dashboard.
+3. **`max_width`** (`int`, default: `120`): Dashboard width in characters.
+4. **`urls_total`** (`int`, default: `0`): Initial total number of URLs, when known.
+
+For scripts without an interactive terminal, use `CrawlerMonitor(enable_ui=False)`. The monitor still collects statistics, available through `monitor.get_summary()`.
 
 ---
 
@@ -154,10 +157,7 @@ dispatcher = MemoryAdaptiveDispatcher(
         max_delay=30.0,
         max_retries=2
     ),
-    monitor=CrawlerMonitor(         # Optional monitoring
-        max_visible_rows=15,
-        display_mode=DisplayMode.DETAILED
-    )
+    monitor=CrawlerMonitor(),       # Optional monitoring
 )
 ```
 
@@ -196,10 +196,7 @@ dispatcher = SemaphoreDispatcher(
         base_delay=(0.5, 1.0),
         max_delay=10.0
     ),
-    monitor=CrawlerMonitor(        # Optional monitoring
-        max_visible_rows=15,
-        display_mode=DisplayMode.DETAILED
-    )
+    monitor=CrawlerMonitor(),      # Optional monitoring
 )
 ```
 
@@ -232,9 +229,7 @@ async def crawl_batch():
         memory_threshold_percent=70.0,
         check_interval=1.0,
         max_session_permit=10,
-        monitor=CrawlerMonitor(
-            display_mode=DisplayMode.DETAILED
-        )
+        monitor=CrawlerMonitor(urls_total=len(urls))
     )
 
     async with AsyncWebCrawler(config=browser_config) as crawler:
@@ -275,9 +270,7 @@ async def crawl_streaming():
         memory_threshold_percent=70.0,
         check_interval=1.0,
         max_session_permit=10,
-        monitor=CrawlerMonitor(
-            display_mode=DisplayMode.DETAILED
-        )
+        monitor=CrawlerMonitor(urls_total=len(urls))
     )
 
     async with AsyncWebCrawler(config=browser_config) as crawler:
@@ -315,10 +308,7 @@ async def crawl_with_semaphore(urls):
             base_delay=(0.5, 1.0),
             max_delay=10.0
         ),
-        monitor=CrawlerMonitor(
-            max_visible_rows=15,
-            display_mode=DisplayMode.DETAILED
-        )
+        monitor=CrawlerMonitor(urls_total=len(urls))
     )
     
     async with AsyncWebCrawler(config=browser_config) as crawler:
