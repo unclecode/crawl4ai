@@ -785,13 +785,12 @@ class TestMaxPagesBoundaryYielded:
     hit the limit, so it returned max_pages-1 results while BFS already returned
     max_pages. The downstream scan count (discovered_urls) is derived from the
     yielded results, so the off-by-one surfaced as "11 requested -> 10 found".
-    BFS is included as the working reference. (DFS batch mode has a separate,
-    unrelated overshoot quirk and is intentionally not asserted here.)
+    BFS and DFS share the same page-budget contract.
     """
 
     @pytest.mark.parametrize(
         "strategy_class",
-        [BFSDeepCrawlStrategy, BestFirstCrawlingStrategy],
+        [BFSDeepCrawlStrategy, BestFirstCrawlingStrategy, DFSDeepCrawlStrategy],
     )
     @pytest.mark.asyncio
     async def test_yields_exactly_max_pages(self, strategy_class):
