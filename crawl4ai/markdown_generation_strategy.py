@@ -5,10 +5,22 @@ from .html2text import CustomHTML2Text
 # from .types import RelevantContentFilter
 from .content_filter_strategy import RelevantContentFilter
 import re
+from string import punctuation
 from urllib.parse import urljoin
 
 # Pre-compile the regex pattern
-LINK_PATTERN = re.compile(r'!?\[((?:[^\[\]]|\[(?:[^\[\]]|\[[^\]]*\])*\])*)\]\(((?:[^()\s]|\([^()]*\))*)(?:\s+"([^"]*)")?\)')
+LINK_PATTERN = re.compile(
+    r"!?\[((?:[^\[\]]|\[(?:[^\[\]]|\[[^\]]*\])*\])*)\]\("
+    r"(?:<((?:\\[^\r\n]|[^\\<>\r\n])*)>|((?:[^()\s]|\([^()]*\))*))"
+    r'(?:\s+"([^"]*)")?\)'
+)
+MARKDOWN_ESCAPE = re.compile(r"\\([" + re.escape(punctuation) + r"])")
+MARKDOWN_CODE = re.compile(
+    r"^(?:[ \t]*> ?)*[ \t]*(?P<fence>(?P<fence_char>`|~)(?P=fence_char){2,})[^\n]*\n"
+    r".*?(?:^(?:[ \t]*> ?)*[ \t]*(?P=fence)(?P=fence_char)*[ \t]*$|\Z)"
+    r"|(?<!`)(?P<ticks>`+)(?!`)(?:(?!\n[ \t]*\n).)*?(?<!`)(?P=ticks)(?!`)",
+    re.MULTILINE | re.DOTALL,
+)
 
 
 def fast_urljoin(base: str, url: str) -> str:
@@ -105,10 +117,24 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
         parts = []
         last_end = 0
         counter = 1
+        code_ranges = MARKDOWN_CODE.finditer(markdown)
+        code_range = None
 
         for match in LINK_PATTERN.finditer(markdown):
+            text, protected_url, bare_url, title = match.groups()
+            url = bare_url
+            if protected_url is not None:
+                # Angle destinations extend the old grammar to include spaces.
+                # Match those destinations only in prose, where they are links.
+                while code_range is None or code_range.end() <= match.start():
+                    code_range = next(code_ranges, None)
+                    if code_range is None:
+                        break
+                if code_range is not None and code_range.start() <= match.start():
+                    continue
+                url = MARKDOWN_ESCAPE.sub(r"\1", protected_url)
+
             parts.append(markdown[last_end : match.start()])
-            text, url, title = match.groups()
 
             # Use cached URL if available, otherwise compute and cache
             if base_url and not url.startswith(("http://", "https://", "mailto:")):
