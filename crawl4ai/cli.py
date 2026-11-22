@@ -264,12 +264,9 @@ css_schema.json:
 
 extract_llm.yml:
     type: "llm"
-    provider: "openai/gpt-4"
+    provider: "openai/gpt-6-luna"
     instruction: "Extract all articles with their titles and links"
-    api_token: "your-token"
-    params:
-        temperature: 0.3
-        max_tokens: 1000
+    api_token: "env:OPENAI_API_KEY"
 
 llm_schema.json:
     {
@@ -340,7 +337,7 @@ For more documentation visit: https://github.com/unclecode/crawl4ai
     Supported provider format: 'company/model'
     Examples:
       - ollama/llama3.3
-      - openai/gpt-4
+      - openai/gpt-6-luna
       - anthropic/claude-3-sonnet
       - cohere/command
       - google/gemini-pro
