@@ -15,6 +15,21 @@ DEFAULT_USER_AGENT = (
     "(KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36"
 )
 
+# Chromium derives the Sec-CH-UA GREASE ("Not ... Brand") name and version
+# from the browser major version (components/embedder_support/user_agent_utils.cc):
+# the two filler characters come from the 11-entry list below at positions
+# major % 11 and (major + 1) % 11, and the version cycles ["8", "99", "24"].
+# Measured: Chrome 158 -> "Not.A/Brand";v="24"; Chrome 159 -> "Not/A)Brand";v="8".
+_GREASE_CHARS = [" ", "(", ":", "-", ".", "/", ")", ";", "=", "?", "_"]
+_GREASE_VERSIONS = ["8", "99", "24"]
+
+
+def _grease_brand(major: int) -> str:
+    """Fake GREASE brand for a Chromium major version, e.g. '"Not.A/Brand";v="24"'."""
+    name = f"Not{_GREASE_CHARS[major % 11]}A{_GREASE_CHARS[(major + 1) % 11]}Brand"
+    return f'"{name}";v="{_GREASE_VERSIONS[major % 3]}"'
+
+
 class UAGen(ABC):
    @abstractmethod
    def generate(self, 
@@ -28,7 +43,13 @@ class UAGen(ABC):
    
    @staticmethod
    def generate_client_hints( user_agent: str) -> str:
-        """Generate Sec-CH-UA header value based on user agent string"""
+        """Generate Sec-CH-UA header value based on user agent string.
+
+        The brands are derived from the UA itself: a HeadlessChrome
+        (Chrome for Testing) UA is unbranded Chromium, so it gets no
+        "Google Chrome" brand, and the GREASE brand follows Chromium's
+        major-version rules instead of a fixed "Not_A Brand";v="8".
+        """
         def _parse_user_agent(user_agent: str) -> Dict[str, str]:
             """Parse a user agent string to extract browser and version information"""
             browsers = {
@@ -47,18 +68,27 @@ class UAGen(ABC):
             return result
         browsers = _parse_user_agent(user_agent)
 
+        # HeadlessChrome (Chrome for Testing) is unbranded Chromium: it sends
+        # only the GREASE brand and Chromium, never "Google Chrome".
+        # Measured on Chrome for Testing 158: "Not.A/Brand";v="24", "Chromium";v="158".
+        headless = re.search(r"HeadlessChrome/(\d+)", user_agent)
+        if headless:
+            major = int(headless.group(1))
+            return f"{_grease_brand(major)}, \"Chromium\";v=\"{major}\""
+
         # Client hints components
         hints = []
 
         # Handle different browser combinations
         if "chrome" in browsers:
-            hints.append(f'"Chromium";v="{browsers["chrome"]}"')
-            hints.append('"Not_A Brand";v="8"')
+            major = int(browsers["chrome"])
+            hints.append(f'"Chromium";v="{major}"')
+            hints.append(_grease_brand(major))
 
             if "edge" in browsers:
                 hints.append(f'"Microsoft Edge";v="{browsers["edge"]}"')
             else:
-                hints.append(f'"Google Chrome";v="{browsers["chrome"]}"')
+                hints.append(f'"Google Chrome";v="{major}"')
 
         elif "firefox" in browsers:
             # Firefox doesn't typically send Sec-CH-UA
@@ -436,32 +466,12 @@ class UserAgentGenerator():
         return result
 
     def generate_client_hints(self, user_agent: str) -> str:
-        """Generate Sec-CH-UA header value based on user agent string"""
-        browsers = self.parse_user_agent(user_agent)
+        """Generate Sec-CH-UA header value based on user agent string.
 
-        # Client hints components
-        hints = []
-
-        # Handle different browser combinations
-        if "chrome" in browsers:
-            hints.append(f'"Chromium";v="{browsers["chrome"]}"')
-            hints.append('"Not_A Brand";v="8"')
-
-            if "edge" in browsers:
-                hints.append(f'"Microsoft Edge";v="{browsers["edge"]}"')
-            else:
-                hints.append(f'"Google Chrome";v="{browsers["chrome"]}"')
-
-        elif "firefox" in browsers:
-            # Firefox doesn't typically send Sec-CH-UA
-            return ""
-
-        elif "safari" in browsers:
-            # Safari's format for client hints
-            hints.append(f'"Safari";v="{browsers["safari"]}"')
-            hints.append('"Not_A Brand";v="8"')
-
-        return ", ".join(hints)
+        Delegates to UAGen.generate_client_hints so both entry points emit
+        the same brands for a given UA.
+        """
+        return UAGen.generate_client_hints(user_agent)
 
 
 # Example usage:
