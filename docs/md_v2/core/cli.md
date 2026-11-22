@@ -133,12 +133,9 @@ params:
 ```yaml
 # extract_llm.yml
 type: "llm"
-provider: "openai/gpt-4"
+provider: "openai/gpt-6-luna"
 instruction: "Extract all articles with their titles and links"
-api_token: "your-token"
-params:
-  temperature: 0.3
-  max_tokens: 1000
+api_token: "env:OPENAI_API_KEY"
 ```
 
 ```json
@@ -184,7 +181,7 @@ crwl https://example.com \
 First-time setup:
 - Prompts for LLM provider and API token
 - Saves configuration in `~/.crawl4ai/global.yml`
-- Supports various providers (openai/gpt-4, anthropic/claude-3-sonnet, etc.)
+- Supports various providers (for example, `openai/gpt-6-luna` and `ollama/llama3.3`).
 - For case of `ollama` you do not need to provide API token.
 - See [LiteLLM Providers](https://docs.litellm.ai/docs/providers) for full list
 
