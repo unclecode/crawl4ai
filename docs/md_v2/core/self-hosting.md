@@ -80,13 +80,13 @@ Pull and run images directly from Docker Hub without building locally.
 
 #### 1. Pull the Image
 
-Our latest release is `0.9.2`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
+Our latest release is `0.9.6`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
 
 > 💡 **Note**: The `latest` tag points to the most recent stable version.
 
 ```bash
 # Pull the latest version
-docker pull unclecode/crawl4ai:0.9.2
+docker pull unclecode/crawl4ai:0.9.6
 
 # Or pull using the latest tag
 docker pull unclecode/crawl4ai:latest
@@ -196,7 +196,7 @@ docker stop crawl4ai && docker rm crawl4ai
 #### Docker Hub Versioning Explained
 
 *   **Image Name:** `unclecode/crawl4ai`
-*   **Tag Format:** `LIBRARY_VERSION[-SUFFIX]` (e.g., `0.9.2`)
+*   **Tag Format:** `LIBRARY_VERSION[-SUFFIX]` (e.g., `0.9.6`)
     *   `LIBRARY_VERSION`: The semantic version of the core `crawl4ai` Python library
     *   `SUFFIX`: Optional tag for release candidates (``) and revisions (`r1`)
 *   **`latest` Tag:** Points to the most recent stable version

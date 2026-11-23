@@ -155,7 +155,7 @@ In 2023, I needed web-to-Markdown. The “open source” option wanted an accoun
 
 I made it open source for **availability**, anyone can use it without a gate. Now I’m building the platform for **affordability**, anyone can run serious crawls without breaking the bank. If that resonates, join in, send feedback, or just crawl something amazing.
 
-That platform is live now: [Crawl4AI Cloud](https://crawl4ai.com/?ref=readme).
+That platform is live now: [Crawl4AI Cloud](https://crawl4ai.com/).
 </details>
 
 <details>
@@ -526,7 +526,7 @@ Our mission is to unlock the value of personal and enterprise data by turning di
 ## 💖 Support Crawl4AI
 
 1. ⭐ **Star the repo**: it helps more people find it.
-2. ☁️ **Use the cloud**: [crawl4ai.com](https://crawl4ai.com/?ref=readme). It funds the library.
+2. ☁️ **Use the cloud**: [crawl4ai.com](https://crawl4ai.com/). It funds the library.
 3. 💝 **Sponsor on GitHub**: [github.com/sponsors/unclecode](https://github.com/sponsors/unclecode)
 4. 🏢 **Companies**: the sponsor tiers and benefits are in [SPONSORS.md](SPONSORS.md).
 
