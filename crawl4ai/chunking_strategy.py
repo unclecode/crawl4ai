@@ -231,6 +231,17 @@ class OverlappingWindowChunking(ChunkingStrategy):
             window_size (int): The size of the window in words.
             overlap (int): The size of the overlap between consecutive chunks in words.
         """
+        if window_size < 1:
+            raise ValueError(f"window_size must be at least 1, got {window_size}")
+        if not 0 <= overlap < window_size:
+            # The sliding window advances by `window_size - overlap` words, so an
+            # overlap that is not smaller than the window never advances `start`:
+            # `overlap == window_size` loops forever, `overlap > window_size` walks
+            # backwards through the text.
+            raise ValueError(
+                f"overlap must be between 0 and window_size - 1, got overlap={overlap} "
+                f"for window_size={window_size}"
+            )
         self.window_size = window_size
         self.overlap = overlap
 
@@ -250,6 +261,8 @@ class OverlappingWindowChunking(ChunkingStrategy):
             if end >= len(words):
                 break
 
-            start = end - self.overlap
+            # Always advance by at least one word, even if `overlap` is mutated after
+            # construction to a value >= window_size.
+            start = max(end - self.overlap, start + 1)
 
         return chunks
