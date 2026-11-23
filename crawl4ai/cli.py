@@ -1654,7 +1654,9 @@ def default(url: str, example: bool, browser_config: str, crawler_config: str, f
 
 def main():
     import sys
-    if len(sys.argv) < 2 or sys.argv[1] not in cli.commands:
+    if len(sys.argv) > 1 and sys.argv[1] == "--example":
+        sys.argv[1] = "examples"
+    elif len(sys.argv) < 2 or sys.argv[1] not in cli.commands:
         sys.argv.insert(1, "crawl")
     try:
         from .cloud_notice import show_once
