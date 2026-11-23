@@ -105,11 +105,9 @@ class FilterChain:
         if tasks:
             results = await asyncio.gather(*tasks)
 
-            # Count how many filters rejected
-            rejections = results.count(False)
-            self.stats._counters[2] += rejections
-
             if not all(results):
+                # Chain counters describe URLs, not individual filter results.
+                self.stats._counters[2] += 1
                 return False  # Stop early if any filter rejected
 
         self.stats._counters[1] += 1  # Passed
