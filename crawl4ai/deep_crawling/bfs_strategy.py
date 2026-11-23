@@ -251,6 +251,20 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 break
 
             next_level: List[Tuple[str, Optional[str]]] = []
+            if self._resume_state:
+                # A per-URL checkpoint can contain unfinished siblings followed
+                # by their discovered children. Keep those depths in BFS order.
+                current_depth = min(depths.get(url, 0) for url, _ in current_level)
+                next_level = [
+                    item
+                    for item in current_level
+                    if depths.get(item[0], 0) > current_depth
+                ]
+                current_level = [
+                    item
+                    for item in current_level
+                    if depths.get(item[0], 0) == current_depth
+                ]
             # Siblings in a level queue links before the level's own pages are all
             # counted, so cap the level to the budget left before fetching it.
             # max_pages defaults to infinity, which is not a valid slice index.
@@ -260,6 +274,11 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             urls = [url for url, _ in current_level]
             # reversed() keeps first-parent-wins if a resumed level repeats a URL
             parents = dict(reversed(current_level))
+            pending_level = (
+                {url: parents[url] for url, _ in current_level}
+                if self._on_state_change
+                else None
+            )
 
             # Clone the config to disable deep crawling recursion and enforce batch mode.
             batch_config = config.clone(deep_crawl_strategy=None, stream=False)
@@ -275,6 +294,8 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
 
             for result in batch_results:
                 url = result.url
+                if pending_level is not None:
+                    pending_level.pop(url, None)
                 depth = depths.get(url, 0)
                 result.metadata = result.metadata or {}
                 result.metadata["depth"] = depth
@@ -295,7 +316,10 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                         state = {
                             "strategy_type": "bfs",
                             "visited": list(visited),
-                            "pending": [{"url": u, "parent_url": p} for u, p in next_level],
+                            "pending": [
+                                {"url": u, "parent_url": p}
+                                for u, p in list(pending_level.items()) + next_level
+                            ],
                             "depths": depths,
                             "pages_crawled": self._pages_crawled,
                             "cancelled": self._cancel_event.is_set(),
@@ -356,6 +380,20 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 break
 
             next_level: List[Tuple[str, Optional[str]]] = []
+            if self._resume_state:
+                # A per-URL checkpoint can contain unfinished siblings followed
+                # by their discovered children. Keep those depths in BFS order.
+                current_depth = min(depths.get(url, 0) for url, _ in current_level)
+                next_level = [
+                    item
+                    for item in current_level
+                    if depths.get(item[0], 0) > current_depth
+                ]
+                current_level = [
+                    item
+                    for item in current_level
+                    if depths.get(item[0], 0) == current_depth
+                ]
             # Siblings in a level queue links before the level's own pages are all
             # counted, so cap the level to the budget left before fetching it.
             # max_pages defaults to infinity, which is not a valid slice index.
@@ -368,6 +406,11 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             urls = [url for url, _ in current_level]
             # reversed() keeps first-parent-wins if a resumed level repeats a URL
             parents = dict(reversed(current_level))
+            pending_level = (
+                {url: parents[url] for url, _ in current_level}
+                if self._on_state_change
+                else None
+            )
             visited.update(urls)
 
             stream_config = config.clone(deep_crawl_strategy=None, stream=True)
@@ -382,6 +425,8 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             results_count = 0
             async for result in stream_gen:
                 url = result.url
+                if pending_level is not None:
+                    pending_level.pop(url, None)
                 depth = depths.get(url, 0)
                 result.metadata = result.metadata or {}
                 result.metadata["depth"] = depth
@@ -409,7 +454,10 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                         state = {
                             "strategy_type": "bfs",
                             "visited": list(visited),
-                            "pending": [{"url": u, "parent_url": p} for u, p in next_level],
+                            "pending": [
+                                {"url": u, "parent_url": p}
+                                for u, p in list(pending_level.items()) + next_level
+                            ],
                             "depths": depths,
                             "pages_crawled": self._pages_crawled,
                             "cancelled": self._cancel_event.is_set(),
