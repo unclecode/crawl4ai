@@ -112,6 +112,38 @@ class OnlineUAGenerator(UAGen):
        except Exception as e:
            print(f"Error fetching agents: {e}")
            
+   @staticmethod
+   def _matches_browser(ua: str, browser: str, min_version: float = 0.0) -> bool:
+       b = browser.lower()
+       if b == "edge":
+           m = re.search(r"Edg(?:A|iOS)?/(\d+(?:\.\d+)?)", ua)
+       elif b in ("chrome", "chromium"):
+           if re.search(r"(?:Edg|EdgA|EdgiOS|OPR)/", ua):
+               return False
+           m = re.search(r"(?:Chrome|CriOS|Chromium)/(\d+(?:\.\d+)?)", ua)
+       elif b == "safari":
+           if re.search(r"(?:Chrome|CriOS|Chromium|Edg|EdgA|EdgiOS|OPR|Firefox|FxiOS)/", ua):
+               return False
+           m = re.search(r"Version/(\d+(?:\.\d+)?)", ua)
+       elif b == "firefox":
+           m = re.search(r"(?:Firefox|FxiOS)/(\d+(?:\.\d+)?)", ua)
+       else:
+           m = re.search(rf"{re.escape(browser)}(?:[/ ](\d+(?:\.\d+)?))?", ua, re.IGNORECASE)
+           if not m:
+               return False
+           return float(m.group(1)) >= min_version if m.group(1) else min_version <= 0.0
+       return bool(m) and float(m.group(1)) >= min_version
+
+   @staticmethod
+   def _matches_platform(ua: str, platform: str) -> bool:
+       is_mobile = bool(re.search(r"Mobile|Android|iPhone|iPad|iPod", ua, re.IGNORECASE))
+       p = platform.lower()
+       if p == "desktop":
+           return not is_mobile
+       if p == "mobile":
+           return is_mobile
+       return p in ua.lower()
+
    def generate(self,
                browsers: Optional[List[str]] = None,
                os: Optional[Union[str, List[str]]] = None,
@@ -129,8 +161,19 @@ class OnlineUAGenerator(UAGen):
            filtered_agents = [a for a in filtered_agents if a['pct'] >= pct_threshold]
            
        if browsers:
-           filtered_agents = [a for a in filtered_agents 
-                            if any(b.lower() in a['ua'].lower() for b in browsers)]
+           browser_list = [browsers] if isinstance(browsers, str) else browsers
+           filtered_agents = [
+               a for a in filtered_agents
+               if any(self._matches_browser(a['ua'], b, min_version) for b in browser_list)
+           ]
+       elif min_version > 0.0:
+           filtered_agents = [
+               a for a in filtered_agents
+               if any(
+                   self._matches_browser(a['ua'], b, min_version)
+                   for b in ("edge", "chrome", "safari", "firefox")
+               )
+           ]
            
        if os:
            os_list = [os] if isinstance(os, str) else os
@@ -140,7 +183,7 @@ class OnlineUAGenerator(UAGen):
        if platforms:
            platform_list = [platforms] if isinstance(platforms, str) else platforms
            filtered_agents = [a for a in filtered_agents 
-                            if any(p.lower() in a['ua'].lower() for p in platform_list)]
+                            if any(self._matches_platform(a['ua'], p) for p in platform_list)]
            
        return filtered_agents[0] if filtered_agents else {'ua': fallback, 'pct': 0}
 
@@ -185,7 +228,7 @@ class UserAgentGenerator():
             },
             "macos": {
                 "intel": "(Macintosh; Intel Mac OS X 10_15_7)",
-                "newer": "(Macintosh; Intel Mac OS X 10.15; rv:109.0)",
+                "newer": "(Macintosh; Intel Mac OS X 14_0)",
             },
             "linux": {
                 "generic": "(X11; Linux x86_64)",
@@ -221,7 +264,7 @@ class UserAgentGenerator():
             "gecko": [  # Added Gecko versions
                 "Gecko/20100101",
                 "Gecko/20100101",  # Firefox usually uses this constant version
-                "Gecko/2010010",
+                "Gecko/20100101",
             ],
         }
 
@@ -399,23 +442,31 @@ class UserAgentGenerator():
 
     def get_random_platform(self, device_type, os_type, device_brand):
         """Helper method to get random platform based on constraints"""
-        platforms = (
-            self.desktop_platforms
-            if device_type == "desktop"
-            else self.mobile_platforms
-            if device_type == "mobile"
-            else {**self.desktop_platforms, **self.mobile_platforms}
-        )
+        if device_type is None:
+            platforms = {**self.desktop_platforms, **self.mobile_platforms}
+        elif device_type == "desktop":
+            platforms = self.desktop_platforms
+        elif device_type == "mobile":
+            platforms = self.mobile_platforms
+        else:
+            raise ValueError(f"Unsupported device type: {device_type}")
 
-        if os_type:
-            for platform_group in [self.desktop_platforms, self.mobile_platforms]:
-                if os_type in platform_group:
-                    platforms = {os_type: platform_group[os_type]}
-                    break
+        if os_type is not None:
+            if os_type not in platforms:
+                raise ValueError(f"Unsupported OS type: {os_type}")
+            platforms = {os_type: platforms[os_type]}
+
+        if device_brand is not None:
+            matching = [
+                brands[device_brand]
+                for brands in platforms.values()
+                if device_brand in brands
+            ]
+            if not matching:
+                raise ValueError(f"Unsupported device brand: {device_brand}")
+            return random.choice(matching)
 
         os_key = random.choice(list(platforms.keys()))
-        if device_brand and device_brand in platforms[os_key]:
-            return platforms[os_key][device_brand]
         return random.choice(list(platforms[os_key].values()))
 
     def parse_user_agent(self, user_agent: str) -> Dict[str, str]:
