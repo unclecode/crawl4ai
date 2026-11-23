@@ -1,0 +1,10 @@
+{#- Overrides the terminal theme's search button without the schema.org ListItem markup (see menu.html). -#}
+{%- set features = config.theme.features or [] -%}
+{%- set plugins = config.plugins or [] -%}
+{%- if 'search' in plugins and "navigation.top.search_button.hide" not in features %}
+<li>
+    <a href="#" class="menu-item" data-toggle="modal" data-target="#mkdocs_search_modal">
+        <i aria-hidden="true" class="fa fa-search"></i> <span>Search</span>
+    </a>
+</li>
+{%- endif -%}

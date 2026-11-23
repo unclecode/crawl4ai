@@ -25,6 +25,16 @@ By the end of this guide, you’ll have performed a basic crawl, generated Markd
 
 ## 2. Your First Crawl
 
+Install the library and its browser once:
+
+```bash
+pip install -U crawl4ai
+crawl4ai-setup
+```
+
+**Or skip the install.** One API call. First crawl in 30 seconds. [Get a free API key →](https://crawl4ai.com/signin/?ref=docs-quickstart-inline){ .c4s-box-btn data-c4s-ev="banner_inline_clicked" }
+{: .c4s-box }
+
 Here’s a minimal Python script that creates an **`AsyncWebCrawler`**, fetches a webpage, and prints the first 300 characters of its Markdown output:
 
 ```python

@@ -25,8 +25,6 @@ If you self-host the Docker server, upgrade. If you use the library, upgrade too
 
 ## Security fixes
 
-GHSA ids are added when the advisories are published.
-
 ### Browser context shared between API callers
 
 **GHSA-9xxj-3r64-qw54, CWE-488, medium.** Credit: [arpe1618](https://github.com/arpe1618).
