@@ -64,6 +64,12 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
             self._reset_seen(start_url)
 
         while stack and not self._cancel_event.is_set():
+            if self._pages_crawled >= self.max_pages:
+                self.logger.info(
+                    f"Max pages limit ({self.max_pages}) reached, stopping crawl"
+                )
+                break
+
             # Check external cancellation callback before processing this URL
             if await self._check_cancellation():
                 self.logger.info("Crawl cancelled by user")
@@ -179,6 +185,12 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
             self._reset_seen(start_url)
 
         while stack and not self._cancel_event.is_set():
+            if self._pages_crawled >= self.max_pages:
+                self.logger.info(
+                    f"Max pages limit ({self.max_pages}) reached, stopping crawl"
+                )
+                break
+
             # Check external cancellation callback before processing this URL
             if await self._check_cancellation():
                 self.logger.info("Crawl cancelled by user")
