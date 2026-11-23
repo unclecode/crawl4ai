@@ -11,7 +11,7 @@
 {%- set article = {
   "@context": "https://schema.org",
   "@type": "TechArticle",
-  "headline": page.title,
+  "headline": config.extra.home_title if page.is_homepage else page.title,
   "description": (page.meta.description if page.meta and page.meta.description else config.site_description)|trim,
   "url": page.canonical_url,
   "mainEntityOfPage": page.canonical_url,
@@ -97,6 +97,13 @@ d.setAttribute("data-c4s",s);})();
     <a href="https://crawl4ai.com/pricing/" data-c4s-home="docs-footer">Pricing</a>
     <a href="https://crawl4ai.com/compare/" data-c4s-home="docs-footer">Compare</a>
 </footer>
+{% endblock %}
+
+{#- the home page carries the brand title from mkdocs.yml (extra.home_title); other pages keep "Page - site name" -#}
+{% block htmltitle %}
+{%- if page and page.is_homepage and config.extra.home_title %}
+<title>{{ config.extra.home_title }}</title>
+{%- else %}{{ super() }}{% endif %}
 {% endblock %}
 
 {% block top_nav %}
