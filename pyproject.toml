@@ -58,6 +58,11 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 
+[project.urls]
+Homepage = "https://github.com/unclecode/crawl4ai"
+Documentation = "https://docs.crawl4ai.com"
+"Get a free API key" = "https://crawl4ai.com/signin/?ref=pip"
+
 [project.optional-dependencies]
 pdf = ["pypdf"]  
 torch = ["torch", "nltk", "scikit-learn"]

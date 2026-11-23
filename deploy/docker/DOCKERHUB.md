@@ -1,6 +1,6 @@
 # Crawl4AI
 
-**Crawl4AI Cloud is the hosted web crawler API for LLMs and AI agents. No servers to run. Start free at [crawl4ai.com](https://crawl4ai.com/?ref=dockerhub).** Prefer to self-host? This image is the open-source Crawl4AI server (Apache-2.0).
+**Crawl4AI Cloud is the hosted web crawler API for LLMs and AI agents. No servers to run. Start free at [crawl4ai.com](https://crawl4ai.com/signin/?ref=dockerhub).** Prefer to self-host? This image is the open-source Crawl4AI server (Apache-2.0).
 
 [![GitHub Stars](https://img.shields.io/github/stars/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai)
 [![Downloads](https://static.pepy.tech/badge/crawl4ai/month)](https://pepy.tech/project/crawl4ai)
@@ -40,7 +40,7 @@ Images are multi-arch (`amd64`, `arm64`). Tags: `latest`, or a version such as `
 - Source and issues: [github.com/unclecode/crawl4ai](https://github.com/unclecode/crawl4ai)
 - Hosted API docs: [crawl4ai.com/docs](https://crawl4ai.com/docs?ref=dockerhub)
 
-[![Want this without the ops work? Try Crawl4AI Cloud.](https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/dockerhub-cta.svg)](https://crawl4ai.com/?ref=dockerhub-cta)
+[![Want this without the ops work? Try Crawl4AI Cloud.](https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/dockerhub-cta.svg)](https://crawl4ai.com/signin/?ref=dockerhub-cta)
 
 ---
 
