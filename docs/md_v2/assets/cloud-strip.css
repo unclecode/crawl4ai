@@ -46,7 +46,13 @@ html{scroll-padding-top:calc(var(--header-height,65px) + var(--c4s-h) + 15px)}
   #terminal-mkdocs-side-panel{top:calc(var(--header-height,65px) + var(--c4s-h));bottom:calc(var(--c4s-compact) - var(--c4s-h));transition:transform var(--c4s-ease),left var(--layout-transition-speed,.2s) ease-in-out}
   html.c4s-shrunk .c4s,html.c4s-shrunk #terminal-mkdocs-side-panel,html.c4s-shrunk #toc-sidebar{transform:translateY(calc(-1 * var(--c4s-rise)))}
 }
-@media (prefers-reduced-motion:reduce){.c4s,.c4s-in,#toc-sidebar,#terminal-mkdocs-side-panel{transition:none}}
+/* the entrance, on the first page of a visit only: one slide-in, then one soft pulse of the button 1 s
+   after load; never repeated */
+@keyframes c4s-slide{from{transform:translateY(-100%)}to{transform:translateY(0)}}
+@keyframes c4s-pulse{0%{transform:scale(1);box-shadow:0 0 0 0 rgba(47,93,85,.45)}40%{transform:scale(1.04);box-shadow:0 0 0 8px rgba(47,93,85,0)}100%{transform:scale(1);box-shadow:0 0 0 0 rgba(47,93,85,0)}}
+html.c4s-arrive:not(.c4s-shrunk) .c4s{animation:c4s-slide .45s ease-out}
+html.c4s-arrive .c4s a.c4s-btn{animation:c4s-pulse .9s ease-out 1.45s 1}
+@media (prefers-reduced-motion:reduce){.c4s,.c4s-in,#toc-sidebar,#terminal-mkdocs-side-panel{transition:none}html.c4s-arrive:not(.c4s-shrunk) .c4s,html.c4s-arrive .c4s a.c4s-btn{animation:none}}
 
 /* phones: always the one-line strip */
 @media (max-width:768px){
