@@ -296,7 +296,9 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
             )
             return
 
-        links = result.links.get("internal", [])
+        # Copy the list: ``+=`` below must not append external links to the
+        # caller's ``result.links["internal"]``.
+        links = list(result.links.get("internal", []))
         if self.include_external:
             links += result.links.get("external", [])
 
