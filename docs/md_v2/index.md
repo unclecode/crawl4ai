@@ -66,6 +66,9 @@ pip install -U crawl4ai
 crawl4ai-setup        # installs the browser, once
 ```
 
+**Or skip the install.** One API call. First crawl in 30 seconds. [Get a free API key →](https://crawl4ai.com/signin/?ref=docs-home-inline){ .c4s-box-btn data-c4s-ev="banner_inline_clicked" }
+{: .c4s-box }
+
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler
