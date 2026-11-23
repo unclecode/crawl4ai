@@ -19,6 +19,11 @@ localStorage.setItem(K,JSON.stringify({visits:n,lastFull:last}));sessionStorage.
 if(/(^|; )c4_sess=1(;|$)/.test(document.cookie))s="compact";}catch(e){s="full";}
 d.setAttribute("data-c4s",s);})();
 </script>
+{#- assets/toc.js builds the "On this page" column after load; on a page that will get one, an empty column
+    of the same width holds its place, so the text column never narrows under the reader (layout shift). -#}
+{%- if page and page.toc and (page.toc|length > 1 or (page.toc|first).children) %}
+<style>@media (min-width:1201px){.terminal-mkdocs-main-grid:not(:has(#toc-sidebar))::after{content:"";flex:0 0 var(--toc-width);align-self:stretch}}</style>
+{%- endif %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pushfeedback/dist/pushfeedback/pushfeedback.css">
 
 <style>

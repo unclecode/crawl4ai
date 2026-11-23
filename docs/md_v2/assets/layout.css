@@ -381,6 +381,28 @@ footer {
     color: var(--secondary-dimmed-color); /* Dimmer color for icons */
 }
 
+/* The badge arrives after a GitHub API call. It has a fixed width, and an empty slot of the same width
+   holds its place until it arrives, so the header menu never moves (layout shift). */
+.github-stats-badge {
+    flex: 0 0 auto;
+    width: 262px;
+    display: flex;
+    justify-content: flex-end;
+}
+.terminal-nav:not(:has(.github-stats-badge))::after {
+    content: "";
+    flex: 0 0 auto;
+    width: 262px;
+    margin-left: 2em;
+}
+@media screen and (max-width: 900px) {
+    .github-stats-badge { width: 120px; }
+    .terminal-nav:not(:has(.github-stats-badge))::after { width: 120px; margin-left: 1em; }
+}
+@media screen and (max-width: 768px) {
+    .terminal-nav:not(:has(.github-stats-badge))::after { display: none; }
+}
+
 
 /* Adjust positioning relative to search/nav if needed */
 /* Example: If search is floated right */
