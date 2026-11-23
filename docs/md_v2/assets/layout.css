@@ -395,12 +395,14 @@ footer {
     width: 262px;
     margin-left: 2em;
 }
-@media screen and (max-width: 900px) {
-    .github-stats-badge { width: 120px; }
-    .terminal-nav:not(:has(.github-stats-badge))::after { width: 120px; margin-left: 1em; }
+/* the header gets crowded first: the short badge (stars and forks) from 1100px, no badge from 960px */
+@media screen and (max-width: 1100px) {
+    .github-stats-badge { width: 140px; margin-left: 1em; }
+    .github-stats-badge .repo-name { display: none; }
+    .terminal-nav:not(:has(.github-stats-badge))::after { width: 140px; margin-left: 1em; }
 }
-@media screen and (max-width: 768px) {
-    .terminal-nav:not(:has(.github-stats-badge))::after { display: none; }
+@media screen and (max-width: 960px) {
+    .github-stats-badge, .terminal-nav:not(:has(.github-stats-badge))::after { display: none; }
 }
 
 

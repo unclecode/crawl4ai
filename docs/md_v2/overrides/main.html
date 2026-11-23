@@ -67,6 +67,19 @@ d.setAttribute("data-c4s",s);})();
     src="https://cdn.jsdelivr.net/npm/pushfeedback@latest/dist/pushfeedback/pushfeedback.esm.js"></script>
 {% endblock %}
 
+{#- the plain links to crawl4ai.com at the end of every article, in the server HTML (assets/toc.js moves a
+    footer to the end of the article, and this one is already there, so nothing moves). The href stays plain;
+    assets/cloud-strip.js adds ref and aid on click. -#}
+{% block content_container %}
+{{ super() }}
+<footer class="c4s-footer">
+    <span>Crawl4AI Cloud</span>
+    <a href="https://crawl4ai.com/" data-c4s-home="docs-footer">Home</a>
+    <a href="https://crawl4ai.com/pricing/" data-c4s-home="docs-footer">Pricing</a>
+    <a href="https://crawl4ai.com/compare/" data-c4s-home="docs-footer">Compare</a>
+</footer>
+{% endblock %}
+
 {% block top_nav %}
 {{ super() }}
 {% include "partials/cloud-strip.html" %}

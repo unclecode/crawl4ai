@@ -27,6 +27,18 @@
       var t = e.target.closest("[data-c4s-ev]"); if (t) ev(t.getAttribute("data-c4s-ev"));
     });
 
+    /* plain links to crawl4ai.com (the Cloud menu item, the footer row): crawlers see the plain href; the
+       ref and the anonymous id are added only when a person opens the link (any button, or the keyboard) */
+    function tagHome(e) {
+      var a = e.target.closest && e.target.closest("a[data-c4s-home]"); if (!a || a.getAttribute("data-c4s-tagged")) return;
+      var ref = a.getAttribute("data-c4s-home");
+      a.href += (a.href.indexOf("?") < 0 ? "?" : "&") + "ref=" + encodeURIComponent(ref) + (anon && !quiet ? "&aid=" + anon : "");
+      a.setAttribute("data-c4s-tagged", "1");
+      ev("cloud_home_clicked", { to: a.pathname, ref: ref });
+    }
+    document.addEventListener("mousedown", tagHome);
+    document.addEventListener("keydown", function (e) { if (e.key === "Enter") tagHome(e); });
+
     /* ---- a full strip shrinks to one line on scroll, and grows back at the top of the page ---- */
     var shrunk = false, tick = false;
     function onScroll() {
