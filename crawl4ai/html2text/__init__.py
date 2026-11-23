@@ -390,7 +390,9 @@ class HTML2Text(html.parser.HTMLParser):
                 self.p()
 
         if tag == "br" and start:
-            if self.blockquote > 0:
+            if self.split_next_td and not self.bypass_tables and not self.ignore_tables:
+                self.o("<br>")
+            elif self.blockquote > 0:
                 self.o("  \n> ")
             else:
                 self.o("  \n")
@@ -733,6 +735,10 @@ class HTML2Text(html.parser.HTMLParser):
                             self.soft_br()
                             self.o("</" + config.TABLE_MARKER_FOR_PAD + ">")
                             self.o("  \n")
+                        else:
+                            # blank line so following text is not read as a table row
+                            self.soft_br()
+                            self.o("\n")
                 if tag in ["td", "th"] and start:
                     if self.pad_tables:
                         # pad_tables mode: keep upstream inter-cell delimiter only

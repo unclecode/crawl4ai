@@ -192,6 +192,28 @@ class TestTableGFMCompliance:
         assert len(table_lines) >= 3, f"Expected at least 3 table rows, got {len(table_lines)}"
         assert table_lines[0].startswith('|'), f"Header not starting with pipe: {repr(table_lines[0])}"
 
+    def test_br_in_cell_stays_in_its_row(self):
+        """A <br> inside a cell does not end the table row."""
+        html = '<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>one<br>two</td></tr></table>'
+        h = HTML2Text()
+        h.body_width = 0
+        lines = _table_lines(h.handle(html))
+
+        assert len(lines) == 3, f"Expected header, separator and one row: {lines}"
+        assert 'one<br>two' in lines[2]
+
+    def test_text_after_table_is_not_a_row(self):
+        """The paragraph after a table is separated by a blank line."""
+        html = '<table><tr><th>A</th></tr><tr><td>1</td></tr></table><p>After.</p>'
+        h = HTML2Text()
+        h.body_width = 0
+        h.single_line_break = True
+        result = h.handle(html)
+
+        lines = result.split('\n')
+        after = next(i for i, line in enumerate(lines) if line.startswith('After.'))
+        assert lines[after - 1].strip() == '', repr(result)
+
 
 class TestPadTablesUnchanged:
     """Verify pad_tables=True behavior is unchanged from upstream."""
