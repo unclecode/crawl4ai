@@ -135,7 +135,7 @@ class C4ACompiler:
             return CompilationResult(success=False, errors=[error])
         
         try:
-            script = path.read_text()
+            script = path.read_text(encoding="utf-8")
             return cls.compile(script, root=path.parent)
         except Exception as e:
             error = ErrorDetail(
