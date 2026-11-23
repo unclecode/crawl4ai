@@ -76,6 +76,25 @@ class TestCLIBasics:
         assert result.exit_code != 0
         assert 'URL argument is required' in result.output
 
+    def test_missing_profile_exits_non_zero(self, runner, monkeypatch):
+        """A missing --profile must not look like a successful crawl."""
+
+        class MissingProfiler:
+            def get_profile_path(self, name):
+                return None
+
+            def list_profiles(self):
+                return []
+
+        monkeypatch.setattr("crawl4ai.cli.BrowserProfiler", MissingProfiler)
+
+        result = runner.invoke(
+            cli, ['crawl', 'https://example.com', '--profile', 'does-not-exist']
+        )
+
+        assert result.exit_code == 1, result.output
+        assert 'No profiles found' in result.output
+
 class TestConfigParsing:
     def test_parse_key_values_basic(self):
         result = parse_key_values(None, None, "key1=value1,key2=true")
