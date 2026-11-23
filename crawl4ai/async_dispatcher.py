@@ -145,6 +145,10 @@ class BaseDispatcher(ABC):
         pass
 
 
+class _RequeuedTaskResult(CrawlerTaskResult):
+    """Internal result for work that was put back on the dispatcher queue."""
+
+
 class MemoryAdaptiveDispatcher(BaseDispatcher):
     def __init__(
         self,
@@ -300,8 +304,8 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                         error_message="Requeued due to critical memory pressure"
                     )
                 
-                # Return placeholder result with requeued status
-                return CrawlerTaskResult(
+                # The crawl is still pending rather than a terminal failure.
+                return _RequeuedTaskResult(
                     task_id=task_id,
                     url=url,
                     result=CrawlResult(
@@ -445,7 +449,8 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                     # Process completed tasks
                     for completed_task in done:
                         result = await completed_task
-                        results.append(result)
+                        if not isinstance(result, _RequeuedTaskResult):
+                            results.append(result)
                         
                     # Update active tasks list
                     active_tasks = list(pending)
@@ -599,8 +604,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                     for completed_task in done:
                         result = await completed_task
                         
-                        # Only count as completed if it wasn't requeued
-                        if "requeued" not in result.error_message:
+                        if not isinstance(result, _RequeuedTaskResult):
                             completed_count += 1
                             yield result
                         
