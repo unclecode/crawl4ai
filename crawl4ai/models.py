@@ -4,7 +4,7 @@ from typing import List, Dict, Optional, Callable, Awaitable, Union, Any
 from typing import AsyncGenerator
 from typing import Generic, TypeVar
 from enum import Enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from .ssl_certificate import SSLCertificate
 from datetime import datetime
 from datetime import timedelta
@@ -102,7 +102,7 @@ class UrlModel(BaseModel):
 class TraversalStats:
     """Statistics for the traversal process"""
 
-    start_time: datetime = datetime.now()
+    start_time: datetime = field(default_factory=datetime.now)
     urls_processed: int = 0
     urls_failed: int = 0
     urls_skipped: int = 0
