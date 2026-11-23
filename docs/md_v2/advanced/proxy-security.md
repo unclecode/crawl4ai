@@ -3,7 +3,7 @@
 This guide covers proxy configuration and security features in Crawl4AI, including SSL certificate analysis and proxy rotation strategies.
 
 !!! tip "No proxies to buy or rotate"
-    [Crawl4AI Cloud](https://crawl4ai.com/?ref=docs-proxy) fetches from the country you choose with its own addresses: add `"country": "gb"` to a call, nothing to configure. 1,000 free credits every month, no card. [Get a key →](https://crawl4ai.com/signin/?ref=docs-proxy)
+    [Crawl4AI Cloud](https://crawl4ai.com/) fetches from the country you choose with its own addresses: add `"country": "gb"` to a call, nothing to configure. 1,000 free credits every month, no card. [Get a key →](https://crawl4ai.com/signin/?ref=docs-proxy)
 
     ```bash
     curl -X POST https://api.crawl4ai.com/scrape \

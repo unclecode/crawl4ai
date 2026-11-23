@@ -25,8 +25,8 @@ import sys
 import time
 from pathlib import Path
 
-CLOUD_URL = "https://crawl4ai.com/?ref=pip"
-BLOCKED_URL = "https://crawl4ai.com/?ref=blocked"
+CLOUD_URL = "https://crawl4ai.com/signin/?ref=pip"
+BLOCKED_URL = "https://crawl4ai.com/signin/?ref=blocked"
 _ENV_OFF = "CRAWL4AI_NO_CLOUD_NOTICE"
 _MARKER = ".cloud-notice-shown"
 _BLOCKED_MARKER = ".cloud-notice-blocked"

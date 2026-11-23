@@ -5,6 +5,13 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Cloud links follow one rule: the product name links to https://crawl4ai.com/ with no tracking, and an offer ("Get a free API key", "1,000 free credits") links to https://crawl4ai.com/signin/ with a ref tag. The CLI notice, the README, the Docker Hub page and the docs follow it.
+- PyPI project URLs: Homepage is https://crawl4ai.com/, the GitHub repository is listed as Source.
+
 ## [0.9.6] - 2026-11-20
 
 0.9.6 is a security release. It closes eleven coordinated-disclosure advisories. Nine are in the Docker server: one more SSRF path, a browser context and declarative hooks shared between API callers, a list-form bypass of the 0.9.5 ReDoS fix, unchecked markdown options, a request-size limit that skipped chunked bodies, a TLS fetch that blocked the event loop, an uncapped `screenshot_wait_for`, and a monitor leak. Two reach the library too: unbounded sitemap index following in the URL seeder, and dependency floors that allowed a vulnerable Brotli decoder. It also ships the bug fixes that landed on `develop` since 0.9.5. Users who self-host the Docker server should upgrade.

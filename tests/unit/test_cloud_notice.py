@@ -65,6 +65,6 @@ def test_the_banner_is_ascii_with_the_link_and_the_off_switch():
         shown = _render(lines)
         assert shown.isascii(), "every console can print it"
         assert shown.startswith(cloud_notice._RULE) and shown.rstrip().endswith(cloud_notice._RULE)
-        assert "https://crawl4ai.com/?ref=" in shown
+        assert "https://crawl4ai.com/signin/?ref=" in shown
     assert cloud_notice._ENV_OFF in _render(cloud_notice.LINES)
     assert cloud_notice.text() == _render(cloud_notice.LINES).rstrip("\n")
