@@ -26,6 +26,22 @@
     document.addEventListener("click", function (e) {
       var t = e.target.closest("[data-c4s-ev]"); if (t) ev(t.getAttribute("data-c4s-ev"));
     });
+
+    /* ---- a full strip shrinks to one line on scroll, and grows back at the top of the page ---- */
+    var shrunk = false, tick = false;
+    function onScroll() {
+      if (tick) return; tick = true;
+      requestAnimationFrame(function () {
+        tick = false;
+        if (html.getAttribute("data-c4s") !== "full") return;
+        var y = window.scrollY || 0;
+        /* two thresholds, so a page resting near the top does not flicker between the states */
+        if (!shrunk && y > 40) { shrunk = true; html.classList.add("c4s-shrunk"); }
+        else if (shrunk && y < 8) { shrunk = false; html.classList.remove("c4s-shrunk"); }
+      });
+    }
+    addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
     ev("banner_shown");
   }
 })();

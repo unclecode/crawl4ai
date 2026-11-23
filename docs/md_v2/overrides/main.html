@@ -6,6 +6,19 @@
 <script>
     document.documentElement.setAttribute("data-theme", "dark");
 </script>
+<script>
+/* The Cloud strip's state before the first paint, so its reserved height never moves the page.
+   A visit is a new browser session. Visit 1: full; visits 2-4: compact; full again on every 5th visit or
+   14 days after the last full one. A signed-in Cloud user (the c4_sess cookie on .crawl4ai.com): compact.
+   Storage blocked: full. */
+(function(){var d=document.documentElement,K="c4-strip",s="full";
+try{s=sessionStorage.getItem(K+"-state");
+if(!s){var v=JSON.parse(localStorage.getItem(K)||"{}"),n=(v.visits|0)+1,now=Date.now(),last=Number(v.lastFull)||0;
+s=(n%5===0||now-last>=14*864e5)?"full":"compact";if(s==="full")last=now;
+localStorage.setItem(K,JSON.stringify({visits:n,lastFull:last}));sessionStorage.setItem(K+"-state",s);}
+if(/(^|; )c4_sess=1(;|$)/.test(document.cookie))s="compact";}catch(e){s="full";}
+d.setAttribute("data-c4s",s);})();
+</script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pushfeedback/dist/pushfeedback/pushfeedback.css">
 
 <style>
