@@ -952,6 +952,7 @@ class HTML2Text(html.parser.HTMLParser):
             data = escape_md_section(
                 data,
                 snob=self.escape_snob,
+                escape_backslash=self.escape_backslash,
                 escape_dot=self.escape_dot,
                 escape_plus=self.escape_plus,
                 escape_dash=self.escape_dash,
