@@ -661,7 +661,7 @@ class AsyncDatabaseManager:
         try:
             async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
                 return await f.read()
-        except:
+        except Exception:
             self.logger.error(
                 message="Failed to load content: {file_path}",
                 tag="ERROR",
