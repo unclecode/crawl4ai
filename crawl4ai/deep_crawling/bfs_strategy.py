@@ -260,6 +260,8 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             urls = [url for url, _ in current_level]
             # reversed() keeps first-parent-wins if a resumed level repeats a URL
             parents = dict(reversed(current_level))
+            # Normalized like discovered links, so a page linking to itself is not queued again
+            visited.update(normalize_url_for_deep_crawl(u, u) for u in urls)
 
             # Clone the config to disable deep crawling recursion and enforce batch mode.
             batch_config = config.clone(deep_crawl_strategy=None, stream=False)
@@ -368,7 +370,8 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             urls = [url for url, _ in current_level]
             # reversed() keeps first-parent-wins if a resumed level repeats a URL
             parents = dict(reversed(current_level))
-            visited.update(urls)
+            # Normalized like discovered links, so a page linking to itself is not queued again
+            visited.update(normalize_url_for_deep_crawl(u, u) for u in urls)
 
             stream_config = config.clone(deep_crawl_strategy=None, stream=True)
             arun_many_kwargs = (
@@ -391,14 +394,15 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 # Count only successful crawls
                 if result.success:
                     self._pages_crawled += 1
-                    # Check if we've reached the limit during batch processing
-                    if self._pages_crawled >= self.max_pages:
-                        self.logger.info(f"Max pages limit ({self.max_pages}) reached during batch, stopping crawl")
-                        break  # Exit the generator
-                
+
                 results_count += 1
                 yield result
-                
+
+                # Stop after yielding, so the page that reaches the limit is not dropped
+                if self._pages_crawled >= self.max_pages:
+                    self.logger.info(f"Max pages limit ({self.max_pages}) reached during batch, stopping crawl")
+                    break  # Exit the generator
+
                 # Only discover links from successful crawls
                 if result.success:
                     # Link discovery will handle the max pages limit internally
