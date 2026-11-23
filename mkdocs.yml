@@ -1,5 +1,5 @@
 site_name: Crawl4AI Documentation (v0.9.x)
-site_description:  🚀🤖 Crawl4AI, Open-source LLM-Friendly Web Crawler & Scraper
+site_description: Crawl4AI turns any website into LLM-ready Markdown. Call the hosted API with one key, no browsers or proxies to run, or self-host the open-source crawler.
 site_url: https://docs.crawl4ai.com
 repo_url: https://github.com/unclecode/crawl4ai
 repo_name: unclecode/crawl4ai
@@ -104,6 +104,8 @@ markdown_extensions:
   - tables
 
 extra:
+  # the docs home page title in search results (overrides/main.html)
+  home_title: "Crawl4AI Docs: Open-Source Crawler and Hosted Crawling API"
   version: !ENV [CRAWL4AI_VERSION, 'development']
 
 extra_css:
