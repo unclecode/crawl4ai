@@ -56,7 +56,9 @@ class RegexChunking(ChunkingStrategy):
         for pattern in self.patterns:
             new_paragraphs = []
             for paragraph in paragraphs:
-                new_paragraphs.extend(re.split(pattern, paragraph))
+                new_paragraphs.extend(
+                    part for part in re.split(pattern, paragraph) if part is not None
+                )
             paragraphs = new_paragraphs
         return paragraphs
 
