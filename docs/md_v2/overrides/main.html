@@ -6,6 +6,25 @@
 <script>
     document.documentElement.setAttribute("data-theme", "dark");
 </script>
+{#- TechArticle structured data for search engines, on every docs page -#}
+{%- if page and page.title and page.canonical_url %}
+{%- set article = {
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": page.title,
+  "description": (page.meta.description if page.meta and page.meta.description else config.site_description)|trim,
+  "url": page.canonical_url,
+  "mainEntityOfPage": page.canonical_url,
+  "inLanguage": "en",
+  "isPartOf": {"@type": "WebSite", "name": "Crawl4AI Documentation", "url": "https://docs.crawl4ai.com/"},
+  "author": {"@type": "Organization", "name": "Crawl4AI", "url": "https://crawl4ai.com/"},
+  "publisher": {"@type": "Organization", "name": "Crawl4AI", "url": "https://crawl4ai.com/",
+                "logo": {"@type": "ImageObject", "url": "https://docs.crawl4ai.com/img/favicon-32x32.png"}},
+  "about": {"@type": "SoftwareApplication", "name": "Crawl4AI", "applicationCategory": "DeveloperApplication",
+            "operatingSystem": "Linux, macOS, Windows", "url": "https://github.com/unclecode/crawl4ai"}
+} %}
+<script type="application/ld+json">{{ article|tojson }}</script>
+{%- endif %}
 {#- the Cloud strip's fonts (assets/cloud-strip.css): fetched early so they are ready before the strip paints -#}
 <link rel="preload" href="{{ 'assets/fonts/IBMPlexSans-400.woff2' | url }}" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="{{ 'assets/fonts/IBMPlexSans-600.woff2' | url }}" as="font" type="font/woff2" crossorigin>
