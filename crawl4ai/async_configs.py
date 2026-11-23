@@ -1074,7 +1074,10 @@ class BrowserConfig:
         headers (dict): Extra HTTP headers to apply to all requests in this context.
                         Default: {}.
         user_agent (str): Custom User-Agent string to use. An empty string keeps the browser's own
-                           User-Agent. Default: DEFAULT_USER_AGENT (a Linux Chrome User-Agent).
+                           User-Agent. Default: None, which resolves to DEFAULT_USER_AGENT (a Linux
+                           Chrome User-Agent) — except when attaching to an existing browser via
+                           cdp_url, where it resolves to "" so that browser's own User-Agent and
+                           client hints are left alone unless user_agent is set explicitly.
         user_agent_mode (str or None): Mode for generating the user agent (e.g., "random"). If None, use the provided
                                        user_agent as-is. Default: None.
         user_agent_generator_config (dict or None): Configuration for user agent generation if user_agent_mode is set.
@@ -1133,12 +1136,7 @@ class BrowserConfig:
         verbose: bool = True,
         cookies: list = None,
         headers: dict = None,
-        user_agent: str = (
-            # "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) AppleWebKit/537.36 "
-            # "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-            # "(KHTML, like Gecko) Chrome/116.0.5845.187 Safari/604.1 Edg/117.0.2045.47"
-            DEFAULT_USER_AGENT
-        ),
+        user_agent: str = None,
         user_agent_mode: str = "",
         user_agent_generator_config: dict = {},
         text_mode: bool = False,
@@ -1203,6 +1201,19 @@ class BrowserConfig:
         self.java_script_enabled = java_script_enabled
         self.cookies = cookies if cookies is not None else []
         self.headers = headers if headers is not None else {}
+        # Whether the caller asked for a specific User-Agent: an explicit arg,
+        # a class-level set_defaults() override, or user_agent_mode="random"
+        # (which generates one). When attaching to a browser crawl4ai did not
+        # launch (a caller-supplied cdp_url), the browser already has its own
+        # UA and client hints, so an unset user_agent resolves to "" ("leave
+        # the browser alone") instead of DEFAULT_USER_AGENT. Browsers crawl4ai
+        # launches itself (dedicated / builtin / docker / persistent) keep the
+        # default: their cdp_url is None at construction time.
+        user_agent_explicit = user_agent is not None or user_agent_mode == "random"
+        if user_agent is None:
+            user_agent = DEFAULT_USER_AGENT
+        if cdp_url is not None and not user_agent_explicit:
+            user_agent = ""
         self.user_agent = user_agent
         self.user_agent_mode = user_agent_mode
         self.user_agent_generator_config = user_agent_generator_config
