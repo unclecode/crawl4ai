@@ -10,13 +10,19 @@
 /* The Cloud strip's state before the first paint, so its reserved height never moves the page.
    A visit is a new browser session. Visit 1: full; visits 2-4: compact; full again on every 5th visit or
    14 days after the last full one. A signed-in Cloud user (the c4_sess cookie on .crawl4ai.com): compact.
-   Storage blocked: full. The first page of a visit gets class c4s-arrive (the strip's one entrance). */
-(function(){var d=document.documentElement,K="c4-strip",s="full";
-try{s=sessionStorage.getItem(K+"-state");
+   Storage blocked: full. The first page of a visit gets class c4s-arrive (the strip's one entrance).
+   Test switch for reviewers: ?strip=full or ?strip=compact holds that state for the rest of the visit and
+   replays the entrance; ?strip=reset forgets the stored visits, so the page counts as visit 1. */
+(function(){var d=document.documentElement,K="c4-strip",s="full",q;
+try{q=new URLSearchParams(location.search).get("strip");
+if(q==="reset"){localStorage.removeItem(K);sessionStorage.removeItem(K+"-state");sessionStorage.removeItem(K+"-test");}
+if(q==="full"||q==="compact"){sessionStorage.setItem(K+"-test",q);d.classList.add("c4s-arrive");}
+s=sessionStorage.getItem(K+"-state");
 if(!s){var v=JSON.parse(localStorage.getItem(K)||"{}"),n=(v.visits|0)+1,now=Date.now(),last=Number(v.lastFull)||0;
 s=(n%5===0||now-last>=14*864e5)?"full":"compact";if(s==="full")last=now;
 localStorage.setItem(K,JSON.stringify({visits:n,lastFull:last}));sessionStorage.setItem(K+"-state",s);d.classList.add("c4s-arrive");}
-if(/(^|; )c4_sess=1(;|$)/.test(document.cookie))s="compact";}catch(e){s="full";}
+if(/(^|; )c4_sess=1(;|$)/.test(document.cookie))s="compact";
+s=sessionStorage.getItem(K+"-test")||s;}catch(e){s="full";}
 d.setAttribute("data-c4s",s);})();
 </script>
 {#- assets/toc.js builds the "On this page" column after load; on a page that will get one, an empty column
