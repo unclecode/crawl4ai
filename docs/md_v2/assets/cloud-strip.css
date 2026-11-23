@@ -1,0 +1,36 @@
+/* The Crawl4AI Cloud strip (overrides/partials/cloud-strip.html), in the light colours of crawl4ai.com
+   on the docs' dark page. It is fixed under the header; --c4s-h reserves its height in the layout, so the
+   page below never moves when the strip appears. */
+:root{--c4s-h:110px;--c4s-bg:#f8f7f2;--c4s-ink:#1a1b16;--c4s-muted:#5d625f;--c4s-teal:#0a7c86;--c4s-green:#2f5d55;--c4s-green-hover:#264b45;--c4s-on:#ffffff;
+  --c4s-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,Roboto,"Helvetica Neue",Arial,sans-serif}
+
+.c4s{position:fixed;top:var(--header-height,65px);left:0;right:0;height:var(--c4s-h);z-index:950;
+  background:var(--c4s-bg);border-bottom:2px solid var(--c4s-green);font-family:var(--c4s-sans);line-height:1.3;overflow:hidden}
+.c4s *{box-sizing:border-box}
+.c4s-in{height:100%;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:0 24px}
+.c4s-text{min-width:0}
+.c4s-eyebrow{font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--c4s-teal);margin:0 0 6px}
+/* the theme styles every p; these win by specificity */
+.c4s p.c4s-title{font-size:22px;font-weight:700;color:var(--c4s-ink);margin:0 0 4px;padding:0;letter-spacing:-.01em}
+.c4s p.c4s-line{font-size:14px;color:var(--c4s-muted);margin:0;padding:0}
+.c4s-actions{display:flex;align-items:center;gap:18px;flex-shrink:0}
+.c4s a{text-decoration:none}
+.c4s a.c4s-btn{display:inline-flex;align-items:center;font-size:15px;font-weight:600;color:var(--c4s-on);background:var(--c4s-green);
+  padding:11px 18px;border-radius:6px;white-space:nowrap}
+.c4s a.c4s-btn:hover{background:var(--c4s-green-hover);color:var(--c4s-on)}
+.c4s a.c4s-link{font-size:14px;color:var(--c4s-green);border-bottom:1px solid currentColor;white-space:nowrap}
+
+/* the page under the strip: the header space plus the strip height */
+html{scroll-padding-top:calc(var(--header-height,65px) + var(--c4s-h) + 15px)}
+.container:has(.terminal-mkdocs-main-grid){padding-top:calc(var(--header-height,65px) + var(--c4s-h))}
+#toc-sidebar{top:calc(var(--header-height,65px) + var(--c4s-h));height:calc(100vh - var(--header-height,65px) - var(--c4s-h))}
+@media (min-width:769px){#terminal-mkdocs-side-panel{top:calc(var(--header-height,65px) + var(--c4s-h))}}
+
+/* phones: always the one-line strip */
+@media (max-width:768px){
+  :root{--c4s-h:48px}
+  .c4s-in{padding:0 12px;gap:10px}
+  .c4s-eyebrow,.c4s p.c4s-line,.c4s a.c4s-link{display:none}
+  .c4s p.c4s-title{font-size:14px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .c4s a.c4s-btn{font-size:13px;padding:7px 11px}
+}
