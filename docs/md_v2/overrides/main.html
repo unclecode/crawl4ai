@@ -6,6 +6,10 @@
 <script>
     document.documentElement.setAttribute("data-theme", "dark");
 </script>
+{#- the Cloud strip's fonts (assets/cloud-strip.css): fetched early so they are ready before the strip paints -#}
+<link rel="preload" href="{{ 'assets/fonts/IBMPlexSans-400.woff2' | url }}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{ 'assets/fonts/IBMPlexSans-600.woff2' | url }}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{ 'assets/fonts/IBMPlexMono-500.woff2' | url }}" as="font" type="font/woff2" crossorigin>
 <script>
 /* The Cloud strip's state before the first paint, so its reserved height never moves the page.
    A visit is a new browser session. Visit 1: full; visits 2-4: compact; full again on every 5th visit or
