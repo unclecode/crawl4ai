@@ -1690,7 +1690,7 @@ In this scenario, use your best judgment to generate the schema. You need to exa
             url (str or List[str], optional): URL(s) to fetch HTML from. If provided, html parameter is ignored.
                 When multiple URLs are provided, HTMLs are fetched in parallel and concatenated.
             validate (bool): If True, validate the schema against the HTML and
-                refine via LLM feedback loop. Defaults to False (zero overhead).
+                refine via LLM feedback loop. Defaults to True; pass False to skip it.
             max_refinements (int): Max refinement rounds when validate=True. Defaults to 3.
             usage (TokenUsage, optional): Token usage accumulator. If provided,
                 token counts from all LLM calls (including inference and
@@ -1766,7 +1766,7 @@ In this scenario, use your best judgment to generate the schema. You need to exa
             url (str or List[str], optional): URL(s) to fetch HTML from. If provided, html parameter is ignored.
                 When multiple URLs are provided, HTMLs are fetched in parallel and concatenated.
             validate (bool): If True, validate the schema against the HTML and
-                refine via LLM feedback loop. Defaults to False (zero overhead).
+                refine via LLM feedback loop. Defaults to True; pass False to skip it.
             max_refinements (int): Max refinement rounds when validate=True. Defaults to 3.
             usage (TokenUsage, optional): Token usage accumulator. If provided,
                 token counts from all LLM calls (including inference and
