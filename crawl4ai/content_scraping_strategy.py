@@ -766,8 +766,10 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             elif content_element is None:
                 content_element = body
 
-            # Replace mermaid SVGs with text before they get stripped
-            for svg in body.xpath('.//svg[starts-with(@id, "mermaid-")]'):
+            # Replace mermaid SVGs with text before they get stripped. Runs on
+            # content_element (see the note above the cleanup block below) so a
+            # selector picks up the placeholder instead of a stale, unmutated copy.
+            for svg in content_element.xpath('.//svg[starts-with(@id, "mermaid-")]'):
                 try:
                     diagram_type = svg.get("aria-roledescription", "diagram")
                     labels = []
@@ -827,9 +829,10 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                     pass
 
             # Remove script and style tags. drop_tree() keeps the text after
-            # each one (its .tail), which remove() would throw away.
+            # each one (its .tail), which remove() would throw away. Runs on
+            # content_element, not body, for the same reason as the mermaid pass.
             for tag in ["style", "link", "meta", "noscript", "script"]:
-                for element in body.xpath(f".//{tag}"):
+                for element in content_element.xpath(f".//{tag}"):
                     if element.getparent() is not None:
                         element.drop_tree()
 
@@ -842,13 +845,16 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 )
                 kwargs["exclude_domains"].update(kwargs["exclude_social_media_domains"])
 
-            # Process forms if needed
+            # Process forms if needed. Same reason as the passes above: this
+            # must land on content_element, not body.
             if kwargs.get("remove_forms", False):
-                for form in body.xpath(".//form"):
+                for form in content_element.xpath(".//form"):
                     if form.getparent() is not None:
                         form.drop_tree()
 
-            # Process content
+            # Process content. Link and media collection stays page-wide by
+            # design, so this deliberately reads from body, not content_element,
+            # even when a selector is in play.
             media = {"images": [], "videos": [], "audios": [], "tables": []}
             internal_links_dict = {}
             external_links_dict = {}
@@ -864,7 +870,8 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 **kwargs,
             )
 
-            # Extract tables using the table extraction strategy if provided
+            # Extract tables using the table extraction strategy if provided.
+            # Page-wide for the same reason as the link/media pass above.
             if 'table' not in excluded_tags:
                 table_extraction = kwargs.get('table_extraction')
                 if table_extraction:
@@ -875,10 +882,16 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                     extracted_tables = table_extraction.extract_tables(body, **kwargs)
                     media["tables"].extend(extracted_tables)
 
+            # Every pass below mutates and then serialises content_element, the
+            # thing that becomes cleaned_html. With a css_selector or
+            # target_elements that is the deep copy severed from body at the
+            # top of this method; without one content_element is body itself,
+            # so the common path is unchanged.
+
             # Handle only_text option
             if kwargs.get("only_text", False):
                 for tag in ONLY_TEXT_ELIGIBLE_TAGS:
-                    for element in body.xpath(f".//{tag}"):
+                    for element in content_element.xpath(f".//{tag}"):
                         if element.text:
                             new_text = lhtml.Element("span")
                             new_text.text = element.text_content()
@@ -886,17 +899,18 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                                 element.getparent().replace(element, new_text)
 
             # Clean base64 images
-            for img in body.xpath(".//img[@src]"):
+            for img in content_element.xpath(".//img[@src]"):
                 src = img.get("src", "")
                 if self.BASE64_PATTERN.match(src):
                     img.set("src", self.BASE64_PATTERN.sub("", src))
 
             # Remove empty elements
-            self.remove_empty_elements_fast(body, 1)
+            self.remove_empty_elements_fast(content_element, 1)
 
             # Remove unneeded attributes
             self.remove_unwanted_attributes_fast(
-                body, keep_data_attributes=kwargs.get("keep_data_attributes", False)
+                content_element,
+                keep_data_attributes=kwargs.get("keep_data_attributes", False),
             )
 
             # Generate output HTML
