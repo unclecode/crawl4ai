@@ -1,6 +1,7 @@
 from typing import List, Dict, Optional, Tuple
 from abc import ABC, abstractmethod
 from itertools import cycle
+from urllib.parse import urlparse
 import os
 import asyncio
 import time
@@ -35,13 +36,8 @@ class ProxyConfig:
     def _extract_ip_from_server(self) -> Optional[str]:
         """Extract IP address from server URL."""
         try:
-            # Simple extraction assuming http://ip:port format
-            if "://" in self.server:
-                parts = self.server.split("://")[1].split(":")
-                return parts[0]
-            else:
-                parts = self.server.split(":")
-                return parts[0]
+            server = self.server if "://" in self.server else "//" + self.server
+            return urlparse(server).hostname
         except Exception:
             return None
     
