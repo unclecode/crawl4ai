@@ -158,8 +158,10 @@ class FixedLengthWordChunking(ChunkingStrategy):
         Initialize the fixed-length word chunking strategy with the given chunk size.
 
         Args:
-            chunk_size (int): The size of each chunk in words.
+            chunk_size (int): The positive size of each chunk in words.
         """
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be positive")
         self.chunk_size = chunk_size
 
     def chunk(self, text: str) -> list:
