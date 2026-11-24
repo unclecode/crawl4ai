@@ -970,7 +970,10 @@ class LLMContentFilter(RelevantContentFilter):
         )
         return sections
 
-    def filter_content(self, html: str, ignore_cache: bool = True) -> List[str]:
+    def filter_content(
+        self, html: str, ignore_cache: Optional[bool] = None
+    ) -> List[str]:
+        """Filter HTML, using the instance cache setting when no override is given."""
         if not html or not isinstance(html, str):
             return []
 
@@ -988,8 +991,8 @@ class LLMContentFilter(RelevantContentFilter):
         cache_key = self._get_cache_key(html, self.instruction or "")
         cache_file = cache_dir / f"{cache_key}.json"
 
-        # if ignore_cache == None:
-        ignore_cache = self.ignore_cache
+        if ignore_cache is None:
+            ignore_cache = self.ignore_cache
 
         if not ignore_cache and cache_file.exists():
             if self.logger:
