@@ -144,9 +144,6 @@ class PruningContentFilterLXML(PruningContentFilter):
             threshold_type=threshold_type,
             threshold=threshold,
         )
-        # word count is only needed when a min-word threshold is active; skip
-        # the per-fragment space counting otherwise.
-        self._need_words = self.min_word_threshold is not None
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -167,7 +164,9 @@ class PruningContentFilterLXML(PruningContentFilter):
         # Metrics are computed on the *un-stripped* tree so that text which
         # surrounds soon-to-be-removed nodes is measured as separate fragments
         # (matching BeautifulSoup's decompose semantics).
-        metrics = self._compute_metrics(body)
+        if min_word_threshold is None:
+            min_word_threshold = self.min_word_threshold
+        metrics = self._compute_metrics(body, need_words=bool(min_word_threshold))
 
         # Now physically drop comments and unwanted tags. ``with_tail=False``
         # keeps the text that followed them (merged into the previous sibling /
@@ -183,7 +182,7 @@ class PruningContentFilterLXML(PruningContentFilter):
 
         # The original scores the body itself first; if it fails, the whole
         # body is decomposed and nothing is returned.
-        if self._should_remove(body, body_metrics, metrics):
+        if self._should_remove(body, body_metrics, metrics, min_word_threshold):
             return []
 
         # Top-down pass: a node survives only if it and every ancestor up to
@@ -201,7 +200,9 @@ class PruningContentFilterLXML(PruningContentFilter):
                 if in_sentence and child.tag in self.inline_tags:
                     continue
                 child_metrics = metrics.get(child)
-                if child_metrics is None or self._should_remove(child, child_metrics, metrics):
+                if child_metrics is None or self._should_remove(
+                    child, child_metrics, metrics, min_word_threshold
+                ):
                     child.drop_tree()  # removes subtree, preserves following text
                 else:
                     stack.append(child)
@@ -219,7 +220,7 @@ class PruningContentFilterLXML(PruningContentFilter):
     # ------------------------------------------------------------------ #
     # Metrics (single bottom-up pass)
     # ------------------------------------------------------------------ #
-    def _compute_metrics(self, body) -> Dict[object, _NodeMetrics]:
+    def _compute_metrics(self, body, *, need_words: bool) -> Dict[object, _NodeMetrics]:
         """Compute and cache metrics for ``body`` and every descendant element,
         skipping the interior of excluded subtrees (they will be removed).
 
@@ -229,7 +230,6 @@ class PruningContentFilterLXML(PruningContentFilter):
         processed first.
         """
         metrics: Dict[object, _NodeMetrics] = {}
-        need_words = self._need_words
         excluded = self.excluded_tags
 
         # Pre-order collection that does not descend into excluded subtrees.
@@ -317,7 +317,13 @@ class PruningContentFilterLXML(PruningContentFilter):
     # ------------------------------------------------------------------ #
     # Scoring (top-down pass)
     # ------------------------------------------------------------------ #
-    def _should_remove(self, node, m: _NodeMetrics, metrics: Dict[object, _NodeMetrics]) -> bool:
+    def _should_remove(
+        self,
+        node,
+        m: _NodeMetrics,
+        metrics: Dict[object, _NodeMetrics],
+        min_word_threshold,
+    ) -> bool:
         text_len = m.text_len
         tag_len = m.inner_len
 
@@ -328,7 +334,9 @@ class PruningContentFilterLXML(PruningContentFilter):
                 if cm is not None and cm.string_len > 0:
                     link_text_len += cm.string_len
 
-        score = self._composite_score(node, m, text_len, tag_len, link_text_len)
+        score = self._composite_score(
+            node, m, text_len, tag_len, link_text_len, min_word_threshold
+        )
 
         if self.threshold_type == "fixed":
             return score < self.threshold
@@ -348,10 +356,18 @@ class PruningContentFilterLXML(PruningContentFilter):
 
         return score < threshold
 
-    def _composite_score(self, node, m: _NodeMetrics, text_len: int, tag_len: int, link_text_len: int) -> float:
-        if self.min_word_threshold:
+    def _composite_score(
+        self,
+        node,
+        m: _NodeMetrics,
+        text_len: int,
+        tag_len: int,
+        link_text_len: int,
+        min_word_threshold,
+    ) -> float:
+        if min_word_threshold:
             word_count = m.space_count + 1
-            if word_count < self.min_word_threshold:
+            if word_count < min_word_threshold:
                 return -1.0
 
         cfg = self.metric_config
