@@ -25,6 +25,16 @@ By the end of this guide, you’ll have performed a basic crawl, generated Markd
 
 ## 2. Your First Crawl
 
+Install the library and its browser once:
+
+```bash
+pip install -U crawl4ai
+crawl4ai-setup
+```
+
+**Or skip the install.** One API call. First crawl in 30 seconds. [Get a free API key →](https://crawl4ai.com/signin/?ref=docs-quickstart-inline){ .c4s-box-btn data-c4s-ev="banner_inline_clicked" }
+{: .c4s-box }
+
 Here’s a minimal Python script that creates an **`AsyncWebCrawler`**, fetches a webpage, and prints the first 300 characters of its Markdown output:
 
 ```python
@@ -92,17 +102,17 @@ By default, Crawl4AI automatically generates Markdown from each crawled page. Ho
 - **`result.markdown`**:  
   The direct HTML-to-Markdown conversion.  
 - **`result.markdown.fit_markdown`**:  
-  The same content after applying any configured **content filter** (e.g., `PruningContentFilter`).
+  The same content after applying any configured **content filter** (e.g., `PruningContentFilterLXML`).
 
 ### Example: Using a Filter with `DefaultMarkdownGenerator`
 
 ```python
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 md_generator = DefaultMarkdownGenerator(
-    content_filter=PruningContentFilter(threshold=0.4, threshold_type="fixed")
+    content_filter=PruningContentFilterLXML(threshold=0.4, threshold_type="fixed")
 )
 
 config = CrawlerRunConfig(
@@ -116,7 +126,7 @@ async with AsyncWebCrawler() as crawler:
     print("Fit Markdown length:", len(result.markdown.fit_markdown))
 ```
 
-**Note**: If you do **not** specify a content filter or markdown generator, you’ll typically see only the raw Markdown. `PruningContentFilter` may adds around `50ms` in processing time. We’ll dive deeper into these strategies in a dedicated **Markdown Generation** tutorial.
+**Note**: If you do **not** specify a content filter or markdown generator, you’ll typically see only the raw Markdown. `PruningContentFilterLXML` may adds around `50ms` in processing time. We’ll dive deeper into these strategies in a dedicated **Markdown Generation** tutorial.
 
 ---
 
@@ -136,7 +146,7 @@ html = "<div class='product'><h2>Gaming Laptop</h2><span class='price'>$999.99</
 # Using OpenAI (requires API token)
 schema = JsonCssExtractionStrategy.generate_schema(
     html,
-    llm_config = LLMConfig(provider="openai/gpt-4o",api_token="your-openai-token")  # Required for OpenAI
+    llm_config = LLMConfig(provider="openai/gpt-6-luna",api_token="your-openai-token")  # Required for OpenAI
 )
 
 # Or using Ollama (open source, no token needed)
@@ -260,7 +270,7 @@ if __name__ == "__main__":
 
     asyncio.run(
         extract_structured_data_using_llm(
-            provider="openai/gpt-4o", api_token=os.getenv("OPENAI_API_KEY")
+            provider="openai/gpt-6-luna", api_token=os.getenv("OPENAI_API_KEY")
         )
     )
 ```

@@ -23,7 +23,7 @@ async def get_health():
         raise HTTPException(500, str(e))
 
 
-@router.get("/requests")
+@router.get("/requests", dependencies=[Depends(require_admin)])
 async def get_requests(status: str = "all", limit: int = 50):
     """Get active and completed requests.
 
@@ -56,7 +56,7 @@ async def get_requests(status: str = "all", limit: int = 50):
         raise HTTPException(500, str(e))
 
 
-@router.get("/browsers")
+@router.get("/browsers", dependencies=[Depends(require_admin)])
 async def get_browsers():
     """Get detailed browser pool information."""
     try:
@@ -85,7 +85,7 @@ async def get_browsers():
         raise HTTPException(500, str(e))
 
 
-@router.get("/endpoints/stats")
+@router.get("/endpoints/stats", dependencies=[Depends(require_admin)])
 async def get_endpoint_stats():
     """Get aggregated endpoint statistics."""
     try:
@@ -96,7 +96,7 @@ async def get_endpoint_stats():
         raise HTTPException(500, str(e))
 
 
-@router.get("/timeline")
+@router.get("/timeline", dependencies=[Depends(require_admin)])
 async def get_timeline(metric: str = "memory", window: str = "5m"):
     """Get timeline data for charts.
 
@@ -118,7 +118,7 @@ async def get_timeline(metric: str = "memory", window: str = "5m"):
         raise HTTPException(500, str(e))
 
 
-@router.get("/logs/janitor")
+@router.get("/logs/janitor", dependencies=[Depends(require_admin)])
 async def get_janitor_log(limit: int = 100):
     """Get recent janitor cleanup events."""
     # Input validation
@@ -133,7 +133,7 @@ async def get_janitor_log(limit: int = 100):
         raise HTTPException(500, str(e))
 
 
-@router.get("/logs/errors")
+@router.get("/logs/errors", dependencies=[Depends(require_admin)])
 async def get_errors_log(limit: int = 100):
     """Get recent errors."""
     # Input validation
@@ -363,7 +363,12 @@ async def websocket_endpoint(websocket: WebSocket):
     """
     # Auth is enforced by the AuthGateMiddleware (outermost ASGI layer), which
     # validates the ?token= query param / Authorization header for this
-    # WebSocket and closes 4401 before we are reached. No bespoke check here.
+    # WebSocket and closes 4401 before we are reached. The feed lists every
+    # caller's requests, so like the HTTP reads it needs admin scope.
+    principal = websocket.scope.get("state", {}).get("principal") or {}
+    if principal.get("scope") != "admin":
+        await websocket.close(code=4403)
+        return
     await websocket.accept()
     logger.info("WebSocket client connected")
 

@@ -44,12 +44,14 @@ def post_install():
     Run all post-installation tasks.
     Checks CRAWL4AI_MODE environment variable. If set to 'api',
     skips Playwright browser installation.
+    Exits with code 1 when the browser could not be installed.
     """
     logger.info("Running post-installation setup...", tag="INIT")
     setup_home_directory()
 
     # Check environment variable to conditionally skip Playwright install
     run_mode = os.getenv('CRAWL4AI_MODE')
+    browser_installed = True
     if run_mode == 'api':
         logger.warning(
             "CRAWL4AI_MODE=api detected. Skipping Playwright browser installation.",
@@ -57,13 +59,26 @@ def post_install():
         )
     else:
         # Proceed with installation only if mode is not 'api'
-        install_playwright()
+        browser_installed = install_playwright()
 
     run_migration()
     # TODO: Will be added in the future
     # setup_builtin_browser()
+    if not browser_installed:
+        logger.error(
+            "Setup did not finish: the browser is not installed. "
+            "Run the command above, then 'crawl4ai-doctor' to check.",
+            tag="SETUP",
+        )
+        sys.exit(1)
     logger.success("Post-installation setup completed!", tag="COMPLETE")
-    
+    try:
+        from .cloud_notice import show_at_install
+
+        show_at_install(logger)
+    except Exception:
+        pass
+
 def setup_builtin_browser():
     """Set up a builtin browser for use with Crawl4AI"""
     try:
@@ -91,60 +106,65 @@ async def _setup_builtin_browser():
         raise
 
 
-def install_playwright():
-    logger.info("Installing Playwright browsers...", tag="INIT")
+def _run_install(command: list) -> str:
+    """Run one install command. Returns "" when it worked, otherwise the reason it failed."""
     try:
-        # subprocess.check_call([sys.executable, "-m", "playwright", "install", "--with-deps", "--force", "chrome"])
-        subprocess.check_call(
-            [
-                sys.executable,
-                "-m",
-                "playwright",
-                "install",
-                "--with-deps",
-                "--force",
-                "chromium",
-            ]
-        )
-        logger.success(
-            "Playwright installation completed successfully.", tag="COMPLETE"
-        )
-    except subprocess.CalledProcessError:
-        # logger.error(f"Error during Playwright installation: {e}", tag="ERROR")
-        logger.warning(
-            f"Please run '{sys.executable} -m playwright install --with-deps' manually after the installation."
-        )
-    except Exception:
-        # logger.error(f"Unexpected error during Playwright installation: {e}", tag="ERROR")
-        logger.warning(
-            f"Please run '{sys.executable} -m playwright install --with-deps' manually after the installation."
-        )
-    
+        subprocess.check_call(command)
+        return ""
+    except subprocess.CalledProcessError as e:
+        return f"exit code {e.returncode}"
+    except Exception as e:
+        return str(e)
+
+
+def _install_chromium(tool: str) -> bool:
+    """Install Chromium with ``tool`` ("playwright" or "patchright"). Returns True when the browser is installed.
+
+    1. Try with ``--with-deps``, which also installs the system libraries. On Linux that needs root.
+    2. If that fails, install the browser alone, and print the command for the system libraries.
+    3. If that fails too, print the command to run by hand.
+    """
+    install = [sys.executable, "-m", tool, "install"]
+    reason = _run_install(install + ["--with-deps", "--force", "chromium"])
+    if not reason:
+        logger.success(f"{tool} Chromium installed.", tag="COMPLETE")
+        return True
+    logger.warning(
+        f"'{tool} install --with-deps chromium' failed ({reason}); the error is printed above. "
+        "Trying the browser alone, without the system libraries...",
+        tag="SETUP",
+    )
+
+    # ---- 2. The browser alone needs no root; only the system libraries do
+    reason = _run_install(install + ["--force", "chromium"])
+    if not reason:
+        logger.warning(f"{tool} Chromium installed, but its system libraries may be missing.", tag="SETUP")
+        if sys.platform.startswith("linux"):
+            logger.warning(
+                f"If the browser does not start, run: sudo {sys.executable} -m {tool} install-deps chromium",
+                tag="SETUP",
+            )
+        return True
+
+    # ---- 3. Nothing worked: the user runs it by hand
+    logger.error(f"'{tool} install chromium' failed ({reason}); the error is printed above.", tag="SETUP")
+    logger.error(f"Install it by hand: {sys.executable} -m {tool} install --with-deps chromium", tag="SETUP")
+    if sys.platform.startswith("linux"):
+        logger.error("Installing the system libraries needs root: run the command with sudo.", tag="SETUP")
+    return False
+
+
+def install_playwright() -> bool:
+    """Install the Playwright and Patchright browsers. Returns True when the Playwright browser is installed.
+    Patchright only serves the undetected mode, so its failure is a warning."""
+    logger.info("Installing Playwright browsers...", tag="INIT")
+    playwright_installed = _install_chromium("playwright")
+
     # Install Patchright browsers for undetected browser support
     logger.info("Installing Patchright browsers for undetected mode...", tag="INIT")
-    try:
-        subprocess.check_call(
-            [
-                sys.executable,
-                "-m",
-                "patchright",
-                "install",
-                "--with-deps",
-                "--force",
-                "chromium",
-            ]
-        )
-        logger.success(
-            "Patchright installation completed successfully.", tag="COMPLETE"
-        )
-    except subprocess.CalledProcessError:
-        logger.warning(
-            f"Please run '{sys.executable} -m patchright install --with-deps' manually after the installation."
-        )
-    except Exception:
-        logger.warning(
-            f"Please run '{sys.executable} -m patchright install --with-deps' manually after the installation."
-        )
+    if not _install_chromium("patchright"):
+        logger.warning("Only the undetected browser mode needs Patchright; everything else works without it.", tag="SETUP")
+    return playwright_installed
 
 
 def run_migration():
@@ -193,11 +213,11 @@ async def run_doctor():
             logger.info("Testing crawling capabilities...", tag="TEST")
             result = await crawler.arun(url="https://crawl4ai.com", config=run_config)
 
-            if result and result.markdown:
+            if result and result.success and result.markdown:
                 logger.success("✅ Crawling test passed!", tag="COMPLETE")
                 return True
             else:
-                raise Exception("Failed to get content")
+                raise Exception(f"Failed to get content: {getattr(result, 'error_message', None) or 'empty page'}")
 
     except Exception as e:
         logger.error(f"❌ Test failed: {e}", tag="ERROR")
@@ -205,8 +225,12 @@ async def run_doctor():
 
 
 def doctor():
-    """Entry point for the doctor command"""
+    """Entry point for the doctor command. Exits with code 1 when the test crawl fails."""
     import asyncio
 
-    asyncio.run(run_doctor())
-    sys.exit(0)
+    # The doctor checks the installation; a cloud banner here would read as "the library is broken, go hosted"
+    from .cloud_notice import _ENV_OFF
+
+    os.environ[_ENV_OFF] = "1"
+    passed = asyncio.run(run_doctor())
+    sys.exit(0 if passed else 1)

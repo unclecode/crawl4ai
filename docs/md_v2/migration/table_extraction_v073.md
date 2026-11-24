@@ -363,7 +363,7 @@ If you encounter issues:
 2. Verify imports if using new classes
 3. Enable verbose logging: `DefaultTableExtraction(verbose=True)`
 4. Review the [Table Extraction Documentation](../core/table_extraction.md)
-5. Check [examples](../examples/table_extraction_example.py)
+5. Check [examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/table_extraction_example.py)
 
 ## Summary
 

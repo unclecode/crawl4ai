@@ -18,6 +18,7 @@ recoverable:
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import logging
 from typing import Awaitable, Callable, Dict, Optional
 
@@ -64,9 +65,15 @@ class WorkQueue:
     async def _worker(self) -> None:
         assert self._q is not None
         while True:
-            principal, factory = await self._q.get()
+            principal, factory, ctx = await self._q.get()
             try:
-                await factory()
+                # Run in the submitting request's context, not the worker's
+                # boot-time one, so per-request state such as the caller's
+                # browser context partition follows the job. create_task()
+                # copies the current context, so create it inside ctx.run()
+                # (create_task's context= argument needs Python 3.11).
+                loop = asyncio.get_running_loop()
+                await ctx.run(lambda: loop.create_task(factory()))
             except Exception:
                 logger.exception("background job failed")
             finally:
@@ -90,7 +97,7 @@ class WorkQueue:
             if self._counts.get(principal, 0) >= self.per_principal:
                 raise QuotaExceeded()
         try:
-            self._q.put_nowait((principal, factory))
+            self._q.put_nowait((principal, factory, contextvars.copy_context()))
         except asyncio.QueueFull:
             raise QueueFull()
         if principal:

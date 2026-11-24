@@ -1,0 +1,91 @@
+/* The Crawl4AI Cloud strip (overrides/partials/cloud-strip.html), in the light colours of crawl4ai.com
+   on the docs' dark page. It is fixed under the header; --c4s-h reserves its height in the layout, so the
+   page below never moves.
+   States on <html>: data-c4s="full" (110px) or "compact" (48px), set before the first paint; class
+   c4s-shrunk = a full strip shrunk by scrolling. The shrink only uses transform and opacity: neither is a
+   layout shift, so the page, the side panel and the table of contents never move (CLS). */
+/* IBM Plex, self-hosted (the same files as crawl4ai.com) and preloaded in overrides/main.html.
+   font-display: optional = a late font is not swapped in, so text never moves (layout shift). */
+@font-face{font-family:"C4S Plex";src:url(fonts/IBMPlexSans-400.woff2) format("woff2");font-weight:400;font-display:optional}
+@font-face{font-family:"C4S Plex";src:url(fonts/IBMPlexSans-600.woff2) format("woff2");font-weight:600;font-display:optional}
+@font-face{font-family:"C4S Plex Mono";src:url(fonts/IBMPlexMono-500.woff2) format("woff2");font-weight:500;font-display:optional}
+:root{--c4s-full:110px;--c4s-compact:48px;--c4s-h:var(--c4s-full);--c4s-rise:calc(var(--c4s-full) - var(--c4s-compact));
+  --c4s-bg:#faf8f3;--c4s-ink:#17221f;--c4s-muted:#3b4543;--c4s-teal:#117a72;--c4s-teal-hover:#0c5f59;--c4s-band:#0f2a27;--c4s-on:#ffffff;
+  --c4s-sans:"C4S Plex",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --c4s-mono:"C4S Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;--c4s-ease:.28s ease}
+html[data-c4s="compact"]{--c4s-h:var(--c4s-compact)}
+
+.c4s{position:fixed;top:var(--header-height,65px);left:0;right:0;height:var(--c4s-h);z-index:950;
+  background:var(--c4s-bg);border-bottom:2px solid var(--c4s-band);font-family:var(--c4s-sans);line-height:1.3;overflow:hidden;
+  transition:transform var(--c4s-ease)}
+.c4s *{box-sizing:border-box}
+.c4s-in{position:absolute;left:0;right:0;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:0 24px;
+  transition:opacity var(--c4s-ease),visibility var(--c4s-ease)}
+.c4s-full{top:0;height:var(--c4s-full)}
+.c4s-compact{bottom:0;height:var(--c4s-compact)}
+/* only one layer is visible; visibility also takes the hidden one out of the tab order */
+.c4s-compact,html[data-c4s="compact"] .c4s-full,html.c4s-shrunk .c4s-full{opacity:0;visibility:hidden}
+html[data-c4s="compact"] .c4s-compact,html.c4s-shrunk .c4s-compact{opacity:1;visibility:visible}
+
+.c4s-text{min-width:0}
+.c4s-eyebrow{font-family:var(--c4s-mono);font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--c4s-teal);margin:0 0 6px}
+/* the theme styles every p; these win by specificity */
+.c4s p.c4s-title{font-family:var(--c4s-sans);font-size:22px;font-weight:600;color:var(--c4s-ink);margin:0 0 4px;padding:0;letter-spacing:-.01em}
+.c4s p.c4s-line{font-family:var(--c4s-sans);font-size:14px;color:var(--c4s-muted);margin:0;padding:0}
+.c4s p.c4s-one{font-family:var(--c4s-sans);font-size:15px;color:var(--c4s-muted);margin:0;padding:0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c4s p.c4s-one b{color:var(--c4s-ink);font-weight:600}
+.c4s-actions{display:flex;align-items:center;gap:18px;flex-shrink:0}
+.c4s a{text-decoration:none}
+.c4s a.c4s-btn{display:inline-flex;align-items:center;font-family:var(--c4s-mono);font-size:14px;font-weight:500;color:var(--c4s-on);background:var(--c4s-teal);
+  height:40px;padding:0 18px;border-radius:999px;white-space:nowrap}
+.c4s-compact a.c4s-btn{font-size:13px;height:34px;padding:0 14px}
+.c4s a.c4s-btn:hover{background:var(--c4s-teal-hover);color:var(--c4s-on)}
+.c4s a.c4s-link{font-family:var(--c4s-sans);font-size:14px;color:var(--c4s-teal);border-bottom:1px solid currentColor;white-space:nowrap}
+
+/* the page under the strip: the header space plus the reserved strip height */
+html{scroll-padding-top:calc(var(--header-height,65px) + var(--c4s-h) + 15px)}
+.container:has(.terminal-mkdocs-main-grid){padding-top:calc(var(--header-height,65px) + var(--c4s-h))}
+/* the side panel and the table of contents rise with the shrinking strip: a transform, and they are sized
+   for the compact strip so no gap opens at the bottom after the rise */
+#toc-sidebar{top:calc(var(--header-height,65px) + var(--c4s-h));height:calc(100vh - var(--header-height,65px) - var(--c4s-compact));transition:transform var(--c4s-ease)}
+@media (min-width:769px){
+  #terminal-mkdocs-side-panel{top:calc(var(--header-height,65px) + var(--c4s-h));bottom:calc(var(--c4s-compact) - var(--c4s-h));transition:transform var(--c4s-ease),left var(--layout-transition-speed,.2s) ease-in-out}
+  html.c4s-shrunk .c4s,html.c4s-shrunk #terminal-mkdocs-side-panel,html.c4s-shrunk #toc-sidebar{transform:translateY(calc(-1 * var(--c4s-rise)))}
+}
+/* the entrance, on the first page of a visit only: one slide-in, then one soft pulse of the button 1 s
+   after load; never repeated */
+@keyframes c4s-slide{from{transform:translateY(-100%)}to{transform:translateY(0)}}
+@keyframes c4s-pulse{0%{transform:scale(1);box-shadow:0 0 0 0 rgba(17,122,114,.45)}40%{transform:scale(1.04);box-shadow:0 0 0 8px rgba(17,122,114,0)}100%{transform:scale(1);box-shadow:0 0 0 0 rgba(17,122,114,0)}}
+html.c4s-arrive:not(.c4s-shrunk) .c4s{animation:c4s-slide .45s ease-out}
+html.c4s-arrive .c4s a.c4s-btn{animation:c4s-pulse .9s ease-out 1.45s 1}
+@media (prefers-reduced-motion:reduce){.c4s,.c4s-in,#toc-sidebar,#terminal-mkdocs-side-panel{transition:none}html.c4s-arrive:not(.c4s-shrunk) .c4s,html.c4s-arrive .c4s a.c4s-btn{animation:none}}
+
+/* phones: always the one-line strip */
+@media (max-width:768px){
+  :root{--c4s-h:var(--c4s-compact)}
+  .c4s-full{opacity:0;visibility:hidden}
+  .c4s-compact{opacity:1;visibility:visible}
+  .c4s-in{padding:0 12px;gap:10px}
+  .c4s p.c4s-one{font-size:14px}
+  .c4s p.c4s-one span,.c4s a.c4s-link{display:none}
+  .c4s-compact a.c4s-btn{font-size:12px;height:32px;padding:0 11px}
+}
+
+/* the decision-point box under an install command (markdown paragraph with class c4s-box on home,
+   installation, quickstart and self-hosting): a light card with a green left edge, as the strip */
+#terminal-mkdocs-main-content p.c4s-box{display:flex;flex-wrap:wrap;align-items:center;column-gap:.35em;row-gap:10px;
+  margin:14px 0 18px;padding:14px 16px;background:var(--c4s-bg);color:var(--c4s-ink);border-left:4px solid var(--c4s-teal);
+  border-radius:6px;font-family:var(--c4s-sans);font-size:15px;line-height:1.45}
+#terminal-mkdocs-main-content p.c4s-box strong{color:var(--c4s-ink);font-family:var(--c4s-sans);font-size:inherit;font-weight:600;letter-spacing:normal;text-shadow:none}
+#terminal-mkdocs-main-content p.c4s-box a.c4s-box-btn{margin-left:auto;display:inline-flex;align-items:center;font-family:var(--c4s-mono);font-size:13px;font-weight:500;
+  color:var(--c4s-on);background:var(--c4s-teal);height:36px;padding:0 16px;border-radius:999px;white-space:nowrap;text-decoration:none;border:0}
+#terminal-mkdocs-main-content p.c4s-box a.c4s-box-btn:hover{background:var(--c4s-teal-hover)}
+/* the longer self-hosting box puts its button on its own line */
+#terminal-mkdocs-main-content p.c4s-box.c4s-box-stack{display:block}
+#terminal-mkdocs-main-content p.c4s-box.c4s-box-stack a.c4s-box-btn{display:flex;width:fit-content;margin:10px 0 0}
+
+/* the plain crawl4ai.com links at the end of every article (overrides/main.html) */
+#terminal-mkdocs-main-content footer.c4s-footer{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;margin:48px 0 8px;padding:14px 0 0;background:none;
+  border-top:1px solid var(--progress-bar-background,#3f3f44);font-size:13px;color:var(--secondary-color,#a3abba)}
+#terminal-mkdocs-main-content footer.c4s-footer span{color:var(--font-color,#e8e9ed)}
+#terminal-mkdocs-main-content footer.c4s-footer a{color:var(--primary-color,#50ffff)}

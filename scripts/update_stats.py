@@ -27,45 +27,34 @@ OUTPUT_PATH = Path(__file__).resolve().parent.parent / "docs" / "md_v2" / "stats
 # Star history milestones (manually maintained — stargazer API is too slow for 60K+ stars)
 STAR_MILESTONES = [
     ("2024-02-01", 0),
-    ("2024-06-01", 2000),
-    ("2024-09-01", 5000),
-    ("2024-10-01", 12000),
-    ("2024-11-01", 18000),
-    ("2024-12-01", 22000),
-    ("2025-01-01", 26000),
-    ("2025-02-01", 30000),
-    ("2025-03-01", 34000),
-    ("2025-04-01", 38000),
-    ("2025-05-01", 42000),
-    ("2025-06-01", 45000),
-    ("2025-07-01", 47000),
-    ("2025-08-01", 49000),
-    ("2025-09-01", 51000),
-    ("2025-10-01", 53000),
-    ("2025-11-01", 55000),
-    ("2025-12-01", 57000),
-    ("2026-01-01", 59000),
+    ("2024-06-01", 684),
+    ("2024-09-01", 1849),
+    ("2024-10-01", 7631),
+    ("2024-11-01", 14474),
+    ("2024-12-01", 16425),
+    ("2025-01-01", 18221),
+    ("2025-02-01", 27046),
+    ("2025-03-01", 30718),
+    ("2025-04-01", 33846),
+    ("2025-05-01", 40377),
+    ("2025-06-01", 43334),
+    ("2025-07-01", 45458),
+    ("2025-08-01", 48704),
+    ("2025-09-01", 50509),
+    ("2025-10-01", 52733),
+    ("2025-11-01", 54006),
+    ("2025-12-01", 55354),
+    ("2026-01-01", 56678),
+    ("2026-02-01", 58161),
+    ("2026-03-01", 60113),
+    ("2026-04-01", 62055),
+    ("2026-05-01", 63985),
+    ("2026-06-01", 66686),
+    ("2026-07-01", 69884),
+    ("2026-08-01", 75213),
+    ("2026-09-01", 80208),
+    ("2026-10-01", 84378),
 ]
-
-# Historical PyPI monthly downloads (manually maintained).
-# The pypistats.org API only retains ~180 days of data, so earlier months must be
-# hardcoded. Source: pepy.tech total (8.46M as of Feb 2026) minus API-reported data.
-# First PyPI release: Sep 25, 2024 (v0.3.0).
-# Update these when you have better numbers — they only affect months before the API window.
-PYPI_MONTHLY_HISTORY = {
-    "2024-09":   28_000,    # v0.3.0 launched Sep 25 — partial month
-    "2024-10":  135_000,    # v0.3.5–0.3.8, project going viral
-    "2024-11":  210_000,    # v0.3.73–0.3.746, steady growth
-    "2024-12":  285_000,    # v0.4.0–0.4.24 launch
-    "2025-01":  350_000,    # v0.4.24x series
-    "2025-02":  380_000,    # pre-0.5 momentum
-    "2025-03":  430_000,    # v0.5.0 launch
-    "2025-04":  480_000,    # v0.6.0 launch
-    "2025-05":  520_000,    # v0.6.3 adoption
-    "2025-06":  560_000,    # growth
-    "2025-07":  620_000,    # v0.7.0–0.7.2 launch
-    "2025-08":  750_000,    # v0.7.3–0.7.4 (estimated from 24K/day rate)
-}
 
 # --- Data Fetching ---
 
@@ -203,34 +192,33 @@ def fetch_pypi_live() -> dict:
     return {"monthly": monthly_sorted, "daily": daily, "total": total}
 
 
-def merge_pypi_data(live: dict) -> dict:
-    """Merge hardcoded historical monthly data with live API data.
+def fetch_pypi_monthly_clickhouse() -> dict:
+    """Fetch full monthly PyPI download history from ClickHouse's public PyPI dataset."""
+    print("Fetching PyPI monthly history (ClickHouse)...")
+    query = (
+        "SELECT toStartOfMonth(date), sum(count) FROM pypi.pypi_downloads_per_day "
+        f"WHERE project = '{PYPI_PACKAGE}' GROUP BY 1 ORDER BY 1 FORMAT JSONCompact"
+    )
+    try:
+        req = urllib.request.Request(
+            "https://sql-clickhouse.clickhouse.com/?user=demo",
+            data=query.encode(),
+            headers={"User-Agent": "crawl4ai-stats/1.0"},
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return {m[:7]: int(c) for m, c in json.loads(resp.read().decode())["data"]}
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        print(f"  [warn] ClickHouse PyPI query: {e}")
+        return {}
 
-    The API only has ~180 days. The first month in the API window is typically
-    partial (e.g. only 5 days of August), so we prefer the hardcoded value for
-    any month that exists in PYPI_MONTHLY_HISTORY. For months beyond the
-    hardcoded range, we use the live API data — but only if the month has at
-    least 20 days of data (to avoid showing misleadingly low partial months).
-    """
-    merged_monthly = dict(PYPI_MONTHLY_HISTORY)  # start with hardcoded
-    live_monthly = live["monthly"]
 
-    for month, value in live_monthly.items():
-        if month in merged_monthly:
-            # Hardcoded value exists — keep it (it's the full-month estimate)
-            continue
-        # Count how many days of data we have for this month
-        days_in_month = sum(1 for d in live["daily"] if d["date"].startswith(month))
-        if days_in_month >= 20:
-            merged_monthly[month] = value
-
-    merged_sorted = dict(sorted(merged_monthly.items()))
-    total = sum(merged_sorted.values())
-
+def merge_pypi_data(live: dict, history: dict) -> dict:
+    """Use ClickHouse monthly history for the monthly charts and live API data for the daily chart."""
+    monthly = dict(sorted(history.items()))
     return {
-        "monthly": merged_sorted,
+        "monthly": monthly,
         "daily": live["daily"],       # daily chart only uses live data (recent ~180 days)
-        "total": total,
+        "total": sum(monthly.values()),
     }
 
 
@@ -862,8 +850,15 @@ def main():
 
     pypi_live = fetch_pypi_live()
     print(f"  PyPI live: {len(pypi_live['monthly'])} months, {len(pypi_live['daily'])} daily points")
-    pypi = merge_pypi_data(pypi_live)
+    pypi = merge_pypi_data(pypi_live, fetch_pypi_monthly_clickhouse())
     print(f"  PyPI merged: {len(pypi['monthly'])} months, total: {pypi['total']:,}")
+    months = list(pypi["monthly"])
+    prev_month = (datetime.now().replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+    span = 0
+    if months:
+        span = (int(months[-1][:4]) - int(months[0][:4])) * 12 + int(months[-1][5:]) - int(months[0][5:]) + 1
+    if not months or len(months) != span or months[-1] < prev_month:
+        sys.exit(f"[error] PyPI monthly data is missing, stale or has gaps; not writing {OUTPUT_PATH}")
 
     docker_pulls = fetch_docker_pulls()
     print(f"  Docker pulls: {docker_pulls}")

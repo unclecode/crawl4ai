@@ -17,7 +17,7 @@ from crawl4ai import (
     JsonCssExtractionStrategy,
     JsonXPathExtractionStrategy,
 )
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 
@@ -29,7 +29,7 @@ async def run_extraction(crawler: AsyncWebCrawler, url: str, strategy, name: str
             cache_mode=CacheMode.BYPASS,
             extraction_strategy=strategy,
             markdown_generator=DefaultMarkdownGenerator(
-                content_filter=PruningContentFilter()  # For fit_markdown support
+                content_filter=PruningContentFilterLXML()  # For fit_markdown support
             ),
         )
 

@@ -21,3 +21,24 @@ We thank the following security researchers for their responsible disclosure:
 | Zhixi "Jace" Sun | GitHub: [manus-use](https://github.com/manus-use) | Arbitrary file write via unconfined PDFContentScrapingStrategy image-write fields in untrusted config bodies (0.9.3) | 2026-08-24 |
 | Nguyen Tran Thanh Lam | GitHub: [c240030](https://github.com/c240030) | SSRF via PDF download redirects, DoS via unbounded PDF size and page count, XSS via unescaped PDF text in cleaned_html (0.9.3) | 2026-07-27 |
 | e1codes | GitHub: [e1codes](https://github.com/e1codes) | DOM-based XSS in the Docker Playground leading to operator API-token theft (0.9.3) | 2026-07-24 |
+| x0root | GitHub: [x0root](https://github.com/x0root) | SSRF in the hosted service at stage.crawl4ai.com | 2026-09-02 |
+| arpe1618 | GitHub: [arpe1618](https://github.com/arpe1618) | Blind SSRF via the robots.txt fetch in RobotsParser.can_fetch bypassing the Docker egress controls (0.9.4) | 2026-09-04 |
+| Ibrahim AlJaafreh - Cystack RedTeam | [LinkedIn](https://www.linkedin.com/in/ibrahim-aljaafreh-glitch/), [cystack.ps](https://cystack.ps) | SSRF with response disclosure via link_preview_config through the URL seeder (0.9.4) | 2026-09-04 |
+| Adam Jordan | GitHub: [adamyordan](https://github.com/adamyordan) | Untrusted-config gate bypass via dict-wrapper laundering, leaking server env vars (0.9.4) | 2026-09-08 |
+| arpe1618 | GitHub: [arpe1618](https://github.com/arpe1618) | Blind SSRF via the CacheValidator freshness check bypassing the Docker egress proxy (0.9.5) | 2026-09-29 |
+| Zhixi "Jace" Sun | GitHub: [manus-use](https://github.com/manus-use) | Page JavaScript injection via css_selector and wait_for, HuggingFace model choice via CosineStrategy.model_name, and ReDoS via untrusted regex patterns on the Docker server (0.9.5) | 2026-10-01 |
+| Chunyi Liu | GitHub: [liuchunyi-buaa](https://github.com/liuchunyi-buaa) | SQL injection in the docs marketplace backend, DOM XSS in the LinkedIn graph view example, unbounded delay fields in untrusted config bodies, and Docker hardening gaps (header-name validation, DomainFilter host parsing, silent guard failures) (0.9.5) | 2026-09-21 |
+| Julian Godfrey | Email report | Chromium launched with --ignore-certificate-errors so TLS verification was off, and the Chromium sandbox opt-in had no effect (0.9.5) | 2026-10-04 |
+| Siyang Wu | GitHub: [LeoWSY-hashblue](https://github.com/LeoWSY-hashblue) | Unclamped PDFContentScrapingStrategy batch_size and max_redirects in untrusted config bodies, and ReDoS via untrusted regex patterns (independent report) (0.9.6) | 2026-10-06 |
+| Zachariah Mithani | GitHub: [zachariah-mithani](https://github.com/zachariah-mithani) | SSRF via URL userinfo in the TLS certificate fetch (fetch_ssl_certificate) bypassing the Docker egress check (0.9.6) | 2026-10-15 |
+| arpe1618 | GitHub: [arpe1618](https://github.com/arpe1618) | Browser context (cookies, storage, service workers) shared between API callers on the Docker server (0.9.6) | 2026-10-19 |
+| Vijhn Austin | GitHub: [VijhnAustin](https://github.com/VijhnAustin) | ReDoS gate bypass via list-form schema field type, an incomplete fix of GHSA-j843 (0.9.6) | 2026-10-25 |
+| Daniel Ruf | GitHub: [weaverant](https://github.com/weaverant) | Vulnerable Brotli decoder (CVE-2026-111497) in the brotli dependency range and in the Node.js bundled with the Playwright and patchright drivers in the Docker image (0.9.6) | 2026-10-25 |
+| Soham | Email report | Memory exhaustion on the Docker server via unchecked DefaultMarkdownGenerator options reaching html2text internal state (0.9.6) | 2026-11-02 |
+| Ugur Celik | GitHub: [ucsurf](https://github.com/ucsurf) | Unbounded sitemap index following in AsyncUrlSeeder and DomainMapper (cycles, nesting, gzip bombs) (0.9.6) | 2026-11-10 |
+| TheCyberMessi | GitHub: [TheCyberMessi](https://github.com/TheCyberMessi) | TLS certificate fetch blocking the Docker server's event loop (0.9.6) | 2026-11-17 |
+| TheCyberMessi | GitHub: [TheCyberMessi](https://github.com/TheCyberMessi) | Unbounded screenshot_wait_for holding every browser page on the Docker server (0.9.6) | 2026-11-17 |
+| TheCyberMessi | GitHub: [TheCyberMessi](https://github.com/TheCyberMessi) | Declarative hooks kept on the pooled crawler, request-size limit skipping chunked bodies, and rejected requests left in the active-request monitor on the Docker server (0.9.6) | 2026-11-17 |
+| TheCyberMessi | GitHub: [TheCyberMessi](https://github.com/TheCyberMessi) | Request body-size limit skipped for chunked bodies on the Docker server (0.9.6) | 2026-11-17 |
+| TheCyberMessi | GitHub: [TheCyberMessi](https://github.com/TheCyberMessi) | Declarative hooks kept on the pooled crawler and run on later callers' crawls on the Docker server (0.9.6) | 2026-11-17 |
+| TheCyberMessi | GitHub: [TheCyberMessi](https://github.com/TheCyberMessi) | Rejected requests kept in the Docker server's active-request monitor (0.9.6) | 2026-11-17 |

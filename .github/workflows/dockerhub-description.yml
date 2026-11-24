@@ -1,0 +1,25 @@
+name: Docker Hub description
+
+# Copies deploy/docker/DOCKERHUB.md to the Docker Hub page of unclecode/crawl4ai.
+# Runs when that file changes on main, or by hand from the Actions tab; it builds no image.
+on:
+  push:
+    branches: [main]
+    paths:
+      - deploy/docker/DOCKERHUB.md
+      - .github/workflows/dockerhub-description.yml
+  workflow_dispatch:
+
+jobs:
+  description:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: peter-evans/dockerhub-description@v4
+        with:
+          username: unclecode
+          # a Docker Hub access token with Read, Write, Delete rights (needed to edit the description)
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: unclecode/crawl4ai
+          short-description: "Hosted web crawler API for LLMs: Crawl4AI Cloud. Prefer to self-host? Run this open-source server."
+          readme-filepath: deploy/docker/DOCKERHUB.md

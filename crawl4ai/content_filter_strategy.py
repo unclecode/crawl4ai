@@ -1,6 +1,7 @@
 import inspect
 import re
 import time
+import warnings
 from bs4 import BeautifulSoup, Tag
 from typing import List, Tuple, Dict, Optional
 from rank_bm25 import BM25Okapi
@@ -584,6 +585,19 @@ class PruningContentFilter(RelevantContentFilter):
             preserve_tags (list): HTML tag names to always keep regardless of score (optional).
         """
         super().__init__(None)
+        # Deprecation: the BeautifulSoup engine is superseded by the lxml one.
+        # Only warn for direct use of this class, not when PruningContentFilterLXML
+        # (a subclass) calls super().__init__.
+        if type(self) is PruningContentFilter:
+            warnings.warn(
+                "PruningContentFilter (BeautifulSoup-based) is deprecated in favor of "
+                "PruningContentFilterLXML, an lxml reimplementation that is ~10x faster "
+                "with identical output. Switch to PruningContentFilterLXML now. In an "
+                "upcoming release PruningContentFilter will become an alias for the lxml "
+                "implementation, and PruningContentFilterLXML will be kept as a legacy alias.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         self.min_word_threshold = min_word_threshold
         self.threshold_type = threshold_type
         self.threshold = threshold
@@ -636,6 +650,39 @@ class PruningContentFilter(RelevantContentFilter):
             "h5": 0.8,
             "h6": 0.7,
         }
+
+        # Phrasing tags that sit inside a kept node's own text are part of a
+        # sentence, so they are kept whole instead of being scored alone.
+        self.inline_tags = frozenset(
+            {
+                "a",
+                "abbr",
+                "b",
+                "bdi",
+                "bdo",
+                "cite",
+                "code",
+                "data",
+                "del",
+                "dfn",
+                "em",
+                "i",
+                "ins",
+                "kbd",
+                "mark",
+                "q",
+                "ruby",
+                "s",
+                "samp",
+                "small",
+                "span",
+                "strong",
+                "sub",
+                "time",
+                "u",
+                "var",
+            }
+        )
 
     def filter_content(self, html: str, min_word_threshold: int = None) -> List[str]:
         """
@@ -750,8 +797,13 @@ class PruningContentFilter(RelevantContentFilter):
         if should_remove:
             node.decompose()
         else:
+            in_sentence = any(
+                isinstance(c, NavigableString) and c.strip() for c in node.children
+            )
             children = [child for child in node.children if hasattr(child, "name")]
             for child in children:
+                if in_sentence and child.name in self.inline_tags:
+                    continue
                 self._prune_tree(child)
 
     def _compute_composite_score(self, metrics, text_len, tag_len, link_text_len):
@@ -1108,3 +1160,17 @@ class LLMContentFilter(RelevantContentFilter):
                     f"{i:<10} {usage.completion_tokens:>12,} "
                     f"{usage.prompt_tokens:>12,} {usage.total_tokens:>12,}"
                 )
+
+
+def __getattr__(name):
+    """Lazily re-export PruningContentFilterLXML from this module.
+
+    The lxml engine lives in ``content_filter_strategy_lxml`` (which imports
+    from this module). Exposing it here via PEP 562 lazy attribute access lets
+    ``from crawl4ai.content_filter_strategy import PruningContentFilterLXML``
+    work without creating an import-time circular dependency.
+    """
+    if name == "PruningContentFilterLXML":
+        from .content_filter_strategy_lxml import PruningContentFilterLXML
+        return PruningContentFilterLXML
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

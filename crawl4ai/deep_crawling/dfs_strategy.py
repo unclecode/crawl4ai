@@ -60,6 +60,7 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
             stack: List[Tuple[str, Optional[str], int]] = [(start_url, None, 0)]
             depths: Dict[str, int] = {start_url: 0}
             results: List[CrawlResult] = []
+            self._pages_crawled = 0
             self._reset_seen(start_url)
 
         while stack and not self._cancel_event.is_set():
@@ -75,7 +76,12 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
 
             # Clone config to disable recursive deep crawling.
             batch_config = config.clone(deep_crawl_strategy=None, stream=False)
-            url_results = await crawler.arun_many(urls=[url], config=batch_config)
+            arun_many_kwargs = (
+                {"dispatcher": self.dispatcher} if self.dispatcher is not None else {}
+            )
+            url_results = await crawler.arun_many(
+                urls=[url], config=batch_config, **arun_many_kwargs
+            )
             
             for result in url_results:
                 result.metadata = result.metadata or {}
@@ -169,6 +175,7 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
             visited: Set[str] = set()
             stack: List[Tuple[str, Optional[str], int]] = [(start_url, None, 0)]
             depths: Dict[str, int] = {start_url: 0}
+            self._pages_crawled = 0
             self._reset_seen(start_url)
 
         while stack and not self._cancel_event.is_set():
@@ -183,7 +190,12 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
             visited.add(url)
 
             stream_config = config.clone(deep_crawl_strategy=None, stream=True)
-            stream_gen = await crawler.arun_many(urls=[url], config=stream_config)
+            arun_many_kwargs = (
+                {"dispatcher": self.dispatcher} if self.dispatcher is not None else {}
+            )
+            stream_gen = await crawler.arun_many(
+                urls=[url], config=stream_config, **arun_many_kwargs
+            )
             async for result in stream_gen:
                 result.metadata = result.metadata or {}
                 result.metadata["depth"] = depth

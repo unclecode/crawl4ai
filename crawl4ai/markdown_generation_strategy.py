@@ -206,10 +206,12 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
                 input_html = str(input_html)
 
             # Generate raw markdown
+            generation_failed = False
             try:
                 raw_markdown = h.handle(input_html)
             except Exception as e:
                 raw_markdown = f"Error converting HTML to markdown: {str(e)}"
+                generation_failed = True
 
             raw_markdown = raw_markdown.replace("    ```", "```")
 
@@ -225,6 +227,7 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
                 except Exception as e:
                     markdown_with_citations = raw_markdown
                     references_markdown = f"Error generating citations: {str(e)}"
+                    generation_failed = True
 
             # Generate fit markdown if content filter is provided
             fit_markdown: Optional[str] = ""
@@ -239,22 +242,27 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
                     fit_markdown = h.handle(filtered_html)
                 except Exception as e:
                     fit_markdown = f"Error generating fit markdown: {str(e)}"
+                    generation_failed = True
                     filtered_html = ""
 
-            return MarkdownGenerationResult(
+            result = MarkdownGenerationResult(
                 raw_markdown=raw_markdown or "",
                 markdown_with_citations=markdown_with_citations or "",
                 references_markdown=references_markdown or "",
                 fit_markdown=fit_markdown or "",
                 fit_html=filtered_html or "",
             )
+            result._generation_failed = generation_failed
+            return result
         except Exception as e:
             # If anything fails, return empty strings with error message
             error_msg = f"Error in markdown generation: {str(e)}"
-            return MarkdownGenerationResult(
+            result = MarkdownGenerationResult(
                 raw_markdown=error_msg,
                 markdown_with_citations=error_msg,
                 references_markdown="",
                 fit_markdown="",
                 fit_html="",
             )
+            result._generation_failed = True
+            return result

@@ -1,0 +1,32 @@
+{#- The Crawl4AI Cloud strip: fixed under the header on every docs page, in the server HTML so it never
+    moves the page (CLS). Two layers: the full strip (110px) and the one-line compact strip (48px); the
+    pre-paint script in main.html picks which one a visit starts with (<html data-c4s>).
+    The ref tag says which page sent the sign-up: docs-home, docs-quickstart, docs-install, docs-selfhost,
+    else docs-<last path segment>. Styles: assets/cloud-strip.css · scroll and events: assets/cloud-strip.js -#}
+{%- set path = (page.url if page and page.url else '').strip('/') -%}
+{%- set named = {'': 'docs-home', 'core/quickstart': 'docs-quickstart', 'core/installation': 'docs-install', 'core/self-hosting': 'docs-selfhost'} -%}
+{%- set ref = named[path] if path in named else 'docs-' ~ path.split('/')[-1] -%}
+<div id="c4s" class="c4s" role="region" aria-label="Crawl4AI Cloud" data-ref="{{ ref }}">
+  <div class="c4s-in c4s-full">
+    <div class="c4s-text">
+      <div class="c4s-eyebrow">Hosted by the team behind the open-source crawler</div>
+      <p class="c4s-title">Need the data, not the infrastructure?</p>
+      <p class="c4s-line">First crawl in 30 seconds. No credit card.</p>
+    </div>
+    <div class="c4s-actions">
+      {%- if ref == 'docs-selfhost' %}
+      <a class="c4s-link" href="https://crawl4ai.com/build-vs-buy/?ref={{ ref }}" data-c4s-ev="banner_compare_clicked">Compare build vs. buy</a>
+      {%- endif %}
+      <a class="c4s-btn" href="https://crawl4ai.com/signin/?ref={{ ref }}" data-c4s-ev="banner_key_clicked">Get a free API key →</a>
+    </div>
+  </div>
+  <div class="c4s-in c4s-compact">
+    <p class="c4s-one"><b>Need the data, not the infrastructure?</b> <span>First crawl in 30 seconds. No credit card.</span></p>
+    <div class="c4s-actions">
+      {%- if ref == 'docs-selfhost' %}
+      <a class="c4s-link" href="https://crawl4ai.com/build-vs-buy/?ref={{ ref }}" data-c4s-ev="banner_compare_clicked">Compare build vs. buy</a>
+      {%- endif %}
+      <a class="c4s-btn" href="https://crawl4ai.com/signin/?ref={{ ref }}" data-c4s-ev="banner_key_clicked">Get a free API key →</a>
+    </div>
+  </div>
+</div>

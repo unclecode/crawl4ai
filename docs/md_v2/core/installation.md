@@ -6,6 +6,9 @@
 pip install crawl4ai
 ```
 
+**Or skip the install.** One API call. First crawl in 30 seconds. [Get a free API key →](https://crawl4ai.com/signin/?ref=docs-install-inline){ .c4s-box-btn data-c4s-ev="banner_inline_clicked" }
+{: .c4s-box }
+
 This installs the **core** Crawl4AI library along with essential dependencies. **No** advanced features (like transformers or PyTorch) are included yet.
 
 ## 2. Initial Setup & Diagnostics
@@ -98,16 +101,18 @@ This step caches large models locally (if needed). **Only do this** if your wo
 
 ---
 
-## 5. Docker (Experimental)
+## 5. Docker
 
-We provide a **temporary** Docker approach for testing. **It’s not stable and may break** with future releases. We plan a major Docker revamp in a future stable version, 2025 Q1. If you still want to try:
+The Docker server needs a token. Without one it answers only inside its container.
 
 ```bash
-docker pull unclecode/crawl4ai:basic
-docker run -p 11235:11235 unclecode/crawl4ai:basic
+export CRAWL4AI_API_TOKEN="$(openssl rand -hex 32)"
+docker run -d -p 11235:11235 --name crawl4ai --shm-size=1g \
+  -e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN" \
+  unclecode/crawl4ai:latest
 ```
 
-You can then make POST requests to `http://localhost:11235/crawl` to perform crawls. **Production usage** is discouraged until our new Docker approach is ready (planned in Jan or Feb 2025).
+Send the token with every request (`Authorization: Bearer $CRAWL4AI_API_TOKEN`). For LLM keys, MCP and all settings, see the [Self-hosting guide](self-hosting.md).
 
 ---
 
@@ -127,3 +132,13 @@ Some older docs mention running Crawl4AI as a local server. This approach has be
 6. **Local server** references in older docs are largely deprecated; a new solution is in progress.
 
 **Got questions?** Check [GitHub issues](https://github.com/unclecode/crawl4ai/issues) for updates or ask the community!
+
+## Version numbering
+
+Crawl4AI follows PEP 440: `MAJOR.MINOR.PATCH`, for example `0.9.4`. A pre-release carries a suffix: `dev` (unstable), `a` (alpha), `b` (beta), `rc` (release candidate).
+
+- The stable version: `pip install -U crawl4ai`
+- The latest pre-release: `pip install crawl4ai --pre`
+- One exact version: `pip install crawl4ai==0.9.4`
+
+Use the stable version in production. Pre-releases exist to test new features with real users before the final release.

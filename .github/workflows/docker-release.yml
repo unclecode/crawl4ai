@@ -6,9 +6,23 @@ on:
     tags:
       - 'docker-rebuild-v*'  # Allow manual Docker rebuilds via tags
 
+env:
+  IMAGE: unclecode/crawl4ai
+
 jobs:
-  docker:
-    runs-on: ubuntu-latest
+  # Each platform builds on its own native runner (no QEMU), so crawl4ai-doctor
+  # runs a real browser on both. Images are pushed by digest only; the merge job
+  # adds the tags once both builds succeed.
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Free up disk space
@@ -33,6 +47,47 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Prepare platform name
+        run: echo "PLATFORM_PAIR=${{ matrix.platform }}" | sed 's|/|-|g' >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
+          cache-to: type=gha,mode=max,scope=${{ env.PLATFORM_PAIR }}
+
+      - name: Export digest
+        run: |
+          mkdir -p ${{ runner.temp }}/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
       - name: Extract version from release or tag
         id: get_version
         run: |
@@ -57,6 +112,13 @@ jobs:
           echo "MINOR=$MINOR" >> $GITHUB_OUTPUT
           echo "Semantic versions - Major: $MAJOR, Minor: $MINOR"
 
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          merge-multiple: true
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -66,19 +128,18 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Build and push Docker images
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            unclecode/crawl4ai:${{ steps.get_version.outputs.VERSION }}
-            unclecode/crawl4ai:${{ steps.versions.outputs.MINOR }}
-            unclecode/crawl4ai:${{ steps.versions.outputs.MAJOR }}
-            unclecode/crawl4ai:latest
-          platforms: linux/amd64,linux/arm64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Create and push multi-platform tags
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          docker buildx imagetools create \
+            -t ${{ env.IMAGE }}:${{ steps.get_version.outputs.VERSION }} \
+            -t ${{ env.IMAGE }}:${{ steps.versions.outputs.MINOR }} \
+            -t ${{ env.IMAGE }}:${{ steps.versions.outputs.MAJOR }} \
+            -t ${{ env.IMAGE }}:latest \
+            $(printf '${{ env.IMAGE }}@sha256:%s ' *)
+
+      - name: Inspect image
+        run: docker buildx imagetools inspect ${{ env.IMAGE }}:${{ steps.get_version.outputs.VERSION }}
 
       - name: Summary
         run: |

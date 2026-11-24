@@ -1,0 +1,25 @@
+{#- Overrides the terminal theme's top menu without its schema.org BreadcrumbList markup: the top menu is
+    site navigation, not a breadcrumb, and Search Console rejected it ("Missing field 'id'"). -#}
+        <nav class="terminal-menu">
+            {% if nav|length>1 %}
+            <ul>
+                {% for nav_item in nav %}
+                {% if not nav_item.is_section %}
+                <li>
+                    <a href="{{ nav_item.url|url }}" class="menu-item {% if nav_item.active%}active{% endif %}">
+                        <span>{{ nav_item.title }}</span>
+                    </a>
+                </li>
+                {% endif %}
+                {% endfor %}
+                <li>
+                    <a href="https://crawl4ai.com/" class="menu-item" data-c4s-home="docs-menu">
+                        <span>Cloud</span>
+                    </a>
+                </li>
+                {%- block search_button %}
+                    {% include "partials/top-nav/search-button.html" %}
+                {%- endblock search_button %}
+            </ul>
+            {% endif %}
+        </nav>

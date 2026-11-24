@@ -73,7 +73,7 @@ from crawl4ai import (
     SeedingConfig,
     AsyncLogger
 )
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 # LiteLLM for AI capabilities
@@ -357,7 +357,7 @@ async def crawl_selected_urls(
     # Configure intelligent content extraction
     # This removes ads, navigation, and other noise
     md_generator = DefaultMarkdownGenerator(
-        content_filter=PruningContentFilter(
+        content_filter=PruningContentFilterLXML(
             threshold=0.48,  # Content relevance threshold
             threshold_type="dynamic",  # Adapts to page structure
             min_word_threshold=10  # Ignore tiny text blocks
@@ -1028,7 +1028,7 @@ You've built a complete AI research assistant that:
 
 - 🐙 **GitHub**: [github.com/unclecode/crawl4ai](https://github.com/unclecode/crawl4ai)
 - 📚 **Documentation**: [crawl4ai.com/docs](https://crawl4ai.com/docs)
-- 💬 **Discord**: [Join our community](https://discord.gg/crawl4ai)
+- 💬 **Discord**: [Join our community](https://discord.gg/jP8KfhDhyN)
 
 Thank you for learning with Crawl4AI! 🙏
 

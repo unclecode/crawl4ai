@@ -132,6 +132,51 @@ async def test_browser_context_manager(local_server):
 
 
 # ---------------------------------------------------------------------------
+# Launch flags
+# ---------------------------------------------------------------------------
+
+
+def _disable_feature_names(args):
+    """Every name listed in any --disable-features switch (not last-wins)."""
+    names = []
+    for arg in args:
+        if arg.startswith("--disable-features="):
+            names.extend(
+                name.strip()
+                for name in arg.split("=", 1)[1].split(",")
+                if name.strip()
+            )
+    return names
+
+
+def test_disable_features_omits_optimization_hints():
+    """Issue #2239: OptimizationHints in --disable-features crashes
+    Chrome-for-Testing under --headless=new on macOS arm64 (SEGV_ACCERR).
+
+    MediaRouter and DialMediaRouteProvider must remain. #2219 merges
+    repeated --disable-features lists and previously asserted
+    OptimizationHints as a default that must survive; after this fix the
+    expected defaults are MediaRouter and DialMediaRouteProvider only.
+    """
+    from crawl4ai.browser_manager import BrowserManager, ManagedBrowser
+
+    for light_mode in (False, True):
+        config = BrowserConfig(headless=True, light_mode=light_mode)
+        for flags in (
+            ManagedBrowser.build_browser_flags(config),
+            BrowserManager(browser_config=config)._build_browser_args()["args"],
+        ):
+            names = _disable_feature_names(flags)
+            assert "OptimizationHints" not in names, (
+                f"light_mode={light_mode}: OptimizationHints must not be disabled"
+            )
+            for expected in ("MediaRouter", "DialMediaRouteProvider"):
+                assert expected in names, (
+                    f"light_mode={light_mode} lost {expected}"
+                )
+
+
+# ---------------------------------------------------------------------------
 # Viewport configuration
 # ---------------------------------------------------------------------------
 

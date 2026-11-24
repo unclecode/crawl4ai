@@ -82,12 +82,15 @@ If errors occur, rerun `crawl4ai-doctor` or manually ensure Playwright is instal
 ```bash
 crawl4ai-download-models
 ```
-## 5. Docker (Experimental)
+## 5. Docker
+The Docker server needs a token. Without one it answers only inside its container.
 ```bash
-docker pull unclecode/crawl4ai:basic
-docker run -p 11235:11235 unclecode/crawl4ai:basic
+export CRAWL4AI_API_TOKEN="$(openssl rand -hex 32)"
+docker run -d -p 11235:11235 --name crawl4ai --shm-size=1g \
+  -e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN" \
+  unclecode/crawl4ai:latest
 ```
-You can then make POST requests to `http://localhost:11235/crawl` to perform crawls. **Production usage** is discouraged until our new Docker approach is ready (planned in Jan or Feb 2025).
+Send the token with every request (`Authorization: Bearer $CRAWL4AI_API_TOKEN`). For LLM keys, MCP and all settings, see the [Self-hosting guide](core/self-hosting.md).
 ## 6. Local Server Mode (Legacy)
 ## Summary
 1. **Install** with `pip install crawl4ai` and run `crawl4ai-setup`.
@@ -151,15 +154,15 @@ if __name__ == "__main__":
 ## 4. Generating Markdown Output
 - **`result.markdown`**:  
 - **`result.markdown.fit_markdown`**:  
-  The same content after applying any configured **content filter** (e.g., `PruningContentFilter`).
+  The same content after applying any configured **content filter** (e.g., `PruningContentFilterLXML`).
 ### Example: Using a Filter with `DefaultMarkdownGenerator`
 ```python
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 md_generator = DefaultMarkdownGenerator(
-    content_filter=PruningContentFilter(threshold=0.4, threshold_type="fixed")
+    content_filter=PruningContentFilterLXML(threshold=0.4, threshold_type="fixed")
 )
 
 config = CrawlerRunConfig(
@@ -172,7 +175,7 @@ async with AsyncWebCrawler() as crawler:
     print("Raw Markdown length:", len(result.markdown.raw_markdown))
     print("Fit Markdown length:", len(result.markdown.fit_markdown))
 ```
-**Note**: If you do **not** specify a content filter or markdown generator, you’ll typically see only the raw Markdown. `PruningContentFilter` may adds around `50ms` in processing time. We’ll dive deeper into these strategies in a dedicated **Markdown Generation** tutorial.
+**Note**: If you do **not** specify a content filter or markdown generator, you’ll typically see only the raw Markdown. `PruningContentFilterLXML` may adds around `50ms` in processing time. We’ll dive deeper into these strategies in a dedicated **Markdown Generation** tutorial.
 ## 5. Simple Data Extraction (CSS-based)
 ```python
 from crawl4ai import JsonCssExtractionStrategy
@@ -184,7 +187,7 @@ html = "<div class='product'><h2>Gaming Laptop</h2><span class='price'>$999.99</
 # Using OpenAI (requires API token)
 schema = JsonCssExtractionStrategy.generate_schema(
     html,
-    llm_config = LLMConfig(provider="openai/gpt-4o",api_token="your-openai-token")  # Required for OpenAI
+    llm_config = LLMConfig(provider="openai/gpt-6-luna",api_token="your-openai-token")  # Required for OpenAI
 )
 
 # Or using Ollama (open source, no token needed)
@@ -292,7 +295,7 @@ if __name__ == "__main__":
 
     asyncio.run(
         extract_structured_data_using_llm(
-            provider="openai/gpt-4o", api_token=os.getenv("OPENAI_API_KEY")
+            provider="openai/gpt-6-luna", api_token=os.getenv("OPENAI_API_KEY")
         )
     )
 ```
@@ -1006,7 +1009,7 @@ Instead of using one config for all URLs, provide a list of configs with `url_ma
 from crawl4ai import CrawlerRunConfig, MatchMode
 from crawl4ai.processors.pdf import PDFContentScrapingStrategy
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 # PDF files - specialized extraction
@@ -1019,7 +1022,7 @@ pdf_config = CrawlerRunConfig(
 blog_config = CrawlerRunConfig(
     url_matcher=["*/blog/*", "*/article/*", "*python.org*"],
     markdown_generator=DefaultMarkdownGenerator(
-        content_filter=PruningContentFilter(threshold=0.48)
+        content_filter=PruningContentFilterLXML(threshold=0.48)
     )
 )
 
@@ -1077,8 +1080,8 @@ class CrawlResult(BaseModel):
     success: bool
     cleaned_html: Optional[str] = None
     fit_html: Optional[str] = None  # Preprocessed HTML optimized for extraction
-    media: Dict[str, List[Dict]] = {}
-    links: Dict[str, List[Dict]] = {}
+    media: Dict[str, List[Dict]] = {"images": [], "videos": [], "audios": []}
+    links: Dict[str, List[Dict]] = {"internal": [], "external": []}
     downloaded_files: Optional[List[str]] = None
     screenshot: Optional[str] = None
     pdf : Optional[bytes] = None
@@ -1171,7 +1174,7 @@ print(result.markdown.raw_markdown[:200])
 print(result.markdown.fit_markdown)
 print(result.markdown.fit_html)
 ```
-**Important**: "Fit" content (in `fit_markdown`/`fit_html`) exists in result.markdown, only if you used a **filter** (like **PruningContentFilter** or **BM25ContentFilter**) within a `MarkdownGenerationStrategy`.
+**Important**: "Fit" content (in `fit_markdown`/`fit_html`) exists in result.markdown, only if you used a **filter** (like **PruningContentFilterLXML** or **BM25ContentFilter**) within a `MarkdownGenerationStrategy`.
 ## 4. Media & Links
 ### 4.1 **`media`** *(Dict[str, List[Dict]])*  
 **What**: Contains info about discovered images, videos, or audio. Typically keys: `"images"`, `"videos"`, `"audios"`.  
@@ -1363,7 +1366,7 @@ async def handle_result(result: CrawlResult):
    - `markdown_v2` - Removed in v0.5. Accessing it raises `AttributeError`. Use `markdown`.
    - `fit_markdown` and `fit_html` - Removed as top-level `CrawlResult` properties in v0.5. Use `result.markdown.fit_markdown` and `result.markdown.fit_html`.
 2. **Fit Content**  
-   - **`fit_markdown`** and **`fit_html`** appear in MarkdownGenerationResult, only if you used a content filter (like **PruningContentFilter** or **BM25ContentFilter**) inside your **MarkdownGenerationStrategy** or set them directly.  
+   - **`fit_markdown`** and **`fit_html`** appear in MarkdownGenerationResult, only if you used a content filter (like **PruningContentFilterLXML** or **BM25ContentFilter**) inside your **MarkdownGenerationStrategy** or set them directly.  
    - If no filter is used, they remain `None`.
 3. **References & Citations**  
    - If you enable link citations in your `DefaultMarkdownGenerator` (`options={"citations": True}`), you’ll see `markdown_with_citations` plus a **`references_markdown`** block. This helps large language models or academic-like referencing.
@@ -1593,7 +1596,7 @@ The `clone()` method:
 ### Key fields to note
 1. **`provider`**:  
 - Which LLM provider to use. 
-- Possible values are `"ollama/llama3","groq/llama3-70b-8192","groq/llama3-8b-8192", "openai/gpt-4o-mini" ,"openai/gpt-4o","openai/o1-mini","openai/o1-preview","openai/o3-mini","openai/o3-mini-high","anthropic/claude-3-haiku-20240307","anthropic/claude-3-opus-20240229","anthropic/claude-3-sonnet-20240229","anthropic/claude-3-5-sonnet-20240620","gemini/gemini-pro","gemini/gemini-1.5-pro","gemini/gemini-2.0-flash","gemini/gemini-2.0-flash-exp","gemini/gemini-2.0-flash-lite-preview-02-05","deepseek/deepseek-chat"`<br/>*(default: `"openai/gpt-4o-mini"`)*
+- Possible values are `"ollama/llama3","groq/llama3-70b-8192","groq/llama3-8b-8192", "openai/gpt-6-luna","anthropic/claude-3-haiku-20240307","anthropic/claude-3-opus-20240229","anthropic/claude-3-sonnet-20240229","anthropic/claude-3-5-sonnet-20240620","gemini/gemini-pro","gemini/gemini-1.5-pro","gemini/gemini-2.0-flash","gemini/gemini-2.0-flash-exp","gemini/gemini-2.0-flash-lite-preview-02-05","deepseek/deepseek-chat"`<br/>*(default: `"openai/gpt-6-luna"`)*
 2. **`api_token`**:  
     - Optional. When not provided explicitly, api_token will be read from environment variables based on provider. For example: If a gemini model is passed as provider then,`"GEMINI_API_KEY"` will be read from environment variables  
     - API token of LLM provider <br/> eg: `api_token = "gsk_1ClHGGJ7Lpn4WGybR7vNWGdyb3FY7zXEw3SCiy0BAVM9lL8CQv"`
@@ -1608,7 +1611,7 @@ The `clone()` method:
    - Because these plug into Crawl4AI’s retry helper, every LLM strategy automatically follows the pacing you define here.
 ```python
 llm_config = LLMConfig(
-    provider="openai/gpt-4o-mini",
+    provider="openai/gpt-6-luna",
     api_token=os.getenv("OPENAI_API_KEY"),
     backoff_base_delay=1, # optional
     backoff_max_attempts=5, # optional
@@ -1988,12 +1991,12 @@ run_config = CrawlerRunConfig(
 ## 3.1 Parameters
 | **Parameter**         | **Type / Default**                     | **What It Does**                                                                                                                     |
 |-----------------------|----------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| **`provider`**    | `"ollama/llama3","groq/llama3-70b-8192","groq/llama3-8b-8192", "openai/gpt-4o-mini" ,"openai/gpt-4o","openai/o1-mini","openai/o1-preview","openai/o3-mini","openai/o3-mini-high","anthropic/claude-3-haiku-20240307","anthropic/claude-3-opus-20240229","anthropic/claude-3-sonnet-20240229","anthropic/claude-3-5-sonnet-20240620","gemini/gemini-pro","gemini/gemini-1.5-pro","gemini/gemini-2.0-flash","gemini/gemini-2.0-flash-exp","gemini/gemini-2.0-flash-lite-preview-02-05","deepseek/deepseek-chat"`<br/>*(default: `"openai/gpt-4o-mini"`)* | Which LLM provider to use. 
+| **`provider`**    | `"ollama/llama3","groq/llama3-70b-8192","groq/llama3-8b-8192", "openai/gpt-6-luna","anthropic/claude-3-haiku-20240307","anthropic/claude-3-opus-20240229","anthropic/claude-3-sonnet-20240229","anthropic/claude-3-5-sonnet-20240620","gemini/gemini-pro","gemini/gemini-1.5-pro","gemini/gemini-2.0-flash","gemini/gemini-2.0-flash-exp","gemini/gemini-2.0-flash-lite-preview-02-05","deepseek/deepseek-chat"`<br/>*(default: `"openai/gpt-6-luna"`)* | Which LLM provider to use. 
 | **`api_token`**         |1.Optional. When not provided explicitly, api_token will be read from environment variables based on provider. For example: If a gemini model is passed as provider then,`"GEMINI_API_KEY"` will be read from environment variables  <br/> 2. API token of LLM provider <br/> eg: `api_token = "gsk_1ClHGGJ7Lpn4WGybR7vNWGdyb3FY7zXEw3SCiy0BAVM9lL8CQv"` <br/> 3. Environment variable - use with prefix "env:" <br/> eg:`api_token = "env: GROQ_API_KEY"`              | API token to use for the given provider 
 | **`base_url`**         |Optional. Custom API endpoint | If your provider has a custom endpoint
 ## 3.2 Example Usage
 ```python
-llm_config = LLMConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY"))
+llm_config = LLMConfig(provider="openai/gpt-6-luna", api_token=os.getenv("OPENAI_API_KEY"))
 ```
 ## 4. Putting It All Together
 - **Use** `BrowserConfig` for **global** browser settings: engine, headless, proxy, user agent.  
@@ -2039,7 +2042,7 @@ The `arun()` method returns a `CrawlResult` object with several useful propertie
 ```python
 config = CrawlerRunConfig(
     markdown_generator=DefaultMarkdownGenerator(
-        content_filter=PruningContentFilter(threshold=0.6),
+        content_filter=PruningContentFilterLXML(threshold=0.6),
         options={"ignore_links": True}
     )
 )
@@ -2294,12 +2297,12 @@ config = CrawlerRunConfig(markdown_generator=md_generator)
 - **`bm25_threshold`**: Raise it to keep fewer blocks; lower it to keep more.  
 - **`use_stemming`** *(default `True`)*: Whether to apply stemming to the query and content.
 - **`language (str)`**: Language for stemming (default: 'english').
-### 5.2 PruningContentFilter
-If you **don’t** have a specific query, or if you just want a robust “junk remover,” use `PruningContentFilter`. It analyzes text density, link density, HTML structure, and known patterns (like “nav,” “footer”) to systematically prune extraneous or repetitive sections.
+### 5.2 PruningContentFilterLXML
+If you **don’t** have a specific query, or if you just want a robust “junk remover,” use `PruningContentFilterLXML`. It analyzes text density, link density, HTML structure, and known patterns (like “nav,” “footer”) to systematically prune extraneous or repetitive sections.
 ```python
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 
-prune_filter = PruningContentFilter(
+prune_filter = PruningContentFilterLXML(
     threshold=0.5,
     threshold_type="fixed",  # or "dynamic"
     min_word_threshold=50
@@ -2319,7 +2322,7 @@ from crawl4ai.content_filter_strategy import LLMContentFilter
 async def main():
     # Initialize LLM filter with specific instruction
     filter = LLMContentFilter(
-        llm_config = LLMConfig(provider="openai/gpt-4o",api_token="your-api-token"), #or use environment variable
+        llm_config = LLMConfig(provider="openai/gpt-6-luna",api_token="your-api-token"), #or use environment variable
         instruction="""
         Focus on extracting the core educational content.
         Include:
@@ -2384,12 +2387,12 @@ When a content filter is active, the library produces two forms of markdown insi
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 
 async def main():
     config = CrawlerRunConfig(
         markdown_generator=DefaultMarkdownGenerator(
-            content_filter=PruningContentFilter(threshold=0.6),
+            content_filter=PruningContentFilterLXML(threshold=0.6),
             options={"ignore_links": True}
         )
     )
@@ -2425,14 +2428,14 @@ print("FIT:\n", md_obj.fit_markdown)
 - Or feed `fit_markdown` into a vector database to reduce token usage.  
 - `references_markdown` can help you keep track of link provenance.
 ## 8. Combining Filters (BM25 + Pruning) in Two Passes
-You might want to **prune out** noisy boilerplate first (with `PruningContentFilter`), and then **rank what’s left** against a user query (with `BM25ContentFilter`). You don’t have to crawl the page twice. Instead:
-1. **First pass**: Apply `PruningContentFilter` directly to the raw HTML from `result.html` (the crawler’s downloaded HTML).  
+You might want to **prune out** noisy boilerplate first (with `PruningContentFilterLXML`), and then **rank what’s left** against a user query (with `BM25ContentFilter`). You don’t have to crawl the page twice. Instead:
+1. **First pass**: Apply `PruningContentFilterLXML` directly to the raw HTML from `result.html` (the crawler’s downloaded HTML).  
 2. **Second pass**: Take the pruned HTML (or text) from step 1, and feed it into `BM25ContentFilter`, focusing on a user query.
 ### Two-Pass Example
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.content_filter_strategy import PruningContentFilter, BM25ContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML, BM25ContentFilter
 from bs4 import BeautifulSoup
 
 async def main():
@@ -2451,8 +2454,8 @@ async def main():
 
         raw_html = result.html
 
-        # 2. First pass: PruningContentFilter on raw HTML
-        pruning_filter = PruningContentFilter(threshold=0.5, min_word_threshold=50)
+        # 2. First pass: PruningContentFilterLXML on raw HTML
+        pruning_filter = PruningContentFilterLXML(threshold=0.5, min_word_threshold=50)
 
         # filter_content returns a list of "text chunks" or cleaned HTML sections
         pruned_chunks = pruning_filter.filter_content(raw_html)
@@ -2519,17 +2522,24 @@ In **`CrawlerRunConfig`**, you can specify a **`content_filter`** to shape how c
 - **`result.markdown.fit_markdown`** (filtered or “fit” version)
 - **`result.markdown.fit_html`** (the corresponding HTML snippet that produced `fit_markdown`)
 ### 1.2 Common Filters
-## 2. PruningContentFilter
+## 2. PruningContentFilterLXML
+
+!!! warning "Deprecation"
+    Use `PruningContentFilterLXML` (lxml engine, **~10× faster**, identical output). The legacy
+    `PruningContentFilter` (BeautifulSoup) still works but emits a `DeprecationWarning`. In an
+    upcoming release `PruningContentFilter` will become an alias for the lxml engine, with
+    `PruningContentFilterLXML` kept as a legacy alias.
+
 ### 2.1 Usage Example
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilterLXML
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 async def main():
     # Step 1: Create a pruning filter
-    prune_filter = PruningContentFilter(
+    prune_filter = PruningContentFilterLXML(
         # Lower → more content retained, higher → more content pruned
         threshold=0.45,           
         # "fixed" or "dynamic"
@@ -2624,7 +2634,7 @@ If the content filter is **BM25**, you might see additional logic or references 
 ## 5. Code Patterns Recap
 ### 5.1 Pruning
 ```python
-prune_filter = PruningContentFilter(
+prune_filter = PruningContentFilterLXML(
     threshold=0.5,
     threshold_type="fixed",
     min_word_threshold=10
@@ -2648,7 +2658,7 @@ config = CrawlerRunConfig(
     excluded_tags=["nav", "footer", "header"],
     exclude_external_links=True,
     markdown_generator=DefaultMarkdownGenerator(
-        content_filter=PruningContentFilter(threshold=0.5)
+        content_filter=PruningContentFilterLXML(threshold=0.5)
     )
 )
 ```
@@ -4404,7 +4414,7 @@ async def extract_with_generated_pattern():
 
         # Configure LLM
         llm_config = LLMConfig(
-            provider="openai/gpt-4o-mini",
+            provider="openai/gpt-6-luna",
             api_token="env:OPENAI_API_KEY",
         )
 
@@ -4531,7 +4541,7 @@ html = """
 css_schema = JsonCssExtractionStrategy.generate_schema(
     html,
     schema_type="css", 
-    llm_config = LLMConfig(provider="openai/gpt-4o",api_token="your-openai-token")
+    llm_config = LLMConfig(provider="openai/gpt-6-luna",api_token="your-openai-token")
 )
 
 # Option 2: Using Ollama (open source, no token needed)
@@ -4588,9 +4598,9 @@ With Crawl4AI's LLM-free extraction strategies - `JsonCssExtractionStrategy`, `J
 ## 1. Why Use an LLM?
 ## 2. Provider-Agnostic via LiteLLM
 ```python
-llmConfig = LlmConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY"))
+llmConfig = LlmConfig(provider="openai/gpt-6-luna", api_token=os.getenv("OPENAI_API_KEY"))
 ```
-Crawl4AI uses a “provider string” (e.g., `"openai/gpt-4o"`, `"ollama/llama2.0"`, `"aws/titan"`) to identify your LLM. **Any** model that LiteLLM supports is fair game. You just provide:
+Crawl4AI uses a “provider string” (e.g., `"openai/gpt-6-luna"`, `"ollama/llama2.0"`, `"aws/titan"`) to identify your LLM. **Any** model that LiteLLM supports is fair game. You just provide:
 - **`provider`**: The `<provider>/<model_name>` identifier (e.g., `"openai/gpt-4"`, `"ollama/llama2"`, `"huggingface/google-flan"`, etc.).  
 - **`api_token`**: If needed (for OpenAI, HuggingFace, etc.); local models or Ollama might not require it.  
 - **`base_url`** (optional): If your provider has a custom endpoint.  
@@ -4650,7 +4660,7 @@ class Product(BaseModel):
 async def main():
     # 1. Define the LLM extraction strategy
     llm_strategy = LLMExtractionStrategy(
-        llm_config = LLMConfig(provider="openai/gpt-4o-mini", api_token=os.getenv('OPENAI_API_KEY')),
+        llm_config = LLMConfig(provider="openai/gpt-6-luna", api_token=os.getenv('OPENAI_API_KEY')),
         schema=Product.schema_json(), # Or use model_json_schema()
         extraction_type="schema",
         instruction="Extract all product objects with 'name' and 'price' from the content.",
@@ -4699,7 +4709,7 @@ To keep context continuous across chunks, we can overlap them. E.g., `overlap_ra
 ## 7. Input Format
 By default, **LLMExtractionStrategy** uses `input_format="markdown"`, meaning the **crawler’s final markdown** is fed to the LLM. You can change to:
 - **`html`**: The cleaned HTML or raw HTML (depending on your crawler config) goes into the LLM.  
-- **`fit_markdown`**: If you used, for instance, `PruningContentFilter`, the “fit” version of the markdown is used. This can drastically reduce tokens if you trust the filter.  
+- **`fit_markdown`**: If you used, for instance, `PruningContentFilterLXML`, the “fit” version of the markdown is used. This can drastically reduce tokens if you trust the filter.  
 - **`markdown`**: Standard markdown output from the crawler’s `markdown_generator`.
 This setting is crucial: if the LLM instructions rely on HTML tags, pick `"html"`. If you prefer a text-based approach, pick `"markdown"`.
 ```python
@@ -4792,7 +4802,7 @@ if __name__ == "__main__":
 - Monitor token usage with `show_usage()`.
 If your site’s data is consistent or repetitive, consider [`JsonCssExtractionStrategy`](./no-llm-strategies.md) first for speed and simplicity. But if you need an **AI-driven** approach, `LLMExtractionStrategy` offers a flexible, multi-provider solution for extracting structured JSON from any website.
 1. **Experiment with Different Providers**  
-   - Try switching the `provider` (e.g., `"ollama/llama2"`, `"openai/gpt-4o"`, etc.) to see differences in speed, accuracy, or cost.  
+   - Try switching the `provider` (e.g., `"ollama/llama2"`, `"openai/gpt-6-luna"`, etc.) to see differences in speed, accuracy, or cost.  
    - Pass different `extra_args` like `temperature`, `top_p`, and `max_tokens` to fine-tune your results.
 2. **Performance Tuning**  
    - If pages are large, tweak `chunk_token_threshold`, `overlap_rate`, or `apply_chunking` to optimize throughput.  

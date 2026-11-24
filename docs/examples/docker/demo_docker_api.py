@@ -362,7 +362,7 @@ async def demo_markdown_pruning(client: httpx.AsyncClient):
                     "type": "DefaultMarkdownGenerator",
                     "params": {
                         "content_filter": {
-                            "type": "PruningContentFilter",
+                            "type": "PruningContentFilterLXML",
                             "params": {
                                 "threshold": 0.6,
                                 "threshold_type": "relative"

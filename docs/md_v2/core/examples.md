@@ -15,7 +15,7 @@ This page provides a comprehensive list of example scripts that demonstrate vari
 
 | Example  | Description | Link |
 |----------|--------------|------|
-| **NSTProxy** | [NSTProxy](https://www.nstproxy.com/?utm_source=crawl4ai) Seamlessly integrates with crawl4ai — no setup required. Access high-performance residential, datacenter, ISP, and IPv6 proxies with smart rotation and anti-blocking technology. Starts from $0.1/GB. Use code crawl4ai for 10% off. | [View Code](https://github.com/unclecode/crawl4ai/tree/main/docs/examples/proxy) |
+| **NSTProxy** | [NSTProxy](https://www.nstproxy.com/?utm_source=crawl4ai) Seamlessly integrates with crawl4ai — no setup required. Access high-performance residential, datacenter, ISP, and IPv6 proxies with smart rotation and anti-blocking technology. Starts from $0.1/GB. Use code crawl4ai for 10% off. | [View Code](https://github.com/unclecode/crawl4ai/tree/main/docs/examples/nst_proxy) |
 
 ## Browser & Crawling Features
 

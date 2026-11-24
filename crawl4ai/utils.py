@@ -36,6 +36,7 @@ from functools import lru_cache
 
 from packaging import version
 from . import __version__
+from .egress_policy import proxy_url
 from typing import Sequence
 
 from itertools import chain
@@ -50,27 +51,68 @@ from urllib.parse import (
 import inspect
 
 
-# Monkey patch to fix wildcard handling in urllib.robotparser
-from urllib.robotparser import RuleLine
-import re
+# Monkey patch to fix wildcard handling in urllib.robotparser.
+# Python 3.14 rewrote robotparser with native wildcard, '$' and RFC 9309
+# longest-match support, and its applies_to returns a match *length* used to
+# rank rules. Patching it there returns a bool, which collapses every wildcard
+# rule to the lowest priority and breaks Allow: overrides -- so only patch the
+# older implementation, which has no wildcard support at all.
+import sys
 
-original_applies_to = RuleLine.applies_to
+if sys.version_info < (3, 14):
+    from urllib.robotparser import RuleLine
 
-def patched_applies_to(self, filename):
-   # Handle wildcards in paths
-   if '*' in self.path or '%2A' in self.path or self.path in ("*", "%2A"):
-       pattern = self.path.replace('%2A', '*')
-       pattern = re.escape(pattern).replace('\\*', '.*')
-       pattern = '^' + pattern
-       if pattern.endswith('\\$'):
-           pattern = pattern[:-2] + '$'
-       try:
-           return bool(re.match(pattern, filename))
-       except re.error:
-           return original_applies_to(self, filename)
-   return original_applies_to(self, filename)
+    # RobotFileParser.parse unquotes rule paths before RuleLine quotes them
+    # again, which collapses raw '*'/'$' and percent-encoded '%2A'/'%24' into
+    # the same '%2A'/'%24' tokens. Mark percent-encoded '%2A' and '%24' before
+    # parse() unquotes the line so they stay literal instead of acting as a
+    # wildcard or end anchor.
+    _LITERAL_STAR = "%EE%80%80"
+    _LITERAL_DOLLAR = "%EE%80%81"
+    original_parse = RobotFileParser.parse
+    original_applies_to = RuleLine.applies_to
 
-RuleLine.applies_to = patched_applies_to
+    def _escape_encoded_specials(line: str) -> str:
+        body, hash_sep, comment = line.partition("#")
+        key, sep, value = body.partition(":")
+        if sep and key.strip().lower() in ("allow", "disallow"):
+            value = re.sub(
+                r"%([0-9A-Fa-f]{2})",
+                lambda m: (
+                    "\ue000"
+                    if m.group(1).upper() == "2A"
+                    else ("\ue001" if m.group(1) == "24" else m.group(0))
+                ),
+                value,
+            )
+            return f"{key}:{value}" + (f"#{comment}" if hash_sep else "")
+        return line
+
+    def patched_parse(self, lines):
+        return original_parse(self, (_escape_encoded_specials(line) for line in lines))
+
+    def patched_applies_to(self, filename):
+        if "*" in self.path or "%2A" in self.path or self.path.endswith("%24"):
+            pattern = self.path.replace("%2A", "*")
+            pattern = "^" + re.escape(pattern).replace("\\*", ".*")
+            if pattern.endswith("%24"):
+                pattern = pattern[:-3] + "$"
+            pattern = pattern.replace(_LITERAL_STAR, "%2A").replace(
+                _LITERAL_DOLLAR, "%24"
+            )
+            try:
+                return bool(re.match(pattern, filename))
+            except re.error:
+                return original_applies_to(self, filename)
+        if _LITERAL_STAR in self.path or _LITERAL_DOLLAR in self.path:
+            path = self.path.replace(_LITERAL_STAR, "%2A").replace(
+                _LITERAL_DOLLAR, "%24"
+            )
+            return filename.startswith(path)
+        return original_applies_to(self, filename)
+
+    RobotFileParser.parse = patched_parse
+    RuleLine.applies_to = patched_applies_to
 # Monkey patch ends
 
 def chunk_documents(
@@ -249,6 +291,28 @@ class VersionManager:
         return installed is None or installed < current
 
 
+def _preserve_bare_query(rules_text: str) -> str:
+    """Append '*' to Allow/Disallow values ending in a bare '?' (e.g. '/*?').
+
+    Only correct below Python 3.14, and only called there. Those parsers drop a
+    trailing '?' when normalizing the rule path, collapsing '/*?' to '/*' and
+    blocking the whole site; they also take the first matching rule, so making a
+    rule longer cannot change which one wins.
+
+    From 3.14 the stdlib keeps the '?' and ranks rules by match length, and the
+    rewrite becomes actively wrong: '/*?*' matches to end of string, so it
+    outranks a competing 'Allow: /*?q=' that the raw '/*?' would have lost to.
+    """
+    fixed = []
+    for raw_line in rules_text.splitlines():
+        body, _, _ = raw_line.partition("#")
+        key, sep, value = body.partition(":")
+        if sep and key.strip().lower() in ("allow", "disallow") and value.strip().endswith("?"):
+            raw_line = f"{key.strip()}: {value.strip()}*"
+        fixed.append(raw_line)
+    return "\n".join(fixed)
+
+
 class RobotsParser:
     # Default 7 days cache TTL
     CACHE_TTL = 7 * 24 * 60 * 60
@@ -340,8 +404,16 @@ class RobotsParser:
                 scheme = parsed.scheme or 'http'
                 robots_url = f"{scheme}://{domain}/robots.txt"
                 
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(robots_url, timeout=2, ssl=False) as response:
+                # proxy=None unless an embedder installed one (the Docker
+                # server does). Without it this fetch is a caller-chosen URL on
+                # an unguarded client: it reached internal hosts directly and
+                # followed redirects into them.
+                # ssl=False is gone: a bad certificate now raises, and the
+                # except below fails open, so robots is ignored rather than
+                # respected -- more crawling, never a broken crawl.
+                timeout = aiohttp.ClientTimeout(total=2)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get(robots_url, proxy=proxy_url()) as response:
                         if response.status == 200:
                             rules = await response.text()
                             self._cache_rules(domain, rules)
@@ -355,7 +427,12 @@ class RobotsParser:
             return True
 
         # Create parser for this check
-        parser = RobotFileParser() 
+        parser = RobotFileParser()
+        # Below 3.14, rewrite rules ending in a bare '?' so they survive path
+        # normalization. From 3.14 the stdlib handles them, and the rewrite
+        # would skew its longest-match ranking -- see _preserve_bare_query.
+        if sys.version_info < (3, 14):
+            rules = _preserve_bare_query(rules)
         parser.parse(rules.splitlines())
         
         # If parser can't read rules, allow access
@@ -1779,7 +1856,9 @@ def perform_completion_with_backoff(
     import litellm
     litellm.drop_params = True  # Auto-drop unsupported params (e.g., temperature for O-series/GPT-5)
 
-    extra_args = {"temperature": 0.01, "api_key": api_token, "base_url": base_url}
+    # No default temperature: reasoning models (GPT-5, gpt-6-luna) reject anything
+    # but 1, and litellm can't drop it for models it doesn't know. Set it in extra_args.
+    extra_args = {"api_key": api_token, "base_url": base_url}
     if json_response:
         extra_args["response_format"] = {"type": "json_object"}
 
@@ -1872,7 +1951,9 @@ async def aperform_completion_with_backoff(
     import asyncio
     litellm.drop_params = True  # Auto-drop unsupported params (e.g., temperature for O-series/GPT-5)
 
-    extra_args = {"temperature": 0.01, "api_key": api_token, "base_url": base_url}
+    # No default temperature: reasoning models (GPT-5, gpt-6-luna) reject anything
+    # but 1, and litellm can't drop it for models it doesn't know. Set it in extra_args.
+    extra_args = {"api_key": api_token, "base_url": base_url}
     if json_response:
         extra_args["response_format"] = {"type": "json_object"}
 
@@ -2009,7 +2090,7 @@ def extract_blocks_batch(batch_data, provider="groq/llama3-70b-8192", api_token=
 
         messages.append([{"role": "user", "content": prompt_with_variables}])
 
-    responses = batch_completion(model=provider, messages=messages, temperature=0.01)
+    responses = batch_completion(model=provider, messages=messages)
 
     all_blocks = []
     for response in responses:
@@ -2162,7 +2243,7 @@ def format_html(html_string):
         str: The prettified HTML string.
     """
 
-    soup = BeautifulSoup(html_string, "lxml.parser")
+    soup = BeautifulSoup(html_string, "lxml")
     return soup.prettify()
 
 
@@ -2211,6 +2292,16 @@ def fast_format_html(html_string):
 
     return "\n".join(formatted)
 
+
+
+def _lowercase_host(netloc: str) -> str:
+    """Lowercase the host of a netloc, leaving any userinfo as written.
+
+    A host is case-insensitive, but the `user:password` part in front of it is
+    not: lowercasing the whole netloc rewrites credentials taken from a URL.
+    """
+    userinfo, separator, hostport = netloc.rpartition('@')
+    return f"{userinfo}{separator}{hostport.lower()}"
 
 
 def normalize_url(
@@ -2268,7 +2359,7 @@ def normalize_url(
     parsed = urlparse(full_url)
 
     # ── netloc ──
-    netloc = parsed.netloc.lower()
+    netloc = _lowercase_host(parsed.netloc)
 
     # ── path ──
     # Strip duplicate slashes and trailing "/" (except root)
@@ -2340,7 +2431,7 @@ def normalize_url_for_deep_crawl(href, base_url, preserve_https=False, original_
     parsed = urlparse(full_url)
     
     # Convert hostname to lowercase
-    netloc = parsed.netloc.lower()
+    netloc = _lowercase_host(parsed.netloc)
     
     # Remove fragment entirely
     fragment = ''
@@ -2402,7 +2493,7 @@ def efficient_normalize_url_for_deep_crawl(href, base_url, preserve_https=False,
     # 2. Remove fragment
     normalized = urlunparse((
         parsed.scheme,
-        parsed.netloc.lower(),
+        _lowercase_host(parsed.netloc),
         parsed.path or '/',  # Preserve trailing slash
         parsed.params,
         parsed.query,
@@ -3094,10 +3185,13 @@ def preprocess_html_for_schema(html_content, text_threshold=100, attr_value_thre
     Returns:
         str: Preprocessed HTML content
     """
+    # Local import: content_scraping_strategy imports from this module.
+    from .content_scraping_strategy import unwrap_orphaned_noscript
+
     try:
         # Parse HTML with error recovery
         parser = etree.HTMLParser(remove_comments=True, remove_blank_text=True)
-        tree = lhtml.fromstring(html_content, parser=parser)
+        tree = lhtml.fromstring(unwrap_orphaned_noscript(html_content), parser=parser)
         
         # 1. Remove HEAD section (keep only BODY)
         head_elements = tree.xpath('//head')

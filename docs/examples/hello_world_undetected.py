@@ -4,7 +4,7 @@ from crawl4ai import (
     BrowserConfig,
     CrawlerRunConfig,
     DefaultMarkdownGenerator,
-    PruningContentFilter,
+    PruningContentFilterLXML,
     CrawlResult,
     UndetectedAdapter
 )
@@ -35,7 +35,7 @@ async def main():
         # Configure the crawl
         crawler_config = CrawlerRunConfig(
             markdown_generator=DefaultMarkdownGenerator(
-                content_filter=PruningContentFilter()
+                content_filter=PruningContentFilterLXML()
             ),
             capture_console_messages=True,  # Enable console capture to test adapter
         )

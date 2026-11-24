@@ -22,8 +22,8 @@ class CrawlResult(BaseModel):
     fit_html: Optional[str] = None
     success: bool
     cleaned_html: Optional[str] = None
-    media: Dict[str, List[Dict]] = {}
-    links: Dict[str, List[Dict]] = {}
+    media: Dict[str, List[Dict]] = {"images": [], "videos": [], "audios": []}
+    links: Dict[str, List[Dict]] = {"internal": [], "external": []}
     downloaded_files: Optional[List[str]] = None
     js_execution_result: Optional[Dict[str, Any]] = None
     screenshot: Optional[str] = None
@@ -141,7 +141,7 @@ print(md_res.markdown_with_citations)
 print(md_res.references_markdown)
 ```
 
-**Note**: If you use a filter like `PruningContentFilter`, you’ll get `fit_markdown` and `fit_html` as well.
+**Note**: If you use a filter like `PruningContentFilterLXML`, you’ll get `fit_markdown` and `fit_html` as well.
 
 ---
 
@@ -336,7 +336,7 @@ else:
 ## 7. Next Steps
 
 - **Markdown Generation**: Dive deeper into how to configure `DefaultMarkdownGenerator` and various filters.  
-- **Content Filtering**: Learn how to use `BM25ContentFilter` and `PruningContentFilter`.
+- **Content Filtering**: Learn how to use `BM25ContentFilter` and `PruningContentFilterLXML`.
 - **Session & Hooks**: If you want to manipulate the page or preserve state across multiple `arun()` calls, see the hooking or session docs.  
 - **LLM Extraction**: For complex or unstructured content requiring AI-driven parsing, check the LLM-based strategies doc.
 

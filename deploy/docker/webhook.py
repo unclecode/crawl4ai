@@ -68,7 +68,7 @@ def sanitize_webhook_headers(headers: Optional[Dict[str, str]]) -> Dict[str, str
         raise ValueError("too many webhook headers")
     clean: Dict[str, str] = {}
     for name, value in headers.items():
-        if not isinstance(name, str) or not _WEBHOOK_HEADER_NAME.match(name):
+        if not isinstance(name, str) or not _WEBHOOK_HEADER_NAME.fullmatch(name):
             raise ValueError(f"invalid webhook header name: {name!r}")
         if name.lower() in _WEBHOOK_DENY_HEADERS:
             raise ValueError(f"webhook header not allowed: {name}")

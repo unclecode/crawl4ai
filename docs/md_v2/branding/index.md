@@ -1294,9 +1294,8 @@ Use these CSS variables for consistency across all styles:
 
 ### Download Assets
 
-- [Dank Mono Font Files](/docs/md_v2/assets/) (Regular, Bold, Italic)
-- [Brand CSS Template](/docs/md_v2/branding/assets/brand-examples.css)
-- [Component Library](/docs/md_v2/apps/)
+- [Dank Mono Font Files](https://github.com/unclecode/crawl4ai/tree/main/docs/md_v2/assets) (Regular, Bold, Italic)
+- [Component Library](../apps/index.md)
 
 ### Reference Files
 
@@ -1312,7 +1311,7 @@ If you're unsure about which style to use or need help implementing these guidel
 
 - Check existing examples in the relevant section
 - Review the "When to Use Each Style" guidelines above
-- Ask in our [Discord community](https://discord.gg/crawl4ai)
+- Ask in our [Discord community](https://discord.gg/jP8KfhDhyN)
 - Open an issue on [GitHub](https://github.com/unclecode/crawl4ai)
 
 ---

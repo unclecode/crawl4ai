@@ -14,7 +14,7 @@ from crawl4ai import (
     CrawlerHub,
     CrawlResult,
     DefaultMarkdownGenerator,
-    PruningContentFilter,
+    PruningContentFilterLXML,
 )
 from pathlib import Path
 from pydantic import BaseModel
@@ -35,7 +35,7 @@ async def hello_web():
         crawler_config = CrawlerRunConfig(
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(
-                content_filter=PruningContentFilter(
+                content_filter=PruningContentFilterLXML(
                     threshold=0.48, threshold_type="fixed", min_word_threshold=0
                 )
             ),        

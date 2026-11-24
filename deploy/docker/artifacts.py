@@ -100,7 +100,7 @@ def resolve_artifact(artifact_id: str) -> Tuple[str, str]:
     Raises ArtifactNotFound for an invalid id, a non-regular/symlink file, a
     missing file, or an expired artifact (so existence is never revealed).
     """
-    if not isinstance(artifact_id, str) or not _HEX32.match(artifact_id):
+    if not isinstance(artifact_id, str) or not _HEX32.fullmatch(artifact_id):
         raise ArtifactNotFound()
     for ext, mime in _KIND.values():
         path = os.path.join(ARTIFACT_DIR, artifact_id + ext)

@@ -1,4 +1,4 @@
-# 🚀🤖 Crawl4AI: Open-Source LLM-Friendly Web Crawler & Scraper
+# 🚀🤖 Crawl4AI: the open-source web crawler for LLMs and AI agents
 
 <div class = "badges" align="center">
 
@@ -15,59 +15,103 @@
   <p>
     <a href="https://github.com/unclecode/crawl4ai/stargazers">
       <img src="https://img.shields.io/github/stars/unclecode/crawl4ai?style=social"
-           alt="GitHub Stars"/>
+           alt="GitHub Stars" width="88" height="20"/>
     </a>
     <a href="https://github.com/unclecode/crawl4ai/network/members">
       <img src="https://img.shields.io/github/forks/unclecode/crawl4ai?style=social"
-           alt="GitHub Forks"/>
+           alt="GitHub Forks" width="92" height="20"/>
     </a>
     <a href="https://badge.fury.io/py/crawl4ai">
       <img src="https://badge.fury.io/py/crawl4ai.svg"
-           alt="PyPI version"/>
+           alt="PyPI version" width="125" height="20"/>
     </a>
   </p>
 
   <p>
     <a href="https://pypi.org/project/crawl4ai/">
       <img src="https://img.shields.io/pypi/pyversions/crawl4ai"
-           alt="Python Version"/>
+           alt="Python Version" width="198" height="20"/>
     </a>
     <a href="https://pepy.tech/project/crawl4ai">
       <img src="https://static.pepy.tech/badge/crawl4ai/month"
-           alt="Downloads"/>
+           alt="Downloads" width="136" height="20"/>
     </a>
     <a href="https://github.com/unclecode/crawl4ai/blob/main/LICENSE">
       <img src="https://img.shields.io/github/license/unclecode/crawl4ai"
-           alt="License"/>
+           alt="License" width="120" height="20"/>
     </a>
   </p>
   <p align="center">
     <a href="https://x.com/crawl4ai">
-      <img src="https://img.shields.io/badge/Follow%20on%20X-000000?style=for-the-badge&logo=x&logoColor=white" alt="Follow on X" />
+      <img src="https://img.shields.io/badge/Follow%20on%20X-000000?style=for-the-badge&logo=x&logoColor=white" alt="Follow on X" width="136" height="28"/>
     </a>
     <a href="https://www.linkedin.com/company/crawl4ai">
-      <img src="https://img.shields.io/badge/Follow%20on%20LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="Follow on LinkedIn" />
+      <img src="https://img.shields.io/badge/Follow%20on%20LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="Follow on LinkedIn" width="175" height="28"/>
     </a>
     <a href="https://discord.gg/jP8KfhDhyN">
-      <img src="https://img.shields.io/badge/Join%20our%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join our Discord" />
+      <img src="https://img.shields.io/badge/Join%20our%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join our Discord" width="175" height="28"/>
     </a>
   </p>
   
 </div>
 
----
-#### 🚀 Crawl4AI Cloud API — Closed Beta (Launching Soon)
-Reliable, large-scale web extraction, now built to be _**drastically more cost-effective**_ than any of the existing solutions.
+Crawl4AI turns any website into clean, LLM-ready Markdown for RAG, AI agents and data pipelines. Run the open-source web crawler and scraper yourself, free forever, or use it hosted with one key: `/scrape` a page to Markdown, `/extract` it to JSON, `/search` the web, `/serp` for Google's results page as data, `/answer` a question with sources; MCP for your agent. Free: 1,000 credits every month, 10 a minute, 2 at a time. Paid: 120 a minute, 10 at a time, from $10 a month.
 
-👉 **Apply [here](https://forms.gle/E9MyPaNXACnAMaqG7) for early access**  
-_We’ll be onboarding in phases and working closely with early users.
-Limited slots._
+## Two ways to use Crawl4AI
 
----
+### 🐍 Run it yourself: open source, forever
 
-Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant community. It delivers blazing-fast, AI-ready web crawling tailored for large language models, AI agents, and data pipelines. Fully open source, flexible, and built for real-time performance, **Crawl4AI** empowers developers with unmatched speed, precision, and deployment ease.
+```bash
+pip install -U crawl4ai
+crawl4ai-setup        # installs the browser, once
+```
 
-> Enjoy using Crawl4AI? Consider **[becoming a sponsor](https://github.com/sponsors/unclecode)** to support ongoing development and community growth!
+**Or skip the install.** One API call. First crawl in 30 seconds. [Get a free API key →](https://crawl4ai.com/signin/?ref=docs-home-inline){ .c4s-box-btn data-c4s-ev="banner_inline_clicked" }
+{: .c4s-box }
+
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler
+
+async def main():
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(url="https://news.ycombinator.com")
+        print(result.markdown)
+
+asyncio.run(main())
+```
+
+Docker server, CLI and every option: [Installation](core/installation.md) · [Self-hosting](core/self-hosting.md)
+
+### ☁️ Or use the cloud: no browsers, no proxies
+
+1. [![Get a key in 10 seconds](https://img.shields.io/badge/Get_a_key_in_10_seconds-1%2C000_free_credits-f5a300?style=for-the-badge&labelColor=0d0d10)](https://crawl4ai.com/signin/?ref=docs)  
+   Verify your email and 1,000 free credits are yours every month. No card.
+2. Get any page as Markdown:
+
+   ```bash
+   curl -s https://api.crawl4ai.com/scrape \
+     -H "Authorization: Bearer $CRAWL4AI_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url": "https://news.ycombinator.com"}' | jq -r .markdown
+   ```
+
+   The same key works for `/extract`, `/search`, `/serp`, `/answer` and many URLs at once (`/scrape/batch`, `/scrape/jobs`). Pay as you go: [live prices](https://crawl4ai.com/docs?ref=docs#pricing).
+3. Give it to your AI agent. Claude Code shown; [Codex, Cursor and OpenCode →](https://crawl4ai.com/docs?ref=docs#mcp)
+
+   ```bash
+   claude mcp add --transport http crawl4ai https://api.crawl4ai.com/mcp \
+     --header "Authorization: Bearer $CRAWL4AI_KEY"
+   ```
+
+### Which one?
+
+| | 🐍 Library | 🐳 Your own server | ☁️ Crawl4AI Cloud |
+|---|---|---|---|
+| **Runs the browsers** | you, in your Python process | you, in Docker on your machine | we do |
+| **JS-heavy pages and bot walls** | your settings, your proxies | your settings, your proxies | handled for you, automatically |
+| **Web search** | – | – | `/search`, `/serp` and `/answer` |
+| **Price** | free, forever | free (your hosting) | 1,000 free credits a month; plans from $10 |
 
 ## 🆕 AI Assistant Skill Now Available!
 
@@ -96,29 +140,6 @@ Crawl4AI now features intelligent adaptive crawling that knows when to stop! Usi
 
 [Learn more about Adaptive Crawling →](core/adaptive-crawling.md)
 
-
-## Quick Start
-
-Here's a quick example to show you how easy it is to use Crawl4AI with its asynchronous capabilities:
-
-```python
-import asyncio
-from crawl4ai import AsyncWebCrawler
-
-async def main():
-    # Create an instance of AsyncWebCrawler
-    async with AsyncWebCrawler() as crawler:
-        # Run the crawler on a URL
-        result = await crawler.arun(url="https://crawl4ai.com")
-
-        # Print the extracted content
-        print(result.markdown)
-
-# Run the async main function
-asyncio.run(main())
-```
-
----
 
 ## Video Tutorial
 

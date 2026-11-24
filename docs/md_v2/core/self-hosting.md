@@ -80,13 +80,13 @@ Pull and run images directly from Docker Hub without building locally.
 
 #### 1. Pull the Image
 
-Our latest release is `0.9.2`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
+Our latest release is `0.9.6`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
 
 > 💡 **Note**: The `latest` tag points to the most recent stable version.
 
 ```bash
 # Pull the latest version
-docker pull unclecode/crawl4ai:0.9.2
+docker pull unclecode/crawl4ai:0.9.6
 
 # Or pull using the latest tag
 docker pull unclecode/crawl4ai:latest
@@ -113,7 +113,7 @@ ANTHROPIC_API_KEY=your-anthropic-key
 # GEMINI_API_TOKEN=your-gemini-token
 
 # Optional: Global LLM settings
-# LLM_PROVIDER=openai/gpt-4o-mini
+# LLM_PROVIDER=openai/gpt-6-luna
 # LLM_TEMPERATURE=0.7
 # LLM_BASE_URL=https://api.custom.com/v1
 
@@ -152,6 +152,9 @@ export CRAWL4AI_API_TOKEN="$(openssl rand -hex 32)"
       -e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN" \
       unclecode/crawl4ai:latest
     ```
+
+    **Or skip the Docker setup.** No servers, browsers or proxies to run. First crawl in 30 seconds. [Get a free API key →](https://crawl4ai.com/signin/?ref=docs-selfhost-inline){ .c4s-box-btn data-c4s-ev="banner_inline_clicked" }
+    {: .c4s-box .c4s-box-stack }
 
 *   **With LLM support:**
     ```bash
@@ -193,7 +196,7 @@ docker stop crawl4ai && docker rm crawl4ai
 #### Docker Hub Versioning Explained
 
 *   **Image Name:** `unclecode/crawl4ai`
-*   **Tag Format:** `LIBRARY_VERSION[-SUFFIX]` (e.g., `0.9.2`)
+*   **Tag Format:** `LIBRARY_VERSION[-SUFFIX]` (e.g., `0.9.6`)
     *   `LIBRARY_VERSION`: The semantic version of the core `crawl4ai` Python library
     *   `SUFFIX`: Optional tag for release candidates (``) and revisions (`r1`)
 *   **`latest` Tag:** Points to the most recent stable version
@@ -274,7 +277,7 @@ The Docker setup now supports flexible LLM provider configuration through a hier
    LLM_BASE_URL=https://api.proxy.com/v1
    ```
 
-4. **Config File Default**: Falls back to `config.yml` (default: `openai/gpt-4o-mini`)
+4. **Config File Default**: Falls back to `config.yml` (default: `openai/gpt-6-luna`)
 
 The system automatically selects the appropriate API key based on the provider. LiteLLM handles finding the correct environment variable for each provider (e.g., OPENAI_API_KEY for OpenAI, GEMINI_API_TOKEN for Google Gemini, etc.).
 
@@ -412,7 +415,8 @@ You can add Crawl4AI as an MCP tool provider in Claude Code with a simple comman
 
 ```bash
 # Add the Crawl4AI server as an MCP provider
-claude mcp add --transport sse c4ai-sse http://localhost:11235/mcp/sse
+claude mcp add --transport sse c4ai-sse http://localhost:11235/mcp/sse \
+  --header "Authorization: Bearer $CRAWL4AI_API_TOKEN"
 
 # List all MCP providers to verify it was added
 claude mcp list
@@ -726,7 +730,7 @@ Submit an asynchronous LLM extraction job with optional webhook notification.
 {
   "url": "https://example.com/article",
   "q": "Extract the article title, author, publication date, and main points",
-  "provider": "openai/gpt-4o-mini",
+  "provider": "openai/gpt-6-luna",
   "schema": "{\"title\": \"string\", \"author\": \"string\", \"date\": \"string\", \"points\": [\"string\"]}",
   "cache": false,
   "webhook_config": {
@@ -927,7 +931,7 @@ def submit_llm_job_with_webhook():
         json={
             "url": "https://example.com/article",
             "q": "Extract the article title, author, and main points",
-            "provider": "openai/gpt-4o-mini",
+            "provider": "openai/gpt-6-luna",
             "webhook_config": {
                 "webhook_url": "https://your-app.com/webhook/llm-complete",
                 "webhook_data_in_payload": True,
@@ -1290,7 +1294,61 @@ Crucially, when sending configurations directly via JSON, they **must** follow t
 ```
 
 **LLM Extraction Strategy** *(Keep example, ensure schema uses type/value wrapper)*
-*(Keep Deep Crawler Example)*
+#### Deep Crawling (opt-in)
+
+Deep crawling over the API is **disabled by default**: a request with
+`deep_crawl_strategy` returns HTTP 400. To allow it, start the container with
+`CRAWL4AI_ALLOW_DEEP_CRAWL=true`:
+
+```bash
+docker run -d \
+  -p 11235:11235 \
+  --name crawl4ai \
+  --shm-size=1g \
+  -e CRAWL4AI_API_TOKEN="$CRAWL4AI_API_TOKEN" \
+  -e CRAWL4AI_ALLOW_DEEP_CRAWL=true \
+  unclecode/crawl4ai:latest
+```
+
+With Docker Compose, put `CRAWL4AI_ALLOW_DEEP_CRAWL=true` in the `.env` file in
+the project root, or export it in your shell.
+
+```json
+{
+  "urls": ["https://docs.crawl4ai.com"],
+  "crawler_config": {
+    "type": "CrawlerRunConfig",
+    "params": {
+      "deep_crawl_strategy": {
+        "type": "BFSDeepCrawlStrategy",
+        "params": {
+          "max_depth": 2,
+          "max_pages": 20,
+          "filter_chain": {
+            "type": "FilterChain",
+            "params": {
+              "filters": [
+                {"type": "URLPatternFilter", "params": {"patterns": ["*/core/*"]}},
+                {"type": "DomainFilter", "params": {"allowed_domains": ["docs.crawl4ai.com"]}}
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Rules the server applies:
+
+- **One start URL** per request, and not inside `crawler_configs`.
+- `max_pages` and `max_depth` are clamped to `limits.max_pages` and `limits.max_depth` in `config.yml` (default 100 and 5; `max_pages: 0` means no limit). The crawl stops after `limits.wall_clock_s`, also on `/crawl/stream`.
+- **Allowed types:** `BFSDeepCrawlStrategy`, `DFSDeepCrawlStrategy`, `BestFirstCrawlingStrategy`; `FilterChain` with `URLPatternFilter`, `DomainFilter`, `ContentTypeFilter`; scorers `KeywordRelevanceScorer`, `CompositeScorer`, `DomainAuthorityScorer`, `FreshnessScorer`, `PathDepthScorer`. `SEOFilter` and `ContentRelevanceFilter` are refused (they fetch pages outside the egress controls).
+- `URLPatternFilter` accepts globs that start with `*` (`*/blog/*`), `/prefix/*` or `*.ext`. Regex patterns are refused.
+- `resume_state` is refused, and so is `fetch_ssl_certificate` together with a deep crawl. Lists (patterns, keywords, filters, scorers) are limited to 100 items. One strategy may have at most 20 filters and scorers and 200 list items in total, and a `CompositeScorer` cannot contain another `CompositeScorer`. Discovered links longer than 2048 characters are skipped.
+
+Turn the flag on only when you accept that one request can fetch many pages.
 
 ### LLM Configuration Examples
 
@@ -1480,6 +1538,29 @@ async def test_stream_crawl(token: str = None): # Made token optional
 # import asyncio
 # asyncio.run(test_stream_crawl())
 ```
+
+#### Per-URL Configs (`crawler_configs`)
+
+To crawl different URLs with different settings in one request, send `crawler_configs`: a list of `CrawlerRunConfig` payloads, each with a `url_matcher`. Every URL uses the first entry whose `url_matcher` matches it, and an entry without a `url_matcher` matches every URL.
+
+```python
+payload = {
+    "urls": ["https://docs.example.com/guide", "https://example.com/"],
+    "crawler_configs": [
+        {
+            "type": "CrawlerRunConfig",
+            "params": {"url_matcher": "*docs.example.com*", "css_selector": "main"},
+        },
+        # Catch-all: decides every URL the entries above did not match
+        {"type": "CrawlerRunConfig", "params": {"url_matcher": "*"}},
+    ],
+}
+```
+
+- The list is used for one URL or many, on both `/crawl` and `/crawl/stream`.
+- When a list is sent, `crawler_config` is ignored. It is not a fallback: a URL that no entry matches comes back as a failed result (`No matching configuration found for URL: ...`), so end the list with a catch-all entry (`"url_matcher": "*"`).
+- The server's `crawler.base_config` defaults from `config.yml` are applied to each entry on both endpoints.
+- A list that mixes `PDFContentScrapingStrategy` entries with other scraping strategies is refused with `400`, because one crawler serves every URL of a request.
 
 ---
 
@@ -1978,7 +2059,7 @@ app:
 
 # Default LLM Configuration
 llm:
-  provider: "openai/gpt-4o-mini"  # Can be overridden by LLM_PROVIDER env var
+  provider: "openai/gpt-6-luna"  # Can be overridden by LLM_PROVIDER env var
   # api_key: sk-...  # If you pass the API key directly (not recommended)
   # temperature and base_url are controlled via environment variables or request parameters
 
@@ -2112,7 +2193,7 @@ We're here to help you succeed with Crawl4AI! Here's how to get support:
 
 - 📖 Check our [full documentation](https://docs.crawl4ai.com)
 - 🐛 Found a bug? [Open an issue](https://github.com/unclecode/crawl4ai/issues)
-- 💬 Join our [Discord community](https://discord.gg/crawl4ai)
+- 💬 Join our [Discord community](https://discord.gg/jP8KfhDhyN)
 - ⭐ Star us on GitHub to show support!
 
 ## Summary

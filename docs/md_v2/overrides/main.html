@@ -6,6 +6,53 @@
 <script>
     document.documentElement.setAttribute("data-theme", "dark");
 </script>
+{#- TechArticle structured data for search engines, on every docs page -#}
+{%- if page and page.title and page.canonical_url %}
+{%- set article = {
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": config.extra.home_title if page.is_homepage else page.title,
+  "description": (page.meta.description if page.meta and page.meta.description else config.site_description)|trim,
+  "url": page.canonical_url,
+  "mainEntityOfPage": page.canonical_url,
+  "inLanguage": "en",
+  "isPartOf": {"@type": "WebSite", "name": "Crawl4AI Documentation", "url": "https://docs.crawl4ai.com/"},
+  "author": {"@type": "Organization", "name": "Crawl4AI", "url": "https://crawl4ai.com/"},
+  "publisher": {"@type": "Organization", "name": "Crawl4AI", "url": "https://crawl4ai.com/",
+                "logo": {"@type": "ImageObject", "url": "https://docs.crawl4ai.com/img/favicon-32x32.png"}},
+  "about": {"@type": "SoftwareApplication", "name": "Crawl4AI", "applicationCategory": "DeveloperApplication",
+            "operatingSystem": "Linux, macOS, Windows", "url": "https://github.com/unclecode/crawl4ai"}
+} %}
+<script type="application/ld+json">{{ article|tojson }}</script>
+{%- endif %}
+{#- the Cloud strip's fonts (assets/cloud-strip.css): fetched early so they are ready before the strip paints -#}
+<link rel="preload" href="{{ 'assets/fonts/IBMPlexSans-400.woff2' | url }}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{ 'assets/fonts/IBMPlexSans-600.woff2' | url }}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{ 'assets/fonts/IBMPlexMono-500.woff2' | url }}" as="font" type="font/woff2" crossorigin>
+<script>
+/* The Cloud strip's state before the first paint, so its reserved height never moves the page.
+   A visit is a new browser session. Visit 1: full; visits 2-4: compact; full again on every 5th visit or
+   14 days after the last full one. A signed-in Cloud user (the c4_sess cookie on .crawl4ai.com): compact.
+   Storage blocked: full. The first page of a visit gets class c4s-arrive (the strip's one entrance).
+   Test switch for reviewers: ?strip=full or ?strip=compact holds that state for the rest of the visit and
+   replays the entrance; ?strip=reset forgets the stored visits, so the page counts as visit 1. */
+(function(){var d=document.documentElement,K="c4-strip",s="full",q;
+try{q=new URLSearchParams(location.search).get("strip");
+if(q==="reset"){localStorage.removeItem(K);sessionStorage.removeItem(K+"-state");sessionStorage.removeItem(K+"-test");}
+if(q==="full"||q==="compact"){sessionStorage.setItem(K+"-test",q);d.classList.add("c4s-arrive");}
+s=sessionStorage.getItem(K+"-state");
+if(!s){var v=JSON.parse(localStorage.getItem(K)||"{}"),n=(v.visits|0)+1,now=Date.now(),last=Number(v.lastFull)||0;
+s=(n%5===0||now-last>=14*864e5)?"full":"compact";if(s==="full")last=now;
+localStorage.setItem(K,JSON.stringify({visits:n,lastFull:last}));sessionStorage.setItem(K+"-state",s);d.classList.add("c4s-arrive");}
+if(/(^|; )c4_sess=1(;|$)/.test(document.cookie))s="compact";
+s=sessionStorage.getItem(K+"-test")||s;}catch(e){s="full";}
+d.setAttribute("data-c4s",s);})();
+</script>
+{#- assets/toc.js builds the "On this page" column after load; on a page that will get one, an empty column
+    of the same width holds its place, so the text column never narrows under the reader (layout shift). -#}
+{%- if page and page.toc and (page.toc|length > 1 or (page.toc|first).children) %}
+<style>@media (min-width:1201px){.terminal-mkdocs-main-grid:not(:has(#toc-sidebar))::after{content:"";flex:0 0 var(--toc-width);align-self:stretch}}</style>
+{%- endif %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pushfeedback/dist/pushfeedback/pushfeedback.css">
 
 <style>
@@ -37,6 +84,31 @@
 </style>
 <script type="module"
     src="https://cdn.jsdelivr.net/npm/pushfeedback@latest/dist/pushfeedback/pushfeedback.esm.js"></script>
+{% endblock %}
+
+{#- the plain links to crawl4ai.com at the end of every article, in the server HTML (assets/toc.js moves a
+    footer to the end of the article, and this one is already there, so nothing moves). The href stays plain;
+    assets/cloud-strip.js adds ref and aid on click. -#}
+{% block content_container %}
+{{ super() }}
+<footer class="c4s-footer">
+    <span>Crawl4AI Cloud</span>
+    <a href="https://crawl4ai.com/" data-c4s-home="docs-footer">Home</a>
+    <a href="https://crawl4ai.com/pricing/" data-c4s-home="docs-footer">Pricing</a>
+    <a href="https://crawl4ai.com/compare/" data-c4s-home="docs-footer">Compare</a>
+</footer>
+{% endblock %}
+
+{#- the home page carries the brand title from mkdocs.yml (extra.home_title); other pages keep "Page - site name" -#}
+{% block htmltitle %}
+{%- if page and page.is_homepage and config.extra.home_title %}
+<title>{{ config.extra.home_title }}</title>
+{%- else %}{{ super() }}{% endif %}
+{% endblock %}
+
+{% block top_nav %}
+{{ super() }}
+{% include "partials/cloud-strip.html" %}
 {% endblock %}
 
 {% block footer %}
