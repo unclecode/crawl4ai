@@ -7,15 +7,13 @@
   - [Browser Configuration](#browser-configuration)
   - [Crawler Configuration](#crawler-configuration)
   - [Extraction Configuration](#extraction-configuration)
-  - [Content Filtering](#content-filtering)
 - [Advanced Features](#advanced-features)
   - [LLM Q&A](#llm-qa)
   - [Structured Data Extraction](#structured-data-extraction)
-  - [Content Filtering](#content-filtering-1)
+  - [Content Filtering](#content-filtering)
 - [Output Formats](#output-formats)
-- [Examples](#examples)
-- [Configuration Reference](#configuration-reference)
-- [Best Practices & Tips](#best-practices--tips)
+- [Complete Examples](#complete-examples)
+- [Best Practices & Tips](#best-practices-tips)
 
 ## Installation
 The Crawl4AI CLI will be installed automatically when you install the library.
