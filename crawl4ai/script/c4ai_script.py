@@ -569,11 +569,11 @@ class Compiler:
                     }}
                 """).strip()
             else:
-                # JS expression (from backticks)
+                # Keep nested WAIT commands in the caller's async context.
                 count_expr = count[1:-1] if count.startswith('`') and count.endswith('`') else count
                 repeat_js = self._handle_cmd_or_proc(cmd)
                 return textwrap.dedent(f"""
-                    (()=>{{
+                    {{
                       const _count = {count_expr};
                       if (typeof _count === 'number') {{
                         for (let _i = 0; _i < _count; _i++) {{
@@ -582,7 +582,7 @@ class Compiler:
                       }} else if (_count) {{
                         {repeat_js}
                       }}
-                    }})();
+                    }}
                 """).strip()
 
         raise ValueError(f"Unhandled op {op}")
