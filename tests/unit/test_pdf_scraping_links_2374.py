@@ -16,6 +16,7 @@ pypdf = pytest.importorskip("pypdf")
 
 from pypdf import PdfWriter
 from pypdf.annotations import Link as LinkAnnotation
+from pypdf.generic import DictionaryObject, NameObject, NullObject
 
 from crawl4ai.processors.pdf import PDFContentScrapingStrategy
 
@@ -37,6 +38,32 @@ def _write_pdf(path, pages):
 
 def _hrefs(items):
     return [item.href for item in items]
+
+
+@pytest.mark.parametrize("malformed", ["annotation", "action"])
+def test_malformed_pdf_annotation_does_not_hide_following_links(tmp_path, malformed):
+    path = tmp_path / "malformed-annotation.pdf"
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    writer.add_annotation(
+        0, LinkAnnotation(rect=(20, 20, 200, 40), url="https://example.org/before")
+    )
+    invalid = NullObject()
+    if malformed == "action":
+        invalid = DictionaryObject({NameObject("/A"): NullObject()})
+    writer.pages[0]["/Annots"].append(invalid)
+    writer.add_annotation(
+        0, LinkAnnotation(rect=(20, 60, 200, 80), url="https://example.org/after")
+    )
+    writer.write(path)
+
+    result = PDFContentScrapingStrategy(extract_images=False).scrap(str(path), "")
+
+    assert result.success
+    assert _hrefs(result.links.external) == [
+        "https://example.org/before",
+        "https://example.org/after",
+    ]
 
 
 def test_local_pdf_uri_links_survive_scraping(tmp_path):
