@@ -770,7 +770,7 @@ async def handle_crawl_request(
     end_status = 499  # if no branch below sets one, the client went away (cancelled)
 
     try:
-        urls, refused = _normalize_and_validate_seeds(urls)
+        urls, refused = await asyncio.to_thread(_normalize_and_validate_seeds, urls)
         browser_config = BrowserConfig.load(browser_config, provenance=Provenance.UNTRUSTED)
         crawler_config = CrawlerRunConfig.load(crawler_config, provenance=Provenance.UNTRUSTED)
         from egress_broker import enforce_egress
@@ -1007,7 +1007,7 @@ async def handle_stream_crawl_request(
         # SSRF guard: validate every seed URL's destination before fetching,
         # mirroring handle_crawl_request. The streaming path previously skipped
         # this, leaving /crawl/stream (and /crawl with stream=true) unguarded.
-        urls, refused = _normalize_and_validate_seeds(urls)
+        urls, refused = await asyncio.to_thread(_normalize_and_validate_seeds, urls)
         browser_config = BrowserConfig.load(
             browser_config, provenance=Provenance.UNTRUSTED
         )
