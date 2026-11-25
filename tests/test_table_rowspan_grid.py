@@ -9,9 +9,11 @@ https://github.com/unclecode/crawl4ai/issues/2258
 
 import time
 
+import pytest
 from lxml import html as lhtml
 
 from crawl4ai import DefaultTableExtraction
+from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
 
 
 def _extract(html: str):
@@ -122,6 +124,8 @@ def test_key_value_first_row_is_not_mistaken_for_a_header():
     <tr><th scope="row">Food</th><td>Apple pie</td></tr>
     <tr><th scope="row">Drink</th><td>Apple cider</td></tr>
     </table>""")
+    assert tables[0]["headers"] == ["Column 1", "Column 2"]
+    assert not tables[0]["metadata"]["has_headers"]
     assert tables[0]["rows"] == [["Food", "Apple pie"], ["Drink", "Apple cider"]]
 
 
@@ -160,3 +164,62 @@ def test_invalid_span_attribute_counts_as_one():
     <tr><td colspan="-3">e</td><td>f</td></tr>
     </tbody></table>""")
     assert tables[0]["rows"] == [["a", "b"], ["c", "d"], ["e", "f"]]
+
+
+def test_scoped_row_header_does_not_limit_later_row_width():
+    tables = _extract("""
+        <table><tbody>
+        <tr><th scope="ROW">Food</th><td>Apple pie</td></tr>
+        <tr><th scope="row">Drink</th><td>Apple cider</td><td>cold</td></tr>
+        </tbody></table>
+        """)
+    assert tables[0]["headers"] == ["Column 1", "Column 2", "Column 3"]
+    assert tables[0]["rows"] == [
+        ["Food", "Apple pie", ""],
+        ["Drink", "Apple cider", "cold"],
+    ]
+    assert tables[0]["metadata"]["column_count"] == 3
+
+
+def test_scoped_rowgroup_header_stays_in_the_data_grid():
+    tables = _extract("""
+        <table><tbody>
+        <tr><th scope="rowgroup" rowspan="2">Fruit</th><td>Apple</td></tr>
+        <tr><td>Orange</td><td>Blood orange</td></tr>
+        </tbody></table>
+        """)
+    assert tables[0]["headers"] == ["Column 1", "Column 2", "Column 3"]
+    assert tables[0]["rows"] == [
+        ["Fruit", "Apple", ""],
+        ["Fruit", "Orange", "Blood orange"],
+    ]
+    assert not tables[0]["metadata"]["has_headers"]
+
+
+@pytest.mark.parametrize(
+    "column_scope",
+    ["", ' scope=""', ' scope="unknown"', ' scope="col"', ' scope="COLGROUP"'],
+    ids=["omitted", "empty", "invalid", "col", "colgroup"],
+)
+def test_mixed_first_row_keeps_column_headers(column_scope):
+    markup = f"""
+    <main><table><caption>Quarterly revenue</caption><tbody>
+    <tr><th scope="row">Quarter</th><th id="q1"{column_scope}>Q1</th>
+    <th id="q2"{column_scope}>Q2</th></tr>
+    <tr><th scope="row">Retail</th><td headers="q1">120</td>
+    <td headers="q2">150</td></tr>
+    </tbody></table></main>
+    """
+    extraction = DefaultTableExtraction()
+    (direct,) = extraction.extract_tables(lhtml.fromstring(markup))
+    scraped = LXMLWebScrapingStrategy().scrap(
+        "https://example.test/revenue", markup, table_extraction=extraction
+    )
+    assert scraped.success
+    (result_table,) = scraped.media.tables
+    assert result_table == direct
+    assert direct["headers"] == ["Quarter", "Q1", "Q2"]
+    assert direct["rows"] == [["Retail", "120", "150"]]
+    assert direct["metadata"]["has_headers"] is True
+    assert direct["metadata"]["column_count"] == 3
+    assert direct["metadata"]["row_count"] == 1

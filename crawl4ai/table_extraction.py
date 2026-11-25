@@ -291,11 +291,16 @@ class DefaultTableExtraction(TableExtractionStrategy):
             # Check first row for headers
             first_row = table.xpath(".//tr[1]")
             if first_row:
-                implicit_header_row = first_row[0]
-                for cell in implicit_header_row.xpath(".//th|.//td"):
-                    text = cell.text_content().strip()
-                    colspan = int(cell.get("colspan", 1))
-                    headers.extend([text] * colspan)
+                first = first_row[0]
+                scopes = {cell.get("scope", "").lower() for cell in first.xpath("./th")}
+                has_only_row_scopes = bool(scopes) and scopes <= {"row", "rowgroup"}
+                # Only explicitly row-only labels should bypass header inference.
+                if not has_only_row_scopes:
+                    implicit_header_row = first
+                    for cell in implicit_header_row.xpath(".//th|.//td"):
+                        text = cell.text_content().strip()
+                        colspan = int(cell.get("colspan", 1))
+                        headers.extend([text] * colspan)
         
         # Extract rows, laying each cell into a grid so colspan/rowspan land in
         # the columns they actually cover and <th> row headers are kept (#2258).
@@ -321,10 +326,13 @@ class DefaultTableExtraction(TableExtractionStrategy):
             headers = [f"Column {i+1}" for i in range(max_columns)]
         
         # Build metadata
+        has_headers = bool(thead_rows) or (
+            implicit_header_row is not None and bool(table.xpath(".//tr[1]/th"))
+        )
         metadata = {
             "row_count": len(aligned_rows),
             "column_count": max_columns,
-            "has_headers": bool(thead_rows) or bool(table.xpath(".//tr[1]/th")),
+            "has_headers": has_headers,
             "has_caption": bool(caption),
             "has_summary": bool(summary)
         }
