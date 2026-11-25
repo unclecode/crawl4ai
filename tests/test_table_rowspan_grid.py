@@ -9,9 +9,11 @@ https://github.com/unclecode/crawl4ai/issues/2258
 
 import time
 
+import pytest
 from lxml import html as lhtml
 
 from crawl4ai import DefaultTableExtraction
+from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
 
 
 def _extract(html: str):
@@ -192,3 +194,32 @@ def test_scoped_rowgroup_header_stays_in_the_data_grid():
         ["Fruit", "Orange", "Blood orange"],
     ]
     assert not tables[0]["metadata"]["has_headers"]
+
+
+@pytest.mark.parametrize(
+    "column_scope",
+    ["", ' scope=""', ' scope="unknown"', ' scope="col"', ' scope="COLGROUP"'],
+    ids=["omitted", "empty", "invalid", "col", "colgroup"],
+)
+def test_mixed_first_row_keeps_column_headers(column_scope):
+    markup = f"""
+    <main><table><caption>Quarterly revenue</caption><tbody>
+    <tr><th scope="row">Quarter</th><th id="q1"{column_scope}>Q1</th>
+    <th id="q2"{column_scope}>Q2</th></tr>
+    <tr><th scope="row">Retail</th><td headers="q1">120</td>
+    <td headers="q2">150</td></tr>
+    </tbody></table></main>
+    """
+    extraction = DefaultTableExtraction()
+    (direct,) = extraction.extract_tables(lhtml.fromstring(markup))
+    scraped = LXMLWebScrapingStrategy().scrap(
+        "https://example.test/revenue", markup, table_extraction=extraction
+    )
+    assert scraped.success
+    (result_table,) = scraped.media.tables
+    assert result_table == direct
+    assert direct["headers"] == ["Quarter", "Q1", "Q2"]
+    assert direct["rows"] == [["Retail", "120", "150"]]
+    assert direct["metadata"]["has_headers"] is True
+    assert direct["metadata"]["column_count"] == 3
+    assert direct["metadata"]["row_count"] == 1

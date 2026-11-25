@@ -292,10 +292,9 @@ class DefaultTableExtraction(TableExtractionStrategy):
             if first_row:
                 first = first_row[0]
                 scopes = {cell.get("scope", "").lower() for cell in first.xpath("./th")}
-                has_row_scope = not scopes.isdisjoint(("row", "rowgroup"))
-                has_column_scope = not scopes.isdisjoint(("col", "colgroup"))
-                # Labels for rows should not determine the grid's column width.
-                if not has_row_scope or has_column_scope:
+                has_only_row_scopes = bool(scopes) and scopes <= {"row", "rowgroup"}
+                # Only explicitly row-only labels should bypass header inference.
+                if not has_only_row_scopes:
                     implicit_header_row = first
                     for cell in implicit_header_row.xpath(".//th|.//td"):
                         text = cell.text_content().strip()
