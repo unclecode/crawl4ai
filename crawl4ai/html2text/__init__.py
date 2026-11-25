@@ -547,6 +547,11 @@ class HTML2Text(html.parser.HTMLParser):
                         if self.inline_links:
                             self.p_p = 0
                             title = a.get("title") or ""
+                            # Character references keep literal quotes inside the quoted
+                            # Markdown title. Escape ampersands first to preserve entities
+                            # that were literal text in the HTML attribute.
+                            if '"' in title:
+                                title = title.replace("&", "&amp;").replace('"', "&quot;")
                             title = escape_md(title)
                             link_url(self, a["href"], title)
                         else:
