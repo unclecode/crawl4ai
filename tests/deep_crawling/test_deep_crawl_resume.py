@@ -441,6 +441,41 @@ class TestBestFirstResume:
     """Best-First strategy resume tests."""
 
     @pytest.mark.asyncio
+    async def test_mid_batch_checkpoint_retains_unreported_results(self):
+        first = "https://example.com/first"
+        second = "https://example.com/second"
+        saved_state = {
+            "depths": {first: 0, second: 0},
+            "queue_items": [
+                {"score": -2, "depth": 0, "url": first, "parent_url": None},
+                {"score": -1, "depth": 0, "url": second, "parent_url": None},
+            ],
+        }
+        checkpoints = []
+
+        async def capture_state(state):
+            checkpoints.append(json.loads(json.dumps(state)))
+
+        async def collect_urls(strategy):
+            crawler = create_mock_crawler_tracking([], return_no_links=True)
+            stream = await strategy.arun(
+                first, crawler, create_mock_config(stream=True)
+            )
+            return [result.url async for result in stream]
+
+        strategy = BestFirstCrawlingStrategy(
+            max_depth=1,
+            batch_size=2,
+            resume_state=saved_state,
+            on_state_change=capture_state,
+        )
+        assert await collect_urls(strategy) == [first, second]
+        assert checkpoints[0]["pages_crawled"] == 1
+
+        resumed = BestFirstCrawlingStrategy(max_depth=1, resume_state=checkpoints[0])
+        assert await collect_urls(resumed) == [second]
+
+    @pytest.mark.asyncio
     async def test_state_export_includes_scored_queue(self):
         """Verify Best-First state includes queue with scores."""
         captured_states: List[Dict] = []

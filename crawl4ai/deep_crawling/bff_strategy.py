@@ -310,7 +310,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             async for result in stream_gen:
                 results_by_url[result.url] = result
 
-            for score, depth, url, parent_url in batch:
+            for index, (score, depth, url, parent_url) in enumerate(batch):
                 result = results_by_url.get(url)
                 if result is None:
                     continue
@@ -357,12 +357,16 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
 
                     # Capture state after EACH URL processed (if callback set)
                     if self._on_state_change and self._queue_shadow is not None:
+                        # The whole batch is reserved in visited for deduplication.
+                        # Results not yet yielded still need to be resumed.
+                        pending_batch = batch[index + 1 :]
+                        pending_urls = {item[2] for item in pending_batch}
                         state = {
                             "strategy_type": "best_first",
-                            "visited": list(visited),
+                            "visited": list(visited - pending_urls),
                             "queue_items": [
                                 {"score": s, "depth": d, "url": u, "parent_url": p}
-                                for s, d, u, p in self._queue_shadow
+                                for s, d, u, p in self._queue_shadow + pending_batch
                             ],
                             "depths": depths,
                             "pages_crawled": self._pages_crawled,
