@@ -142,6 +142,33 @@ class TopicSegmentationChunking(ChunkingStrategy):
         return segments_with_topics
 
 
+# Scripts written without spaces between words (Thai, Chinese, Japanese kana and kanji).
+# For the word based strategies below every character of these counts as one word, so a page
+# in such a language is split by size like any other instead of staying one huge chunk.
+_UNSPACED_SCRIPTS = "\u0e00-\u0e7f\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff"
+_WORD_RE = re.compile(rf"[{_UNSPACED_SCRIPTS}]|[^\s{_UNSPACED_SCRIPTS}]+")
+
+
+def _split_words(text: str) -> list:
+    """Split text into (word, preceded_by_whitespace) pairs.
+
+    For text written with spaces this is ``text.split()``, so existing output is unchanged.
+    """
+    words = []
+    previous_end = None
+    for match in _WORD_RE.finditer(text):
+        words.append((match.group(), previous_end is None or match.start() > previous_end))
+        previous_end = match.end()
+    return words
+
+
+def _join_words(words: list) -> str:
+    """Join pairs from ``_split_words``: a space only where the source had whitespace."""
+    return "".join(
+        (" " if spaced and index else "") + word for index, (word, spaced) in enumerate(words)
+    )
+
+
 # Fixed-length word chunks
 class FixedLengthWordChunking(ChunkingStrategy):
     """
@@ -163,9 +190,9 @@ class FixedLengthWordChunking(ChunkingStrategy):
         self.chunk_size = chunk_size
 
     def chunk(self, text: str) -> list:
-        words = text.split()
+        words = _split_words(text)
         return [
-            " ".join(words[i : i + self.chunk_size])
+            _join_words(words[i : i + self.chunk_size])
             for i in range(0, len(words), self.chunk_size)
         ]
 
@@ -194,19 +221,19 @@ class SlidingWindowChunking(ChunkingStrategy):
         self.step = step
 
     def chunk(self, text: str) -> list:
-        words = text.split()
+        words = _split_words(text)
         chunks = []
 
         if len(words) <= self.window_size:
             return [text]
 
         for i in range(0, len(words) - self.window_size + 1, self.step):
-            chunk = " ".join(words[i : i + self.window_size])
+            chunk = _join_words(words[i : i + self.window_size])
             chunks.append(chunk)
 
         # Handle the last chunk if it doesn't align perfectly
         if i + self.window_size < len(words):
-            chunks.append(" ".join(words[-self.window_size :]))
+            chunks.append(_join_words(words[-self.window_size :]))
 
         return chunks
 
@@ -235,7 +262,7 @@ class OverlappingWindowChunking(ChunkingStrategy):
         self.overlap = overlap
 
     def chunk(self, text: str) -> list:
-        words = text.split()
+        words = _split_words(text)
         chunks = []
 
         if len(words) <= self.window_size:
@@ -244,7 +271,7 @@ class OverlappingWindowChunking(ChunkingStrategy):
         start = 0
         while start < len(words):
             end = start + self.window_size
-            chunk = " ".join(words[start:end])
+            chunk = _join_words(words[start:end])
             chunks.append(chunk)
 
             if end >= len(words):
