@@ -882,6 +882,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                         if element.text:
                             new_text = lhtml.Element("span")
                             new_text.text = element.text_content()
+                            new_text.tail = element.tail
                             if element.getparent() is not None:
                                 element.getparent().replace(element, new_text)
 
