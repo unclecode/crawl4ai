@@ -990,11 +990,12 @@ class HTML2Text(html.parser.HTMLParser):
 
         :rtype: int
         """
-        nest_count = 0
-        if "margin-left" in style:
-            nest_count = int(style["margin-left"][:-2]) // self.google_list_indent
-
-        return nest_count
+        margin = style.get("margin-left", "")
+        match = re.fullmatch(r"\+?([0-9]+)(?:\.[0-9]+)?[a-zA-Z]{2}", margin)
+        if match is None:
+            return 0
+        # A fractional remainder cannot add a level at an integer indent width.
+        return int(match.group(1)) // self.google_list_indent
 
     def optwrap(self, text: str) -> str:
         """
