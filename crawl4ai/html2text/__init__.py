@@ -29,6 +29,10 @@ from .utils import (
 
 __version__ = (2024, 2, 26)
 
+_VOID_TAGS = frozenset(
+    "area base br col embed hr img input link meta param source track wbr".split()
+)
+
 
 # TODO:
 # Support decoded entities with UNIFIABLE.
@@ -1108,6 +1112,16 @@ class CustomHTML2Text(HTML2Text):
         # relative links). Must run before preserved tags since <base> is in <head>
         if tag == "base" and start:
             return super().handle_tag(tag, attrs, start)
+
+        # A void element has no closing tag to finish a preserved block.
+        if tag in _VOID_TAGS and (tag in self.preserve_tags or self.preserve_depth > 0):
+            if start:
+                markup = self.get_starttag_text()
+                if self.preserve_depth:
+                    self.preserved_content.append(markup)
+                else:
+                    self.o("\n" + markup + "\n")
+            return
 
         # Handle preserved tags
         if tag in self.preserve_tags:
