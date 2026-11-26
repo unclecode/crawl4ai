@@ -1073,6 +1073,7 @@ class CustomHTML2Text(HTML2Text):
         self.inside_pre = False
         self.inside_code = False
         self.inside_link = False
+        self._inline_code = None
         self.preserve_tags = set()  # Set of tags to preserve
         self.current_preserved_tag = None
         self.preserved_content = []
@@ -1157,6 +1158,17 @@ class CustomHTML2Text(HTML2Text):
             if self.inside_pre and not self.handle_code_in_pre:
                 # Ignore code tags inside pre blocks if handle_code_in_pre is False
                 return
+            if not self.inside_pre:
+                if start:
+                    if self.maybe_automatic_link is not None:
+                        self.o("[")
+                        self.maybe_automatic_link = None
+                        self.empty_link = False
+                    self._inline_code = []
+                    self.inside_code = True
+                else:
+                    self._flush_inline_code()
+                return
             if start:
                 if not self.inside_link:
                     self.o("`")  # Only output backtick if not inside a link
@@ -1171,6 +1183,41 @@ class CustomHTML2Text(HTML2Text):
                 super().handle_tag(tag, attrs, start) 
         else:
             super().handle_tag(tag, attrs, start)
+
+    def o(self, data, puredata=False, force=False):
+        if self._inline_code is not None:
+            if not self.quiet:
+                self._inline_code.append(data)
+            return
+        super().o(data, puredata, force)
+
+    def _flush_inline_code(self):
+        if self._inline_code is None:
+            return
+        content = "".join(self._inline_code)
+        self._inline_code = None
+        self.inside_code = False
+        if not content:
+            return
+
+        # A delimiter must be longer than any backtick run in the code.
+        delimiter = "`" * (
+            max((len(run) for run in re.findall(r"`+", content)), default=0) + 1
+        )
+        # CommonMark strips one space from both ends, except for all-space spans.
+        if (
+            content.startswith("`")
+            or content.endswith("`")
+            or (
+                content.startswith(" ") and content.endswith(" ") and content.strip(" ")
+            )
+        ):
+            content = " " + content + " "
+        self.o(delimiter + content + delimiter)
+
+    def close(self):
+        super().close()
+        self._flush_inline_code()
 
     def handle_data(self, data, entity_char=False):
         """Override handle_data to capture content within preserved tags."""
