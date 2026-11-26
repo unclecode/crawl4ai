@@ -144,6 +144,7 @@ class CrawlResult(BaseModel):
         default_factory=lambda: {"internal": [], "external": []}
     )
     downloaded_files: Optional[List[str]] = None
+    downloaded_artifacts: Optional[List[Dict[str, Any]]] = None
     js_execution_result: Optional[Dict[str, Any]] = None
     screenshot: Optional[str] = None
     pdf: Optional[bytes] = None

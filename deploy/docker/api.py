@@ -617,6 +617,80 @@ async def _dispose_crawler(crawler):
     else:
         await release_crawler(crawler)
 
+def _publish_downloaded_artifacts(result_dict: dict) -> None:
+    """Move local downloaded_files into the sandboxed artifact store.
+
+    Replaces internal server filesystem paths in ``downloaded_files`` with
+    authenticated ``/artifacts/{artifact_id}`` URLs and populates
+    ``downloaded_artifacts`` metadata so remote API callers can retrieve bytes.
+    """
+    downloaded_files = result_dict.get("downloaded_files")
+    if not downloaded_files:
+        return
+
+    from artifacts import store_downloaded_file, ArtifactNotFound
+
+    artifacts_meta = []
+    artifact_urls = []
+    for item in downloaded_files:
+        if not isinstance(item, str):
+            continue
+        if item.startswith("/artifacts/"):
+            artifact_urls.append(item)
+            continue
+        try:
+            meta = store_downloaded_file(item)
+        except (FileNotFoundError, ArtifactNotFound):
+            continue
+        finally:
+            try:
+                if os.path.isabs(item) and not os.path.islink(item):
+                    os.unlink(item)
+            except OSError:
+                pass
+        artifacts_meta.append(meta)
+        artifact_urls.append(meta["url"])
+
+    result_dict["downloaded_files"] = artifact_urls or None
+    if artifacts_meta:
+        result_dict["downloaded_artifacts"] = artifacts_meta
+
+
+def _serialize_crawl_result(result, is_pdf_crawl: bool = False) -> dict:
+    """Normalize a CrawlResult (or dict) into a JSON-safe API result dict."""
+    from utils import datetime_handler
+
+    if hasattr(result, "model_dump"):
+        result_dict = result.model_dump()
+    elif isinstance(result, dict):
+        result_dict = result
+    else:
+        logger.warning(f"Unexpected result type: {type(result)}")
+        result_dict = {
+            "url": str(result) if hasattr(result, "__str__") else "unknown",
+            "success": False,
+            "error_message": f"Unexpected result type: {type(result).__name__}",
+        }
+
+    # if fit_html is not a string, set it to None to avoid serialization errors
+    if "fit_html" in result_dict and not (
+        result_dict["fit_html"] is None or isinstance(result_dict["fit_html"], str)
+    ):
+        result_dict["fit_html"] = None
+
+    # If PDF exists, encode it to base64
+    if result_dict.get("pdf") is not None and isinstance(result_dict.get("pdf"), bytes):
+        result_dict["pdf"] = b64encode(result_dict["pdf"]).decode("utf-8")
+
+    _publish_downloaded_artifacts(result_dict)
+
+    if is_pdf_crawl:
+        # PDF metadata contains datetimes that JSONResponse can't serialize
+        result_dict = json.loads(json.dumps(result_dict, default=datetime_handler))
+
+    return result_dict
+
+
 async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) -> AsyncGenerator[bytes, None]:
     """Stream results with heartbeats and completion markers."""
     import json
@@ -626,14 +700,8 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
         async for result in results_gen:
             try:
                 server_memory_mb = _get_memory_mb()
-                result_dict = result.model_dump()
+                result_dict = _serialize_crawl_result(result)
                 result_dict['server_memory_mb'] = server_memory_mb
-                # Ensure fit_html is JSON-serializable
-                if "fit_html" in result_dict and not (result_dict["fit_html"] is None or isinstance(result_dict["fit_html"], str)):
-                    result_dict["fit_html"] = None
-                # If PDF exists, encode it to base64
-                if result_dict.get('pdf') is not None:
-                    result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
                 logger.info(f"Streaming result for {result_dict.get('url', 'unknown')}")
                 data = json.dumps(result_dict, default=datetime_handler) + "\n"
                 yield data.encode('utf-8')
@@ -859,37 +927,17 @@ async def handle_crawl_request(
             peak_mem_mb = max(peak_mem_mb if peak_mem_mb else 0, end_mem_mb) # <--- Get peak memory
         logger.info(f"Memory usage: Start: {start_mem_mb} MB, End: {end_mem_mb} MB, Delta: {mem_delta_mb} MB, Peak: {peak_mem_mb} MB")
 
-        # Process results to handle PDF bytes
+        # Process results to handle PDF bytes and downloaded artifacts
+        from artifacts import ArtifactTooLarge, QuotaExceeded
+
         processed_results = []
         for result in results:
             try:
-                # Check if result has model_dump method (is a proper CrawlResult)
-                if hasattr(result, 'model_dump'):
-                    result_dict = result.model_dump()
-                elif isinstance(result, dict):
-                    result_dict = result
-                else:
-                    # Handle unexpected result type
-                    logger.warning(f"Unexpected result type: {type(result)}")
-                    result_dict = {
-                        "url": str(result) if hasattr(result, '__str__') else "unknown",
-                        "success": False,
-                        "error_message": f"Unexpected result type: {type(result).__name__}"
-                    }
-                
-                # if fit_html is not a string, set it to None to avoid serialization errors
-                if "fit_html" in result_dict and not (result_dict["fit_html"] is None or isinstance(result_dict["fit_html"], str)):
-                    result_dict["fit_html"] = None
-                    
-                # If PDF exists, encode it to base64
-                if result_dict.get('pdf') is not None and isinstance(result_dict.get('pdf'), bytes):
-                    result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
-                    
-                if is_pdf_crawl:
-                    # PDF metadata contains datetimes that JSONResponse can't serialize
-                    result_dict = json.loads(json.dumps(result_dict, default=datetime_handler))
-
-                processed_results.append(result_dict)
+                processed_results.append(_serialize_crawl_result(result, is_pdf_crawl=is_pdf_crawl))
+            except ArtifactTooLarge:
+                raise HTTPException(413, "Artifact too large")
+            except QuotaExceeded:
+                raise HTTPException(507, "Artifact storage quota exceeded")
             except Exception as e:
                 logger.error(f"Error processing result: {e}")
                 processed_results.append({

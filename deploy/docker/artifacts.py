@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import re
+import stat
 import time
 import uuid
 from typing import Dict, Tuple
@@ -30,6 +31,7 @@ _HEX32 = re.compile(r"^[0-9a-f]{32}$")
 _KIND = {
     "png": (".png", "image/png"),
     "pdf": (".pdf", "application/pdf"),
+    "bin": (".bin", "application/octet-stream"),
 }
 
 
@@ -92,6 +94,35 @@ def write_artifact(kind: str, data: bytes) -> Dict:
     with os.fdopen(fd, "wb") as f:
         f.write(data)
     return {"artifact_id": artifact_id, "mime": mime, "size": len(data)}
+
+
+def store_downloaded_file(file_path: str) -> Dict:
+    """Ingest a regular downloaded file into the sandboxed artifact store.
+
+    Refuses symlinks and special files via lstat + O_NOFOLLOW and enforces
+    MAX_ARTIFACT_BYTES before reading the payload into memory.
+    """
+    st = os.lstat(file_path)
+    if not stat.S_ISREG(st.st_mode):
+        raise ArtifactNotFound("Download artifact is not a regular file")
+    if st.st_size > MAX_ARTIFACT_BYTES:
+        raise ArtifactTooLarge(f"artifact exceeds {MAX_ARTIFACT_BYTES} bytes")
+
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(file_path, flags)
+    with os.fdopen(fd, "rb") as f:
+        data = f.read(MAX_ARTIFACT_BYTES + 1)
+    if len(data) > MAX_ARTIFACT_BYTES:
+        raise ArtifactTooLarge(f"artifact exceeds {MAX_ARTIFACT_BYTES} bytes")
+
+    meta = write_artifact("bin", data)
+    return {
+        "artifact_id": meta["artifact_id"],
+        "url": f"/artifacts/{meta['artifact_id']}",
+        "filename": os.path.basename(file_path),
+        "mime": meta["mime"],
+        "size": meta["size"],
+    }
 
 
 def resolve_artifact(artifact_id: str) -> Tuple[str, str]:

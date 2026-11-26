@@ -8,6 +8,7 @@ import re
 import os
 import subprocess
 import platform
+import tempfile
 from .prompts import PROMPT_EXTRACT_BLOCKS
 from array import array
 from .html2text import html2text, CustomHTML2Text
@@ -707,6 +708,34 @@ def get_home_folder():
     os.makedirs(f"{home_folder}/cache", exist_ok=True)
     os.makedirs(f"{home_folder}/models", exist_ok=True)
     return home_folder
+
+
+def resolve_downloads_path(downloads_path: Optional[str] = None) -> str:
+    """Return a writable directory for downloaded files.
+
+    When ``downloads_path`` is explicitly supplied, ensure it exists and return
+    it (propagating OSError if invalid/unwritable). Otherwise prefer
+    ``$CRAWL4AI_DOWNLOADS_DIR``, then ``<home>/.crawl4ai/downloads``, falling
+    back to ``<tempdir>/crawl4ai/downloads`` if the home directory is not
+    writable (e.g. read-only container rootfs without a writable home mount).
+    """
+    if downloads_path:
+        os.makedirs(downloads_path, exist_ok=True)
+        return downloads_path
+
+    env_dir = os.environ.get("CRAWL4AI_DOWNLOADS_DIR")
+    if env_dir:
+        os.makedirs(env_dir, exist_ok=True)
+        return env_dir
+
+    try:
+        candidate = os.path.join(get_home_folder(), "downloads")
+        os.makedirs(candidate, exist_ok=True)
+        return candidate
+    except OSError:
+        fallback = os.path.join(tempfile.gettempdir(), "crawl4ai", "downloads")
+        os.makedirs(fallback, exist_ok=True)
+        return fallback
 
 async def get_chromium_path(browser_type) -> str:
     """Returns the browser executable path using playwright's browser management.
