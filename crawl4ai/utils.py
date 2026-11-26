@@ -3435,6 +3435,13 @@ def extract_page_context(page_title: str, headlines_text: str, meta_description:
     return context
 
 
+# An "ad" class word (ad, ads, ad1, adwrap, advert, ...), but not ad-hoc or ad-free
+_AD_CLASS_RE = re.compile(
+    r'(?:^|[\s_-])ad(?:s(?:ense|bygoogle)?|v(?:ert\w*)?|box|slot|unit|wrap\w*|holder|zone'
+    r'|block|space|container|server|mob|\d+)?(?![^\s_-])(?![\s_-](?:hoc|free)\b)'
+)
+
+
 def calculate_link_intrinsic_score(
     link_text: str, 
     url: str, 
@@ -3470,7 +3477,11 @@ def calculate_link_intrinsic_score(
         if any(nav_class in class_str for nav_class in ['nav', 'menu', 'primary', 'main', 'important']):
             score += 1.5
         # Marketing/ad classes reduce score  
-        if any(bad_class in class_str for bad_class in ['ad', 'sponsor', 'track', 'promo', 'banner']):
+        # "ad" must be a whole word, not part of breadcrumb, header-link or badge;
+        # camelCase is split first so googleAd and adContainer keep an "ad" word
+        ad_str = re.sub(r'([a-z])([A-Z])', r'\1 \2', class_attr or '').lower()
+        if _AD_CLASS_RE.search(ad_str) or any(
+                bad_class in class_str for bad_class in ['sponsor', 'track', 'promo', 'banner']):
             score -= 1.0
             
         rel_str = (rel_attr or '').lower()
