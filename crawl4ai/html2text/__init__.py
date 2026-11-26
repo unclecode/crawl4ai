@@ -1103,6 +1103,18 @@ class CustomHTML2Text(HTML2Text):
             else:
                 setattr(self, key, value)
 
+    def handle_charref(self, c: str) -> None:
+        if self.preserve_depth > 0:
+            self.preserved_content.append(f"&#{c};")
+        else:
+            super().handle_charref(c)
+
+    def handle_entityref(self, c: str) -> None:
+        if self.preserve_depth > 0:
+            self.preserved_content.append(f"&{c};")
+        else:
+            super().handle_entityref(c)
+
     def handle_tag(self, tag, attrs, start):
         # Let the parent class handle <base> (it updates the base URL for
         # relative links). Must run before preserved tags since <base> is in <head>
@@ -1117,7 +1129,9 @@ class CustomHTML2Text(HTML2Text):
                     self.preserved_content = []
                     # Format opening tag with attributes
                     attr_str = "".join(
-                        f' {k}="{v}"' for k, v in attrs.items() if v is not None
+                        f' {k}="{html.escape(v, quote=True)}"'
+                        for k, v in attrs.items()
+                        if v is not None
                     )
                     self.preserved_content.append(f"<{tag}{attr_str}>")
                 self.preserve_depth += 1
@@ -1137,7 +1151,9 @@ class CustomHTML2Text(HTML2Text):
             if start:
                 # Format nested tags with attributes
                 attr_str = "".join(
-                    f' {k}="{v}"' for k, v in attrs.items() if v is not None
+                    f' {k}="{html.escape(v, quote=True)}"'
+                    for k, v in attrs.items()
+                    if v is not None
                 )
                 self.preserved_content.append(f"<{tag}{attr_str}>")
             else:
@@ -1175,7 +1191,10 @@ class CustomHTML2Text(HTML2Text):
     def handle_data(self, data, entity_char=False):
         """Override handle_data to capture content within preserved tags."""
         if self.preserve_depth > 0:
-            self.preserved_content.append(data)
+            # Script/style content is raw text, where entities are not decoded.
+            self.preserved_content.append(
+                data if self.cdata_elem else html.escape(data, quote=False)
+            )
             return
 
         if self.inside_pre:
