@@ -2618,7 +2618,7 @@ class RegexExtractionStrategy(ExtractionStrategy):
         # IDs
         "uuid":            r"[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",
         # Money / numbers
-        "currency":        r"(?:USD|EUR|RM|\$|€|£)\s?\d+(?:[.,]\d{2})?",
+        "currency":        r"(?:USD|EUR|RM|\$|€|£)\s?(?:\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,]\d{2})?",
         "percentage":      r"\d+(?:\.\d+)?%",
         "number":          r"\b\d{1,3}(?:[,.\s]\d{3})*(?:\.\d+)?\b",
         # Dates / Times
