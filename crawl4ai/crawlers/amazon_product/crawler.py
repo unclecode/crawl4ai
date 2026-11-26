@@ -1,3 +1,5 @@
+import json
+
 from crawl4ai.hub import BaseCrawler
 
 __meta__ = {
