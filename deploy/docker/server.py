@@ -708,7 +708,10 @@ async def get_artifact(artifact_id: str, _td: Dict = Depends(token_dep)):
         path, mime = resolve_artifact(artifact_id)
     except ArtifactNotFound:
         raise HTTPException(404, "Artifact not found")
-    return FileResponse(path, media_type=mime, headers={"X-Content-Type-Options": "nosniff"})
+    headers = {"X-Content-Type-Options": "nosniff"}
+    if mime == "application/octet-stream":
+        headers["Content-Disposition"] = "attachment"
+    return FileResponse(path, media_type=mime, headers=headers)
 
 
 # Screenshot endpoint

@@ -18,8 +18,9 @@ import re
 import uuid
 from .js_snippet import load_js_script
 from .models import AsyncCrawlResponse
-from .config import SCREENSHOT_HEIGHT_TRESHOLD
+from .config import DOWNLOAD_PAGE_TIMEOUT, SCREENSHOT_HEIGHT_TRESHOLD
 from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig
+from .utils import resolve_downloads_path
 from .async_logger import AsyncLogger
 from .ssl_certificate import SSLCertificate
 from .user_agent_generator import ValidUAGenerator, UAGen
@@ -109,6 +110,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         # Initialize session management
         self._downloaded_files = []
+        self._downloads_by_crawl: Dict[str, List[str]] = {}
 
         # Initialize hooks system
         self.hooks = {
@@ -546,8 +548,14 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         redirected_url = url
         redirected_status_code = None
 
-        # Reset downloaded files list for new crawl
-        self._downloaded_files = []
+        # Scope downloaded files and tasks to this crawl invocation so
+        # concurrent crawls never cross-contaminate and teardown awaits saves.
+        crawl_id = uuid.uuid4().hex
+        self._downloads_by_crawl[crawl_id] = []
+        download_tasks: List[asyncio.Task] = []
+        download_event = asyncio.Event()
+        navigation_download_triggered = False
+        on_download = None
         
         # Initialize capture lists
         captured_requests = []
@@ -732,14 +740,16 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 # also runs the server and its in-process egress proxy.
                 ssl_cert = await asyncio.to_thread(SSLCertificate.from_url, url)
 
-            # Set up download handling
+            # Set up download handling scoped to this crawl invocation
             if self.browser_config.accept_downloads:
-                page.on(
-                    "download",
-                    lambda download: asyncio.create_task(
-                        self._handle_download(download)
-                    ),
-                )
+                def on_download(download):
+                    download_event.set()
+                    task = asyncio.create_task(
+                        self._handle_download(download, crawl_id=crawl_id)
+                    )
+                    download_tasks.append(task)
+
+                page.on("download", on_download)
 
             # Handle page navigation and content loading
             if not config.js_only:
@@ -786,9 +796,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         redirected_url = page.url
                         redirected_status_code = response.status if response else None
                     except Error as e:
-                        # Allow navigation to be aborted when downloading files
-                        # This is expected behavior for downloads in some browser engines
-                        if 'net::ERR_ABORTED' in str(e) and self.browser_config.accept_downloads:
+                        # Allow navigation to be aborted or superseded when downloading files
+                        err_msg = str(e)
+                        if self.browser_config.accept_downloads and (
+                            'net::ERR_ABORTED' in err_msg
+                            or 'Download is starting' in err_msg
+                        ):
+                            navigation_download_triggered = True
                             self.logger.info(
                                 message=f"Navigation aborted, likely due to file download: {url}",
                                 tag="GOTO",
@@ -796,7 +810,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                             )
                             response = None
                         else:
-                            raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
+                            raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{err_msg}")
 
                     # ──────────────────────────────────────────────────────────────
                     # Walk the redirect chain.  Playwright returns only the last
@@ -1198,6 +1212,17 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if not is_local_content:
                 redirected_url = page.url  # Use current page URL to capture JS redirects
             
+            if self.browser_config.accept_downloads:
+                await self._await_crawl_downloads(
+                    download_tasks=download_tasks,
+                    download_event=download_event,
+                    navigation_download_triggered=navigation_download_triggered,
+                    page_timeout_ms=config.page_timeout,
+                )
+            crawl_downloads = self._downloads_by_crawl.pop(crawl_id, [])
+            if crawl_downloads:
+                self._downloaded_files = list(crawl_downloads)
+
             # Return complete response
             return AsyncCrawlResponse(
                 html=html,
@@ -1209,9 +1234,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 mhtml_data=mhtml_data,
                 get_delayed_content=get_delayed_content,
                 ssl_certificate=ssl_cert,
-                downloaded_files=(
-                    self._downloaded_files if self._downloaded_files else None
-                ),
+                downloaded_files=(crawl_downloads if crawl_downloads else None),
                 redirected_url=redirected_url,
                 redirected_status_code=redirected_status_code,
                 # Include captured data if enabled
@@ -1223,9 +1246,18 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             raise e
 
         finally:
+            self._downloads_by_crawl.pop(crawl_id, None)
+            for task in download_tasks:
+                if not task.done():
+                    task.cancel()
+            if download_tasks:
+                await asyncio.gather(*download_tasks, return_exceptions=True)
+
             # Always clean up event listeners to prevent accumulation
             # across reuses (even for session pages).
             try:
+                if on_download is not None:
+                    page.remove_listener("download", on_download)
                 if config.capture_network_requests:
                     page.remove_listener("request", handle_request_capture)
                     page.remove_listener("response", handle_response_capture)
@@ -1509,27 +1541,60 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             )
             # Continue with normal flow even if virtual scroll fails
 
-    async def _handle_download(self, download):
-        """
-        Handle file downloads.
+    async def _await_crawl_downloads(
+        self,
+        download_tasks: List[asyncio.Task],
+        download_event: asyncio.Event,
+        navigation_download_triggered: bool,
+        page_timeout_ms: Optional[int],
+    ) -> None:
+        """Wait for any download tasks triggered during this crawl before teardown."""
+        timeout_s = max((page_timeout_ms or 0) / 1000.0, DOWNLOAD_PAGE_TIMEOUT / 1000.0)
+        if navigation_download_triggered and not download_event.is_set():
+            try:
+                await asyncio.wait_for(download_event.wait(), timeout=min(5.0, timeout_s))
+            except asyncio.TimeoutError:
+                pass
+        elif not download_tasks:
+            # Give a download triggered right at the end of navigation/JS a tick to queue.
+            await asyncio.sleep(0)
 
-        How it works:
-        1. Get the suggested filename.
-        2. Get the download path.
-        3. Log the download.
-        4. Start the download.
-        5. Save the downloaded file.
-        6. Log the completion.
+        while True:
+            pending = [task for task in download_tasks if not task.done()]
+            if not pending:
+                break
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*pending, return_exceptions=True),
+                    timeout=timeout_s,
+                )
+            except asyncio.TimeoutError:
+                for task in pending:
+                    if not task.done():
+                        task.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
+                self.logger.warning(
+                    message="Timed out waiting for download tasks after {timeout}s",
+                    tag="DOWNLOAD",
+                    params={"timeout": timeout_s},
+                )
+                break
+
+    async def _handle_download(self, download, crawl_id: Optional[str] = None):
+        """
+        Handle file downloads, optionally scoped to a specific crawl invocation.
 
         Args:
             download (Download): The Playwright download object
+            crawl_id (Optional[str]): Unique ID of the crawl invocation that triggered this download
 
         Returns:
             None
         """
         try:
             suggested_filename = download.suggested_filename
-            download_path = _safe_download_filepath(self.browser_config.downloads_path, suggested_filename)
+            downloads_root = resolve_downloads_path(self.browser_config.downloads_path)
+            download_path = _safe_download_filepath(downloads_root, suggested_filename)
             # Playwright's save_as performs the write itself (no O_NOFOLLOW
             # hook), so reject a symlink planted at the target before writing.
             if os.path.islink(download_path):
@@ -1544,7 +1609,17 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             start_time = time.perf_counter()
             await download.save_as(download_path)
             end_time = time.perf_counter()
-            self._downloaded_files.append(download_path)
+            if crawl_id is not None:
+                if crawl_id in self._downloads_by_crawl:
+                    self._downloads_by_crawl[crawl_id].append(download_path)
+                else:
+                    self.logger.warning(
+                        message="Download {filename} completed after crawl finished, not attached to any result",
+                        tag="DOWNLOAD",
+                        params={"filename": suggested_filename},
+                    )
+            else:
+                self._downloaded_files.append(download_path)
 
             self.logger.success(
                 message="Downloaded {filename} successfully",
@@ -2829,10 +2904,9 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
 
                     if self._is_file_download(content_type, content_disposition):
                         # Save file to disk
-                        downloads_path = self.browser_config.downloads_path or os.path.join(
-                            os.path.expanduser("~"), ".crawl4ai", "downloads"
+                        downloads_path = resolve_downloads_path(
+                            self.browser_config.downloads_path
                         )
-                        os.makedirs(downloads_path, exist_ok=True)
 
                         filename = self._extract_filename(content_disposition, url, content_type)
                         filepath = _safe_download_filepath(downloads_path, filename)

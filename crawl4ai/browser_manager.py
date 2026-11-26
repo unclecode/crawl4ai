@@ -14,7 +14,7 @@ import hashlib
 from .js_snippet import load_js_script
 from .config import DOWNLOAD_PAGE_TIMEOUT
 from .async_configs import BrowserConfig, CrawlerRunConfig
-from .utils import get_chromium_path
+from .utils import get_chromium_path, resolve_downloads_path
 import warnings
 from contextvars import ContextVar
 
@@ -917,6 +917,11 @@ class BrowserManager:
             if chromium_sandbox_requested():
                 launch_kwargs["chromium_sandbox"] = True
 
+            if self.config.accept_downloads:
+                launch_kwargs["downloads_path"] = resolve_downloads_path(
+                    self.config.downloads_path
+                )
+
             if self.config.proxy_config:
                 launch_kwargs["proxy"] = {
                     "server": self.config.proxy_config.server,
@@ -1215,10 +1220,9 @@ class BrowserManager:
             browser_args["channel"] = self.config.chrome_channel
 
         if self.config.accept_downloads:
-            browser_args["downloads_path"] = self.config.downloads_path or os.path.join(
-                os.getcwd(), "downloads"
+            browser_args["downloads_path"] = resolve_downloads_path(
+                self.config.downloads_path
             )
-            os.makedirs(browser_args["downloads_path"], exist_ok=True)
 
         if self.config.proxy:
             warnings.warn(
@@ -1283,11 +1287,11 @@ class BrowserManager:
         if self.config.accept_downloads:
             context.set_default_timeout(DOWNLOAD_PAGE_TIMEOUT)
             context.set_default_navigation_timeout(DOWNLOAD_PAGE_TIMEOUT)
-            if self.config.downloads_path:
-                context._impl_obj._options["accept_downloads"] = True
-                context._impl_obj._options[
-                    "downloads_path"
-                ] = self.config.downloads_path
+            resolved_downloads_path = resolve_downloads_path(
+                self.config.downloads_path
+            )
+            context._impl_obj._options["accept_downloads"] = True
+            context._impl_obj._options["downloads_path"] = resolved_downloads_path
 
         # Handle user agent and browser hints
         if self.config.user_agent:
