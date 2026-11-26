@@ -469,29 +469,11 @@ class DomainAuthorityScorer(URLScorer):
         Returns:
             Lowercase domain without port
         """
-        # Find domain start
-        start = url.find('://') 
-        if start == -1:
-            start = 0
-        else:
-            start += 3
-            
-        # Find domain end
-        end = url.find('/', start)
-        if end == -1:
-            end = url.find('?', start)
-            if end == -1:
-                end = url.find('#', start)
-                if end == -1:
-                    end = len(url)
-                    
-        # Extract domain and remove port
-        domain = url[start:end]
-        port_idx = domain.rfind(':')
-        if port_idx != -1:
-            domain = domain[:port_idx]
-            
-        return domain.lower()
+        try:
+            parsed = urlparse(url if "://" in url else f"//{url}")
+        except ValueError:
+            return ""
+        return parsed.hostname or ""
 
     @lru_cache(maxsize=10000)
     def _calculate_score(self, url: str) -> float:
