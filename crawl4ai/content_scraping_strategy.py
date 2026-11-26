@@ -14,6 +14,7 @@ from .config import (
     IMPORTANT_ATTRS,
     SOCIAL_MEDIA_DOMAINS,
 )
+
 from bs4 import NavigableString, Comment
 from bs4 import PageElement, Tag
 from urllib.parse import urljoin
@@ -35,6 +36,8 @@ import copy
 
 # Pre-compile regular expressions for Open Graph and Twitter metadata
 OG_REGEX = re.compile(r"^og:")
+_NON_SPACE = re.compile(r"\S")
+_SPACES = re.compile(r"\s+")
 TWITTER_REGEX = re.compile(r"^twitter:")
 DIMENSION_REGEX = re.compile(r"(\d+)(\D*)")
 NOSCRIPT_OPEN_REGEX = re.compile(r"<noscript\b[^>]*>", re.IGNORECASE)
@@ -433,19 +436,42 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
 
     @staticmethod
     def _bounded_text(element: lhtml.HtmlElement, max_length: int) -> str:
-        """The element's text_content(), stripped and cut to `max_length` characters,
-        read only as far as needed."""
+        """The element's text_content().strip() when that fits in `max_length`;
+        otherwise its start with whitespace collapsed, cut to `max_length`.
+
+        Reads only up to `max_length` + 1 non-whitespace characters, so whitespace
+        (e.g. an indented inline SVG before a caption) never uses up the limit."""
+        if max_length <= 0:
+            return ""
         parts = []
-        size = 0
+        kept = 0
+        budget = max_length + 1  # non-whitespace characters still to read
         for chunk in element.itertext():
             if not parts:
                 chunk = chunk.lstrip()
+                if not chunk:
+                    continue
+            seen = 0
+            end = None
+            for match in _NON_SPACE.finditer(chunk):
+                seen += 1
+                if seen == budget:
+                    end = match.end()
+                    break
+            if end is not None:
+                parts.append(chunk[:end])
+                return " ".join("".join(parts).split())[:max_length].rstrip()
+            budget -= seen
+            if kept > max_length:
+                # Past the limit, so any further whitespace is either trailing
+                # (stripped below) or inside a text that gets collapsed anyway.
+                chunk = _SPACES.sub(" ", chunk)
             parts.append(chunk)
-            size += len(chunk)
-            # A little extra, so trailing whitespace does not eat the budget.
-            if size > max_length + 64:
-                break
-        return "".join(parts).strip()[:max_length].rstrip()
+            kept += len(chunk)
+        text = "".join(parts).strip()
+        if len(text) <= max_length:
+            return text
+        return " ".join(text.split())[:max_length].rstrip()
 
     def flatten_nested_elements(self, element: lhtml.HtmlElement) -> lhtml.HtmlElement:
         """Flatten nested elements of the same type in LXML tree"""

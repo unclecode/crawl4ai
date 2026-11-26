@@ -69,3 +69,72 @@ def test_the_limit_can_be_set_per_call():
 
     assert images
     assert all(len(img.desc or "") <= 40 for img in images)
+
+
+ICON = '<svg aria-hidden="true">' + ('\n        <path d="M0 0h1"/>' * 65) + "</svg>"
+
+
+def test_an_indented_icon_before_the_caption_does_not_hide_it():
+    # Reported on the PR: the SVG's indentation used up the budget before the caption.
+    html = (
+        "<html><body><figure>\n" + ICON + "<img src='/museum.jpg' alt='Museum'>"
+        "<figcaption>Museum entrance</figcaption></figure></body></html>"
+    )
+
+    assert _scrape(html).media.images[0].desc == "Museum entrance"
+
+
+def test_whitespace_after_some_text_does_not_count_against_the_limit():
+    html = (
+        "<html><body><figure>\n<span>Gallery</span>"
+        + ICON
+        + "<img src='/museum.jpg' alt='Museum'>"
+        "<figcaption>Museum entrance</figcaption></figure></body></html>"
+    )
+
+    desc = _scrape(html).media.images[0].desc
+
+    assert desc.startswith("Gallery") and desc.endswith("Museum entrance")
+    assert len(desc) <= IMAGE_DESCRIPTION_MAX_LENGTH
+
+
+def test_a_description_within_the_limit_keeps_its_own_whitespace():
+    html = (
+        "<html><body><div>\n  <b>Two</b>\n   <i>lines</i>  \n"
+        + IMG.format(i=1)
+        + "</div></body></html>"
+    )
+
+    assert _scrape(html).media.images[0].desc == "Two\n   lines"
+
+
+def _desc(inner: str, max_length: int = IMAGE_DESCRIPTION_MAX_LENGTH):
+    doc = lhtml.fromstring(
+        f"<html><body><div>\n{inner}<img src='/a.jpg'></div></body></html>"
+    )
+    return LXMLWebScrapingStrategy().find_closest_parent_with_useful_text(
+        doc.xpath("//img")[0], image_description_max_length=max_length
+    )
+
+
+def test_text_that_fits_is_returned_exactly_as_before():
+    assert _desc("abcd\nefghi", 10) == "abcd\nefghi"
+    assert _desc("abcde<b>fghij</b>", 10) == "abcdefghij"
+    caption = "x" * 480 + " H<sub>2</sub>O and CO<sub>2</sub>"
+    assert _desc(caption).endswith(" H2O and CO2")
+
+
+def test_trailing_whitespace_of_any_length_is_stripped_not_collapsed():
+    assert _desc("<b>Two</b>\n   <i>lines</i>" + " " * 70_000) == "Two\n   lines"
+
+
+def test_a_long_run_of_whitespace_inside_a_text_node_does_not_hide_the_caption():
+    desc = _desc("\n" + " " * 5000 + "Museum entrance " * 40)
+    assert (
+        desc.startswith("Museum entrance") and len(desc) <= IMAGE_DESCRIPTION_MAX_LENGTH
+    )
+
+
+def test_long_text_is_cut_at_the_limit_without_splitting_words_at_tags():
+    desc = _desc("<p>" + "H<sub>2</sub>O " * 300 + "</p>", 40)
+    assert desc == " ".join(["H2O"] * 10)
