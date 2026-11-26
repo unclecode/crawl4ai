@@ -134,6 +134,8 @@ class PruningContentFilterLXML(PruningContentFilter):
         min_word_threshold: int = None,
         threshold_type: str = "fixed",
         threshold: float = 0.48,
+        preserve_classes: list = None,
+        preserve_tags: list = None,
     ):
         # Mirror PruningContentFilter's explicit signature (rather than
         # *args/**kwargs) so config (de)serialization can introspect and
@@ -143,6 +145,8 @@ class PruningContentFilterLXML(PruningContentFilter):
             min_word_threshold=min_word_threshold,
             threshold_type=threshold_type,
             threshold=threshold,
+            preserve_classes=preserve_classes,
+            preserve_tags=preserve_tags,
         )
         # word count is only needed when a min-word threshold is active; skip
         # the per-fragment space counting otherwise.
@@ -181,15 +185,14 @@ class PruningContentFilterLXML(PruningContentFilter):
         if body_metrics is None:
             return []
 
-        # The original scores the body itself first; if it fails, the whole
-        # body is decomposed and nothing is returned.
-        if self._should_remove(body, body_metrics, metrics):
+        has_preserve_rules = bool(self.preserve_tags or self.preserve_classes)
+        body_preserved = has_preserve_rules and self._is_preserved(body)
+        if not body_preserved and self._should_remove(body, body_metrics, metrics):
             return []
 
-        # Top-down pass: a node survives only if it and every ancestor up to
-        # body pass the threshold. Iterative (explicit stack) to avoid Python
-        # recursion limits on deeply nested documents.
-        stack = [body]
+        # Walk top down without recursion. As in the original engine, a
+        # preserved node keeps its entire subtree after excluded tags are stripped.
+        stack = [] if body_preserved else [body]
         while stack:
             node = stack.pop()
             in_sentence = bool((node.text or "").strip()) or any(
@@ -197,6 +200,8 @@ class PruningContentFilterLXML(PruningContentFilter):
             )
             for child in list(node):
                 if not isinstance(child.tag, str):
+                    continue
+                if has_preserve_rules and self._is_preserved(child):
                     continue
                 if in_sentence and child.tag in self.inline_tags:
                     continue
@@ -215,6 +220,13 @@ class PruningContentFilterLXML(PruningContentFilter):
             if any(t.strip() for t in el.itertext()):
                 blocks.append(lhtml.tostring(el, encoding="unicode", with_tail=False))
         return blocks
+
+    def _is_preserved(self, node):
+        if node.tag in self.preserve_tags:
+            return True
+        if self.preserve_classes:
+            return not self.preserve_classes.isdisjoint(node.get("class", "").split())
+        return False
 
     # ------------------------------------------------------------------ #
     # Metrics (single bottom-up pass)
