@@ -850,7 +850,7 @@ class BrowserProfiler:
                 self.logger.info("4. Exit", tag="MENU", base_color=LogColor.MAGENTA)
                 exit_option = "4"
             
-            self.logger.info(f"\n[cyan]Enter your choice (1-{exit_option}): [/cyan]", end="")
+            self.logger.info(f"\nEnter your choice (1-{exit_option}): ", base_color=LogColor.CYAN, end="")
             choice = input()
             
             if choice == "1":
@@ -898,7 +898,12 @@ class BrowserProfiler:
                     idx = int(profile_idx) - 1
                     if 0 <= idx < len(profiles):
                         profile_name = profiles[idx]["name"]
-                        self.logger.info(f"Deleting profile: [yellow]{profile_name}[/yellow]", tag="PROFILES")
+                        self.logger.info(
+                            "Deleting profile: {name}",
+                            tag="PROFILES",
+                            params={"name": profile_name},
+                            colors={"name": LogColor.YELLOW},
+                        )
                         
                         # Confirm deletion
                         self.console.print("[red]Are you sure you want to delete this profile? (y/n): [/red]", end="")
