@@ -505,6 +505,9 @@ class BM25ContentFilter(RelevantContentFilter):
         tokenized_corpus = [clean_tokens(tokens) for tokens in tokenized_corpus]
         tokenized_query = clean_tokens(tokenized_query)
 
+        if not any(tokenized_corpus):
+            return []
+
         bm25 = BM25Okapi(tokenized_corpus)
         scores = bm25.get_scores(tokenized_query)
 
