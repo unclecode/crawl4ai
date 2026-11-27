@@ -2081,7 +2081,6 @@ class JsonLxmlExtractionStrategy(JsonElementExtractionStrategy):
     
     def _create_selector_function(self, selector_str):
         """Create a selector function that handles all edge cases"""
-        original_selector = selector_str
         
         # Try to optimize the selector if appropriate
         if self.optimize_common_patterns:
@@ -2089,14 +2088,14 @@ class JsonLxmlExtractionStrategy(JsonElementExtractionStrategy):
         
         try:
             # Attempt to compile the CSS selector
-            compiled = self.CSSSelector(selector_str)
+            compiled = self.CSSSelector(selector_str, translator="html")
             xpath = compiled.path
             
             # Store XPath for later use
             self._xpath_cache[selector_str] = xpath
             
             # Create the wrapper function that implements the selection strategy
-            def selector_func(element, context_sensitive=True):
+            def selector_func(element):
                 cache_key = None
                 
                 # Use result caching if enabled
@@ -2110,34 +2109,7 @@ class JsonLxmlExtractionStrategy(JsonElementExtractionStrategy):
                 
                 results = []
                 try:
-                    # Strategy 1: Direct CSS selector application (fastest)
                     results = compiled(element)
-                    
-                    # If that fails and we need context sensitivity
-                    if not results and context_sensitive:
-                        # Strategy 2: Try XPath with context adjustment
-                        context_xpath = self._make_context_sensitive_xpath(xpath, element)
-                        if context_xpath:
-                            results = element.xpath(context_xpath)
-                        
-                        # Strategy 3: Handle special case - nth-child
-                        if not results and 'nth-child' in original_selector:
-                            results = self._handle_nth_child_selector(element, original_selector)
-                        
-                        # Strategy 4: Direct descendant search for class/ID selectors
-                        if not results:
-                            results = self._fallback_class_id_search(element, original_selector)
-                            
-                        # Strategy 5: Last resort - tag name search for the final part
-                        if not results:
-                            parts = original_selector.split()
-                            if parts:
-                                last_part = parts[-1]
-                                # Extract tag name from the selector
-                                tag_match = re.match(r'^(\w+)', last_part)
-                                if tag_match:
-                                    tag_name = tag_match.group(1)
-                                    results = element.xpath(f".//{tag_name}")
                     
                     # Cache results if caching is enabled
                     if self.use_caching and cache_key:
@@ -2156,86 +2128,7 @@ class JsonLxmlExtractionStrategy(JsonElementExtractionStrategy):
                 print(f"Error compiling selector '{selector_str}': {e}")
             
             # Fallback function for invalid selectors
-            return lambda element, context_sensitive=True: []
-    
-    def _make_context_sensitive_xpath(self, xpath, element):
-        """Convert absolute XPath to context-sensitive XPath"""
-        try:
-            # If starts with descendant-or-self, it's already context-sensitive
-            if xpath.startswith('descendant-or-self::'):
-                return xpath
-                
-            # Remove leading slash if present
-            if xpath.startswith('/'):
-                context_xpath = f".{xpath}"
-            else:
-                context_xpath = f".//{xpath}"
-                
-            # Validate the XPath by trying it
-            try:
-                element.xpath(context_xpath)
-                return context_xpath
-            except:
-                # If that fails, try a simpler descendant search
-                return f".//{xpath.split('/')[-1]}"
-        except:
-            return None
-    
-    def _handle_nth_child_selector(self, element, selector_str):
-        """Special handling for nth-child selectors in tables"""
-        import re
-        results = []
-        
-        try:
-            # Extract the column number from td:nth-child(N)
-            match = re.search(r'td:nth-child\((\d+)\)', selector_str)
-            if match:
-                col_num = match.group(1)
-                
-                # Check if there's content after the nth-child part
-                remaining_selector = selector_str.split(f"td:nth-child({col_num})", 1)[-1].strip()
-                
-                if remaining_selector:
-                    # If there's a specific element we're looking for after the column
-                    # Extract any tag names from the remaining selector
-                    tag_match = re.search(r'(\w+)', remaining_selector)
-                    tag_name = tag_match.group(1) if tag_match else '*'
-                    results = element.xpath(f".//td[{col_num}]//{tag_name}")
-                else:
-                    # Just get the column cell
-                    results = element.xpath(f".//td[{col_num}]")
-        except Exception as e:
-            if self.verbose:
-                print(f"Error handling nth-child selector: {e}")
-                
-        return results
-    
-    def _fallback_class_id_search(self, element, selector_str):
-        """Fallback to search by class or ID"""
-        results = []
-        
-        try:
-            # Extract class selectors (.classname)
-            import re
-            class_matches = re.findall(r'\.([a-zA-Z0-9_-]+)', selector_str)
-            
-            # Extract ID selectors (#idname)
-            id_matches = re.findall(r'#([a-zA-Z0-9_-]+)', selector_str)
-            
-            # Try each class
-            for class_name in class_matches:
-                class_results = element.xpath(f".//*[contains(@class, '{class_name}')]")
-                results.extend(class_results)
-                
-            # Try each ID (usually more specific)
-            for id_name in id_matches:
-                id_results = element.xpath(f".//*[@id='{id_name}']")
-                results.extend(id_results)
-        except Exception as e:
-            if self.verbose:
-                print(f"Error in fallback class/id search: {e}")
-                
-        return results
+            return lambda element: []
     
     def _get_selector(self, selector_str):
         """Get or create a selector function with caching"""
@@ -2246,13 +2139,12 @@ class JsonLxmlExtractionStrategy(JsonElementExtractionStrategy):
     def _get_base_elements(self, parsed_html, selector: str):
         """Get all base elements using the selector"""
         selector_func = self._get_selector(selector)
-        # For base elements, we don't need context sensitivity
-        return selector_func(parsed_html, context_sensitive=False)
+        return selector_func(parsed_html)
     
     def _get_elements(self, element, selector: str):
         """Get child elements using the selector with context sensitivity"""
         selector_func = self._get_selector(selector)
-        return selector_func(element, context_sensitive=True)
+        return selector_func(element)
     
     def _get_element_text(self, element) -> str:
         """Extract normalized text from element"""
