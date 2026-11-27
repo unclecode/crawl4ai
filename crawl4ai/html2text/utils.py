@@ -1,4 +1,5 @@
 import html.entities
+import re
 from typing import Dict, List, Optional
 
 from . import config
@@ -234,16 +235,26 @@ def escape_md_section(
     return text
 
 
+# A cell may hold an escaped pipe, which is content rather than a column
+# boundary, so a row is split on the unescaped ones only.
+RE_UNESCAPED_PIPE = re.compile(r"(?<!\\)((?:\\\\)*)\|")
+
+
+def split_table_row(line: str) -> List[str]:
+    """Split a markdown table row on its unescaped pipes."""
+    return RE_UNESCAPED_PIPE.split(line)[::2]
+
+
 def reformat_table(lines: List[str], right_margin: int) -> List[str]:
     """
     Given the lines of a table
     padds the cells and returns the new lines
     """
     # find the maximum width of the columns
-    max_width = [len(x.rstrip()) + right_margin for x in lines[0].split("|")]
+    max_width = [len(x.rstrip()) + right_margin for x in split_table_row(lines[0])]
     max_cols = len(max_width)
     for line in lines:
-        cols = [x.rstrip() for x in line.split("|")]
+        cols = [x.rstrip() for x in split_table_row(line)]
         num_cols = len(cols)
 
         # don't drop any data if colspan attributes result in unequal lengths
@@ -260,7 +271,7 @@ def reformat_table(lines: List[str], right_margin: int) -> List[str]:
     # reformat
     new_lines = []
     for line in lines:
-        cols = [x.rstrip() for x in line.split("|")]
+        cols = [x.rstrip() for x in split_table_row(line)]
         if set(line.strip()) == set("-|"):
             filler = "-"
             new_cols = [
