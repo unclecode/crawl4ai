@@ -9,6 +9,12 @@
  * Returns the full HTML string including shadow content.
  */
 (() => {
+    const encodeText = (node) => {
+        const tag = node.parentElement && node.parentElement.tagName;
+        if (tag === 'SCRIPT' || tag === 'STYLE') return node.textContent;
+        return node.textContent.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    };
+
     const VOID = new Set([
         'area','base','br','col','embed','hr','img','input',
         'link','meta','param','source','track','wbr'
@@ -17,7 +23,7 @@
     // Serialize a DOM node. When it has a shadow root, switch to
     // shadow-aware serialization that resolves <slot> elements.
     const serialize = (node) => {
-        if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+        if (node.nodeType === Node.TEXT_NODE) return encodeText(node);
         if (node.nodeType === Node.COMMENT_NODE) return '';
         if (node.nodeType !== Node.ELEMENT_NODE) return '';
 
@@ -51,7 +57,7 @@
     // <style> tags are skipped (scoped CSS, useless outside shadow).
     // <slot> tags are replaced with their assigned (projected) nodes.
     const serializeShadowChild = (node, host) => {
-        if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+        if (node.nodeType === Node.TEXT_NODE) return encodeText(node);
         if (node.nodeType === Node.COMMENT_NODE) return '';
         if (node.nodeType !== Node.ELEMENT_NODE) return '';
 
