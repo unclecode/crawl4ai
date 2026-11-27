@@ -1302,8 +1302,13 @@ class BrowserProfiler:
         try:
             # Check if the process exists
             if sys.platform == "win32":
-                process = subprocess.run(["tasklist", "/FI", f"PID eq {pid}"], 
-                                         capture_output=True, text=True)
+                process = subprocess.run(
+                    ["tasklist", "/FI", f"PID eq {pid}"],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                )
                 return str(pid) in process.stdout
             else:
                 # Unix-like systems
