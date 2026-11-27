@@ -69,12 +69,8 @@ import re
 import html
 
 def clean_pdf_text_to_html(page_number, text):
-    # Decode Unicode escapes and handle surrogate pairs
-    try:
-        decoded = text.encode('latin-1').decode('unicode-escape')
-        decoded = decoded.encode('utf-16', 'surrogatepass').decode('utf-16')
-    except Exception as e:
-        decoded = text  # Fallback if decoding fails
+    # pypdf already returns Unicode text; backslashes are literal page content.
+    decoded = text
     
     article_title_detected = False
     # decoded = re.sub(r'\.\n', '.\n\n', decoded)
@@ -205,9 +201,6 @@ def clean_pdf_text_to_html(page_number, text):
     # Fix common citation patterns
     html_output = re.sub(r'\(([A-Z][a-z]+ et al\. \d{4})\)', r'<cite>\1</cite>', html_output)
     
-    # Fix escaped characters
-    html_output = html_output.replace('\\ud835', '').replace('\\u2020', '†')
-    
     # Remove leftover hyphens and fix spacing
     html_output = re.sub(r'\s+-\s+', '', html_output)
     html_output = re.sub(r'\s+([.,!?)])', r'\1', html_output)
@@ -215,12 +208,8 @@ def clean_pdf_text_to_html(page_number, text):
     return html_output
 
 def clean_pdf_text(page_number, text):
-    # Decode Unicode escapes and handle surrogate pairs
-    try:
-        decoded = text.encode('latin-1').decode('unicode-escape')
-        decoded = decoded.encode('utf-16', 'surrogatepass').decode('utf-16')
-    except Exception as e:
-        decoded = text  # Fallback if decoding fails
+    # pypdf already returns Unicode text; backslashes are literal page content.
+    decoded = text
     
     article_title_detected = False
     decoded = re.sub(r'\.\n', '.\n\n', decoded)
@@ -342,9 +331,6 @@ def clean_pdf_text(page_number, text):
     
     # Fix common citation patterns
     markdown = re.sub(r'\(([A-Z][a-z]+ et al\. \d{4})\)', r'[\1]', markdown)
-    
-    # Fix escaped characters
-    markdown = markdown.replace('\\ud835', '').replace('\\u2020', '†')
     
     # Remove leftover hyphens and fix spacing
     markdown = re.sub(r'\s+-\s+', '', markdown)  # Join hyphenated words
