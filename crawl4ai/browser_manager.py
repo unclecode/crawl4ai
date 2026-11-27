@@ -1,6 +1,7 @@
 import asyncio
+import json
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 import os
 import sys
 import shutil
@@ -562,12 +563,118 @@ class ManagedBrowser:
         return profiler.delete_profile(profile_name_or_path)
 
 
+def _resolve_storage_state(
+    storage_state: Union[str, os.PathLike, Dict[str, Any], None],
+) -> Union[str, Dict[str, Any], None]:
+    """Expand leading ``~`` for file-based Playwright storage_state paths."""
+    if isinstance(storage_state, (str, os.PathLike)):
+        return os.path.expanduser(os.fspath(storage_state))
+    return storage_state
+
+
+def _load_storage_state_dict(
+    storage_state: Union[str, os.PathLike, Dict[str, Any], None],
+) -> Dict[str, Any]:
+    """Load a Playwright storage_state dict from memory or a JSON file path."""
+    resolved = _resolve_storage_state(storage_state)
+    if resolved is None:
+        return {}
+    if isinstance(resolved, dict):
+        return resolved
+    with open(resolved, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+    if not isinstance(data, dict):
+        raise ValueError(f"Invalid storage_state JSON object in {resolved!r}")
+    return data
+
+
+def _normalize_local_storage_entries(kvs: Any) -> List[List[str]]:
+    """Normalize Playwright ``[{"name": k, "value": v}]`` or ``[(k, v)]`` entries."""
+    entries: List[List[str]] = []
+    if not isinstance(kvs, list):
+        return entries
+    for item in kvs:
+        if isinstance(item, dict) and "name" in item and "value" in item:
+            entries.append([str(item["name"]), str(item["value"])])
+        elif isinstance(item, (list, tuple)) and len(item) == 2:
+            entries.append([str(item[0]), str(item[1])])
+    return entries
+
+
+async def _apply_storage_state_to_context(
+    dst: BrowserContext,
+    state: Dict[str, Any],
+    logger=None,
+) -> None:
+    """Apply cookies and origin-scoped localStorage entries to an existing BrowserContext.
+
+    Uses a short-lived page with ``page.route`` fulfilling an empty local HTML
+    document so localStorage hydration performs zero external network I/O,
+    cannot leak tokens across SSO redirects, and writes directly into Chromium's
+    native origin storage.
+    """
+    cookies = state.get("cookies") or []
+    if cookies:
+        await dst.add_cookies(cookies)
+
+    origin_batches: List[Tuple[str, List[List[str]]]] = []
+    for origin in state.get("origins") or []:
+        if not isinstance(origin, dict):
+            continue
+        origin_url = origin.get("origin")
+        if not isinstance(origin_url, str) or not origin_url.startswith(
+            ("http://", "https://")
+        ):
+            continue
+        entries = _normalize_local_storage_entries(origin.get("localStorage"))
+        if entries:
+            origin_batches.append((origin_url.rstrip("/"), entries))
+
+    if not origin_batches:
+        return
+
+    page = await dst.new_page()
+    try:
+        for origin_url, entries in origin_batches:
+            init_url = f"{origin_url}/__crawl4ai_storage_init__"
+
+            async def _fulfill_empty(route):
+                await route.fulfill(
+                    status=200,
+                    content_type="text/html; charset=utf-8",
+                    body="<!doctype html><html></html>",
+                )
+
+            await page.route(init_url, _fulfill_empty)
+            try:
+                await page.goto(init_url, wait_until="commit")
+                await page.evaluate(
+                    "([expectedOrigin, items]) => {"
+                    "  if (window.location.origin !== expectedOrigin) return;"
+                    "  for (const [k, v] of items) localStorage.setItem(k, v);"
+                    "}",
+                    [origin_url, entries],
+                )
+            finally:
+                await page.unroute(init_url, _fulfill_empty)
+    finally:
+        try:
+            await page.close()
+        except Exception as close_err:
+            if logger:
+                logger.debug(
+                    message="Error closing temporary storage_state hydration page: {error}",
+                    tag="BROWSER",
+                    params={"error": str(close_err)},
+                )
+
+
 async def clone_runtime_state(
     src: BrowserContext,
     dst: BrowserContext,
     crawlerRunConfig: CrawlerRunConfig | None = None,
     browserConfig: BrowserConfig | None = None,
-) -> None:
+) -> BrowserContext:
     """
     Bring everything that *can* be changed at runtime from `src` → `dst`.
 
@@ -575,24 +682,14 @@ async def clone_runtime_state(
     2. localStorage (and sessionStorage, same API)
     3. Extra headers, permissions, geolocation if supplied in configs
     """
-
-    # ── 1. cookies ────────────────────────────────────────────────────────────
+    # ── 1 & 2. cookies + origin-scoped localStorage ───────────────────────────
     cookies = await src.cookies()
-    if cookies:
-        await dst.add_cookies(cookies)
-
-    # ── 2. localStorage / sessionStorage ──────────────────────────────────────
     state = await src.storage_state()
-    for origin in state.get("origins", []):
-        url = origin["origin"]
-        kvs = origin.get("localStorage", [])
-        if not kvs:
-            continue
-
-        page = dst.pages[0] if dst.pages else await dst.new_page()
-        await page.goto(url, wait_until="domcontentloaded")
-        for k, v in kvs:
-            await page.evaluate("(k,v)=>localStorage.setItem(k,v)", k, v)
+    merged_state = {
+        "cookies": cookies or (state.get("cookies") if isinstance(state, dict) else []),
+        "origins": state.get("origins", []) if isinstance(state, dict) else [],
+    }
+    await _apply_storage_state_to_context(dst, merged_state)
 
     # ── 3. runtime-mutable extras from configs ────────────────────────────────
     # headers
@@ -609,7 +706,7 @@ async def clone_runtime_state(
                 "accuracy": crawlerRunConfig.geolocation.accuracy,
             }
         )
-        
+
     return dst
 
 
@@ -774,6 +871,8 @@ class BrowserManager:
         self.playwright = None
         self._using_cached_cdp = False
         self._launched_persistent = False  # True when using launch_persistent_context
+        self._storage_state_applied = False
+        self._storage_state_lock = asyncio.Lock()
 
         # Session management
         self.sessions = {}
@@ -857,6 +956,7 @@ class BrowserManager:
     async def _start_impl(self):
         if self.playwright is not None:
             await self.close()
+        self._storage_state_applied = False
 
         # Use cached CDP connection if enabled and cdp_url is set
         if self.config.cache_cdp_connection and self.config.cdp_url:
@@ -924,9 +1024,6 @@ class BrowserManager:
                     "password": self.config.proxy_config.password,
                 }
 
-            if self.config.storage_state:
-                launch_kwargs["storage_state"] = self.config.storage_state
-
             user_data_dir = self.config.user_data_dir or tempfile.mkdtemp(
                 prefix="crawl4ai-persistent-"
             )
@@ -940,6 +1037,12 @@ class BrowserManager:
             self._launched_persistent = True
 
             await self.setup_context(self.default_context)
+            if self.config.storage_state:
+                await _apply_storage_state_to_context(
+                    self.default_context,
+                    _load_storage_state_dict(self.config.storage_state),
+                )
+                self._storage_state_applied = True
 
             # Set the browser endpoint key for global page tracking
             self._browser_endpoint_key = self._compute_browser_endpoint_key()
@@ -1277,9 +1380,6 @@ class BrowserManager:
         if self.config.cookies:
             await context.add_cookies(self.config.cookies)
 
-        if self.config.storage_state:
-            await context.storage_state(path=None)
-
         if self.config.accept_downloads:
             context.set_default_timeout(DOWNLOAD_PAGE_TIMEOUT)
             context.set_default_navigation_timeout(DOWNLOAD_PAGE_TIMEOUT)
@@ -1421,7 +1521,7 @@ class BrowserManager:
             "viewport": viewport_settings,
             "proxy": proxy_settings,
             "accept_downloads": self.config.accept_downloads,
-            "storage_state": self.config.storage_state,
+            "storage_state": _resolve_storage_state(self.config.storage_state),
             "ignore_https_errors": self.config.ignore_https_errors,
             "device_scale_factor": self.config.device_scale_factor,
             "java_script_enabled": self.config.java_script_enabled,
@@ -1703,14 +1803,22 @@ class BrowserManager:
                 await self._apply_stealth_to_page(page)
                 self._page_to_sig[page] = config_signature
             elif self.config.storage_state:
-                tmp_context = await self.create_browser_context(crawlerRunConfig)
-                ctx = self.default_context        # default context, one window only
-                ctx = await clone_runtime_state(tmp_context, ctx, crawlerRunConfig, self.config)
-                # Close the temporary context — only needed as a clone source
-                try:
-                    await tmp_context.close()
-                except Exception:
-                    pass
+                ctx = self.default_context  # default context, one window only
+                async with self._storage_state_lock:
+                    if not self._storage_state_applied:
+                        await _apply_storage_state_to_context(
+                            ctx, _load_storage_state_dict(self.config.storage_state)
+                        )
+                        self._storage_state_applied = True
+                if crawlerRunConfig and crawlerRunConfig.geolocation:
+                    await ctx.grant_permissions(["geolocation"])
+                    await ctx.set_geolocation(
+                        {
+                            "latitude": crawlerRunConfig.geolocation.latitude,
+                            "longitude": crawlerRunConfig.geolocation.longitude,
+                            "accuracy": crawlerRunConfig.geolocation.accuracy,
+                        }
+                    )
                 context = ctx  # so (page, context) return value is correct
                 # Avoid concurrent new_page on shared persistent context
                 # See GH-1198: context.pages can be empty under races
