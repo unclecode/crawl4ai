@@ -16,10 +16,20 @@ def fast_urljoin(base: str, url: str) -> str:
     if url.startswith(("http://", "https://", "mailto:", "//")):
         return url
     if url.startswith("/"):
-        # Handle absolute paths
-        if base.endswith("/"):
-            return base[:-1] + url
-        return base + url
+        # Root-absolute path: per RFC 3986 it replaces base's *entire* path,
+        # so it must be resolved against base's scheme://authority root rather
+        # than appended to base (appending keeps base's own path and yields a
+        # broken URL such as ".../guide.html/api" instead of ".../api" when
+        # base points at a sub-page). Fall back to urljoin for bases without a
+        # clean authority boundary (e.g. a query/fragment but no path).
+        scheme_sep = base.find("://")
+        if scheme_sep != -1:
+            authority_end = base.find("/", scheme_sep + 3)
+            if authority_end != -1:
+                return base[:authority_end] + url
+            if "?" not in base and "#" not in base:
+                return base + url
+        return urljoin(base, url)
     return urljoin(base, url)
 
 
