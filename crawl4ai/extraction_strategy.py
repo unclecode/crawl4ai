@@ -2470,7 +2470,7 @@ class JsonXPathExtractionStrategy(JsonElementExtractionStrategy):
 
     def _get_elements(self, element, selector: str):
         xpath = self._css_to_xpath(selector)
-        if not xpath.startswith("."):
+        if xpath.startswith("/"):
             xpath = "." + xpath
         return element.xpath(xpath)
 
