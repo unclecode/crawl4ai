@@ -1827,16 +1827,18 @@ class BrowserManager:
             self._release_page_from_use(page)
             # Decrement context refcount for the session's page
             should_close_context = False
+            refcount = -1
             async with self._contexts_lock:
                 sig = self._page_to_sig.pop(page, None)
                 if sig is not None and sig in self._context_refcounts:
                     self._context_refcounts[sig] = max(
                         0, self._context_refcounts[sig] - 1
                     )
+                    refcount = self._context_refcounts[sig]
                     # Only close the context if no other pages are using it
                     # (refcount dropped to 0) AND we own the context (not managed)
                     if not self.config.use_managed_browser:
-                        if self._context_refcounts.get(sig, 0) == 0:
+                        if refcount == 0:
                             self.contexts_by_config.pop(sig, None)
                             self._context_refcounts.pop(sig, None)
                             self._context_last_used.pop(sig, None)
@@ -1845,6 +1847,14 @@ class BrowserManager:
             if should_close_context:
                 await context.close()
             del self.sessions[session_id]
+
+            # If this session held the last reference to a context from an
+            # older browser version, drop its pending-cleanup entry (and, in
+            # managed mode, close the context) just like
+            # release_page_with_context() does. Otherwise the entry never
+            # drains and the next recycle waits out the 30 s safety timeout.
+            if sig is not None and refcount == 0:
+                await self._maybe_cleanup_old_browser(sig)
 
     def release_page(self, page):
         """
