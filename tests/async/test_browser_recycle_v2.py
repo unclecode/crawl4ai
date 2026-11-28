@@ -384,3 +384,41 @@ async def test_different_configs_get_separate_cleanup_tracking(srv):
 
         # Both configs should work fine
         assert bm._browser_version >= 2
+
+
+# ===================================================================
+# SECTION G — Sessions killed after a version bump
+# ===================================================================
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("managed", [False, True], ids=["playwright", "managed-isolated"])
+async def test_kill_session_drains_pending_cleanup(srv, managed):
+    """kill_session() on a session from an older browser version must drain its
+    _pending_cleanup entry, as release_page_with_context() does. Otherwise three
+    killed sessions fill the safety cap and the next recycle waits out the 30 s
+    timeout (and, in managed mode, the old context stays open until then)."""
+    cfg = BrowserConfig(
+        headless=True, verbose=False,
+        max_pages_before_recycle=1,
+        use_managed_browser=managed,
+        create_isolated_context=managed,
+    )
+
+    async with AsyncWebCrawler(config=cfg) as c:
+        bm = _bm(c)
+
+        for i in range(3):
+            run = CrawlerRunConfig(
+                cache_mode=CacheMode.BYPASS, verbose=False, session_id=f"s{i}",
+            )
+            await c.arun(url=_u(srv, i), config=run)
+            sig = next(iter(bm._pending_cleanup))  # the session's context is draining
+            await c.crawler_strategy.kill_session(f"s{i}")
+            assert sig not in bm._pending_cleanup
+            assert sig not in bm.contexts_by_config
+
+        assert bm._pending_cleanup == {}
+
+        run = CrawlerRunConfig(cache_mode=CacheMode.BYPASS, verbose=False)
+        # Without the drain, this waits out the 30 s safety-cap timeout.
+        await asyncio.wait_for(c.arun(url=_u(srv, 10), config=run), timeout=10)
